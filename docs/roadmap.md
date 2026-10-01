@@ -34,12 +34,13 @@ Open questions:
 - Where does the vault live and how does the CLI find it? (config file, env var, flag)
 - Embeddings for semantic search: local model or API? Default must work offline.
 - Minimum viable command set for v0.1.
+- When the GitHub API reports no license, should `magpie add` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
 
 ## 3. Note template + example vault
 Finalise [note-schema.md](note-schema.md), write `examples/vault/` with the [seed repositories](seed-repos.md), and create `examples/vault/tags.md` with a starter tag list.
-*Obsidian extras (optional):* the Templater template in `examples/vault/_templates/`.
-**Done when:** the example vault opens cleanly in Obsidian and every note validates against the schema.
+*Obsidian extras (optional):* the Templater template in `examples/vault/_templates/`; the example vault opens cleanly in Obsidian.
+**Done when:** every note in `examples/vault/` validates against the schema.
 
 ## 4. Dataview queries
 *Obsidian extras (optional).* Ready-made Dataview queries in `examples/vault/` (by kind, by tag, tried vs. not tried, recently added).
