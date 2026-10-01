@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Personal vault: never commit it. Only examples/vault/ belongs in this repo.
+vault/
+.obsidian/workspace*
+.obsidian/cache
+
+# Claude Code personal settings (project settings in .claude/settings.json ARE committed)
+.claude/settings.local.json
+
+# Private agent work log: never commit
+.worklog/
