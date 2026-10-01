@@ -6,7 +6,7 @@
 
 import { readFileSync } from "node:fs";
 
-const ALLOWED = new Set(["status", "diff", "log", "show", "blame", "ls-files"]);
+const ALLOWED = new Set(["status", "diff", "log", "show", "blame", "ls-files", "check-ignore"]);
 // Global git options whose value is the next word.
 const OPTS_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"]);
 // Words that can precede the real command.

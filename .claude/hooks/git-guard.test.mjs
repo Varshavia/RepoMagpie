@@ -56,6 +56,7 @@ const ALLOWED = [
   ["Bash", "git --no-pager diff --stat"],
   ["Bash", "git show HEAD:README.md && git blame CLAUDE.md && git ls-files"],
   ["Bash", "git --version"],
+  ["Bash", "git check-ignore -v .worklog/2026-10-01.md"],
   ["Bash", 'echo "$(git log -1 --format=%H)"'],
   ["PowerShell", '"Today: $(Get-Date)"; git log -1'],
   ["Bash", 'grep -rn "git commit" docs CLAUDE.md'],

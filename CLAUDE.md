@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. Read this file com
 
 The maintainer does all staging, commits and pushes by hand. You only write and edit files.
 
-- **The only git commands you may run:** `git status`, `git diff`, `git log`, `git show`, `git blame`, `git ls-files`.
+- **The only git commands you may run:** `git status`, `git diff`, `git log`, `git show`, `git blame`, `git ls-files`, `git check-ignore`.
 - **Every other git command is forbidden**, including `add`, `rm`, `mv`, `restore`, `clean`, `revert`, `cherry-pick`, `stash`, `config`, `init` and `worktree`.
 - This is enforced by a PreToolUse hook (`.claude/hooks/git-guard.mjs`, needs Node.js on `PATH`) and a deny list in `.claude/settings.json`. Never try to work around them.
 - Never add a `Co-Authored-By` line or any AI attribution anywhere.
