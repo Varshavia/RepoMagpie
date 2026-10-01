@@ -34,6 +34,8 @@ Before starting any task, read the documents relevant to it:
 | When you are… | Read |
 |---|---|
 | Starting any task | `docs/roadmap.md` (what step are we on?) |
+| Using or defining a domain term | `docs/glossary.md` |
+| Writing core, CLI, search, or MCP code | `docs/architecture.md` |
 | Making a design choice | `docs/vision.md`, `docs/decisions/` |
 | Touching the note format, templates, or parsers | `docs/note-schema.md` |
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
@@ -48,8 +50,8 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `.claude/` | Agent config: `settings.json` (git deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. |
 | `.worklog/` | Private agent work log, one file per day. Git-ignored. |
-| `docs/` | Vision, roadmap, note schema, standards, research, and `decisions/` (decision records). |
-| `examples/vault/` | Sample vault: the only place notes live in this repo. `_templates/` holds the note template. |
+| `docs/` | Vision, roadmap, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
+| `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `.gitignore` | Ignores secrets, build output, the personal vault, `.scratch/` and `.worklog/`. |
 | `AGENTS.md` | Points other coding agents to this file. |
 | `CLAUDE.md` | This rulebook. |

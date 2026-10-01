@@ -31,12 +31,14 @@ Most tools try to fix this by importing all your stars and letting AI summarize 
 |---|---|
 | [Vision](docs/vision.md) | Problem, audience, positioning, non-goals |
 | [Roadmap](docs/roadmap.md) | Ordered steps with acceptance criteria |
-| [Note schema](docs/note-schema.md) | The format of a journal entry |
+| [Note schema](docs/note-schema.md) | The format of a note |
+| [Glossary](docs/glossary.md) | What each term means |
+| [Architecture](docs/architecture.md) | Layers, data flow, storage |
 | [Competitive landscape](docs/competitors.md) | Existing tools and how RepoMagpie differs |
 | [Standards](docs/standards.md) | Agent Skills, skills.sh, DESIGN.md, MCP |
 | [Marketing](docs/marketing.md) | Launch and growth plan |
-| [Seed repositories](docs/seed-repos.md) | The first repositories reviewed for this project |
-| [Decisions](docs/decisions/) | Architecture decision records |
+| [Seed repositories](docs/seed-repos.md) | The first repositories explored for this project |
+| [Decisions](docs/decisions/) | Decision records |
 
 ## License
 
