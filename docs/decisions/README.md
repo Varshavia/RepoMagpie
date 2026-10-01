@@ -5,6 +5,8 @@ Short records of significant decisions. One file per decision: `NNNN-short-title
 Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **Decision**, **Consequences**.
 Never edit an accepted decision's substance — supersede it with a new record.
 
+**Editorial edit:** fixing typos, broken links, or terminology to match `docs/glossary.md`, without changing what was decided, why, or the consequences. Editorial edits are allowed on accepted records; anything else requires a new superseding record. Every editorial edit appends a line at the bottom of the record: `Editorial (YYYY-MM-DD): <what changed>. Substance unchanged.`
+
 | # | Decision | Status |
 |---|---|---|
 | 0001 | [Plain Markdown storage](0001-plain-markdown-storage.md) | accepted |

@@ -38,7 +38,8 @@ One definition per term. Docs, code and CLI output use these words with these me
 
 | Term | Definition |
 |---|---|
-| **decision record** | A short file in `docs/decisions/` that records one significant decision: status, context, decision, consequences. An accepted record is never edited; a new record supersedes it. |
+| **decision record** | A short file in `docs/decisions/` that records one significant decision: status, context, decision, consequences. An accepted record only gets editorial edits; any other change needs a new record that supersedes it. |
+| **editorial edit** | A change to an accepted decision record that fixes typos, broken links or terminology without changing its substance. Defined in [decisions/README.md](decisions/README.md). |
 | **example vault** | `examples/vault/`: the vault in this repository that holds sample notes, built from the seed repositories. It is the only place notes live in this repo. |
 | **git-guard** | The agent hook in `.claude/hooks/` that lets coding agents run only read-only git commands. |
 | **Obsidian extras** | Optional roadmap parts that need Obsidian (Templater template, Dataview queries). Notes, `magpie`, search and the agent skill work without them. |
