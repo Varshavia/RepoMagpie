@@ -36,7 +36,7 @@ Open questions:
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
 
 ## 3. Note template + example vault
-Finalise [note-schema.md](note-schema.md), create `templates/` for Obsidian Templater, and write `examples/vault/` with the [seed repositories](seed-repos.md).
+Finalise [note-schema.md](note-schema.md), create `examples/vault/_templates/` for Obsidian Templater, and write `examples/vault/` with the [seed repositories](seed-repos.md).
 **Done when:** the example vault opens cleanly in Obsidian and every note validates against the schema.
 
 ## 4. Dataview queries

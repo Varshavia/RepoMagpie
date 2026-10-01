@@ -3,10 +3,11 @@ name:
 url: 
 kind: 
 tags: []
+topics: []
 language: 
 license: 
 install: 
-explored: {{date:YYYY-MM-DD}}
+explored: <% tp.date.now("YYYY-MM-DD") %>
 tried: false
 rating: 
 status: inbox
