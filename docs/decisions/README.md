@@ -12,3 +12,4 @@ Never edit an accepted decision's substance — supersede it with a new record.
 | 0003 | [Personal vault lives outside the repo](0003-vault-outside-repo.md) | accepted |
 | 0004 | [English everywhere](0004-english-everywhere.md) | accepted |
 | 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | accepted |
+| 0006 | [One note per repository; skills are searchable lines](0006-skills-as-searchable-lines.md) | accepted |
