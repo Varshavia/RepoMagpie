@@ -6,8 +6,8 @@ Parts marked *Obsidian extras (optional)* need Obsidian. The core (notes, CLI, s
 
 | # | Step | Status |
 |---|---|---|
-| 0 | Repository skeleton | 🟡 in progress |
-| 1 | Agent instructions (`CLAUDE.md`) | 🟡 in progress |
+| 0 | Repository skeleton | ✅ done |
+| 1 | Agent instructions (`CLAUDE.md`) | ✅ done |
 | 2 | Spec and tech-stack decision | ⬜ |
 | 3 | Note template + example vault | ⬜ |
 | 4 | Dataview queries (no-code search), Obsidian extra | ⬜ |
