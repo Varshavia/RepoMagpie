@@ -1,6 +1,6 @@
 # Seed repositories
 
-The first repositories reviewed for this project (2026-10-01). They become the example vault in roadmap step 3. "When it's useful" lines below are **drafts** — the maintainer rewrites them in his own words before they become notes.
+The first repositories explored for this project (2026-10-01). They become the example vault in roadmap step 3. "When it's useful" lines below are **drafts** — the maintainer rewrites them in his own words before they become notes.
 
 ---
 

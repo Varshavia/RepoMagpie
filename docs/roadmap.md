@@ -2,7 +2,7 @@
 
 Each step leaves something usable on its own and should be committed in small pieces. A step is done only when its **acceptance criteria** are met. Update the status column as steps complete.
 
-Parts marked *Obsidian extras (optional)* need Obsidian. The core (notes, CLI, search, agent skill) must work without it.
+Parts marked *Obsidian extras (optional)* need Obsidian. Notes, the CLI, search and the agent skill must work without it.
 
 | # | Step | Status |
 |---|---|---|

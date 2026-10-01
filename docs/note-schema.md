@@ -39,7 +39,7 @@ The double dash keeps owner and repo distinct and avoids collisions between same
      This section is what search matches against. A note without it stays in `inbox`. -->
 
 ## Notable skills
-<!-- Only for skill-packs. The tool lists detected skills with nothing after the dash.
+<!-- Only for skill packs. The tool lists detected skills with nothing after the dash.
      Complete the ones worth remembering:
      - `skill-name` — when it's useful -->
 
