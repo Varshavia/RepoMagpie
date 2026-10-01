@@ -1,0 +1,68 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git branch:*)",
+      "Bash(git tag:*)",
+      "Bash(git stash:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
+      "Bash(git restore:*)",
+      "Bash(git clean:*)",
+      "Bash(git revert:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git config:*)",
+      "Bash(git init:*)",
+      "Bash(git worktree:*)",
+      "PowerShell(git commit:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git pull:*)",
+      "PowerShell(git merge:*)",
+      "PowerShell(git rebase:*)",
+      "PowerShell(git reset:*)",
+      "PowerShell(git checkout:*)",
+      "PowerShell(git switch:*)",
+      "PowerShell(git branch:*)",
+      "PowerShell(git tag:*)",
+      "PowerShell(git stash:*)",
+      "PowerShell(git remote:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(git rm:*)",
+      "PowerShell(git mv:*)",
+      "PowerShell(git restore:*)",
+      "PowerShell(git clean:*)",
+      "PowerShell(git revert:*)",
+      "PowerShell(git cherry-pick:*)",
+      "PowerShell(git config:*)",
+      "PowerShell(git init:*)",
+      "PowerShell(git worktree:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Monitor",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/git-guard.mjs"]
+          }
+        ]
+      }
+    ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
+}
