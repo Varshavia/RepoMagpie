@@ -9,19 +9,20 @@ The double dash keeps owner and repo distinct and avoids collisions between same
 
 ## Frontmatter
 
-| Field | Required | Type | Filled by | Notes |
+| Field | Required | Type | Owner | Notes |
 |---|---|---|---|---|
 | `name` | yes | string | tool | Display name |
 | `url` | yes | string | tool | Canonical GitHub URL |
-| `kind` | yes | enum | human (tool may suggest) | See below |
-| `tags` | yes | list | human (tool may suggest) | Lowercase, kebab-case, from the shared tag list |
+| `kind` | yes | enum | human (tool drafts at creation) | See below |
+| `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the shared tag list |
+| `topics` | no | list | tool | Raw GitHub topics; the source for tag suggestions |
 | `language` | no | string | tool | Primary language from GitHub |
-| `license` | no | string | tool | SPDX id, or `none` if no license file |
-| `install` | no | string | tool/human | One-line install command |
-| `explored` | yes | date | tool | Date the note was created (YYYY-MM-DD) |
-| `tried` | yes | bool | human | Have you actually run it? |
+| `license` | no | string | tool | SPDX id, `none` if no license file, or `mixed` if licensing differs per skill or file |
+| `install` | no | string | human (tool drafts at creation) | One-line install command |
+| `explored` | yes | date | tool | Date the note was created (YYYY-MM-DD); set once, never refreshed |
+| `tried` | yes | bool | human (default `false`) | Have you actually run it? |
 | `rating` | no | 1–5 | human | Leave empty until tried |
-| `status` | yes | enum | human | `inbox` (draft, not reviewed) or `reviewed` |
+| `status` | yes | enum | human (default `inbox`) | `inbox` (not yet reviewed) or `reviewed` |
 
 ### `kind` values
 
@@ -31,14 +32,15 @@ The double dash keeps owner and repo distinct and avoids collisions between same
 
 ```markdown
 ## What it does
-<!-- 1–3 factual sentences. The tool may draft this. -->
+<!-- 1–3 factual sentences. The tool may draft this at creation. -->
 
 ## When it's useful
 <!-- REQUIRED. Your own words. Concrete situations, one per bullet.
      This section is what search matches against. A note without it stays in `inbox`. -->
 
 ## Notable skills
-<!-- Only for skill-packs. One line per skill worth remembering:
+<!-- Only for skill-packs. The tool lists detected skills with nothing after the dash.
+     Complete the ones worth remembering:
      - `skill-name` — when it's useful -->
 
 ## How to use
@@ -53,10 +55,15 @@ The double dash keeps owner and repo distinct and avoids collisions between same
 
 ## Rules
 
-1. A note moves from `inbox` to `reviewed` only when "When it's useful" has at least one bullet written by the user.
-2. The tool may fill or refresh **tool**-owned fields; it must never overwrite human-owned fields or body sections other than "What it does" in a fresh draft.
-3. Tags come from a single shared list (`<vault>/tags.md`) so the same idea isn't spelled three ways.
+1. A note moves from `inbox` to `reviewed` only when "When it's useful" has at least one bullet written by the user. `inbox` is the single "not yet reviewed" state for every source: manual add, CLI add, or any future import.
+2. Ownership:
+   - **Tool-owned:** `name`, `url`, `language`, `license`, `topics`, `explored`. `explored` is set once at creation; the tool may refresh the others.
+   - **Human-owned:** everything else, including all body sections.
+   - **At creation only**, the tool may write a draft of `kind`, `tags`, `install` and "What it does". It also writes fixed defaults: `status: inbox`, `tried: false`, `rating` empty, and the other sections empty apart from detected skill lines (rule 3).
+   - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills". It never edits, reorders or removes existing lines.
+3. "Notable skills": the tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
+4. Tags come from a single shared list (`<vault>/tags.md`) so the same idea isn't spelled three ways.
 
 ## Example
 
-See [templates/repo-note.md](../templates/repo-note.md) for the blank template and [seed-repos.md](seed-repos.md) for content to turn into example notes.
+See [examples/vault/_templates/repo-note.md](../examples/vault/_templates/repo-note.md) for the blank template and [seed-repos.md](seed-repos.md) for content to turn into example notes.
