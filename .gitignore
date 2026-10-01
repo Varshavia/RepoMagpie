@@ -24,6 +24,7 @@ __pycache__/
 
 # Personal vault: never commit it. Only examples/vault/ belongs in this repo.
 vault/
+!examples/vault/
 .obsidian/workspace*
 .obsidian/cache
 
