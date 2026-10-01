@@ -33,3 +33,6 @@ vault/
 
 # Private agent work log: never commit
 .worklog/
+
+# Agent scratch space: never commit
+.scratch/
