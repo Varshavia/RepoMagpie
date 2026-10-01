@@ -28,7 +28,7 @@ Before starting any task, read the documents relevant to it:
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
 | Writing README, docs, or anything user-facing | `docs/vision.md`, `docs/marketing.md` |
 
-If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, update the document (or add a new decision record) as part of the same task.
+If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, record it as part of the same task: ordinary docs are updated in place; accepted decision records are never edited, they are superseded by a new record.
 
 ## 3. Working principles
 

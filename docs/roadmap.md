@@ -2,13 +2,15 @@
 
 Each step leaves something usable on its own and should be committed in small pieces. A step is done only when its **acceptance criteria** are met. Update the status column as steps complete.
 
+Parts marked *Obsidian extras (optional)* need Obsidian. The core (notes, CLI, search, agent skill) must work without it.
+
 | # | Step | Status |
 |---|---|---|
 | 0 | Repository skeleton | 🟡 in progress |
 | 1 | Agent instructions (`CLAUDE.md`) | 🟡 in progress |
 | 2 | Spec and tech-stack decision | ⬜ |
 | 3 | Note template + example vault | ⬜ |
-| 4 | Dataview queries (no-code search) | ⬜ |
+| 4 | Dataview queries (no-code search), Obsidian extra | ⬜ |
 | 5 | `magpie add <url>` | ⬜ |
 | 6 | Search (keyword → semantic) | ⬜ |
 | 7 | Agent layer (`SKILL.md`, skills.sh) | ⬜ |
@@ -30,25 +32,25 @@ Answer the open questions below and record each answer as a decision record.
 Open questions:
 - Implementation language: TypeScript (Node, publishable to npm, matches the skills ecosystem) or Python?
 - Where does the vault live and how does the CLI find it? (config file, env var, flag)
-- Inbox flow: is there a "seen but not yet reviewed" state?
 - Embeddings for semantic search: local model or API? Default must work offline.
 - Minimum viable command set for v0.1.
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
 
 ## 3. Note template + example vault
-Finalise [note-schema.md](note-schema.md), create `examples/vault/_templates/` for Obsidian Templater, and write `examples/vault/` with the [seed repositories](seed-repos.md).
+Finalise [note-schema.md](note-schema.md), write `examples/vault/` with the [seed repositories](seed-repos.md), and create `examples/vault/tags.md` with a starter tag list.
+*Obsidian extras (optional):* the Templater template in `examples/vault/_templates/`.
 **Done when:** the example vault opens cleanly in Obsidian and every note validates against the schema.
 
 ## 4. Dataview queries
-Ready-made Dataview queries in `examples/vault/` (by kind, by tag, tried vs. not tried, recently added).
+*Obsidian extras (optional).* Ready-made Dataview queries in `examples/vault/` (by kind, by tag, tried vs. not tried, recently added).
 **Done when:** a user can answer "which skill packs have I tried?" without writing any code.
 
 ## 5. `magpie add <url>`
-Fetch description, language, license, topics, stars and README from the GitHub API; detect `SKILL.md` files; write a draft note with an empty "When it's useful" section.
-**Done when:** running it on every seed repository produces valid drafts, and it never overwrites an existing note.
+Fetch description, language, license, topics and README from the GitHub API; turn topics into tag suggestions; detect `SKILL.md` files and write one skill line per skill; write a draft note with an empty "When it's useful" section. A skill URL creates or updates the parent repository note ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
+**Done when:** running it on every seed repository produces valid drafts, and it never overwrites human-owned fields or sections of an existing note.
 
 ## 6. Search
-`magpie search "<query>"`. Keyword (frontmatter + text) first; semantic search over "What it does" and "When it's useful" second.
+`magpie search "<query>"`. Keyword (frontmatter + text) first; semantic search over "What it does" and "When it's useful" second. Each completed skill line is its own result.
 **Done when:** for a fixed set of 10 test questions, the expected note is in the top 3.
 
 ## 7. Agent layer

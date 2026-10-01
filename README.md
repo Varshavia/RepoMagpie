@@ -12,8 +12,8 @@ Most tools try to fix this by importing all your stars and letting AI summarize 
 
 ## How it will work
 
-1. You explore a repository (or a single agent skill inside one).
-2. `magpie add <url>` drafts a Markdown note with the facts it can fetch: description, language, license, topics.
+1. You explore a repository, or a single agent skill inside one.
+2. `magpie add <url>` drafts a Markdown note for the repository with the facts it can fetch: description, language, license, topics, and one line per agent skill it finds. A skill URL adds that skill's line to its repository's note.
 3. You fill in the part only you can write: *when is this useful?*
 4. Later, you — or your coding agent — ask: *"what do I have for browser testing?"* and get answers from your own notes.
 
@@ -21,7 +21,7 @@ Most tools try to fix this by importing all your stars and letting AI summarize 
 
 - **Plain Markdown.** Notes are files with YAML frontmatter. No database, no lock-in. Open them in Obsidian, VS Code, or anything else, and version them with git.
 - **You write the "when it's useful" part.** AI can draft facts; judgment stays human.
-- **Skill-level granularity.** One repository can contain dozens of agent skills. RepoMagpie records the skills individually, because that's what you'll actually search for.
+- **Skill-level search.** One repository can contain dozens of agent skills. Each skill gets a line in its repository's note, and search returns that line as its own result, because a skill is what you'll actually search for.
 - **Agent-native.** A CLI plus a `SKILL.md`, following the open [Agent Skills](https://agentskills.io) standard, so any compatible coding agent can query your journal.
 - **Your journal stays yours.** The tool is open source; your personal vault lives outside this repository.
 

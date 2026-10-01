@@ -54,7 +54,7 @@ The first repositories reviewed for this project (2026-10-01). They become the e
 
 ## vercel-labs/agent-skills
 - **URL:** https://github.com/vercel-labs/agent-skills
-- **Kind:** skill-pack · **License:** check per skill
+- **Kind:** skill-pack · **License:** MIT (stated in the README and in 4 of 9 `SKILL.md` files; no other license declared. There is no LICENSE file, so GitHub detects none.)
 - **What it does:** Vercel's official skills: React/Next.js performance rules, UI/accessibility audit, writing guidelines, Vercel deploy and optimisation.
 - **Notable skills:** `react-best-practices`, `web-design-guidelines`, `writing-guidelines`, `composition-patterns`, `deploy-to-vercel`.
 - **Install:** `npx skills add vercel-labs/agent-skills`

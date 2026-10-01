@@ -27,7 +27,7 @@ RepoMagpie starts from **"you understand it, the machine remembers it."**
 | Entry point | Bulk import of all stars | One deliberate entry at a time |
 | Who writes the summary | AI | Facts: tool. *When it's useful*: you |
 | Storage | App database / plugin data | Plain Markdown files you own |
-| Granularity | Repository | Repository **and** individual skills |
+| Granularity | Repository | Repository, plus a searchable line per skill |
 | Primary interface | GUI app | CLI + `SKILL.md` (agent-native), any Markdown editor |
 
 ## Why "magpie"
@@ -36,7 +36,7 @@ Magpies are known for collecting shiny things and keeping them in their nest. Th
 
 ## Non-goals
 
-- **Not a star importer.** We may offer an import later as an *inbox*, but nothing becomes a journal entry without a human-written "when it's useful".
+- **Not a star importer.** We may offer an import later. Imported notes land as `status: inbox`, and none becomes `reviewed` without a human-written "when it's useful".
 - **Not a hosted service.** No accounts, no server, no telemetry by default.
 - **Not tied to Obsidian.** The vault is Obsidian-friendly, but Obsidian is optional.
 - **Not a skill installer.** Tools like the `skills` CLI already install skills. RepoMagpie remembers *which* ones are worth installing and *when*.
