@@ -17,4 +17,7 @@ We choose CLI first for **simplicity and portability**, not because of the token
 - CLI output must be concise and parseable (consider a `--json` flag).
 - Business logic must live in a core module, not in CLI argument handling, so MCP can reuse it.
 
+See also [0008](0008-machine-readable-output.md): every command offers a machine-readable mode.
+
 Editorial (2026-10-02): "The core is a CLI" changed to "The primary interface is a CLI" to match the glossary meaning of core. Substance unchanged.
+Editorial (2026-10-03): added the "See also 0008" line. Substance unchanged.

@@ -15,14 +15,25 @@ agent without a shell ─► MCP server ────────┴─► core �
 
 | Layer | Job | When |
 |---|---|---|
-| **core** | Reads and writes notes, applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index. | Steps 5–6 |
-| **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output. A `--json` flag is under consideration (decision 0002). | Steps 5–6 |
-| **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | Step 7 |
-| **mcp** | Optional MCP server over the same core, for clients without a shell. | Step 7 (optional) |
+| **core** | Reads and writes notes, applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index. | v0.1 |
+| **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
+| **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
+| **mcp** | Optional MCP server over the same core, for clients without a shell. | v0.1 (optional) |
 
 Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
 
 Implementation language: **TBD (roadmap step 2)**.
+
+### Future components
+
+Planned parts of the core and cli layers, by target release. Details: [product](product.md) and [ideas](ideas.md).
+
+| Component | Layer | Job | Release |
+|---|---|---|---|
+| **graph generator** | core | Builds nodes and edges from the notes (repos, completed skill lines, tags, typed relations), with status, drift and `tried` for each node. Nothing is stored that can't be rebuilt (decision 0001). | v0.2 |
+| `magpie graph` | cli | Writes the graph as one self-contained HTML file with the data embedded as JSON. | v0.2 |
+| **publish pipeline** | core | Selects notes with `public: true` only, and builds the nest data: note list, graph and `/uses` view. | v0.3 |
+| `magpie publish` | cli | Writes the nest as a static site. | v0.3 |
 
 ## Storage
 
@@ -34,7 +45,7 @@ Implementation language: **TBD (roadmap step 2)**.
 ## Data flow: `magpie add <url>`
 
 1. **Resolve the URL.** A repository URL names the repository. A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-2. **Fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files (roadmap step 5). How the GitHub token, if any, is supplied: **TBD (roadmap step 2)**. What to record when GitHub reports no license: **TBD (roadmap step 2)**.
+2. **Fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files (roadmap v0.1). How the GitHub token, if any, is supplied: **TBD (roadmap step 2)**. What to record when GitHub reports no license: **TBD (roadmap step 2)**.
 3. **No note yet:** write a new note with:
    - tool-owned fields;
    - drafts of `kind`, `tags` (suggested from topics), `install` and "What it does";
@@ -47,11 +58,11 @@ Implementation language: **TBD (roadmap step 2)**.
 ## Data flow: `magpie search "<query>"`
 
 1. **Get the index:** build it from the notes, or reuse a fresh one (strategy **TBD (roadmap step 2)**).
-2. **Match** (roadmap step 6):
+2. **Match** (roadmap v0.1):
    - first, keyword search over frontmatter and text;
    - then, semantic search over "What it does" and "When it's useful".
 3. **Results** are notes and completed skill lines (decision 0006). Empty skill lines are ignored (note schema, rule 3). Notes in `inbox` rank below `reviewed` notes ([decision 0005](decisions/0005-human-written-usefulness.md)).
-4. **Output:** short and parseable, like every `magpie` command (decision 0002).
+4. **Output:** short and parseable, like every `magpie` command (decision 0002), with a machine-readable mode (decision 0008).
 
 ## Config resolution
 

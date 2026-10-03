@@ -1,6 +1,6 @@
 # Note schema (draft, v0)
 
-One Markdown file per repository, with YAML frontmatter. Status: **draft** — finalised in roadmap step 3.
+One Markdown file per repository, with YAML frontmatter. Status: **draft** — finalised in roadmap v0.1 (example vault).
 
 ## File location and name
 
@@ -63,6 +63,19 @@ The double dash keeps owner and repo distinct and avoids collisions between same
    - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills". It never edits, reorders or removes existing lines.
 3. "Notable skills": the tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
 4. Tags come from a single shared list (`<vault>/tags.md`) so the same idea isn't spelled three ways.
+
+## Planned fields (not active)
+
+These fields are planned for later releases ([ideas](ideas.md)). They are **not** part of the active schema or the template. Each joins the frontmatter table above when its release starts.
+
+| Field | Owner | Type | For | Target |
+|---|---|---|---|---|
+| `packages` | tool | list of `ecosystem:name` | proactive recall | v0.1 |
+| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
+| `works_with` | human | list of wikilinks | typed edges | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
+| `reviewed_commit` | tool | commit SHA | drift | v0.2 |
+| `public` | human | bool, default `false` | nests | v0.3 |
+| `last_resurfaced` | tool | date | digest | v0.4 |
 
 ## Example
 
