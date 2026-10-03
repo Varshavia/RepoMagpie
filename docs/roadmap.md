@@ -109,10 +109,11 @@ The first public release: capture what you learned, find it again, and see it be
 
 ### Journals and example vault
 - [x] Finalise [note-schema.md](note-schema.md) with the format from the step 2 spec (v1).
-- [ ] Personal journal: a folder outside any repository, private by default ([decision 0013](decisions/0013-two-journal-scopes.md)).
-- [ ] Project journal: `.magpie/` inside a project repository, committed with the code.
-- [ ] Write example notes in `examples/vault/` from the [seed repositories](seed-repos.md).
-- [ ] Create `examples/vault/tags.md` with a starter tag list.
+- [x] Personal journal: a folder outside any repository, private by default ([decision 0013](decisions/0013-two-journal-scopes.md)). Resolution in `src/core/journals.ts`.
+- [x] Project journal: `.magpie/` inside a project repository, committed with the code. Discovery in `src/core/journals.ts`.
+- [x] Core note handling in `src/core/`: identity (PURLs and file names), lenient read and validation, canonical and round-trip-safe writing.
+- [x] Write example notes in `examples/vault/` from the [seed repositories](seed-repos.md), with the maintainer's Verdicts.
+- [x] Create `examples/vault/tags.md` with a starter tag list.
 - [x] *Obsidian extra (optional):* the Templater template in `examples/vault/_templates/` matches the final schema (v1).
 
 **Done when:** every note in `examples/vault/` validates against the schema.

@@ -98,5 +98,5 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 
 ([Decision 0016](decisions/0016-journal-locations-and-config.md), [spec](spec.md) section 3.)
 - **Personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in `~/.magpie/config.yaml` > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`).
-- **Project journal:** `--project <dir>`, or the first `.magpie/` found walking up from the working directory, stopping at the git root or the filesystem root. The personal journal's folder is never taken as a project journal.
+- **Project journal:** `--project <dir>` (the project root, like `git -C`, or its `.magpie` folder), or the first `.magpie/` found walking up from the working directory, stopping at the git root or the filesystem root. The personal journal's folder is never taken as a project journal.
 - **Secrets** such as a GitHub token come only from environment variables (`GITHUB_TOKEN`). Agents working on this repository must read secrets from environment variables only (CLAUDE.md, section 10).
