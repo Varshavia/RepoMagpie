@@ -9,7 +9,7 @@ The maintainer does all staging, commits and pushes by hand, and every GitHub wr
 - **The only git commands you may run:** `git status`, `git diff`, `git log`, `git show`, `git blame`, `git ls-files`, `git check-ignore`.
 - **Every other git command is forbidden**, including `add`, `rm`, `mv`, `restore`, `clean`, `revert`, `cherry-pick`, `stash`, `config`, `init` and `worktree`.
 - **The only gh commands you may run:** `gh repo view`, `gh issue list`, `gh issue view`, `gh pr list`, `gh pr view`, `gh release list`, `gh release view`, `gh auth status` (without `--show-token`), and `gh api` with GET only: no `-X`/`--method` other than GET, and no `-f`, `-F`, `--field`, `--raw-field` or `--input`. Every other gh command is forbidden. `gh` runs with the maintainer's GitHub credentials.
-- This is enforced by a PreToolUse hook (`.claude/hooks/git-guard.mjs`, needs Node.js on `PATH`) and, for git, a deny list in `.claude/settings.json`. Never try to work around them.
+- This is enforced by a PreToolUse hook (`.claude/hooks/git-guard.mjs`, needs Node.js on `PATH`). The hook is the real guard. The deny list in `.claude/settings.json` is a partial backup layer: it matches only command prefixes and covers only the most damaging git and gh commands, in case the hook can't run (for example, Node.js is missing). Never try to work around either.
 - **Write and edit files with the Edit/Write tools**, never with shell heredocs or echo redirection. git-guard scans heredoc text as commands on purpose: a heredoc fed to an interpreter (`bash <<EOF`) runs its body. Don't change that.
 - Never add a `Co-Authored-By` line or any AI attribution anywhere.
 
@@ -95,6 +95,9 @@ After two failed attempts at the same problem, stop. Report what you tried, what
 - Batch your questions into one message and number them.
 - For each question, give the options and your recommendation.
 - Never ask what the docs already answer. Point to the doc instead.
+- **Minor questions** (wording, file placement, test details, small consistency fixes inside the current piece's scope): apply your own recommendation and keep going. List each one under "Decisions I made" in your report, and in the work log entry's "Decisions & assumptions" line.
+- **Stop and ask only for:** product decisions, anything that changes the meaning of a decision record, security-related changes beyond what the piece asked, scope expansion beyond the current piece, or anything irreversible.
+- Either way, still stop after every piece with the file list and a commit message.
 
 ## 7. Definition of done
 
