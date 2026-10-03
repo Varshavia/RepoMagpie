@@ -1,6 +1,6 @@
 # Architecture
 
-How RepoMagpie fits together. Nothing is built yet. Anything not decided is marked **TBD (roadmap step 2)**. Terms are defined in the [glossary](glossary.md).
+How RepoMagpie fits together. Nothing is built yet; v0.1 is built from the [spec](spec.md). Terms are defined in the [glossary](glossary.md).
 
 ## Layers
 
@@ -20,12 +20,31 @@ agent without a shell ─► MCP server ────────┴─► core �
 | **core** | Reads and writes notes in both journals ([decision 0013](decisions/0013-two-journal-scopes.md)), applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index, and answers recall. | v0.1 |
 | **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
 | **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
-| **hook** | An agent hook that calls `magpie recall` before a package install. Contains no logic. Claude Code first ([ideas](ideas.md), idea 1). | v0.1 |
+| **hook** | The Claude Code adapter (`magpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never blocks and fails open ([spec](spec.md), section 6). | v0.1 |
 | **mcp** | Optional MCP server over the same core, for clients without a shell. | later |
 
 Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
 
-Implementation language: **TBD (roadmap step 2)**.
+Implementation: TypeScript on Node.js, ESM ([decision 0015](decisions/0015-typescript-on-node.md)); libraries in the [spec](spec.md), section 9.
+
+### Module layout
+
+```
+src/
+  core/        journals: discovery and config (decision 0016)
+               notes: lenient read, strict write, round-trip-safe frontmatter edits
+               identity: PURL resolution and file names (decision 0017)
+               index: build, cache and query (MiniSearch)
+               match: recall and suggest rules
+               github: repository metadata and SKILL.md detection
+  cli/         one module per command; human and --json output
+  hook/        claude-code.ts: stdin JSON → install detection → recall → stdout JSON
+skill/
+  SKILL.md     no code
+test/          node:test; fixture journals; no network
+```
+
+`cli/` and `hook/` import from `core/` only. `core/` never prints and never reads `process.argv`.
 
 ### Future components
 
@@ -41,42 +60,43 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 ## Storage
 
 - **Notes** are the only source of truth: plain Markdown with YAML frontmatter ([decision 0001](decisions/0001-plain-markdown-storage.md)).
-- **Journals:** a personal journal outside any repository, and a project journal in `.magpie/` inside a project repository, with the same format ([decision 0013](decisions/0013-two-journal-scopes.md)). The current draft layout is `<journal>/repos/<owner>--<repo>.md` for notes and `<journal>/tags.md` for the tag list ([note schema](note-schema.md)). How notes are identified (by package or by repository) is redesigned in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)).
-- **Search index:** a derived cache. It can be deleted and rebuilt from the notes at any time (decision 0001). Where it is stored and in what format: **TBD (roadmap step 2)**.
-- **Embeddings** for semantic search: local model or API is **TBD (roadmap step 2)**. The default must work offline.
+- **Journals:** a personal journal outside any repository, and a project journal in `.magpie/` inside a project repository, with the same format ([decision 0013](decisions/0013-two-journal-scopes.md)). Layout: `<journal>/notes/<file>.md` for notes, with the file name derived from the note's PURL (`npm--pdfkit.md`, `github--owner--repo.md`), and `<journal>/tags.md` for the tag list ([note schema](note-schema.md), [decision 0017](decisions/0017-package-identity-purl.md)).
+- **Search index:** a derived cache in `<journal>/.cache/`, one per journal, git-ignored (the project journal gets a `.magpie/.gitignore` with `.cache/`). It is rebuilt when a note file is newer than the index, and can be deleted at any time (decision 0001).
+- **Embeddings:** not in v0.1 ([spec](spec.md), section 10). Semantic search is planned for v0.3; the default must work offline.
 
 ## Data flow: recall before an install
 
-1. **The hook fires.** In Claude Code, a `PreToolUse` hook sees a shell command such as `npm install pdfkit` and calls `magpie recall` with the package names.
-2. **Look up notes** for those packages in the personal and project journals.
-3. **Inform, never block.** If a note matches, the hook passes its verdict to the agent and the user and lets the command run. If nothing matches, it stays silent.
-4. **Skill mode** in other clients: `SKILL.md` tells the agent to run `magpie recall <package>` itself before installing.
-
-How package names map to notes, and the output format: **TBD (roadmap step 2)**.
+1. **The hook fires.** In Claude Code, a `PreToolUse` hook on the `Bash` or `PowerShell` tool runs `magpie hook claude-code` with the tool call as JSON on stdin.
+2. **Find installs.** The hook splits the command line the way git-guard does and picks out install commands and their package names ([spec](spec.md), section 6).
+3. **Look up notes** for those packages in the project and personal journals: an exact PURL match first, then a name-only match, marked as lower confidence ([spec](spec.md), section 5).
+4. **Inform, never block.** If a note matches, the hook returns its Verdict as `additionalContext` for the agent and `systemMessage` for the user, and sets no permission decision. If nothing matches, or anything fails, it prints nothing and exits 0.
+5. **Skill mode** in other clients: `SKILL.md` tells the agent to run `magpie recall <package>` itself before installing.
 
 ## Data flow: `magpie note <name-or-url> "text"`
 
 `magpie import <file>` runs the same flow once per line ([decision 0010](decisions/0010-v0-1-scope.md)).
 
-1. **Resolve the target.** A name refers to a note directly (how notes are identified: **TBD (roadmap step 2)**). A repository URL names the repository. A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-2. **URL only, fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files. How the GitHub token, if any, is supplied: **TBD (roadmap step 2)**. What to record when GitHub reports no license: **TBD (roadmap step 2)**.
+1. **Resolve the target** to a PURL: a URL, a PURL, or a bare name typed by the nearest manifest ([spec](spec.md), section 4). A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
+2. **URL only, fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
 3. **No note yet:** write a new note with:
-   - the user's text, as the verdict (and Use when / Avoid when, if the text has them);
-   - for a URL: tool-owned fields, drafts of `kind`, `tags` (suggested from topics), `install` and "What it does", and one empty skill line per detected skill;
-   - defaults: `status: inbox`, `tried: false`.
-4. **Note exists:** append skill lines for skills not listed yet. Never change human-owned fields or sections (note schema, rule 2). What happens to new text for an existing note, and whether tool-owned fields are refreshed: **TBD (roadmap step 2)**.
-5. **Search index:** whether `note` updates it right away or search rebuilds it on demand: **TBD (roadmap step 2)**.
+   - the user's text, as the Verdict (note schema, rule 7);
+   - for a URL: tool-owned fields, drafts of `kind`, `tags` (suggested from topics), "What it does" and "Use when" ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
+   - defaults: `tried: false`, and `status` per note schema rule 1 (`reviewed` once the user gave a Verdict, otherwise `inbox`).
+4. **Note exists:** append skill lines for skills not listed yet, and refresh tool-owned fields. Write the Verdict only if it is empty; never overwrite one ([spec](spec.md), section 2). Never change other human-owned fields or sections (note schema, rule 2).
+5. **Search index:** marked stale; the next command that needs it rebuilds it.
 
 ## Data flow: `magpie search "<query>"`
 
-1. **Get the index:** build it from the notes, or reuse a fresh one (strategy **TBD (roadmap step 2)**).
+1. **Get the index:** reuse the cached index of each journal if it is newer than every note; otherwise rebuild it.
 2. **Match**, across both journals:
    - keyword search over frontmatter and text (roadmap v0.1);
    - semantic search over the note text (roadmap v0.3).
-3. **Results** are notes and completed skill lines (decision 0006). Empty skill lines are ignored (note schema, rule 3). Notes in `inbox` rank below `reviewed` notes ([decision 0005](decisions/0005-human-written-usefulness.md)).
+3. **Results** are notes and completed skill lines (decision 0006). Empty skill lines are ignored (note schema, rule 4). Notes in `inbox` rank below `reviewed` notes ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)).
 4. **Output:** short and parseable, like every `magpie` command (decision 0002), with a machine-readable mode (decision 0008).
 
 ## Config resolution
 
-- **Journal locations:** how `magpie` finds the personal journal and the project journal (config file, environment variable, flag, current directory) and in which order: **TBD (roadmap step 2)**.
-- **Secrets** such as a GitHub token: **TBD (roadmap step 2)**. Agents working on this repository must read secrets from environment variables only (CLAUDE.md, section 10).
+([Decision 0016](decisions/0016-journal-locations-and-config.md), [spec](spec.md) section 3.)
+- **Personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in `~/.magpie/config.yaml` > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`).
+- **Project journal:** `--project <dir>`, or the first `.magpie/` found walking up from the working directory, stopping at the git root or the filesystem root. The personal journal's folder is never taken as a project journal.
+- **Secrets** such as a GitHub token come only from environment variables (`GITHUB_TOKEN`). Agents working on this repository must read secrets from environment variables only (CLAUDE.md, section 10).
