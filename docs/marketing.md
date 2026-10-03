@@ -17,11 +17,11 @@ Lead with the habit, not the features: *every day, find one repo worth keeping, 
 | Social preview image | Before launch | GitHub repo settings → Social preview. |
 | Logo | Before launch | A magpie. Simple, works at 16px. |
 | "Good first issue" set | Before launch | 5 small, well-described issues. |
-| skills.sh badge | Step 7 | Install-count social proof. |
+| skills.sh badge | v0.1 (agent skill) | Install-count social proof. |
 
 ## The daily content engine: "Magpie find of the day"
 
-From roadmap step 3 onward, the maintainer posts one short item per working day (X, LinkedIn, dev.to):
+Once the example vault exists (roadmap v0.1), the maintainer posts one short item per working day (X, LinkedIn, dev.to):
 - repo name + link
 - one sentence: when it's useful
 - optional: a notable skill inside it

@@ -31,6 +31,11 @@ Most tools try to fix this by importing all your stars and letting AI summarize 
 |---|---|
 | [Vision](docs/vision.md) | Problem, audience, positioning, non-goals |
 | [Roadmap](docs/roadmap.md) | Ordered steps with acceptance criteria |
+| [Ideas](docs/ideas.md) | Approved ideas beyond the first commands, with target releases |
+| [Product](docs/product.md) | The five surfaces, illustrative CLI output, graph specification |
+| [Release process](docs/release.md) | Versions, tags, changelog, who does what |
+| [Changelog](CHANGELOG.md) | User-visible changes per release |
+| [Validation](docs/validation.md) | Developer interviews, competitor review, demo scenario |
 | [Note schema](docs/note-schema.md) | The format of a note |
 | [Glossary](docs/glossary.md) | What each term means |
 | [Architecture](docs/architecture.md) | Layers, data flow, storage |
@@ -39,6 +44,11 @@ Most tools try to fix this by importing all your stars and letting AI summarize 
 | [Marketing](docs/marketing.md) | Launch and growth plan |
 | [Seed repositories](docs/seed-repos.md) | The first repositories explored for this project |
 | [Decisions](docs/decisions/) | Decision records |
+
+## Contributing
+
+Issues and ideas are welcome. Pull requests are not accepted yet. See [CONTRIBUTING.md](CONTRIBUTING.md).
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 

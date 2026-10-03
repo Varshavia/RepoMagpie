@@ -1,6 +1,6 @@
 # Seed repositories
 
-The first repositories explored for this project (2026-10-01). They become the example vault in roadmap step 3. "When it's useful" lines below are **drafts** — the maintainer rewrites them in his own words before they become notes.
+The first repositories explored for this project (2026-10-01). They become the example vault in roadmap v0.1. "When it's useful" lines below are **drafts** — the maintainer rewrites them in his own words before they become notes.
 
 ---
 
@@ -35,7 +35,7 @@ The first repositories explored for this project (2026-10-01). They become the e
 - **What it does:** Playwright browser automation as a CLI with an accompanying skill, designed for coding agents.
 - **When it's useful (draft):** letting an agent test a web UI end-to-end and take screenshots.
 - **Install:** `npm install -g @playwright/cli@latest` then `playwright-cli install --skills`
-- **Role in RepoMagpie:** reference design for "CLI + SKILL.md" (decision 0002); UI testing in step 8.
+- **Role in RepoMagpie:** reference design for "CLI + SKILL.md" (decision 0002); testing the `magpie graph` HTML (v0.2).
 
 ## Leonxlnx/taste-skill
 - **URL:** https://github.com/Leonxlnx/taste-skill
@@ -43,14 +43,14 @@ The first repositories explored for this project (2026-10-01). They become the e
 - **What it does:** Frontend design skills that push agents away from generic, templated-looking UI. Scoped to landing pages, portfolios and redesigns — explicitly not dashboards or data tables.
 - **Notable skills:** `taste-skill`, `redesign-skill`, `minimalist-skill`, `brutalist-skill`, `image-to-code-skill`.
 - **Install:** `npx skills add Leonxlnx/taste-skill`
-- **Role in RepoMagpie:** landing page / project website at launch (step 9), not the app UI.
+- **Role in RepoMagpie:** landing page / project website at launch (v0.1), not the HTML surfaces.
 
 ## VoltAgent/awesome-design-md
 - **URL:** https://github.com/VoltAgent/awesome-design-md
 - **Kind:** awesome-list · **License:** MIT
 - **What it does:** ~70 ready-made `DESIGN.md` files extracted from real sites (Linear, Notion, Raycast, Vercel, Supabase…).
 - **When it's useful (draft):** giving an agent a consistent visual language before it builds UI.
-- **Role in RepoMagpie:** reference when writing our own `DESIGN.md` (step 8).
+- **Role in RepoMagpie:** reference when writing our own `DESIGN.md` (v0.2).
 
 ## vercel-labs/agent-skills
 - **URL:** https://github.com/vercel-labs/agent-skills
@@ -58,7 +58,7 @@ The first repositories explored for this project (2026-10-01). They become the e
 - **What it does:** Vercel's official skills: React/Next.js performance rules, UI/accessibility audit, writing guidelines, Vercel deploy and optimisation.
 - **Notable skills:** `react-best-practices`, `web-design-guidelines`, `writing-guidelines`, `composition-patterns`, `deploy-to-vercel`.
 - **Install:** `npx skills add vercel-labs/agent-skills`
-- **Role in RepoMagpie:** `web-design-guidelines` for UI review (step 8); `writing-guidelines` possibly for docs.
+- **Role in RepoMagpie:** `web-design-guidelines` for reviewing the HTML surfaces (v0.2); `writing-guidelines` possibly for docs.
 
 ## open-lakehouse/open-lakehouse
 - **URL:** https://github.com/open-lakehouse/open-lakehouse

@@ -9,7 +9,7 @@ What we adopt, why, and how firmly. Researched October 2026.
 - Progressive disclosure: agents load only the short description until the skill is needed.
 
 **For RepoMagpie:**
-- We ship our own `SKILL.md` that teaches agents to call the `magpie` CLI (roadmap step 7).
+- We ship our own `SKILL.md` that teaches agents to call the `magpie` CLI (roadmap v0.1).
 - The note schema treats skills as first-class: we detect `SKILL.md` files when adding a repo and list them under "Notable skills".
 
 ## skills.sh and the `skills` CLI — **distribute through**
@@ -28,7 +28,7 @@ See [decision 0002](decisions/0002-cli-first.md). Summary: the Playwright team r
 - Google's open format (Apache 2.0, from Stitch) for describing a design system to AI agents: YAML tokens plus prose rationale. Still alpha; Google says to expect changes.
 - Ready-made examples: <https://github.com/VoltAgent/awesome-design-md>.
 
-**For RepoMagpie:** write our own `DESIGN.md` before any UI work (roadmap step 8). Don't build tooling that depends on the exact spec.
+**For RepoMagpie:** write our own `DESIGN.md` before any HTML surface (roadmap v0.2). Don't build tooling that depends on the exact spec.
 
 ## AGENTS.md / CLAUDE.md — **adopt**
 

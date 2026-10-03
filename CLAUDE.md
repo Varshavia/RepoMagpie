@@ -19,7 +19,7 @@ The maintainer prefers **small, frequent commits**. Split work so each piece can
 
 **At the start of every session**, before doing anything else:
 1. Read the Pending section and the last entry of the most recent `.worklog/` file (section 14).
-2. Read `docs/roadmap.md`: which step are we on?
+2. Read `docs/roadmap.md`: what is in "Now"?
 3. Read the docs relevant to the task (section 3).
 
 **At the end of every task:**
@@ -35,10 +35,14 @@ Before starting any task, read the documents relevant to it:
 
 | When you are… | Read |
 |---|---|
-| Starting any task | `docs/roadmap.md` (what step are we on?) |
+| Starting any task | `docs/roadmap.md` (what is in "Now"?) |
 | Using or defining a domain term | `docs/glossary.md` |
 | Writing core, CLI, search, or MCP code | `docs/architecture.md` |
 | Making a design choice | `docs/vision.md`, `docs/decisions/` |
+| Working on an approved idea (recall, vet, drift, nests, graph, …) | `docs/ideas.md` |
+| Designing a surface (CLI output, agent layer, vault layout, graph, nest) | `docs/product.md` |
+| Writing a changelog entry or release notes | `docs/release.md`, `CHANGELOG.md` |
+| Working with interview or competitor findings | `docs/validation.md` |
 | Touching the note format, templates, or parsers | `docs/note-schema.md` |
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
 | Writing README, docs, or anything user-facing | `docs/vision.md`, `docs/marketing.md` |
@@ -51,16 +55,19 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 
 | Path | What it is |
 |---|---|
-| `.claude/` | Agent config: `settings.json` (git deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
+| `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. |
-| `.worklog/` | Private agent work log, one file per day. Git-ignored. |
-| `docs/` | Vision, roadmap, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
+| `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
+| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `.gitignore` | Ignores secrets, build output, the personal vault, `.scratch/` and `.worklog/`. |
 | `AGENTS.md` | Points other coding agents to this file. |
+| `CHANGELOG.md` | User-visible changes per release (Keep a Changelog). |
 | `CLAUDE.md` | This rulebook. |
+| `CONTRIBUTING.md` | How to contribute while the project is early: issues and ideas yes, pull requests not yet. |
 | `LICENSE` | MIT. |
 | `README.md` | Landing page: what RepoMagpie is and how it will work. |
+| `SECURITY.md` | How to report a vulnerability privately (GitHub private vulnerability reporting). |
 
 ## 5. Working principles
 
@@ -104,7 +111,8 @@ After two failed attempts at the same problem, stop. Report what you tried, what
 - [ ] The goal is verified, with evidence (command output, test result).
 - [ ] Tests pass.
 - [ ] Affected docs are updated.
-- [ ] Roadmap status is updated if a step changed.
+- [ ] CHANGELOG entries are drafted under Unreleased for user-visible changes ([release process](docs/release.md)). This applies from the first product code; docs-only changes don't need entries.
+- [ ] Roadmap checkboxes are ticked for completed work, and the status table and "Now / Next / Later" are updated if they changed.
 - [ ] The work log entry is written.
 - [ ] The file list and a commit message are printed.
 
@@ -153,8 +161,10 @@ For docs and CLI output: short sentences, active voice, concrete examples, no ma
 
 A private log of agent work lives in `.worklog/YYYY-MM-DD.md`, one file per day. It is git-ignored.
 
+`docs/roadmap.md` is the single source of truth for project status. The work log's Pending section is agent memory only: it tracks which parts of a brief are left, never project status.
+
 - **At the start of every session**, before doing anything else, read the `## Pending` section and the last entry of the most recent `.worklog/` file.
-- **Multi-part briefs:** when the maintainer gives a brief with several parts, copy every part not yet done **verbatim** into a `## Pending` section at the top of today's file. Remove a part from Pending when it is completed. When you start a new day's file, move the Pending section into it. If the brief is stored as a file in `.worklog/briefs/`, that file is the verbatim copy: Pending may list piece names with a pointer to the brief instead.
+- **Multi-part briefs:** when the maintainer gives a brief with several parts, copy every part not yet done **verbatim** into a `## Pending` section at the top of today's file. Remove a part from Pending when it is completed. When you start a new day's file, move the Pending section into it. If the brief is stored as a file in `.worklog/briefs/`, that file is the verbatim copy: Pending may list piece names with a pointer to the brief instead. Read a brief file when Pending points to it.
 - **At the end of every task**, append an entry to today's file:
 
   ```markdown
