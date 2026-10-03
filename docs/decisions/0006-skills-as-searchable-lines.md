@@ -8,11 +8,13 @@ A skill pack can hold dozens of independent skills, and users search for a skill
 ## Decision
 - A skill is a line under "Notable skills" in its repository's note, not its own file (see `docs/note-schema.md`).
 - Search indexes each completed skill line as its own result, linked to its parent note.
-- `magpie add <skill-url>` creates the parent repository note if it doesn't exist, or updates it, and adds the skill line (append-only, schema rule 2).
+- `magpie note <skill-url>` creates the parent repository note if it doesn't exist, or updates it, and adds the skill line (append-only, schema rule 2).
 - Separate skill notes may be revisited later, by a new record that supersedes this one.
 
 ## Consequences
 - The vault has one note type; the schema stays small.
 - Search returns two kinds of result: a note, or a skill line inside a note.
 - Skills have no fields of their own (rating, tried); if those become necessary, revisit this decision.
-- `magpie add` must resolve a skill URL to its repository.
+- `magpie note` must resolve a skill URL to its repository.
+
+Editorial (2026-10-03): command name `magpie add` changed to `magpie note`, which took over adding by URL ([decision 0010](0010-v0-1-scope.md)). Substance unchanged.

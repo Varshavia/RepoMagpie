@@ -15,6 +15,15 @@ The maintainer does all staging, commits and pushes by hand, and every GitHub wr
 
 The maintainer prefers **small, frequent commits**. Split work so each piece can be committed on its own, and stop at natural commit points instead of doing everything at once.
 
+### Branches
+
+From [decision 0012](docs/decisions/0012-branch-workflow.md):
+- `main` is always consistent and releasable. Release tags are created on `main` only.
+- All work happens on a branch: `docs/...`, `feat/...`, `fix/...`, or `spike/...` for experiments that may be thrown away.
+- The maintainer creates branches, opens pull requests and merges them, with "Rebase and merge" or a merge commit, not squash. You can't: git-guard blocks `git switch`, `git branch`, `gh pr create` and `gh pr merge`.
+- **Report the current branch at the start of every task** (`git status`). If it is `main` and the task changes files that get committed, stop and ask the maintainer to create a branch. Tasks that only change the work log don't need one.
+- **At the end of a branch**, draft the pull-request description: summary, decisions, files, evidence. Don't open the pull request.
+
 ## 2. Session routine
 
 **At the start of every session**, before doing anything else:
@@ -22,12 +31,16 @@ The maintainer prefers **small, frequent commits**. Split work so each piece can
 2. Read `docs/roadmap.md`: what is in "Now"?
 3. Read the docs relevant to the task (section 3).
 
+**At the start of every task:** run `git status`, report the current branch, and stop if you are on `main` when the task needs a branch (section 1, "Branches").
+
 **At the end of every task:**
 1. Go through the definition of done (section 7).
 2. Append an entry to today's work log (section 14).
 3. Print the list of files you created, changed or deleted.
 4. Print a suggested commit message in Conventional Commits format (section 11).
 5. Stop and wait for the maintainer.
+
+**At the end of a branch:** draft the pull-request description (section 1, "Branches").
 
 ## 3. Read the docs first
 
@@ -47,9 +60,9 @@ Before starting any task, read the documents relevant to it:
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
 | Writing README, docs, or anything user-facing | `docs/vision.md`, `docs/marketing.md` |
 
-If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, record it as part of the same task: ordinary docs are updated in place; accepted decision records are superseded by a new record.
+If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, record it as part of the same task: ordinary docs are updated in place; decision records merged to `main` are superseded by a new record (before the merge, they may be revised on their branch).
 
-**Editorial edit:** fixing typos, broken links, or terminology to match `docs/glossary.md`, without changing what was decided, why, or the consequences. Editorial edits are allowed on accepted records; anything else requires a new superseding record. Every editorial edit appends a line at the bottom of the record: `Editorial (YYYY-MM-DD): <what changed>. Substance unchanged.`
+**Editorial edit:** fixing typos, broken links, or terminology to match `docs/glossary.md`, without changing what was decided, why, or the consequences. Editorial edits are allowed on records merged to `main`; anything else requires a new superseding record. Every editorial edit appends a line at the bottom of the record: `Editorial (YYYY-MM-DD): <what changed>. Substance unchanged.`
 
 ## 4. Repo map
 

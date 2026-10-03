@@ -13,7 +13,7 @@ Lead with the habit, not the features: *every day, find one repo worth keeping, 
 | Asset | When | Notes |
 |---|---|---|
 | README as landing page | Step 0, refined every step | Many developers read the README and never visit a website. Show the output. |
-| 30-second demo GIF | Before launch | `magpie add` → write one line → agent finds it later. |
+| 30-second demo GIF | Before launch | The "pdfkit moment": `magpie note` → the agent runs an install → the verdict appears before it installs. |
 | Social preview image | Before launch | GitHub repo settings → Social preview. |
 | Logo | Before launch | A magpie. Simple, works at 16px. |
 | "Good first issue" set | Before launch | 5 small, well-described issues. |
