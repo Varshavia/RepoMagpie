@@ -89,7 +89,7 @@ Notes may be written in any language ([decision 0004](decisions/0004-english-eve
 6. **One note per subject.** A PURL appears in at most one note per journal, as its `id` or in its `packages`. A repository note that lists `pkg:npm/pdfkit` is the note for that package too.
 7. **User input.**
    - `magpie note <name-or-url> "text"`: the text is the Verdict (human-written).
-   - `magpie import` reads one line per item: `- <url-or-name> — verdict: ... | use: ... | avoid: ...`. An explicit `verdict:` counts as human-written. `use:` and `avoid:` become draft "Use when" and "Avoid when" sections (rule 3). Text without a label becomes a draft "Use when".
+   - `magpie import` reads one line per item: `- <url-or-name> — verdict: ... | use: ... | avoid: ...`. An explicit `verdict:` counts as human-written. `use:` and `avoid:` become draft "Use when" and "Avoid when" sections (rule 3). Text without a label goes to "My notes".
 8. **Lenient read, strict write.**
    - Read hand-written notes even when frontmatter fields or sections are missing, misordered or extra.
    - Write notes in the canonical format above.
