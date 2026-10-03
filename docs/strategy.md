@@ -1,6 +1,6 @@
 # RepoMagpie — Strategy (accepted, 2026-10-03)
 
-**Status:** accepted (2026-10-03). The maintainer approved all four decisions in §14, with the additions in §15. It is accepted before the two further interviews in §12; their results may still change it. It is the basis for vision, ideas and roadmap.
+**Status:** accepted (2026-10-03). The maintainer approved all four decisions in §14, with the additions in §15. It was accepted before any real interview (0 of 3 so far, see §10); their results may still change it. It is the basis for vision, ideas and roadmap.
 
 ---
 
@@ -23,8 +23,8 @@ Coding agents now install packages on their own. Two different questions come up
 
 The second answer exists, but it is scattered: in someone's head, in a daily note, in an old Slack thread, in a wiki page nobody finds. So it gets lost:
 
-- **Interview 1** (unconfirmed source, see §10): the interviewee reinstalled a PDF library he had abandoned years earlier for the same reason, and only remembered ten minutes into fighting it again.
-- The same person checks every agent-suggested package by hand (registry, downloads, last commit, author), every single time.
+- **Illustrative scenario** (from synthetic interview S1, not evidence; see §10): a developer reinstalls a PDF library they abandoned years earlier for the same reason, and only remembers ten minutes into fighting it again. This is the "pdfkit moment" the product is designed around; real interviews have to show whether it happens.
+- In the same synthetic scenario, the developer checks every agent-suggested package by hand (registry, downloads, last commit, author), every single time.
 - Industry voices describe AI agents installing packages that no one on the team decided to adopt, with no clear owner of that decision ([The New Stack](https://thenewstack.io/?p=22824572)).
 
 ---
@@ -62,7 +62,7 @@ Every existing tool judges a package against global data: CVEs, malware database
 
 | Product | What it does |
 |---|---|
-| [Socket Firewall Free](https://github.com/SocketDev/sfw-free) (`sfw`) | Wraps npm, yarn, pnpm, pip, uv and cargo; blocks known-malicious packages. Free, PolyForm Shield licence, anonymous telemetry. |
+| [Socket Firewall Free](https://github.com/SocketDev/sfw-free) (`sfw`) | Wraps npm, yarn, pnpm, pip, uv and cargo; blocks known-malicious packages. Free, PolyForm Shield licence, anonymous telemetry ([The Register, 2025-09-30](https://theregister.com/2025/09/30/socket_will_block_it_with)). |
 | [Aikido Safe Chain](https://help.aikido.dev/ai-and-dev-tools/securing-ai-generated-code) | Validates packages before install, blocks versions younger than 24 h, MCP for agents. |
 | [SafeInstall](https://github.com/Mickdownunder/SafeInstall), Immunity Agent, Agentinel, stillrunning, [SafeDep MCP](https://safedep.io/mcp) | Hooks or MCP servers that check agent installs against threat data, several for Claude Code and Cursor. |
 
@@ -101,8 +101,8 @@ Every existing tool judges a package against global data: CVEs, malware database
 - Socket Firewall Free (`sfw`) is a recommended companion tool, mentioned in the docs, not an integration. Their answer is "malicious or not"; ours is "your history with it". Recall never installs a package or hands an install to another tool.
 - For skills: record *your* review and the commit you reviewed in the note, and link scanner output. Don't build a scanner.
 
-### Note format (from interview 1)
-The interviewee's own tool note had a one-line **decision** with scope ("default for new projects, don't touch legacy"). The note format becomes:
+### Note format (hypothesis to test)
+Synthetic interview S1 (not evidence) suggested tool notes with a one-line **decision** with scope ("default for new projects, don't touch legacy"). The hypothesis to test in real interviews (Q8 in `docs/validation.md`) is this note format:
 - **Verdict:** one line. This is what recall shows first.
 - **Use when / Avoid when:** negative knowledge is what recall needs most.
 - Everything else is optional. Plain Markdown, any language.
@@ -114,7 +114,7 @@ The interviewee's own tool note had a one-line **decision** with scope ("default
 | # | Idea | New status | Why |
 |---|---|---|---|
 | 1 | Proactive recall | **Core, v0.1** | The empty square in §5 D |
-| 8 | Team journal | **Core, v0.1** (as the project journal) | Git gives sharing for free; strongest pain in interviews and industry |
+| 8 | Team journal | **Core, v0.1** (as the project journal) | Git gives sharing for free; strongest pain in industry reports (§2); not yet tested in real interviews |
 | 5 | Gap detection | **v0.1** (as `magpie init` and `magpie gaps`) | Solves the empty-journal problem from real manifests |
 | 2 | Vet and drift | **Reduced, v0.2** | Record your review and the reviewed commit; integrate existing scanners and lockfiles; no own scanner |
 | 4 | Context-aware suggest | v0.3 | Useful once journals have content |
@@ -122,7 +122,7 @@ The interviewee's own tool note had a one-line **decision** with scope ("default
 | 7 | `/uses` generator | v0.3 | Marketing feature |
 | 6 | Resurfacing digest | Later | Nice to have |
 | 9 | Daily find | Later | Distraction from the core |
-| 10 | Graph views | Marketing only | Interview 1: graph view has no practical use |
+| 10 | Graph views | Marketing only | Synthetic signals only (S1, H4): graph views see little practical use. Not evidence; real interviews test it (Q7) |
 
 Dropped from v0.1: semantic search (keyword search is enough at first), the MCP server, Dataview queries, and the Obsidian graph preset.
 
@@ -144,9 +144,10 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 
 ## 10. Validation so far
 
-- **One interview**, source not yet confirmed as a real person. Strong signals: manual vetting of every agent suggestion; a repeat-install of an abandoned library; tool notes with a one-line decision; graph view never used.
+- **Real interviews: 0 of 3.**
+- **Synthetic interview S1** (not evidence; not a real person) in `docs/validation.md`. It suggested manual vetting of every agent suggestion, a repeat install of an abandoned library, tool notes with a one-line decision, and no graph use. These are things to listen for, not findings.
 - **Synthetic hypotheses H1–H4** (not evidence) in `docs/validation.md`.
-- **Desk research** in §5, which changed the positioning more than the interview did.
+- **Desk research** in §5 is the only evidence so far. It is what changed the positioning.
 
 ---
 
@@ -159,7 +160,7 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 | People don't write notes (H1) | One-line capture; `init` pre-fills drafts; only the verdict is needed |
 | Hooks differ between agents | Launch on Claude Code, be honest in the README, skill mode as fallback |
 | Overlap with security vendors | Explicit "compose, don't compete"; never claim to detect malware |
-| One interview is not evidence | Two more interviews before the roadmap changes (§12) |
+| No real interviews yet; the user-level signals are synthetic | At least three real interviews, one per profile (`docs/validation.md`); their results may still change this strategy |
 
 ---
 
@@ -167,7 +168,7 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 
 | Week | Work | Branch |
 |---|---|---|
-| 1 | Approve this strategy; two more interviews with the new questions below; update vision, ideas, competitors and roadmap | `docs/strategy` |
+| 1 | Approve this strategy; at least three real interviews with the new questions below; update vision, ideas, competitors and roadmap | `docs/strategy` |
 | 2 | Step 2: tech stack (leaning TypeScript, published to npm), spec for `note`, `recall`, `init`, `search` | `docs/spec` |
 | 3–4 | `magpie note`, `magpie search` (keyword), journal format, project journal | `feat/core` |
 | 4–5 | `magpie recall` and the Claude Code hook; `magpie init` from manifests | `feat/recall`, `feat/init` |
