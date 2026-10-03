@@ -41,12 +41,12 @@ Behaviour:
    - for a URL: refresh the tool-owned fields (schema rule 2) and append skill lines for newly detected skills only.
 3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and file list (no README) and draft from them ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)):
    - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty; an agent may draft more later through the skill.
-   - `kind`: the first that matches: `plugin` if the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`; `skill-pack` if any `SKILL.md` exists; `cli` if the root `package.json` has `bin`; `awesome-list` if the topics include `awesome-list`; otherwise `other`.
+   - `kind`: the first that matches: `cli` if the root `package.json` has `bin`; `skill-pack` if any `SKILL.md` exists; `plugin` if the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`; `awesome-list` if the topics include `awesome-list`; otherwise `other`.
    - `tags`: the topics that are already in the journal's `tags.md`; otherwise `[]`.
-   - `packages`: from the manifests at the repository root only: `package.json` `name` (skipped when `"private": true`), `pyproject.toml` `[project]` `name`, `Cargo.toml` `[package]` `name`.
+   - `packages`: from the manifests at the repository root only: `package.json` `name` (skipped when `"private": true`), `pyproject.toml` `[project]` `name`, `Cargo.toml` `[package]` `name`. Known limitation (v0.1): the name is recorded whether or not the package is published on its registry.
    - One skill line per `SKILL.md`, named after the folder that holds it.
    - The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable. It is never printed or logged.
-4. If the network fails (offline, timeout after 10 seconds, rate limit), write the note without metadata and warn on stderr. Exit 0.
+4. If the network fails (offline, timeout after 10 seconds, rate limit, a server error), write the note without metadata and warn on stderr. Exit 0. If GitHub says the repository doesn't exist (404) or rejects the token (401), write nothing and exit 1; for 401 the message says `GITHUB_TOKEN` may be invalid or expired.
 5. `--to project` without a project journal creates `.magpie/` (with a `.gitignore` for `.cache/`) at the git root, or in the working directory outside git, and says so.
 
 ```
@@ -175,7 +175,7 @@ Every note's `id` is a Package URL ([decision 0017](decisions/0017-package-ident
 
 Any other input (articles, gists, loose Markdown files) is rejected with exit 2 in v0.1.
 
-**Case-only name clash:** npm and Cargo names are case-sensitive, but note file names are lowercase. If the file for a new subject already holds a note with a different id (`pkg:npm/JSONStream` vs `pkg:npm/jsonstream`), `note`, `import` and `adopt` refuse with an error that names both PURLs and the file, and exit 1 ([note schema](note-schema.md)).
+**Case-only name clash:** Cargo names are case-sensitive, but note file names are lowercase (npm and PyPI PURLs are lowercased, so they can't clash). If the file for a new subject already holds a note with a different id (`pkg:cargo/Inflector` vs `pkg:cargo/inflector`), `note`, `import` and `adopt` refuse with an error that names both PURLs and the file, and exit 1 ([note schema](note-schema.md)).
 
 ## 5. Matching rules
 
