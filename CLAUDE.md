@@ -15,6 +15,15 @@ The maintainer does all staging, commits and pushes by hand, and every GitHub wr
 
 The maintainer prefers **small, frequent commits**. Split work so each piece can be committed on its own, and stop at natural commit points instead of doing everything at once.
 
+### Branches
+
+From [decision 0012](docs/decisions/0012-branch-workflow.md):
+- `main` is always consistent and releasable. Release tags are created on `main` only.
+- All work happens on a branch: `docs/...`, `feat/...`, `fix/...`, or `spike/...` for experiments that may be thrown away.
+- The maintainer creates branches, opens pull requests and merges them, with "Rebase and merge" or a merge commit, not squash. You can't: git-guard blocks `git switch`, `git branch`, `gh pr create` and `gh pr merge`.
+- **Report the current branch at the start of every task** (`git status`). If it is `main` and the task changes files that get committed, stop and ask the maintainer to create a branch. Tasks that only change the work log don't need one.
+- **At the end of a branch**, draft the pull-request description: summary, decisions, files, evidence. Don't open the pull request.
+
 ## 2. Session routine
 
 **At the start of every session**, before doing anything else:
@@ -22,12 +31,16 @@ The maintainer prefers **small, frequent commits**. Split work so each piece can
 2. Read `docs/roadmap.md`: what is in "Now"?
 3. Read the docs relevant to the task (section 3).
 
+**At the start of every task:** run `git status`, report the current branch, and stop if you are on `main` when the task needs a branch (section 1, "Branches").
+
 **At the end of every task:**
 1. Go through the definition of done (section 7).
 2. Append an entry to today's work log (section 14).
 3. Print the list of files you created, changed or deleted.
 4. Print a suggested commit message in Conventional Commits format (section 11).
 5. Stop and wait for the maintainer.
+
+**At the end of a branch:** draft the pull-request description (section 1, "Branches").
 
 ## 3. Read the docs first
 
