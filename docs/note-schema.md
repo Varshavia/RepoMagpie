@@ -75,7 +75,7 @@ These fields are planned for later releases ([ideas](ideas.md)). They are **not*
 | `works_with` | human | list of wikilinks | typed edges | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
 | `reviewed_commit` | tool | commit SHA | drift | v0.2 |
 | `public` | human | bool, default `false` | nests | v0.3 |
-| `last_resurfaced` | tool | date | digest | v0.4 |
+| `last_resurfaced` | tool | date | digest | later |
 
 ## Example
 

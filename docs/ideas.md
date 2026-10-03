@@ -1,18 +1,18 @@
 # Ideas
 
-**Status:** Approved for the roadmap. Timing and scope pending validation (step 1.5).
+**Status:** Statuses and targets follow the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md). The step 1.5 interviews may still change them.
 
-Ten ideas that extend RepoMagpie beyond its first commands. Each one lists its problem, behaviour, surfaces, schema impact, target release and open questions. The [roadmap](roadmap.md) tracks the work; the [glossary](glossary.md) defines the terms.
+The ideas that shape RepoMagpie beyond note capture and search. Each one lists its problem, behaviour, surfaces, schema impact, target release and open questions. The [roadmap](roadmap.md) tracks the work; the [glossary](glossary.md) defines the terms.
 
 ## Direction
 
-The ideas move the product's category:
+The product's category moved:
 - **from:** a better bookmark manager for GitHub repositories
-- **to:** the trust and memory layer for tools in the agent era
+- **to:** the memory of what you and your team learned, shown before your agent installs a dependency
 
-**Candidate one-liner** (not adopted; validation decides, and [vision.md](vision.md) keeps its current positioning until then):
+**One-liner** ([decision 0009](decisions/0009-positioning-dependency-memory.md)):
 
-> The memory of the tools you trust — for you and your coding agent.
+> RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
 
 ## Rules every idea follows
 
@@ -20,30 +20,32 @@ The ideas move the product's category:
 2. The user writes "When it's useful" ([decision 0005](decisions/0005-human-written-usefulness.md)). Whether AI may *suggest* a draft for the user to confirm is an open question for step 1.5.
 3. One note per repository; skills are searchable lines ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 4. CLI first, `SKILL.md` for agents, MCP later as a thin layer ([decision 0002](decisions/0002-cli-first.md)).
-5. The personal vault lives outside this repository ([decision 0003](decisions/0003-vault-outside-repo.md)).
+5. Two journal scopes with one format: a personal journal outside any repository, and a project journal in `.magpie/` ([decision 0013](decisions/0013-two-journal-scopes.md)). This repository holds neither, only the example vault ([decision 0003](decisions/0003-vault-outside-repo.md)).
 6. Local-first: no accounts, no server, no telemetry by default. Nothing is published unless the user marks it public.
+7. Compose with security tools; never claim to detect malware ([decision 0009](decisions/0009-positioning-dependency-memory.md), [decision 0011](decisions/0011-vet-and-drift-reduced.md)).
 
 ## Overview
 
-| # | Idea | Target release |
-|---|---|---|
-| 1 | Proactive recall | v0.1 |
-| 2 | Vet and drift | v0.2 |
-| 3 | Nests and follow | v0.3 |
-| 4 | Context-aware suggest | v0.4 |
-| 5 | Gap detection | v0.4 |
-| 6 | Resurfacing digest | v0.4 |
-| 7 | `/uses` page generator | v0.3 |
-| 8 | Team journal | after v0.4 |
-| 9 | Daily find | v0.4 |
-| 10 | Graph views | levels in v0.1, v0.2, v0.3 |
+| # | Idea | Status | Target | Why |
+|---|---|---|---|---|
+| 1 | Proactive recall | **Core** | v0.1 | The empty square: your verdict before install ([competitors](competitors.md), D) |
+| 8 | Team journal | **Core**, as the project journal | v0.1 | Git gives sharing for free |
+| 4 | Context-aware suggest | **Core** | v0.1 | Shows what you already have when a project starts |
+| 11 | Adopt | **Core** | v0.1 | Moves a note from your personal journal into a project |
+| 5 | Gap detection | `magpie init`; `magpie gaps` | `init`: v0.1 if time allows, else v0.2; `gaps`: v0.2 | Fills an empty journal from real manifests |
+| 2 | Vet and drift | **Reduced** | v0.2 | Record your review; integrate existing scanners and lockfiles; no own scanner |
+| 3 | Nests and follow | Planned | v0.3 | Needs users first |
+| 7 | `/uses` page generator | Planned | v0.3 | Marketing feature |
+| 6 | Resurfacing digest | Later | — | Nice to have |
+| 9 | Daily find | Later | — | Distraction from the core |
+| 10 | Graph views | Marketing only | not scheduled | Graph views are rarely used for real work |
 
 ---
 
 ## 1. Proactive recall
 
 - **Problem:** The journal only helps if the user remembers to query it.
-- **Behaviour:** When a coding agent is about to install a dependency (`npm install`, `pnpm add`, `yarn add`, `pip install`, `uv add`, `cargo add`, …), RepoMagpie checks the journal. If a note matches, it shows the rating, the "When it's useful" lines, gotchas from "My notes", and better-rated alternatives. Recall informs only: it never blocks the install and never asks for confirmation. Example:
+- **Behaviour:** When a coding agent is about to install a dependency (`npm install`, `pnpm add`, `yarn add`, `pip install`, `uv add`, `cargo add`, …), RepoMagpie checks the personal and project journals. If a note matches, it shows the verdict first, then when to use or avoid the package, gotchas, and better-rated alternatives. Recall informs only: it never blocks the install and never asks for confirmation. Example:
 
   > Note from your journal: left-pad 2/5 — 'abandoned, use String.prototype.padStart'.
 
@@ -51,8 +53,8 @@ The ideas move the product's category:
   - **Hook mode:** in clients that support hooks, a hook runs recall before every matching shell command. It runs whether or not the agent remembers to.
   - **Skill mode:** RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Best effort: it depends on the agent following the instruction, but works in any client that supports skills.
 - **Surfaces:** agent hook (hook mode), `SKILL.md` (skill mode), and `magpie recall <package>` on the CLI.
-- **Schema impact:** a tool-owned `packages` field, a list of `ecosystem:name` entries (for example `["npm:@playwright/cli", "pypi:playwright"]`). `magpie add` detects them from manifests such as `package.json`, `pyproject.toml` and `Cargo.toml`, so a package name maps to a note.
-- **Target release:** v0.1. This is the headline demo.
+- **Schema impact:** a tool-owned `packages` field, a list of `ecosystem:name` entries (for example `["npm:@playwright/cli", "pypi:playwright"]`), detected from manifests such as `package.json`, `pyproject.toml` and `Cargo.toml`, so a package name maps to a note. How notes are identified is designed in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)).
+- **Target release:** v0.1, with hook mode for Claude Code at launch and skill mode elsewhere. This is the headline demo.
 - **Open questions:**
   - Which package managers are in v0.1?
   - How are monorepos with several packages handled?
@@ -75,14 +77,14 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 2. Vet and drift
 
 - **Problem:** Skills run with the user's shell permissions, and authors can change them after the user has reviewed them.
-- **Behaviour:**
-  - `magpie vet <repo-or-skill>` reads `SKILL.md` and bundled scripts. It flags shell commands, network calls, file writes outside the project and credential access, and shows a risk summary. When the user approves, it records the reviewed commit.
-  - `magpie drift` lists notes whose upstream changed since review and shows the diff, skill files and scripts first.
-- **Surfaces:** CLI (`magpie vet`, `magpie drift`); drift status in the graph (idea 10).
+- **Behaviour** (reduced, [decision 0011](decisions/0011-vet-and-drift-reduced.md)): RepoMagpie builds no scanner.
+  - **Vet:** the user records their own review and the commit they reviewed in the note, and can link the output of existing scanners ([competitors](competitors.md), C).
+  - **Drift:** `magpie drift` lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
+- **Surfaces:** CLI (`magpie drift`, and a way to record a review).
 - **Schema impact:** a tool-owned `reviewed_commit` field (commit SHA). It joins the schema only when v0.2 work starts.
 - **Target release:** v0.2.
 - **Open questions:**
-  - Is the analysis static only, or optionally LLM-assisted?
+  - Which scanners and lockfile formats to integrate first?
   - How far back can drift look when no commit was recorded?
 
 ## 3. Nests and follow
@@ -101,25 +103,30 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 ## 4. Context-aware suggest
 
-- **Problem:** Starting a project, you don't know which of your notes apply to it.
-- **Behaviour:** `magpie suggest` reads the current project (manifests, README, optionally an issue) and recommends notes from the journal that fit it.
-- **Surfaces:** CLI (`magpie suggest`).
+- **Problem:** Starting or working on a project, you don't know which of your notes apply to it.
+- **Behaviour:** `magpie suggest` shows what you already have that fits the project.
+  - **Input:** the project's manifests and README, or a free-text description ("a TypeScript CLI with tests").
+  - **Output:** matching notes from both journals, verdict first.
+  - **In v0.1, no embeddings:** magpie narrows the candidates by keyword and tags, and the coding agent makes the semantic choice, guided by `SKILL.md`.
+- **Surfaces:** CLI (`magpie suggest`); `SKILL.md`.
 - **Schema impact:** none planned.
-- **Target release:** v0.4.
+- **Target release:** v0.1.
 - **Open questions:**
-  - Reading an issue needs the GitHub API. Is that optional, so suggest works offline?
-  - Keyword matching, semantic matching, or both?
+  - How many candidates does magpie hand to the agent?
+  - Semantic matching (v0.3, with semantic search): does it replace the agent's choice or add to it?
 
 ## 5. Gap detection
 
-- **Problem:** You can't see which tools you rely on but never wrote down, or which areas of the journal are thin.
-- **Behaviour:** Reports tools used in the user's projects but missing from the journal, and tags or kinds with no reviewed notes.
-- **Surfaces:** CLI (command name not decided); gaps in the graph (idea 10).
+- **Problem:** A new journal is empty, and you can't see which tools you rely on but never wrote down.
+- **Behaviour:**
+  - `magpie init` reads a project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and creates draft notes for the dependencies already in use, so the journal starts from real decisions instead of stars.
+  - `magpie gaps` reports dependencies used in a project but missing from the journals, and tags or kinds with no reviewed notes.
+- **Surfaces:** CLI (`magpie init`, `magpie gaps`).
 - **Schema impact:** none planned; it reads the `packages` field (idea 1).
-- **Target release:** v0.4.
+- **Target release:** `init` in v0.1 if time allows, otherwise v0.2; `gaps` in v0.2.
 - **Open questions:**
-  - Which projects are scanned, and how does the user point to them?
-  - Command name.
+  - Does `init` write drafts into the project journal, the personal journal, or ask?
+  - Which projects does `gaps` scan, and how does the user point to them?
 
 ## 6. Resurfacing digest
 
@@ -127,7 +134,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Behaviour:** A periodic digest of the form "You saved X three months ago. Still useful?" It keeps the journal fresh and reinforces what you learned.
 - **Surfaces:** CLI (command name not decided).
 - **Schema impact:** a tool-owned `last_resurfaced` date.
-- **Target release:** v0.4.
+- **Target release:** later (not scheduled).
 - **Open questions:**
   - How is it delivered without notifications (on demand only)?
   - How often, and who sets the interval?
@@ -145,13 +152,13 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 8. Team journal
 
 - **Problem:** Team members vet the same tools again and again, with no shared record.
-- **Behaviour:** A shared vault in a team repository: the tools the team has vetted, an onboarding view, and review ownership. It builds on vet and drift (idea 2).
-- **Surfaces:** a shared vault in a git repository, used through the CLI.
-- **Schema impact:** not designed yet; review ownership likely needs a field.
-- **Target release:** after v0.4.
+- **Behaviour:** The project journal: `.magpie/` inside a project repository, committed with the code ([decision 0013](decisions/0013-two-journal-scopes.md)). The team shares it, reviews changes to it and keeps its history through git, with no server. Search, suggest and recall read it alongside each member's personal journal.
+- **Surfaces:** `.magpie/` in the project repository, used through the CLI and the agent.
+- **Schema impact:** same note format as the personal journal; review ownership may need a field later.
+- **Target release:** v0.1, as the project journal.
 - **Open questions:**
   - How is review ownership recorded?
-  - How do personal and team vaults combine in search?
+  - How are results from the two journals labelled and ranked? (Step 2 spec.)
 
 ## 9. Daily find
 
@@ -159,7 +166,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Behaviour:** `magpie today` suggests one trending repository that matches the user's tags, and tracks an exploration streak. It stays optional and quiet: no nagging, no notifications by default.
 - **Surfaces:** CLI (`magpie today`).
 - **Schema impact:** none planned.
-- **Target release:** v0.4.
+- **Target release:** later (not scheduled).
 - **Open questions:**
   - Where does trending data come from?
   - Can the streak be computed from `explored` dates, so nothing extra is stored ([decision 0001](decisions/0001-plain-markdown-storage.md))?
@@ -175,11 +182,22 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   Graph views are often admired but rarely used. Ours must earn its place by showing status at a glance (drift, inbox, gaps) and by being a visual people can share. It is not decoration. Full specification: [product](product.md#graph-specification).
 - **Surfaces:** Obsidian graph view (level 1); an HTML file (level 2); nest pages (level 3).
 - **Schema impact:** two human-owned fields for typed relations, `alternatives` and `works_with`: lists of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. Proposed in [decision 0007](decisions/0007-typed-relations-in-frontmatter.md).
-- **Target release:** level 1 in v0.1, level 2 in v0.2, level 3 in v0.3.
+- **Target release:** marketing only, not scheduled. Graph views are rarely used for real work, so they are built only as a shareable visual, if at all.
 - **Open questions:**
   - Does Obsidian's graph view count wikilinks inside frontmatter properties? If not, level 1 shows only body links.
-  - Does node size encode connections or rating? Decided in v0.2.
-  - Rendering library for level 2. Decided at the start of v0.2.
+  - Does node size encode connections or rating?
+  - Rendering library for level 2.
+
+## 11. Adopt
+
+- **Problem:** What you learned in your personal journal doesn't reach the project, or your team, unless you copy it by hand.
+- **Behaviour:** `magpie adopt <name>` copies a note from the personal journal into the project's `.magpie/` and prints the install command. It never installs anything itself.
+- **Surfaces:** CLI (`magpie adopt`); the agent can run it through `SKILL.md`.
+- **Schema impact:** none; both journals use the same format ([decision 0013](decisions/0013-two-journal-scopes.md)).
+- **Target release:** v0.1.
+- **Open questions:**
+  - If the project journal already has a note on the same package, does adopt merge, skip or ask?
+  - Adopting into a public repository makes the note public. Should adopt say so?
 
 ---
 
@@ -194,4 +212,4 @@ None of these are in the active schema or the template yet. Each joins the [note
 | `works_with` | human | list of wikilinks | typed edges | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
 | `reviewed_commit` | tool | commit SHA | drift | v0.2 |
 | `public` | human | bool, default `false` | nests | v0.3 |
-| `last_resurfaced` | tool | date | digest | v0.4 |
+| `last_resurfaced` | tool | date | digest | later |

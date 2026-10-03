@@ -1,6 +1,6 @@
-# RepoMagpie — Strategy (proposed, 2026-10-03)
+# RepoMagpie — Strategy (accepted, 2026-10-03)
 
-**Status:** proposed. Becomes the basis for vision, ideas and roadmap once the maintainer approves it and two more interviews have been done (see §12).
+**Status:** accepted (2026-10-03). The maintainer approved all four decisions in §14, with the additions in §15. It is accepted before the two further interviews in §12; their results may still change it. It is the basis for vision, ideas and roadmap.
 
 ---
 
@@ -200,3 +200,37 @@ New interview questions (ask the original eight first, then these, then it's fin
 4. Adopt the branch workflow (§13)?
 
 Once approved, the agent applies the strategy to vision, ideas, competitors, roadmap and validation, and writes decision records for 1 to 3, on the `docs/strategy` branch.
+
+---
+
+## 15. Additions (approved 2026-10-03)
+
+The maintainer approved §14 with these additions. Where they differ from §6, §7 or §14, the additions apply.
+
+### A. Personal journal is first-class
+The personal journal is equal to the project journal. It holds anything the user explored and judged (repositories, skills, tools), not only the dependencies they use. It is private by default. Search, suggest and recall all work across both journals.
+
+### B. `magpie import <file>`
+Generic bulk add. One line per item:
+
+```
+- <url> — verdict: ... | use: ... | avoid: ...
+```
+
+The free text after the URL becomes the draft Verdict, Use when and Avoid when.
+
+### C. `magpie suggest`
+When the user starts or works on a project, magpie shows what they already have that fits.
+- **Input:** the project's manifests and README, or a free-text description ("a TypeScript CLI with tests").
+- **Output:** matching notes from both journals, Verdict first.
+- **In v0.1, no embeddings:** magpie narrows the candidates by keyword and tags, and the coding agent makes the semantic choice, guided by `SKILL.md`.
+
+### D. `magpie adopt <name>`
+Copies a note from the personal journal into the project's `.magpie/` and prints the install command. It never installs anything itself.
+
+### E. Final v0.1 scope
+- `note`, `import`, `search` (keyword), `suggest`, `adopt`
+- `recall` with the Claude Code hook
+- personal and project journals
+
+`init` (draft notes from manifests) goes in v0.1 if time allows, otherwise in v0.2. The positioning stays as in §14 decision 1; the README may add one line about suggest.
