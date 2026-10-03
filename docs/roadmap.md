@@ -85,7 +85,7 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 - [ ] Implementation language: TypeScript (Node, publishable to npm, matches the skills ecosystem) or Python?
 - [ ] Where does the vault live and how does the CLI find it? (config file, env var, flag)
 - [ ] Embeddings for semantic search: local model or API? The default must work offline.
-- [ ] Only if `magpie add` is scheduled (see "Not scheduled"): when the GitHub API reports no license, should `magpie add` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
+- [ ] When the GitHub API reports no license, should `magpie note <url>` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
 - [ ] Note format (Verdict, Use when, Avoid when) and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)).
 - [ ] How `magpie` finds the personal and project journals, and how it labels results from each ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - [ ] Write `docs/spec.md`.
@@ -111,13 +111,15 @@ The first public release: capture what you learned, find it again, and see it be
 
 **Done when:** every note in `examples/vault/` validates against the schema.
 
-### `magpie note`
+### `magpie note <name-or-url> "text"`
 - [ ] Capture a verdict in one line, for example `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. No template to fill.
+- [ ] Given a GitHub URL, fetch description, language, license, topics and README, and turn topics into tag suggestions.
+- [ ] Detect `SKILL.md` files and write one skill line per skill. A skill URL creates or updates the parent repository note ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 
-**Done when:** a note can be captured with one command in about ten seconds, and the result validates against the schema.
+**Done when:** a note can be captured with one command in about ten seconds and validates against the schema; running it on every seed repository URL produces valid drafts; and it never overwrites human-owned fields or sections of an existing note.
 
 ### `magpie import <file>`
-- [ ] Bulk add, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
+- [ ] The bulk form of `magpie note`, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
 - [ ] The free text becomes the draft Verdict, Use when and Avoid when.
 
 **Done when:** importing a file with one line per seed repository produces one valid note per line.
@@ -192,4 +194,3 @@ See [marketing.md](marketing.md).
 
 ## Not scheduled
 - Graph views: marketing only ([ideas](ideas.md), idea 10). The Obsidian graph preset and `magpie graph` are built only as a shareable visual, if at all.
-- `magpie add <url>`, which fetched repository facts from the GitHub API and detected `SKILL.md` files: not in the v0.1 scope. Open question: drop it, fold it into `import`, or schedule it.

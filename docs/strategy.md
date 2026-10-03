@@ -98,7 +98,7 @@ Every existing tool judges a package against global data: CVEs, malware database
 - **Project journal:** `.magpie/` inside a project repository, committed with the code. **Teams get sharing, history and review through git, with no server.** This is the team journal (old idea 8), moved from "later" to the core, at almost no extra cost.
 
 ### Compose, don't compete
-- If `sfw` is installed, `magpie` hands the install to it. Their answer is "malicious or not"; ours is "your history with it".
+- Socket Firewall Free (`sfw`) is a recommended companion tool, mentioned in the docs, not an integration. Their answer is "malicious or not"; ours is "your history with it". Recall never installs a package or hands an install to another tool.
 - For skills: record *your* review and the commit you reviewed in the note, and link scanner output. Don't build a scanner.
 
 ### Note format (from interview 1)

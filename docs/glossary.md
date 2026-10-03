@@ -19,12 +19,12 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **gap** | Planned (v0.2): a dependency used in a project but missing from the journals, or a tag or kind with no reviewed notes. `magpie gaps` lists them. See [ideas](ideas.md), idea 5. |
 | **graph levels** | Three possible graph views, all marketing only and not scheduled: level 1, an Obsidian graph preset for the example vault; level 2, `magpie graph`, an HTML file; level 3, the graph in nest pages. See [ideas](ideas.md), idea 10. |
 | **human-owned** | A field or section only the user changes after creation: every frontmatter field that isn't tool-owned, and all body sections. See [note schema](note-schema.md), rule 2. |
-| **import** | Planned (v0.1): `magpie import <file>` adds many notes at once from a file with one line per item: `- <url> — verdict: ... \| use: ... \| avoid: ...`. The text becomes the draft Verdict, Use when and Avoid when ([decision 0010](decisions/0010-v0-1-scope.md)). |
+| **import** | Planned (v0.1): `magpie import <file>`, the bulk form of `magpie note`, adds many notes at once from a file with one line per item: `- <url> — verdict: ... \| use: ... \| avoid: ...`. The text becomes the draft Verdict, Use when and Avoid when ([decision 0010](decisions/0010-v0-1-scope.md)). |
 | **inbox** | The `status` of a note that is not yet reviewed. It is the only such state, whatever created the note (by hand, `magpie note`, `magpie import`, `magpie init`). |
 | **init** | Planned (v0.1 if time allows, otherwise v0.2): `magpie init` reads a project's manifests and creates draft notes for the dependencies already in use. See [ideas](ideas.md), idea 5. |
 | **journal** | A folder of notes. There are two scopes with one format: the personal journal and the project journal ([decision 0013](decisions/0013-two-journal-scopes.md)). Product copy also calls a note a *journal entry*. |
 | **kind** | The frontmatter field that says what a repository is: `skill-pack`, `cli`, `library`, and so on. The list is in the [note schema](note-schema.md). |
-| **magpie** | The RepoMagpie command-line tool, e.g. `magpie note pdfkit "avoid: …"`. Not built yet. |
+| **magpie** | The RepoMagpie command-line tool, e.g. `magpie note pdfkit "avoid: …"`. `magpie note <url> "…"` also fetches the repository's facts from GitHub. Not built yet. |
 | **MCP server** | A planned thin layer over the core for agent clients without a shell ([decision 0002](decisions/0002-cli-first.md)). |
 | **nest** | Planned (v0.3): a static site built by `magpie publish` from the notes a user marked public. See [ideas](ideas.md), idea 3. |
 | **note** | One Markdown file with YAML frontmatter. In the current draft schema it describes one repository, at `<journal>/repos/<owner>--<repo>.md`; how notes are identified is redesigned in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)). |
@@ -55,8 +55,8 @@ One definition per term. Docs, code and CLI output use these words with these me
 
 | Term | Definition |
 |---|---|
-| **decision record** | A short file in `docs/decisions/` that records one significant decision: status, context, decision, consequences. An accepted record only gets editorial edits; any other change needs a new record that supersedes it. |
-| **editorial edit** | A change to an accepted decision record that fixes typos, broken links or terminology without changing its substance. Defined in [decisions/README.md](decisions/README.md). |
+| **decision record** | A short file in `docs/decisions/` that records one significant decision: status, context, decision, consequences. A record may be revised on its branch until it is merged to `main`; after that it only gets editorial edits, and any other change needs a new record that supersedes it. |
+| **editorial edit** | A change to a decision record merged to `main` that fixes typos, broken links or terminology without changing its substance. Defined in [decisions/README.md](decisions/README.md). |
 | **example vault** | `examples/vault/`: the vault in this repository that holds sample notes, built from the seed repositories. It is the only place notes live in this repo. |
 | **git-guard** | The agent hook in `.claude/hooks/` that lets coding agents run only read-only git and gh commands. |
 | **Obsidian extras** | Optional parts that need Obsidian (Templater template, Dataview queries, graph preset). Notes, `magpie`, search and the agent skill work without them. |

@@ -17,7 +17,7 @@ agent without a shell ─► MCP server ────────┴─► core �
 
 | Layer | Job | When |
 |---|---|---|
-| **core** | Reads and writes notes in both journals ([decision 0013](decisions/0013-two-journal-scopes.md)), applies the ownership rules of the [note schema](note-schema.md), builds and queries the search index, and answers recall. | v0.1 |
+| **core** | Reads and writes notes in both journals ([decision 0013](decisions/0013-two-journal-scopes.md)), applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index, and answers recall. | v0.1 |
 | **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
 | **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
 | **hook** | An agent hook that calls `magpie recall` before a package install. Contains no logic. Claude Code first ([ideas](ideas.md), idea 1). | v0.1 |
@@ -54,20 +54,18 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 
 How package names map to notes, and the output format: **TBD (roadmap step 2)**.
 
-## Data flow: `magpie add <url>` (not scheduled)
+## Data flow: `magpie note <name-or-url> "text"`
 
-`magpie add` is not in the v0.1 scope ([decision 0010](decisions/0010-v0-1-scope.md)); whether it is dropped, folded into `import` or scheduled later is open ([roadmap](roadmap.md), "Not scheduled"). The flow below is kept for reference.
+`magpie import <file>` runs the same flow once per line ([decision 0010](decisions/0010-v0-1-scope.md)).
 
-1. **Resolve the URL.** A repository URL names the repository. A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-2. **Fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files (roadmap v0.1). How the GitHub token, if any, is supplied: **TBD (roadmap step 2)**. What to record when GitHub reports no license: **TBD (roadmap step 2)**.
+1. **Resolve the target.** A name refers to a note directly (how notes are identified: **TBD (roadmap step 2)**). A repository URL names the repository. A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
+2. **URL only, fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files. How the GitHub token, if any, is supplied: **TBD (roadmap step 2)**. What to record when GitHub reports no license: **TBD (roadmap step 2)**.
 3. **No note yet:** write a new note with:
-   - tool-owned fields;
-   - drafts of `kind`, `tags` (suggested from topics), `install` and "What it does";
-   - defaults: `status: inbox`, `tried: false`;
-   - one empty skill line per detected skill;
-   - an empty "When it's useful" section.
-4. **Note exists:** append skill lines for skills not listed yet. Never change human-owned fields or sections (note schema, rule 2). Whether `add` also refreshes tool-owned fields: **TBD (roadmap step 2)**.
-5. **Search index:** whether `add` updates it right away or search rebuilds it on demand: **TBD (roadmap step 2)**.
+   - the user's text, as the verdict (and Use when / Avoid when, if the text has them);
+   - for a URL: tool-owned fields, drafts of `kind`, `tags` (suggested from topics), `install` and "What it does", and one empty skill line per detected skill;
+   - defaults: `status: inbox`, `tried: false`.
+4. **Note exists:** append skill lines for skills not listed yet. Never change human-owned fields or sections (note schema, rule 2). What happens to new text for an existing note, and whether tool-owned fields are refreshed: **TBD (roadmap step 2)**.
+5. **Search index:** whether `note` updates it right away or search rebuilds it on demand: **TBD (roadmap step 2)**.
 
 ## Data flow: `magpie search "<query>"`
 

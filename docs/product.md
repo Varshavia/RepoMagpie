@@ -22,6 +22,10 @@ Illustrative only:
 $ magpie note pdfkit "avoid: async streams painful; use puppeteer"
 ✔ Saved to your personal journal: pdfkit
 
+$ magpie note https://github.com/microsoft/playwright-cli "use: let my agent test a web UI end to end"
+✔ Saved to your personal journal: microsoft/playwright-cli (status: inbox)
+  Fetched: cli · Apache-2.0 · 1 skill · packages: npm:@playwright/cli
+
 $ magpie suggest "a TypeScript CLI with tests"
 1. vitest   project journal   Verdict: default test runner for new projects
 2. commander   personal journal   Verdict: fine for small CLIs

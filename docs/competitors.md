@@ -16,7 +16,7 @@ Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on th
 
 | Product | What it does |
 |---|---|
-| [Socket Firewall Free](https://github.com/SocketDev/sfw-free) (`sfw`) | Wraps npm, yarn, pnpm, pip, uv and cargo, and blocks malicious dependencies before they install. PolyForm Shield License 1.0.0, which forbids providing a competing product. |
+| [Socket Firewall Free](https://github.com/SocketDev/sfw-free) (`sfw`) | Wraps npm, yarn, pnpm, pip, uv and cargo, and blocks malicious dependencies before they install. PolyForm Shield License 1.0.0, which forbids providing a competing product. Collects anonymous usage telemetry ([The Register, 2025-09-30](https://theregister.com/2025/09/30/socket_will_block_it_with)). |
 | [Aikido Safe Chain](https://help.aikido.dev/ai-and-dev-tools/securing-ai-generated-code) | Validates packages before install, blocks versions younger than 24 hours, offers MCP for agents. |
 | [SafeInstall](https://github.com/Mickdownunder/SafeInstall) | Checks agent installs against threat data. |
 | [Prismor](https://github.com/PrismorSec/immunity-agent) (formerly Immunity Agent) | Self-hosted runtime security for coding agents: intercepts tool calls and scores package installs against threat intelligence. |
@@ -56,7 +56,7 @@ Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on th
 1. **Your verdict at install time.** Recall shows what you or your team decided, before the agent installs a package.
 2. **Personal and project journals.** A private personal journal, and a project journal committed with the code, so a team shares its history through git ([decision 0013](decisions/0013-two-journal-scopes.md)).
 3. **Plain Markdown you own.** Not an app database, not plugin data. Git-versionable, editor-agnostic, cross-platform.
-4. **Composes with security tools.** It never claims to detect malware.
+4. **Composes with security tools.** It never claims to detect malware and never installs anything. The docs recommend running a firewall such as Socket Firewall Free alongside it; there is no integration ([strategy](strategy.md), §6).
 
 ## Risks
 
@@ -67,5 +67,5 @@ Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on th
 
 ## Open questions
 
-- If RepoMagpie ever calls or bundles `sfw`, check what the PolyForm Shield License's noncompete clause allows.
+- `sfw` is only recommended in the docs. If RepoMagpie ever calls or bundles it, check first what the PolyForm Shield License's noncompete clause allows.
 - Two tools named in the strategy research, stillrunning and skillsrc, had no source found on 2026-10-03. They are left out until one is found.

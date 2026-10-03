@@ -3,9 +3,9 @@
 Short records of significant decisions. One file per decision: `NNNN-short-title.md`.
 
 Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **Decision**, **Consequences**.
-Never edit an accepted decision's substance — supersede it with a new record.
+**When a record can change:** before it is merged to `main`, a record may be revised on its branch. Once merged, it is immutable: only editorial edits are allowed, and any other change needs a new record that supersedes it.
 
-**Editorial edit:** fixing typos, broken links, or terminology to match `docs/glossary.md`, without changing what was decided, why, or the consequences. Editorial edits are allowed on accepted records; anything else requires a new superseding record. Every editorial edit appends a line at the bottom of the record: `Editorial (YYYY-MM-DD): <what changed>. Substance unchanged.`
+**Editorial edit:** fixing typos, broken links, or terminology to match `docs/glossary.md`, without changing what was decided, why, or the consequences. Editorial edits are allowed on records merged to `main`; anything else requires a new superseding record. Every editorial edit appends a line at the bottom of the record: `Editorial (YYYY-MM-DD): <what changed>. Substance unchanged.`
 
 | # | Decision | Status |
 |---|---|---|

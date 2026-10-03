@@ -1,6 +1,8 @@
 # RepoMagpie
 
-> A plain-markdown field journal for the repos and agent skills you've actually understood — searchable by you and your coding agent.
+> RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
+
+Starting a project? `magpie suggest` shows what you already have that fits.
 
 **Status:** early development. Nothing is installable yet. Follow the [roadmap](docs/roadmap.md).
 
@@ -12,7 +14,7 @@ RepoMagpie keeps that knowledge as plain Markdown notes, and shows it to your co
 
 ## How it will work
 
-1. You capture a verdict in one line: `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Or you import a list you already wrote with `magpie import <file>`.
+1. You capture a verdict in one line: `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Give it a GitHub URL instead of a name and it also fetches the repository's facts. Or import a list you already wrote with `magpie import <file>`.
 2. Notes live in your **personal journal** (private, outside any repository) or in a project's **project journal** (`.magpie/`, committed with the code, shared with your team through git).
 3. When your agent runs `npm install pdfkit`, a hook shows it your verdict first. It informs and never blocks. Claude Code comes first; other agents follow the same instruction through `SKILL.md`.
 4. When you start a project, `magpie suggest` shows what you already have that fits, and `magpie adopt` copies a note into the project.
@@ -22,7 +24,7 @@ RepoMagpie keeps that knowledge as plain Markdown notes, and shows it to your co
 - **Plain Markdown.** Notes are files with YAML frontmatter. No database, no lock-in. Open them in Obsidian, VS Code, or anything else, and version them with git.
 - **You write the judgment.** AI can draft facts; the verdict stays yours.
 - **Skill-level search.** One repository can contain dozens of agent skills. Each skill gets a line in its repository's note, and search returns that line as its own result.
-- **Composes with security tools.** RepoMagpie never claims to detect malware. It shows what you and your team recorded.
+- **Composes with security tools.** RepoMagpie never claims to detect malware, and never installs anything. It shows what you and your team recorded. For malware, run a firewall such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) alongside it.
 - **Agent-native.** A CLI plus a `SKILL.md`, following the open [Agent Skills](https://agentskills.io) standard, so any compatible coding agent can query your journals.
 - **Your journal stays yours.** The tool is open source. Your personal journal is private; a project journal is as visible as its repository.
 
