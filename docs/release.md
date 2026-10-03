@@ -37,7 +37,7 @@ Agents can't tag, release or publish: git-guard and the deny list block those co
 
 ## Before the public launch
 
-A `v0.1.0-beta.N` pre-release goes to the validation interviewees ([roadmap](roadmap.md), step 1.5) before v0.1 is announced.
+A `v0.1.0-beta.N` pre-release goes to early testers before v0.1 is announced. It is the first contact with users, and it tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)).
 
 ## Later decisions
 
