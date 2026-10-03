@@ -54,7 +54,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## 1.5. Validation
 The maintainer's work. Agent work pauses until the interview results arrive.
-- [ ] Interview at least 3 developers, one per profile: a heavy coding-agent user, a security-minded engineer, a student. Add more if the patterns are unclear. Notes go in [validation.md](validation.md). Don't pitch the idea during interviews.
+- [ ] Interview at least 3 developers, one per profile: a heavy coding-agent user, a security-minded engineer, a student. Add more if the patterns are unclear. Real interviews so far: **0 of 3** (the hypotheses and interview S1 in validation.md are synthetic). Notes go in [validation.md](validation.md). Don't pitch the idea during interviews.
 - [ ] Hands-on review of competitors: GithubStarsManager, the Obsidian "GitHub Integration" plugin, and Starcat (README only; it's macOS-only).
 - [ ] Write the 30-second demo scenario.
 - [ ] Decide: soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)?

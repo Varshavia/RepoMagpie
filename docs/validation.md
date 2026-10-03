@@ -64,7 +64,19 @@ These hypotheses came from a simulated exercise before any interview. They are *
 - *Confirm:* in Q7, interviewees who have a graph view describe opening it rarely, mostly to look at it or show it, not to find or decide something.
 - *Reject:* several interviewees describe a recent, specific task they did with a graph view, such as finding related notes or spotting a gap.
 
+### Synthetic interview S1 (not evidence)
+
+S1 is a simulated interview, like the hypotheses above. It was not a real person, it is **not interview data**, and **no step 1.5 decision may rest on it**. It suggested:
+- manual vetting of every package an agent suggests;
+- a repeat install of a library abandoned earlier for the same reason;
+- tool notes with a one-line decision;
+- no use of graph views.
+
+Like H1–H4, it only tells the interviewer what to listen for. It is not in the notes table below.
+
 ### Notes
+
+Real interviews so far: **0 of 3**.
 
 | # | Date | First name or role | Profile | Answers (Q1–Q10) | Reaction to the one-liner | Notable quotes (with permission) |
 |---|---|---|---|---|---|---|
