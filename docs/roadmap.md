@@ -64,11 +64,12 @@ The maintainer's work. Agent work pauses until the interview results arrive.
 Interview questions (they ask about past behaviour, not hypothetical use):
 1. When did you last go back to a repository you starred? How did you find it?
 2. Where do you look when you need a new tool or library?
-3. Do you ask your coding agent for tool recommendations? Do you trust them?
+3. When did you last install something your coding agent suggested? Did you check it first? How?
 4. Have you ever installed a package again after forgetting it went badly the first time? When was the last time?
-5. If a skill you installed changed after you reviewed it, how would you find out? What would you do?
+5. When did you last check what an installed extension, plugin or skill actually does? What made you check?
 6. Whose opinion do you rely on when choosing a tool? Whose recommendation did you last act on?
 7. Do you use Obsidian's graph view, or any graph view? What do you actually do with it?
+8. Where did you last write something down about a tool you found? Can you show me?
 
 **Done when:** `docs/validation.md` has the interview notes and the competitor review, `vision.md` is updated from the findings, and every decision above has a decision record.
 

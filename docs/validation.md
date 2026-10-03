@@ -19,7 +19,7 @@ Add more interviews if the patterns are still unclear after these three.
 
 - **Don't pitch the idea.** Ask about what people do today, not whether they'd like RepoMagpie.
 - **Privacy:** this file is public. Record a first name or a role only, never a full name, email, employer or handle. Ask before quoting anyone.
-- Keep answers short and refer to questions by number (Q1–Q7).
+- Keep answers short and refer to questions by number (Q1–Q8).
 
 ### Questions
 
@@ -27,23 +27,24 @@ The questions ask about past behaviour, not hypothetical use.
 
 1. When did you last go back to a repository you starred? How did you find it?
 2. Where do you look when you need a new tool or library?
-3. Do you ask your coding agent for tool recommendations? Do you trust them?
+3. When did you last install something your coding agent suggested? Did you check it first? How?
 4. Have you ever installed a package again after forgetting it went badly the first time? When was the last time?
-5. If a skill you installed changed after you reviewed it, how would you find out? What would you do?
+5. When did you last check what an installed extension, plugin or skill actually does? What made you check?
 6. Whose opinion do you rely on when choosing a tool? Whose recommendation did you last act on?
 7. Do you use Obsidian's graph view, or any graph view? What do you actually do with it?
+8. Where did you last write something down about a tool you found? Can you show me?
 
 ### Pre-interview hypotheses (synthetic, not evidence)
 
 These hypotheses came from a simulated exercise before any interview. They are **not interview data**, and **no step 1.5 decision may rest on them**. They only tell the interviewer what to listen for. Each one lists what real interviews would need to show to confirm or reject it.
 
 **H1. Note-taking friction may be the biggest risk.** Many developers don't take notes, so [decision 0005](decisions/0005-human-written-usefulness.md)'s rule that the user writes every "When it's useful" section may lose most users at the first step.
-- *Confirm:* most interviewees have never kept written notes on tools they found, or started and stopped. In Q1 and Q2 they find tools again by memory, search or stars, never by notes they wrote.
-- *Reject:* most interviewees already write something about tools they keep (a list, a README, a notes app, comments on bookmarks), and can show a recent example.
+- *Confirm:* in Q8, most interviewees can't point to anything they wrote about a tool they found, or only to notes they started and abandoned. Secondary: in Q1 and Q2 they find tools again by memory, search or stars, never by notes they wrote.
+- *Reject:* in Q8, most interviewees show a recent note about a tool (a list, a README, a notes app, a comment on a bookmark). Secondary: in Q1 and Q2 they mention going back to their own notes.
 
 **H2. Vet and drift may be a stronger hook than proactive recall**, including "you have NOT reviewed this package" warnings (relevant to hallucinated-package attacks).
-- *Confirm:* in Q5, interviewees describe a real past case of a dependency or skill changing, or of a malicious or made-up package, and that it mattered to them. In Q3 they describe checking what their agent suggests before installing it. Q4 brings few or no repeat-install stories.
-- *Reject:* no interviewee has checked what an agent installs or noticed an upstream change, while several tell Q4 stories about reinstalling something that went badly before.
+- *Confirm:* in Q3, interviewees describe checking what their agent suggested before installing it. In Q5, they describe a recent check of what an extension, plugin or skill does, prompted by a safety concern, an upstream change, or a malicious or made-up package. Q4 brings few or no repeat-install stories.
+- *Reject:* in Q3 and Q5, interviewees can't recall checking an agent's suggestion or an installed extension, plugin or skill, while several tell Q4 stories about reinstalling something that went badly before.
 
 **H3. The pain may be bigger for teams than for individuals.** Review notes get lost in wikis.
 - *Confirm:* when interviewees mention a team in Q2 or Q6, they describe tool reviews or decisions that were written down but could not be found later, or the same tool being evaluated twice. Follow-up when a team comes up: "How did your team record the last tool it evaluated? Where is that now?"
@@ -55,7 +56,7 @@ These hypotheses came from a simulated exercise before any interview. They are *
 
 ### Notes
 
-| # | Date | First name or role | Profile | Answers (Q1–Q7) | Notable quotes (with permission) |
+| # | Date | First name or role | Profile | Answers (Q1–Q8) | Notable quotes (with permission) |
 |---|---|---|---|---|---|
 | 1 | | | heavy coding-agent user | | |
 | 2 | | | security-minded engineer | | |
