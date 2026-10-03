@@ -1,6 +1,6 @@
 # 0005 — Human-written "when it's useful"
 
-**Status:** accepted (2026-10-01)
+**Status:** superseded by [0018](0018-ai-drafts-humans-decide.md) (2026-10-03). Accepted 2026-10-01.
 
 ## Context
 This is RepoMagpie's main differentiator from AI star managers. Search quality depends on concrete, personal usage statements.
