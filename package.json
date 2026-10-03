@@ -1,0 +1,28 @@
+{
+  "name": "repomagpie",
+  "version": "0.0.0",
+  "description": "Remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "magpie": "dist/cli/main.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "test": "node --test \"src/**/*.test.ts\"",
+    "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "commander": "15.0.0",
+    "minisearch": "7.2.0",
+    "packageurl-js": "2.0.1",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
