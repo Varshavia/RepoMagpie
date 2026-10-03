@@ -2,13 +2,15 @@
 
 Results of roadmap step 1.5: developer interviews, a hands-on competitor review, and the demo scenario. The findings update [vision.md](vision.md), and each decision listed in the [roadmap](roadmap.md) gets a decision record.
 
-**Status:** template. Nothing recorded yet.
+**Status:** desk research recorded (see "Desk research" below). No interviews were run: the maintainer decided to close step 1.5 with desk research instead.
 
 ## Interviews
 
 ### Plan
 
-Start with at least 3 real interviews, one per profile:
+Not run (see Status). The plan, rules and questions are kept for reference; the questions also structure the desk research.
+
+Originally: start with at least 3 real interviews, one per profile:
 - a heavy coding-agent user
 - a security-minded engineer
 - a student
@@ -43,6 +45,32 @@ Then, after the eight:
 Only after these may the interviewer show the one-liner ([decision 0009](decisions/0009-positioning-dependency-memory.md)) and record the reaction:
 
 > RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
+
+### Desk research (secondhand evidence)
+
+The maintainer decided not to run interviews. Step 1.5 closes with desk research instead. One row per question; sources were checked on 2026-10-03.
+
+| Q | Finding | Sources |
+|---|---|---|
+| Q1 | Stars work as "look at this later" bookmarks that get forgotten. The maker of Starcat built it after collecting 1,800+ starred repositories with "no way to find the one I actually needed". | [jcs.org note (2022)](https://jcs.org/notes/2022/07/14/529220892481516752); [Starcat on Product Hunt](https://www.producthunt.com/products/starcat-2) (maker's comment) |
+| Q2 | Developers' main community platforms are Stack Overflow (84.2%), public GitHub (66.9%) and YouTube (60.5%). | [Stack Overflow Developer Survey 2025, Technology: Community platforms](https://survey.stackoverflow.co/2025/technology) |
+| Q3 | 46% of developers distrust the accuracy of AI tools, up from 31% in 2024. Code LLMs suggested non-existent packages in 19.7% of cases on average (16 models); the 2026 frontier models still do so at 4.62–6.10%. | [Stack Overflow 2025 press release](https://stackoverflow.co/company/press/archive/stack-overflow-2025-developer-survey/); [Spracklen et al., USENIX Security 2025](https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen); [Churilov, arXiv 2605.17062](https://www.alphaxiv.org/abs/2605.17062) |
+| Q4 | No direct data on repeat installs. Decision-record literature says teams can't answer "why did we choose X?", that ADRs are "praised universally and practised sporadically", and that a routine library choice "does not warrant an ADR". | [Catio, ADR guide (2026)](https://www.catio.tech/blog/architecture-decision-record); [Java Code Geeks (2026)](https://www.javacodegeeks.com/?p=143468) |
+| Q5 | GitHub confirmed in May 2026 that a poisoned version of a VS Code extension (Nx Console) on one employee's device led to the theft of ~3,800 internal repositories. The average developer has about 40 IDE extensions, and extensions update automatically, without explicit review. | [BleepingComputer (2026-05-20)](https://www.bleepingcomputer.com/news/security/github-confirms-breach-of-3-800-repos-via-malicious-vscode-extension/); [Security Boulevard (2026-05-20)](https://securityboulevard.com/2026/05/the-extension-blind-spot-how-one-vs-code-plugin-gave-attackers-githubs-source-code/), citing Koi Security research; [BlueOptima (2026-01-21)](https://www.blueoptima.com/post/vs-code-extension-security-risks-the-supply-chain-that-auto-updates-on-your-developers-laptops) |
+| Q6 | 75.3% of developers say they would still ask a person "when I don't trust AI's answers", the top reason given. | [Stack Overflow Developer Survey 2025, AI](https://survey.stackoverflow.co/2025/ai) |
+| Q7 | On the Obsidian forum, graph view is widely reported as not useful: "nothing than a bunch of dots", "never seen the point … other than 'hey look at this!'". A minority use the local graph or filters. | [Obsidian forum: "What's the point of the graph view?" (2023)](https://forum.obsidian.md/t/whats-the-point-of-the-graph-view-how-are-you-using-it/71316); [Obsidian forum: "You All Say the Graph Is Useless…"](https://forum.obsidian.md/t/you-all-say-the-graph-is-useless-let-me-show-you-how-to-use-it/116738) |
+| Q8 | No strong evidence found on whether developers write notes about the tools they find. Open. | — |
+
+**Limits.** This evidence is secondhand: other people's surveys, papers, articles and forum threads, chosen by us. Survey respondents and forum posters are self-selected. None of them are RepoMagpie's users. There is no direct data on repeat installs (Q4) or on note-taking (Q8).
+
+**Hypothesis status after desk research**
+
+| Hypothesis | Status | Why |
+|---|---|---|
+| H1 Note-taking friction | **Open** | No evidence either way (Q8). To be tested by the v0.1 beta. |
+| H2 Vet and drift as a hook | **Real, but crowded** | The risk is real (Q3, Q5), and many tools already address it ([competitors](competitors.md), B and C). |
+| H3 Bigger pain for teams | **Supported** | Teams lose the "why" behind choices, and library-level decisions fall below the threshold for a decision record (Q4). |
+| H4 Graph views as a showcase | **Confirmed** (secondhand) | Widely reported as not useful for real work (Q7). |
 
 ### Pre-interview hypotheses (synthetic, not evidence)
 
