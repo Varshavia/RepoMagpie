@@ -22,3 +22,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
+| 0014 | [Close step 1.5 with desk research instead of interviews](0014-step-1-5-desk-research.md) | accepted |
