@@ -10,16 +10,16 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** step 2, spec and tech-stack decision, including the note format and the two journals.
-- **Next:** v0.1 Remember.
-- **Later:** v0.2 Trust, v0.3 Share.
+- **Now:** v0.1 Remember, built from the [spec](spec.md). First: the maintainer approves the libraries.
+- **Next:** v0.2 Trust.
+- **Later:** v0.3 Share.
 
 | Part | Status |
 |---|---|
 | 0. Repository skeleton | ✅ done |
 | 1. Agent instructions | ✅ done |
 | 1.5. Validation | ✅ done (desk research) |
-| 2. Spec and tech-stack decision | ⬜ |
+| 2. Spec and tech-stack decision | ✅ done |
 | v0.1 Remember | ⬜ |
 | v0.2 Trust | ⬜ |
 | v0.3 Share | ⬜ |
@@ -83,15 +83,17 @@ Only after these may the interviewer show the one-liner and record the reaction.
 
 ## 2. Spec and tech-stack decision
 Answer each open question and record the answer as a decision record. The v0.1 command set is decided in step 1.5, not here.
-- [ ] Implementation language: TypeScript (Node, publishable to npm, matches the skills ecosystem) or Python?
-- [ ] Where does the vault live and how does the CLI find it? (config file, env var, flag)
-- [ ] Embeddings for semantic search: local model or API? The default must work offline.
-- [ ] When the GitHub API reports no license, should `magpie note <url>` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
-- [ ] Note format and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)). The Verdict / Use when / Avoid when format is a hypothesis to test with Q8 ([strategy](strategy.md), §6).
-- [ ] How `magpie` finds the personal and project journals, and how it labels results from each ([decision 0013](decisions/0013-two-journal-scopes.md)).
-- [ ] Decide: soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)? Moved from step 1.5.
-- [ ] Decide: import stars as inbox suggestions? Moved from step 1.5.
-- [ ] Write `docs/spec.md`.
+- [x] Implementation language: TypeScript on Node.js ([decision 0015](decisions/0015-typescript-on-node.md)).
+- [x] Where the journals live and how the CLI finds them ([decision 0016](decisions/0016-journal-locations-and-config.md)).
+- [x] No licence found: record `unknown`, never `none` ([decision 0020](decisions/0020-unknown-license.md)). Reading licence statements from the README or `SKILL.md` files is not part of v0.1.
+- [x] Note format and identity: note schema v1 with Verdict, Use when and Avoid when, identified by PURL ([note schema](note-schema.md), [decision 0017](decisions/0017-package-identity-purl.md)). The format stays a hypothesis that the v0.1 beta tests.
+- [x] How results from the two journals are labelled and ordered ([spec](spec.md), section 3).
+- [x] Soften 0005: AI drafts, humans decide ([decision 0018](decisions/0018-ai-drafts-humans-decide.md), supersedes 0005).
+- [x] Star import: not in v0.1 ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)).
+- [x] Write [`docs/spec.md`](spec.md): commands, journals, identity, matching, hook contract, performance budgets, output design, stack.
+
+Moved out of this step:
+- Embeddings for semantic search (local model or API; the default must work offline): to v0.3, with semantic search. v0.1 has no embeddings.
 
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
 
@@ -105,12 +107,12 @@ Scope follows [decision 0010](decisions/0010-v0-1-scope.md) and [strategy](strat
 The first public release: capture what you learned, find it again, and see it before your agent installs a dependency.
 
 ### Journals and example vault
-- [ ] Finalise [note-schema.md](note-schema.md) with the format from the step 2 spec.
+- [x] Finalise [note-schema.md](note-schema.md) with the format from the step 2 spec (v1).
 - [ ] Personal journal: a folder outside any repository, private by default ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - [ ] Project journal: `.magpie/` inside a project repository, committed with the code.
 - [ ] Write example notes in `examples/vault/` from the [seed repositories](seed-repos.md).
 - [ ] Create `examples/vault/tags.md` with a starter tag list.
-- [ ] *Obsidian extra (optional):* the Templater template in `examples/vault/_templates/` matches the final schema (a draft exists).
+- [x] *Obsidian extra (optional):* the Templater template in `examples/vault/_templates/` matches the final schema (v1).
 
 **Done when:** every note in `examples/vault/` validates against the schema.
 
@@ -163,14 +165,23 @@ The first public release: capture what you learned, find it again, and see it be
 ### `magpie init` (if time allows; otherwise v0.2)
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use.
 
+### Development practice
+- [ ] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor (`>=22`, or `>=22.12.0` with commander 15).
+- [ ] Use `tdd` from `mattpocock/skills` while implementing v0.1, and its `code-review` before each pull request.
+- [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
+
 ### Launch
 See [marketing.md](marketing.md).
-- [ ] README rewrite for the accepted positioning, with one line about suggest
+- [ ] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand.
+- [ ] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards.
+- [ ] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`.
+- [ ] End-to-end check and screenshots of the landing page, and screenshots for the README, with `microsoft/playwright-cli`.
+- [ ] README rewrite for the accepted positioning, with one line about suggest; edit README and docs copy with `writing-guidelines` from `vercel-labs/agent-skills`.
 - [ ] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md))
 - [ ] Write the 30-second demo scenario (moved from step 1.5)
-- [ ] 30-second demo GIF: the "pdfkit moment"
-- [ ] Social preview image
-- [ ] Logo: a magpie, legible at 16 px
+- [ ] 30-second demo GIF: the "pdfkit moment", in the terminal theme from `DESIGN.md`
+- [ ] Social preview image, with `taste-skill`
+- [ ] Logo: a magpie, legible at 16 px; direction with `taste-skill`
 - [ ] Five "good first issue" issues
 - [ ] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact.
 - [ ] Soft launch in niche communities
@@ -184,11 +195,10 @@ See [marketing.md](marketing.md).
 - [ ] `magpie gaps`: dependencies used in a project but missing from the journals.
 
 ## v0.3 Share
-- [ ] Write `DESIGN.md` (Obsidian-inspired, dark-first) before any HTML surface. Use `VoltAgent/awesome-design-md` as reference only.
-- [ ] `magpie publish`: a static "nest" site from notes marked public.
+- [ ] `magpie publish`: a static "nest" site from notes marked public, following `DESIGN.md`. Review it with `web-design-guidelines` and check it with `playwright-cli`.
 - [ ] `magpie follow <nest-url>`: another user's public notes in your search results, attributed.
 - [ ] `/uses` page generator.
-- [ ] Semantic search, also for `suggest`.
+- [ ] Semantic search, also for `suggest`. First decide embeddings: local model or API; the default must work offline (moved from step 2). Orama is the candidate library ([spec](spec.md), section 9).
 
 ## Later
 - [ ] Resurfacing digest.
@@ -197,4 +207,4 @@ See [marketing.md](marketing.md).
 - [ ] *Obsidian extra (optional):* ready-made Dataview queries in `examples/vault/`.
 
 ## Not scheduled
-- Graph views: marketing only ([ideas](ideas.md), idea 10). The Obsidian graph preset and `magpie graph` are built only as a shareable visual, if at all.
+- Graph views: marketing only ([ideas](ideas.md), idea 10). The Obsidian graph preset and `magpie graph` are built only as a shareable visual, if at all. If built: review with `web-design-guidelines`, check and screenshot with `playwright-cli`.
