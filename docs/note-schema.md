@@ -19,7 +19,7 @@ The file name derives from the note's `id`, a Package URL ([decision 0017](decis
 
 The double dash keeps the parts distinct. v0.1 supports GitHub repositories and registry packages (npm, PyPI, Cargo) only.
 
-npm and Cargo names are case-sensitive, so two packages whose names differ only in case (`JSONStream`, `jsonstream`) map to the same file. v0.1 rejects the second one with an error that names both PURLs and the file.
+Cargo names are case-sensitive, so two crates whose names differ only in case (`Inflector`, `inflector`) map to the same file. (npm and PyPI PURLs are lowercased, so they can't clash.) v0.1 rejects the second one with an error that names both PURLs and the file.
 
 ## Frontmatter
 
@@ -87,7 +87,7 @@ Notes may be written in any language ([decision 0004](decisions/0004-english-eve
    - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines.
 3. **Drafts.** A drafted section starts with the line `<!-- magpie:draft -->`. AI may draft only "What it does" and "Use when". "Avoid when" may also be a draft when it comes from the user's own `avoid:` text in `magpie import` (rule 7). The Verdict is never a draft. Deleting the marker accepts the draft. Search, suggest and recall label draft text as a draft.
 4. **Notable skills.** The tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
-5. **Tags** come from the journal's tag list (`<journal>/tags.md`), so the same idea isn't spelled three ways. Across the two journals, tags match by name.
+5. **Tags** come from the journal's tag list (`<journal>/tags.md`), so the same idea isn't spelled three ways. Across the two journals, tags match by name. The tag list has one list line per tag, optionally with its meaning: ``- `testing` — tests and end-to-end checks``. Other lines are ignored.
 6. **One note per subject.** A PURL appears in at most one note per journal, as its `id` or in its `packages`. A repository note that lists `pkg:npm/pdfkit` is the note for that package too.
 7. **User input.**
    - `magpie note <name-or-url> "text"`: the text is the Verdict (human-written).

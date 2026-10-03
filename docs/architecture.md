@@ -37,6 +37,7 @@ src/
                index: build, cache and query (MiniSearch)
                match: recall and suggest rules
                github: repository metadata and SKILL.md detection
+               capture: what note and import write for one item
   cli/         one module per command; human and --json output
   hook/        claude-code.ts: stdin JSON → install detection → recall → stdout JSON
 skill/
