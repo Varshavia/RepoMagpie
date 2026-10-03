@@ -10,7 +10,7 @@ Nothing here is built yet. v0.1 is implemented on `feat/...` branches ([decision
 - **Streams:** data goes to stdout; messages, warnings and errors go to stderr.
 - **`--json`** on every command prints one JSON document to stdout and nothing else ([decision 0008](decisions/0008-machine-readable-output.md)). Its shape is part of the public interface. Under `--json`, `magpie` never prompts.
 - **Interactive prompts** happen only when stdin and stdout are terminals and `--json` is not set.
-- **Global flags:** `--json`, `--home <dir>` (personal journal), `--project <dir>` (project journal), `--help`, `--version`.
+- **Global flags:** `--json`, `--home <dir>` (personal journal), `--project <dir>` (project root, like `git -C`; a path to its `.magpie` folder also works), `--help`, `--version`.
 - **Exit codes:**
 
 | Code | Meaning |
@@ -145,9 +145,9 @@ Internal: the command the Claude Code hook runs (section 6). Not meant to be typ
   .gitignore      project journal only; contains ".cache/"
 ```
 
-**Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`.
+**Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
 
-**Finding the project journal:** `--project <dir>` if given. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal.
+**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal.
 
 **Reading both:** search, suggest and recall read both journals. Each result says which journal it came from. When both journals have a note for the same PURL, the project journal's note comes first: it is the team's decision for this project.
 
@@ -166,6 +166,8 @@ Every note's `id` is a Package URL ([decision 0017](decisions/0017-package-ident
 | A bare name | typed by the nearest manifest: `package.json` → npm, `pyproject.toml` → pypi, `Cargo.toml` → cargo. More than one, or none: ask in a terminal; otherwise fail with exit 2 and suggest `--type` |
 
 Any other input (articles, gists, loose Markdown files) is rejected with exit 2 in v0.1.
+
+**Case-only name clash:** npm and Cargo names are case-sensitive, but note file names are lowercase. If the file for a new subject already holds a note with a different id (`pkg:npm/JSONStream` vs `pkg:npm/jsonstream`), `note`, `import` and `adopt` refuse with an error that names both PURLs and the file, and exit 1 ([note schema](note-schema.md)).
 
 ## 5. Matching rules
 
