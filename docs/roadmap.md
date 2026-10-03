@@ -49,6 +49,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 - [x] Backup deny list in `.claude/settings.json` for the most damaging git and gh commands
 - [x] Private work log in `.worklog/`
 - [x] Live check that git-guard blocks commits sent through the PowerShell tool
+- [x] git-guard blocks shell commands that write files (in-place edits, `tee`, redirection, PowerShell `Set-Content`/`Add-Content`/`Out-File`), with tests
 
 **Done when:** an agent asked to "commit this" refuses and prints a suggested commit message instead.
 
