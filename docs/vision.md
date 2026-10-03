@@ -30,6 +30,8 @@ RepoMagpie starts from **"you understand it, the machine remembers it."**
 | Granularity | Repository | Repository, plus a searchable line per skill |
 | Primary interface | GUI app | CLI + `SKILL.md` (agent-native), any Markdown editor |
 
+Approved ideas that may widen this positioning, with a candidate one-liner, are in [ideas](ideas.md).
+
 ## Why "magpie"
 
 Magpies are known for collecting shiny things and keeping them in their nest. The daily habit — notice something interesting, bring it home, keep it — is the product.
