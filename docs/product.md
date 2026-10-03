@@ -24,7 +24,7 @@ $ magpie note pdfkit "avoid: async streams painful; use puppeteer"
 
 $ magpie note https://github.com/microsoft/playwright-cli "use: let my agent test a web UI end to end"
 ✔ Saved to your personal journal: microsoft/playwright-cli (status: inbox)
-  Fetched: cli · Apache-2.0 · 1 skill · packages: npm:@playwright/cli
+  Fetched: cli · Apache-2.0 · 1 skill · packages: pkg:npm/%40playwright/cli
 
 $ magpie suggest "a TypeScript CLI with tests"
 1. vitest   project journal   Verdict: default test runner for new projects
@@ -65,11 +65,11 @@ Two scopes, one format ([decision 0013](decisions/0013-two-journal-scopes.md)):
 <project>/.magpie/       the project journal, committed with the code
 ```
 
-Inside a journal, the current draft layout is:
+Inside a journal:
 
 ```
-repos/                 notes (how notes are identified is redesigned in the step 2 spec)
-tags.md                shared tag list
+notes/                 one note per subject, named from its PURL (npm--pdfkit.md, github--owner--repo.md)
+tags.md                the journal's tag list
 _templates/            Templater template (Obsidian extra, example vault)
 ```
 
@@ -86,7 +86,7 @@ A single self-contained HTML file. Marketing only, not scheduled. See [Graph spe
 ## Visual identity
 
 - Obsidian-inspired, dark-first, calm, information-dense.
-- A `DESIGN.md` is written before the first HTML surface is built: nests, in v0.3. [`VoltAgent/awesome-design-md`](https://github.com/VoltAgent/awesome-design-md) is a reference only. See [standards](standards.md).
+- A `DESIGN.md` is written in v0.1 Launch, before the logo, social preview, landing page and demo GIF, so they share one visual language. [`VoltAgent/awesome-design-md`](https://github.com/VoltAgent/awesome-design-md) is a reference only. See [standards](standards.md).
 - The logo is a magpie, legible at 16 px.
 
 ## Graph specification
@@ -109,7 +109,7 @@ Graph views are often admired but rarely used. Ours must earn its place by (a) s
 
 | Node | Source | Notes |
 |---|---|---|
-| repo | each note in `repos/` | main node |
+| repo | each note in `notes/` | main node |
 | skill | each completed skill line | attached to its repo |
 | tag | each tag in use | hub node |
 | magpie (v0.3) | each followed nest | other people |
@@ -146,7 +146,7 @@ A legend is always visible. Colour is never the only carrier of meaning: shapes 
 
 - Search box: focus and highlight matching nodes.
 - Filters: kind, tag, status (inbox or reviewed), drift only, tried only.
-- Click a node to open a side panel: "What it does", "When it's useful", notable skills, rating, and links to the note file and the repository.
+- Click a node to open a side panel: Verdict, "Use when", "Avoid when", "What it does", notable skills, rating, and links to the note file and the repository.
 - Local graph: depth 1 or 2 around the selected node.
 - Toggle similar-to edges.
 - Export the current view as PNG and SVG, for sharing.

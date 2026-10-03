@@ -164,6 +164,6 @@ Each decision gets a decision record in [decisions](decisions/README.md). Link i
 
 | Decision | Record |
 |---|---|
-| Soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)? | |
-| Import stars as inbox suggestions? | |
+| Soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)? | [0018](decisions/0018-ai-drafts-humans-decide.md) (decided in step 2) |
+| Import stars as inbox suggestions? | [0019](decisions/0019-no-star-import-in-v0-1.md) (decided in step 2: not in v0.1) |
 | The v0.1 command set and the release themes | [0010](decisions/0010-v0-1-scope.md) |
