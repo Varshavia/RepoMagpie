@@ -12,9 +12,10 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **core** | The module that holds all business logic. `magpie` and the MCP server are thin layers over it ([decision 0002](decisions/0002-cli-first.md), [architecture](architecture.md)). |
 | **daily find** | Planned (later): `magpie today` suggests one trending repository that matches the user's tags. Optional and quiet. See [ideas](ideas.md), idea 9. |
 | **digest** | Planned (later): a periodic "You saved X three months ago. Still useful?" list that resurfaces old notes. See [ideas](ideas.md), idea 6. |
-| **draft** | Content the tool writes once, at note creation, into a human-owned field or section: `kind`, `tags`, `install`, "What it does". The user may change it; the tool never touches it again. |
+| **draft** | Content the tool writes once, at note creation, into a human-owned field or section: `kind`, `tags`, "What it does", "Use when". A drafted section starts with `<!-- magpie:draft -->`; deleting the marker accepts it. The user may change a draft; the tool never touches it again ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). |
 | **drift** | Planned (v0.2): a change upstream since the user reviewed a repository or skill. `magpie drift` lists notes with drift. See [ideas](ideas.md), idea 2. |
 | **empty skill line** | A skill line with nothing after the dash. Search ignores it. |
+| **fail open** | When something goes wrong, do nothing rather than block. The recall hook prints nothing and exits 0 on any error, so an install is never stopped by `magpie` ([spec](spec.md), section 6). |
 | **follow** | Planned (v0.3): `magpie follow <nest-url>` adds another user's public notes to your search results, attributed and kept apart from your notes. See [ideas](ideas.md), idea 3. |
 | **gap** | Planned (v0.2): a dependency used in a project but missing from the journals, or a tag or kind with no reviewed notes. `magpie gaps` lists them. See [ideas](ideas.md), idea 5. |
 | **graph levels** | Three possible graph views, all marketing only and not scheduled: level 1, an Obsidian graph preset for the example vault; level 2, `magpie graph`, an HTML file; level 3, the graph in nest pages. See [ideas](ideas.md), idea 10. |
@@ -23,16 +24,19 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **inbox** | The `status` of a note that is not yet reviewed. It is the only such state, whatever created the note (by hand, `magpie note`, `magpie import`, `magpie init`). |
 | **init** | Planned (v0.1 if time allows, otherwise v0.2): `magpie init` reads a project's manifests and creates draft notes for the dependencies already in use. See [ideas](ideas.md), idea 5. |
 | **journal** | A folder of notes. There are two scopes with one format: the personal journal and the project journal ([decision 0013](decisions/0013-two-journal-scopes.md)). Product copy also calls a note a *journal entry*. |
+| **journal discovery** | How `magpie` finds the journals: the personal journal by flag, `MAGPIE_HOME`, config file or default `~/.magpie/`; the project journal by walking up from the working directory to the first `.magpie/`, stopping at the git root ([decision 0016](decisions/0016-journal-locations-and-config.md)). |
 | **kind** | The frontmatter field that says what a repository is: `skill-pack`, `cli`, `library`, and so on. The list is in the [note schema](note-schema.md). |
+| **lenient read, strict write** | `magpie` reads hand-written notes even when fields or sections are missing or out of order, but always writes notes in the canonical format, and never rewrites a human section ([note schema](note-schema.md), rule 8). |
 | **magpie** | The RepoMagpie command-line tool, e.g. `magpie note pdfkit "avoid: …"`. `magpie note <url> "…"` also fetches the repository's facts from GitHub. Not built yet. |
 | **MCP server** | A planned thin layer over the core for agent clients without a shell ([decision 0002](decisions/0002-cli-first.md)). |
 | **nest** | Planned (v0.3): a static site built by `magpie publish` from the notes a user marked public. See [ideas](ideas.md), idea 3. |
-| **note** | One Markdown file with YAML frontmatter. In the current draft schema it describes one repository, at `<journal>/repos/<owner>--<repo>.md`; how notes are identified is redesigned in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)). |
+| **note** | One Markdown file with YAML frontmatter about one subject (a GitHub repository or a registry package), at `<journal>/notes/<file>.md`. Its `id` is a PURL ([note schema](note-schema.md), [decision 0017](decisions/0017-package-identity-purl.md)). |
 | **personal journal** | The user's own journal: a folder outside any repository, private by default. It holds anything the user explored and judged: repositories, skills, tools ([decision 0013](decisions/0013-two-journal-scopes.md)). |
 | **proactive recall** | Planned (v0.1): when an agent is about to install a package, RepoMagpie shows the user's note on it from both journals. It informs and never blocks. Hook mode runs from an agent hook (Claude Code at launch); skill mode relies on `SKILL.md` and `magpie recall <package>`. See [ideas](ideas.md), idea 1. |
 | **project journal** | A journal in `.magpie/` inside a project repository, committed with the code, so the team shares it through git. It is as visible as the repository ([decision 0013](decisions/0013-two-journal-scopes.md)). |
+| **PURL** (Package URL) | The standard identifier for a package (ECMA-427): `pkg:npm/pdfkit`, `pkg:pypi/requests`, `pkg:github/owner/repo`. Every note's `id` is a PURL, and its file name derives from it ([decision 0017](decisions/0017-package-identity-purl.md)). |
 | **repository** (repo) | A GitHub repository. Each repository has at most one note. |
-| **reviewed** | The `status` of a note whose "When it's useful" section has at least one bullet written by the user. |
+| **reviewed** | The `status` of a note whose Verdict has human-written text ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). |
 | **search index** | A cache built from the notes to answer searches. It can be deleted and rebuilt from the files at any time ([decision 0001](decisions/0001-plain-markdown-storage.md)). |
 | **skill** | A folder with a `SKILL.md` file, following the Agent Skills standard. In RepoMagpie a skill is recorded as a skill line, never as its own note. |
 | **skill line** | One line under "Notable skills" in a note: `` - `skill-name` — when it's useful ``. |
@@ -43,13 +47,13 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **tag** | A lowercase, kebab-case label in a note's `tags` field, chosen by the user from the tag list. |
 | **tag list** | The single shared list of allowed tags, in `<vault>/tags.md`. |
 | **the tool** | RepoMagpie's own code (`magpie` and the core it calls), as opposed to the user. Used in *tool-owned* and *the tool may draft*. |
-| **tool-owned** | A field the tool fills and may refresh: `name`, `url`, `language`, `license`, `topics`, and `explored` (set once). |
+| **tool-owned** | A field the tool fills and may refresh: `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, and `explored` and `adopted` (both set once). |
 | **topic** | A label the repository's owner set on GitHub. Stored raw in `topics`; the tool uses topics to suggest tags. A topic is not a tag. |
 | **typed relation** | Proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)): a link between two notes with a meaning, stored in the human-owned `alternatives` or `works_with` field. See [ideas](ideas.md), idea 10. |
+| **"Use when" / "Avoid when"** | Two body sections: concrete situations where the subject fits, and where it hurt or doesn't fit, one per bullet. "Use when" may start as an AI draft; both are human-owned ([note schema](note-schema.md)). They replace "When it's useful" from schema v0. |
 | **vault** | The folder of a journal, as Obsidian calls it. The user's vault is their personal journal and lives outside this repository ([decision 0003](decisions/0003-vault-outside-repo.md)); `examples/vault/` is the example vault. How `magpie` finds journals is TBD (roadmap step 2). |
-| **verdict** | The one line in a note that says what the user decided about a package or tool, for example "avoid: async streams painful; use puppeteer". Recall and suggest show it first. Part of the note format designed in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)). |
+| **verdict** | The one line in a note that says what the user decided about a package or tool, for example "avoid: async streams painful; use puppeteer". Recall and suggest show it first. Human-written only; a note without one stays `inbox` ([decision 0018](decisions/0018-ai-drafts-humans-decide.md), [note schema](note-schema.md)). |
 | **vet** | Planned (v0.2, reduced): recording your own review of a repository or skill, and the commit you reviewed, in the note, with links to existing scanners. RepoMagpie builds no scanner ([decision 0011](decisions/0011-vet-and-drift-reduced.md)). See [ideas](ideas.md), idea 2. |
-| **"When it's useful"** | The body section the user writes in their own words: one concrete situation per bullet. The tool never writes it ([decision 0005](decisions/0005-human-written-usefulness.md)). |
 
 ## Project terms
 
