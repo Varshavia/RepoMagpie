@@ -86,7 +86,7 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 - [ ] Where does the vault live and how does the CLI find it? (config file, env var, flag)
 - [ ] Embeddings for semantic search: local model or API? The default must work offline.
 - [ ] When the GitHub API reports no license, should `magpie note <url>` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
-- [ ] Note format (Verdict, Use when, Avoid when) and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)).
+- [ ] Note format and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)). The Verdict / Use when / Avoid when format is a hypothesis to test with Q8 ([strategy](strategy.md), §6).
 - [ ] How `magpie` finds the personal and project journals, and how it labels results from each ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - [ ] Write `docs/spec.md`.
 
