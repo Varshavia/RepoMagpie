@@ -1,8 +1,10 @@
-// Where the journals are: spec section 3, decision 0016.
-// Reads the file system; never prints. Home, environment and working directory are passed in.
-import { existsSync, readFileSync, statSync } from "node:fs";
+// Where the journals are and what they hold: spec section 3, decision 0016.
+// Uses the file system; never prints. Home, environment and working directory are passed in.
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
+import type { Manifest } from "./identity.ts";
+import { readNote } from "./note.ts";
 
 export type Env = Record<string, string | undefined>;
 
@@ -58,6 +60,75 @@ export function findProjectJournal(options: { cwd: string; personalJournal: stri
     if (isDirectory(candidate) && comparable(candidate) !== personal) return candidate;
     if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return null;
   }
+}
+
+// The nearest folder with .git, walking up; outside git, the working directory itself.
+export function findProjectRoot(cwd: string): string {
+  for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (dirname(dir) === dir) return resolve(cwd);
+  }
+}
+
+const MANIFESTS: readonly Manifest[] = ["package.json", "pyproject.toml", "Cargo.toml"];
+
+// The manifests in the closest folder that has any, walking up to the git root (spec §4).
+export function findManifests(cwd: string): Manifest[] {
+  for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    const found = MANIFESTS.filter((manifest) => existsSync(join(dir, manifest)));
+    if (found.length) return found;
+    if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return [];
+  }
+}
+
+// Creates a project journal folder with a .gitignore for .cache/ (spec §3). Returns false
+// when the folder already existed; an existing .gitignore is kept.
+export function createProjectJournal(path: string): boolean {
+  const created = !existsSync(path);
+  mkdirSync(path, { recursive: true });
+  const ignore = join(path, ".gitignore");
+  if (!existsSync(ignore)) writeFileSync(ignore, ".cache/\n");
+  return created;
+}
+
+export interface NoteEntry {
+  path: string;
+  id: string | undefined; // undefined when the frontmatter has no readable id
+  packages: string[];
+}
+
+// Every note in <journal>/notes/ with its id and packages.
+export function listNotes(journal: string): NoteEntry[] {
+  const folder = join(journal, "notes");
+  if (!isDirectory(folder)) return [];
+  return readdirSync(folder)
+    .filter((name) => name.endsWith(".md"))
+    .sort()
+    .map((name) => {
+      const path = join(folder, name);
+      const { frontmatter } = readNote(readFileSync(path, "utf8"));
+      const packages = Array.isArray(frontmatter.packages) ? frontmatter.packages.filter((p): p is string => typeof p === "string") : [];
+      return { path, id: typeof frontmatter.id === "string" ? frontmatter.id : undefined, packages };
+    });
+}
+
+// The note whose id or packages has this PURL (schema rule 6).
+export function noteFor(notes: NoteEntry[], purl: string): NoteEntry | undefined {
+  return notes.find((entry) => entry.id === purl) ?? notes.find((entry) => entry.packages.includes(purl));
+}
+
+// Tags from a tag list: one list line per tag, "- `tag`", optionally followed by " — meaning".
+export function parseTagList(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*[-*]\s+`?([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:\s|$)/)?.[1])
+    .filter((tag): tag is string => tag !== undefined);
+}
+
+// The journal's tag list, <journal>/tags.md; empty when there is none.
+export function readTagList(journal: string): string[] {
+  const file = join(journal, "tags.md");
+  return existsSync(file) ? parseTagList(readFileSync(file, "utf8")) : [];
 }
 
 function isDirectory(path: string): boolean {

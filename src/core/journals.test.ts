@@ -1,9 +1,21 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, parse } from "node:path";
-import { configPath, findProjectJournal, resolvePersonalJournal } from "./journals.ts";
+import { fileURLToPath } from "node:url";
+import {
+  configPath,
+  createProjectJournal,
+  findManifests,
+  findProjectJournal,
+  findProjectRoot,
+  listNotes,
+  noteFor,
+  parseTagList,
+  readTagList,
+  resolvePersonalJournal,
+} from "./journals.ts";
 
 // Every fixture lives in its own temporary folder; the real home directory is never used.
 const roots: string[] = [];
@@ -131,4 +143,86 @@ test("--project with a project root means that root's .magpie folder (like git -
   const root = fixture({ ".git/": null, ".magpie/": null });
   assert.equal(findProjectJournal({ cwd: root, personalJournal: join(root, "personal"), flag: "../repo" }), join(root, "..", "repo", ".magpie"));
   assert.equal(findProjectJournal({ cwd: root, personalJournal: join(root, "personal"), flag: "." }), join(root, ".magpie"));
+});
+
+// Project root and manifests (spec §2 note step 5, §4 bare names)
+
+test("the project root is the nearest folder with .git", () => {
+  const root = fixture({ ".git/": null, "src/deep/": null });
+  assert.equal(findProjectRoot(join(root, "src", "deep")), root);
+});
+
+test("outside git, the project root is the working directory", () => {
+  const root = fixture({ "outside/": null });
+  // The fixture's parents may be inside some repository; the walk only ever returns a folder that has .git, or cwd.
+  const found = findProjectRoot(join(root, "outside"));
+  assert.ok(found === join(root, "outside") || existsSync(join(found, ".git")));
+});
+
+test("the nearest manifests are those in the closest folder that has any", () => {
+  const root = fixture({ ".git/": null, "package.json": "{}", "pyproject.toml": "", "app/Cargo.toml": "", "app/src/": null });
+  assert.deepEqual(findManifests(join(root, "app", "src")), ["Cargo.toml"]);
+  assert.deepEqual(findManifests(root), ["package.json", "pyproject.toml"]);
+});
+
+test("the manifest walk stops at the git root", () => {
+  const outer = fixture({ "package.json": "{}", "repo/.git/": null, "repo/src/": null });
+  assert.deepEqual(findManifests(join(outer, "repo", "src")), []);
+});
+
+// Notes in a journal: found by id or packages (schema rule 6)
+
+const note = (id: string, packages: string[] = []) => `---\nid: ${id}\nname: x\npackages: [${packages.join(", ")}]\n---\n\n## Verdict\n`;
+
+test("listNotes reads every note's id and packages; noteFor matches either", () => {
+  const journal = fixture({
+    "notes/npm--pdfkit.md": note("pkg:npm/pdfkit"),
+    "notes/github--microsoft--playwright-cli.md": note("pkg:github/microsoft/playwright-cli", ["pkg:npm/%40playwright/cli"]),
+    "notes/readme.txt": "not a note",
+  });
+  const notes = listNotes(journal);
+  assert.equal(notes.length, 2);
+  assert.equal(noteFor(notes, "pkg:npm/pdfkit")?.path, join(journal, "notes", "npm--pdfkit.md"));
+  assert.equal(noteFor(notes, "pkg:npm/%40playwright/cli")?.id, "pkg:github/microsoft/playwright-cli");
+  assert.equal(noteFor(notes, "pkg:npm/other"), undefined);
+});
+
+test("listNotes on a journal without notes/ is empty; unreadable frontmatter gives an entry without id", () => {
+  assert.deepEqual(listNotes(fixture({})), []);
+  const journal = fixture({ "notes/npm--broken.md": "---\nid: [\n---\n" });
+  assert.deepEqual(listNotes(journal), [{ path: join(journal, "notes", "npm--broken.md"), id: undefined, packages: [] }]);
+});
+
+// The tag list: one "- `tag`" line per tag, optionally followed by " — meaning"
+
+test("parseTagList reads list lines with or without backticks and ignores everything else", () => {
+  const text = "# Tags\n\nIntro with `not-a-tag`.\n\n- `agent-skills` — repos of skills\n* testing\n- `Bad Tag` — no\n- design\n";
+  assert.deepEqual(parseTagList(text), ["agent-skills", "testing", "design"]);
+});
+
+test("readTagList reads <journal>/tags.md, or nothing when it is missing", () => {
+  assert.deepEqual(readTagList(fixture({ "tags.md": "- `pdf`\r\n- `testing` — tests\r\n" })), ["pdf", "testing"]);
+  assert.deepEqual(readTagList(fixture({})), []);
+});
+
+test("the example vault's tag list parses to its ten tags", () => {
+  const tags = readTagList(fileURLToPath(new URL("../../examples/vault/", import.meta.url)));
+  assert.equal(tags.length, 10);
+  assert.ok(tags.includes("agent-skills"));
+});
+
+// Creating a project journal (spec §2 note step 5)
+
+test("createProjectJournal makes the folder and a .gitignore for .cache/", () => {
+  const root = fixture({ ".git/": null });
+  const journal = join(root, ".magpie");
+  assert.equal(createProjectJournal(journal), true);
+  assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n");
+  assert.equal(createProjectJournal(journal), false);
+});
+
+test("createProjectJournal keeps an existing .gitignore", () => {
+  const root = fixture({ ".magpie/.gitignore": "mine\n" });
+  assert.equal(createProjectJournal(join(root, ".magpie")), false);
+  assert.equal(readFileSync(join(root, ".magpie", ".gitignore"), "utf8"), "mine\n");
 });

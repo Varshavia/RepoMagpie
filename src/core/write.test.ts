@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readNote, validate } from "./note.ts";
-import { appendSkillLine, renderNote, setToolFields } from "./write.ts";
+import { appendSkillLine, renderNote, setToolFields, setVerdict } from "./write.ts";
 
 // A hand-written note: comments, odd spacing, a block list, an empty value, text above the
 // sections, an extra hand-written section, and sections a person typed.
@@ -180,6 +180,78 @@ test("appendSkillLine leaves a file with unparsable frontmatter untouched", () =
   const r = appendSkillLine(broken, "new-skill");
   assert.equal(r.text, broken);
   assert.equal(r.warnings.length, 1);
+});
+
+// --- setVerdict: the user's own text into an empty Verdict, and status: reviewed (spec §2) ---
+
+const NO_VERDICT = HAND_WRITTEN.replace("avoid: async streams painful; use puppeteer\n", "").replace("status: reviewed", "status: inbox");
+
+test("a Verdict goes right after an empty Verdict heading; status becomes reviewed; nothing else changes", () => {
+  const r = setVerdict(NO_VERDICT, "use it for one-page PDFs only");
+  assert.equal(r.text, NO_VERDICT.replace("status: inbox", "status: reviewed").replace("##  Verdict\n", "##  Verdict\nuse it for one-page PDFs only\n"));
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.warnings, []);
+});
+
+test("a Verdict section holding only a comment counts as empty; the comment stays", () => {
+  const text = NO_VERDICT.replace("##  Verdict\n", "##  Verdict\n<!-- one line -->\n");
+  const r = setVerdict(text, "ok");
+  assert.equal(r.text, text.replace("status: inbox", "status: reviewed").replace("##  Verdict\n", "##  Verdict\nok\n"));
+});
+
+test("an existing Verdict is never overwritten", () => {
+  const r = setVerdict(HAND_WRITTEN, "something else");
+  assert.equal(r.text, HAND_WRITTEN);
+  assert.equal(r.changed, false);
+  assert.equal(r.warnings.length, 1);
+});
+
+test("without a Verdict section, one is inserted before the first section", () => {
+  const text = NO_VERDICT.replace("##  Verdict\n\n", "");
+  const r = setVerdict(text, "ok");
+  assert.equal(r.text, text.replace("status: inbox", "status: reviewed").replace("## Use when\n", "## Verdict\nok\n\n## Use when\n"));
+});
+
+test("without any section, the Verdict goes at the end after a blank line", () => {
+  const text = "---\nid: pkg:npm/pdfkit\nstatus: inbox\n---\n\nSome text.\n";
+  const r = setVerdict(text, "ok");
+  assert.equal(r.text, "---\nid: pkg:npm/pdfkit\nstatus: reviewed\n---\n\nSome text.\n\n## Verdict\nok\n");
+});
+
+test("a missing status is added as reviewed", () => {
+  const text = NO_VERDICT.replace("status: inbox\n", "");
+  const r = setVerdict(text, "ok");
+  assert.equal(r.text, text.replace("rating:\n---", "rating:\nstatus: reviewed\n---").replace("##  Verdict\n", "##  Verdict\nok\n"));
+});
+
+test("setVerdict keeps CRLF line endings", () => {
+  const crlf = NO_VERDICT.replace(/\n/g, "\r\n");
+  const r = setVerdict(crlf, "ok");
+  assert.equal(r.text, crlf.replace("status: inbox", "status: reviewed").replace("##  Verdict\r\n", "##  Verdict\r\nok\r\n"));
+});
+
+test("a Verdict of more than one line, or an empty one, is refused", () => {
+  for (const verdict of ["two\nlines", "   "]) {
+    const r = setVerdict(NO_VERDICT, verdict);
+    assert.equal(r.text, NO_VERDICT);
+    assert.equal(r.warnings.length, 1);
+  }
+});
+
+test("setVerdict leaves a note without readable frontmatter untouched", () => {
+  const broken = NO_VERDICT.replace("topics: [ pdf,  documents ]", "topics: [ pdf,  documents");
+  for (const text of [broken, "## Verdict\n\n## Use when\n"]) {
+    const r = setVerdict(text, "ok");
+    assert.equal(r.text, text);
+    assert.equal(r.warnings.length, 1);
+  }
+});
+
+test("the result validates as reviewed", () => {
+  const r = setVerdict(NO_VERDICT, "ok");
+  const note = readNote(r.text);
+  assert.equal(note.status, "reviewed");
+  assert.equal(note.frontmatter.status, "reviewed");
 });
 
 // --- renderNote: strict canonical format for new notes ---
