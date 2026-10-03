@@ -85,7 +85,7 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 - [ ] Implementation language: TypeScript (Node, publishable to npm, matches the skills ecosystem) or Python?
 - [ ] Where does the vault live and how does the CLI find it? (config file, env var, flag)
 - [ ] Embeddings for semantic search: local model or API? The default must work offline.
-- [ ] When the GitHub API reports no license, should `magpie add` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
+- [ ] Only if `magpie add` is scheduled (see "Not scheduled"): when the GitHub API reports no license, should `magpie add` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
 - [ ] Note format (Verdict, Use when, Avoid when) and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)).
 - [ ] How `magpie` finds the personal and project journals, and how it labels results from each ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - [ ] Write `docs/spec.md`.

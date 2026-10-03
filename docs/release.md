@@ -6,7 +6,7 @@ How RepoMagpie versions, records and ships releases. Nothing has been released y
 
 - [Semantic Versioning](https://semver.org/spec/v2.0.0.html), starting at `0.x`.
 - Minor versions for features, patch versions for fixes.
-- Tags use the format `vX.Y.Z`, for example `v0.1.0`.
+- Tags use the format `vX.Y.Z`, for example `v0.1.0`, and are created on `main` only ([decision 0012](decisions/0012-branch-workflow.md)).
 - Pre-releases use `vX.Y.Z-beta.N`, for example `v0.1.0-beta.1`.
 
 ## Changelog
@@ -14,7 +14,7 @@ How RepoMagpie versions, records and ships releases. Nothing has been released y
 [`CHANGELOG.md`](../CHANGELOG.md) follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 - New entries go under `## [Unreleased]`, grouped as Added, Changed, Deprecated, Removed, Fixed and Security.
-- An entry describes a user-visible change in one line, for example: `Added: magpie add accepts a skill URL.`
+- An entry describes a user-visible change in one line, for example: `Added: magpie import reads one note per line from a file.`
 - Docs-only changes don't need entries.
 
 ## Who does what
@@ -23,7 +23,7 @@ How RepoMagpie versions, records and ships releases. Nothing has been released y
 |---|---|
 | Draft changelog entries under Unreleased during normal work | agent |
 | Draft release notes, on request | agent |
-| Create tags | maintainer, by hand |
+| Create tags, on `main` only | maintainer, by hand |
 | Create GitHub releases | maintainer, by hand |
 | Publish to the package registry chosen in step 2 | maintainer, by hand |
 

@@ -35,7 +35,7 @@ The first repositories explored for this project (2026-10-01). They become the e
 - **What it does:** Playwright browser automation as a CLI with an accompanying skill, designed for coding agents.
 - **When it's useful (draft):** letting an agent test a web UI end-to-end and take screenshots.
 - **Install:** `npm install -g @playwright/cli@latest` then `playwright-cli install --skills`
-- **Role in RepoMagpie:** reference design for "CLI + SKILL.md" (decision 0002); testing the `magpie graph` HTML (v0.2).
+- **Role in RepoMagpie:** reference design for "CLI + SKILL.md" (decision 0002); testing HTML surfaces such as nests (v0.3).
 
 ## Leonxlnx/taste-skill
 - **URL:** https://github.com/Leonxlnx/taste-skill
