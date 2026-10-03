@@ -54,20 +54,20 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## 1.5. Validation
 The maintainer's work. Agent work pauses until the interview results arrive.
-- [ ] Interview 5–8 developers. Notes go in [validation.md](validation.md). Don't pitch the idea during interviews.
+- [ ] Interview at least 3 developers, one per profile: a heavy coding-agent user, a security-minded engineer, a student. Add more if the patterns are unclear. Notes go in [validation.md](validation.md). Don't pitch the idea during interviews.
 - [ ] Hands-on review of competitors: GithubStarsManager, the Obsidian "GitHub Integration" plugin, and Starcat (README only; it's macOS-only).
 - [ ] Write the 30-second demo scenario.
 - [ ] Decide: soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)?
 - [ ] Decide: import stars as inbox suggestions?
 - [ ] Decide: the v0.1 command set and the release themes.
 
-Interview questions:
+Interview questions (they ask about past behaviour, not hypothetical use):
 1. When did you last go back to a repository you starred? How did you find it?
 2. Where do you look when you need a new tool or library?
 3. Do you ask your coding agent for tool recommendations? Do you trust them?
-4. Would it help if your agent reminded you of your own notes before installing a package?
+4. Have you ever installed a package again after forgetting it went badly the first time? When was the last time?
 5. If a skill you installed changed after you reviewed it, how would you find out? What would you do?
-6. Would you follow a trusted developer's notes on tools?
+6. Whose opinion do you rely on when choosing a tool? Whose recommendation did you last act on?
 7. Do you use Obsidian's graph view, or any graph view? What do you actually do with it?
 
 **Done when:** `docs/validation.md` has the interview notes and the competitor review, `vision.md` is updated from the findings, and every decision above has a decision record.
