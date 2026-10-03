@@ -53,7 +53,7 @@ export function fileNameFor(purl: string): string {
   return `${parts.join("--").toLowerCase().replace(/[^a-z0-9._-]/g, "-")}.md`;
 }
 
-// npm and Cargo names are case-sensitive, but file names are lowercase, so two subjects can map
+// Cargo names are case-sensitive (npm and PyPI PURLs are lowercased), but file names are lowercase, so two subjects can map
 // to one file. v0.1 rejects the second: returns an error message, or null when there is no clash.
 // `existing` is the id of the note already at that file name, if any.
 export function fileNameClash(purl: string, existing: string | undefined): string | null {

@@ -84,6 +84,40 @@ export function renderNote(note: NewNote): string {
 // added at the end of the frontmatter. explored and adopted are set once; a known licence is
 // never replaced with "unknown". A note whose frontmatter can't be read is left untouched.
 export function setToolFields(text: string, values: Partial<Record<ToolField, string | string[] | null>>): EditResult {
+  return editFrontmatter(text, values, true);
+}
+
+// Writes the user's own one-line Verdict into an empty Verdict section and sets status: reviewed
+// (spec §2, schema rule 1). An existing Verdict is never overwritten. Without a Verdict section,
+// one is inserted before the first section, or at the end.
+export function setVerdict(text: string, verdict: string): EditResult {
+  const line = verdict.trim();
+  if (!line || /[\r\n]/.test(line)) return untouched(text, "The Verdict must be one line of text.");
+  const withStatus = editFrontmatter(text, { status: "reviewed" }, false);
+  if (withStatus.warnings.length) return untouched(text, withStatus.warnings[0]);
+
+  const result = withStatus.text;
+  const bounds = frontmatterBounds(result);
+  const cr = result.includes("\r\n") ? "\r" : "";
+  const lines = result.split("\n");
+  const headings = findHeadings(lines, bounds ? result.slice(0, bounds.end).split("\n").length : 0);
+  const at = headings.findIndex((h) => h.name === "verdict");
+  if (at !== -1) {
+    const start = headings[at].line;
+    const body = lines.slice(start + 1, headings[at + 1]?.line ?? lines.length).join("\n");
+    if (body.replace(/<!--[\s\S]*?-->/g, "").trim()) return untouched(text, "This note already has a Verdict; edit the file to change it.");
+    lines.splice(start + 1, 0, line + cr);
+  } else if (headings.length) {
+    lines.splice(headings[0].line, 0, `## Verdict${cr}`, line + cr, cr);
+  } else {
+    while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+    lines.push(cr, `## Verdict${cr}`, line + cr, "");
+  }
+  return { text: lines.join("\n"), changed: true, warnings: [] };
+}
+
+// Splices new values into the frontmatter. With `toolOnly`, keys that aren't tool-owned are refused.
+function editFrontmatter(text: string, values: Record<string, string | string[] | null | undefined>, toolOnly: boolean): EditResult {
   const warnings: string[] = [];
   const bounds = frontmatterBounds(text);
   if (!bounds) return untouched(text, "The note has no frontmatter; it was left unchanged.");
@@ -98,7 +132,7 @@ export function setToolFields(text: string, values: Partial<Record<ToolField, st
   const added: string[] = [];
 
   for (const [key, value] of Object.entries(values)) {
-    if (!TOOL_FIELDS.includes(key)) {
+    if (toolOnly && !TOOL_FIELDS.includes(key)) {
       warnings.push(`${key} is not a tool-owned field; it was left unchanged.`);
       continue;
     }
