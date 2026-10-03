@@ -1,6 +1,6 @@
 # RepoMagpie — Strategy (accepted, 2026-10-03)
 
-**Status:** accepted (2026-10-03). The maintainer approved all four decisions in §14, with the additions in §15. It was accepted before any real interview (0 of 3 so far, see §10); their results may still change it. It is the basis for vision, ideas and roadmap.
+**Status:** accepted (2026-10-03). The maintainer approved all four decisions in §14, with the additions in §15. No user interviews were run; step 1.5 closed with desk research (§10, [decision 0014](decisions/0014-step-1-5-desk-research.md)). The v0.1 beta may still change it. It is the basis for vision, ideas and roadmap.
 
 ---
 
@@ -23,7 +23,7 @@ Coding agents now install packages on their own. Two different questions come up
 
 The second answer exists, but it is scattered: in someone's head, in a daily note, in an old Slack thread, in a wiki page nobody finds. So it gets lost:
 
-- **Illustrative scenario** (from synthetic interview S1, not evidence; see §10): a developer reinstalls a PDF library they abandoned years earlier for the same reason, and only remembers ten minutes into fighting it again. This is the "pdfkit moment" the product is designed around; real interviews have to show whether it happens.
+- **Illustrative scenario** (from synthetic interview S1, not evidence; see §10): a developer reinstalls a PDF library they abandoned years earlier for the same reason, and only remembers ten minutes into fighting it again. This is the "pdfkit moment" the product is designed around. Desk research has no direct data on repeat installs (Q4), so the v0.1 beta has to show whether it happens.
 - In the same synthetic scenario, the developer checks every agent-suggested package by hand (registry, downloads, last commit, author), every single time.
 - Industry voices describe AI agents installing packages that no one on the team decided to adopt, with no clear owner of that decision ([The New Stack](https://thenewstack.io/?p=22824572)).
 
@@ -114,7 +114,7 @@ Synthetic interview S1 (not evidence) suggested tool notes with a one-line **dec
 | # | Idea | New status | Why |
 |---|---|---|---|
 | 1 | Proactive recall | **Core, v0.1** | The empty square in §5 D |
-| 8 | Team journal | **Core, v0.1** (as the project journal) | Git gives sharing for free; strongest pain in industry reports (§2); not yet tested in real interviews |
+| 8 | Team journal | **Core, v0.1** (as the project journal) | Git gives sharing for free; strongest pain in industry reports (§2); supported by desk research (§10, Q4) |
 | 5 | Gap detection | **v0.1** (as `magpie init` and `magpie gaps`) | Solves the empty-journal problem from real manifests |
 | 2 | Vet and drift | **Reduced, v0.2** | Record your review and the reviewed commit; integrate existing scanners and lockfiles; no own scanner |
 | 4 | Context-aware suggest | v0.3 | Useful once journals have content |
@@ -122,7 +122,7 @@ Synthetic interview S1 (not evidence) suggested tool notes with a one-line **dec
 | 7 | `/uses` generator | v0.3 | Marketing feature |
 | 6 | Resurfacing digest | Later | Nice to have |
 | 9 | Daily find | Later | Distraction from the core |
-| 10 | Graph views | Marketing only | Synthetic signals only (S1, H4): graph views see little practical use. Not evidence; real interviews test it (Q7) |
+| 10 | Graph views | Marketing only | Desk research (Q7, secondhand): graph views are widely reported as not useful for real work |
 
 Dropped from v0.1: semantic search (keyword search is enough at first), the MCP server, Dataview queries, and the Obsidian graph preset.
 
@@ -144,10 +144,18 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 
 ## 10. Validation so far
 
-- **Real interviews: 0 of 3.**
-- **Synthetic interview S1** (not evidence; not a real person) in `docs/validation.md`. It suggested manual vetting of every agent suggestion, a repeat install of an abandoned library, tool notes with a one-line decision, and no graph use. These are things to listen for, not findings.
-- **Synthetic hypotheses H1–H4** (not evidence) in `docs/validation.md`.
-- **Desk research** in §5 is the only evidence so far. It is what changed the positioning.
+- **No interviews.** Step 1.5 closed with desk research instead ([decision 0014](decisions/0014-step-1-5-desk-research.md)). Findings, sources and limits per question are in `docs/validation.md`, "Desk research".
+- **What the desk research shows:**
+  - Stars become forgotten bookmarks (Q1).
+  - Trust in AI output is falling: 46% of developers distrust its accuracy, up from 31% (Q3). Code LLMs still suggest non-existent packages: 19.7% on average in 2025, 4.6–6.1% for 2026 frontier models (Q3).
+  - Extensions are a live supply-chain risk: a poisoned VS Code extension led to a breach of ~3,800 GitHub repositories in 2026 (Q5).
+  - Teams lose the "why" behind choices, and library-level decisions fall below the threshold for a decision record (Q4). That is the gap the project journal fills.
+  - Graph views are widely reported as not useful (Q7).
+  - No evidence either way on whether developers write notes about tools (Q8).
+- **Hypotheses:** H1 open (tested by the v0.1 beta), H2 real but crowded, H3 supported, H4 confirmed (secondhand).
+- **Limits:** secondhand, self-selected sources; none of them are RepoMagpie's users.
+- **Synthetic material** (interview S1, hypotheses H1–H4) stays in `docs/validation.md` and is not evidence.
+- **Competitor research** in §5 is what changed the positioning.
 
 ---
 
@@ -160,7 +168,7 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 | People don't write notes (H1) | One-line capture; `init` pre-fills drafts; only the verdict is needed |
 | Hooks differ between agents | Launch on Claude Code, be honest in the README, skill mode as fallback |
 | Overlap with security vendors | Explicit "compose, don't compete"; never claim to detect malware |
-| No real interviews yet; the user-level signals are synthetic | At least three real interviews, one per profile (`docs/validation.md`); their results may still change this strategy |
+| No user interviews; the evidence is secondhand desk research | The v0.1 beta is the first contact with users and tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)); its results may still change this strategy |
 
 ---
 
@@ -168,11 +176,11 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 
 | Week | Work | Branch |
 |---|---|---|
-| 1 | Approve this strategy; at least three real interviews with the new questions below; update vision, ideas, competitors and roadmap | `docs/strategy` |
+| 1 | Approve this strategy; close step 1.5 with desk research ([decision 0014](decisions/0014-step-1-5-desk-research.md)); update vision, ideas, competitors and roadmap | `docs/strategy` |
 | 2 | Step 2: tech stack (leaning TypeScript, published to npm), spec for `note`, `recall`, `init`, `search` | `docs/spec` |
 | 3–4 | `magpie note`, `magpie search` (keyword), journal format, project journal | `feat/core` |
 | 4–5 | `magpie recall` and the Claude Code hook; `magpie init` from manifests | `feat/recall`, `feat/init` |
-| 6 | `v0.1.0-beta.1` to interviewees; demo GIF of the "pdfkit moment"; README rewrite | `release/v0.1` |
+| 6 | `v0.1.0-beta.1` to early testers; demo GIF of the "pdfkit moment"; README rewrite | `release/v0.1` |
 
 New interview questions (ask the original eight first, then these, then it's fine to show the one-liner and record the reaction):
 - "Has your team ever adopted a dependency it had already rejected before? How did you find out?"

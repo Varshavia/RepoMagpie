@@ -9,7 +9,7 @@ RepoMagpie remembers what you and your team learned about every dependency, and 
 ## The problem
 
 1. **Coding agents install packages on their own.** At that moment two questions come up: *is this package dangerous?* and *have we been here before, and what did we decide?* Security tools answer the first. Nobody answers the second.
-2. **What you learned is scattered.** It sits in someone's head, a daily note, an old chat thread, or a wiki page nobody finds. We expect that the same mistake then gets made twice, and every agent suggestion gets checked again from scratch. That is a hypothesis: the step 1.5 interviews have to show it happens ([validation](validation.md)).
+2. **What you learned is scattered.** It sits in someone's head, a daily note, an old chat thread, or a wiki page nobody finds. We expect that the same mistake then gets made twice, and every agent suggestion gets checked again from scratch. That is a hypothesis. Desk research supports the "lost why" for teams but has no direct data on repeat installs ([validation](validation.md)); the v0.1 beta has to show it happens.
 3. **Stars are cheap, so they become noise.** A star records *that* you saw something, never *what it's for* or *when to avoid it*.
 4. **Skills are a supply chain too.** With the Agent Skills standard, one repository can ship dozens of skills, and agents install them as readily as packages.
 

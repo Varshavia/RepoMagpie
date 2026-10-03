@@ -1,6 +1,6 @@
 # Ideas
 
-**Status:** Statuses and targets follow the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md). The step 1.5 interviews may still change them.
+**Status:** Statuses and targets follow the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md). The v0.1 beta may still change them.
 
 The ideas that shape RepoMagpie beyond note capture and search. Each one lists its problem, behaviour, surfaces, schema impact, target release and open questions. The [roadmap](roadmap.md) tracks the work; the [glossary](glossary.md) defines the terms.
 
@@ -38,7 +38,7 @@ The product's category moved:
 | 7 | `/uses` page generator | Planned | v0.3 | Marketing feature |
 | 6 | Resurfacing digest | Later | — | Nice to have |
 | 9 | Daily find | Later | — | Distraction from the core |
-| 10 | Graph views | Marketing only | not scheduled | Synthetic signals (S1, H4) suggest little practical use; real interviews test it (Q7) |
+| 10 | Graph views | Marketing only | not scheduled | Desk research (Q7, secondhand): widely reported as not useful for real work |
 
 ---
 
@@ -182,7 +182,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   Graph views are often admired but rarely used. Ours must earn its place by showing status at a glance (drift, inbox, gaps) and by being a visual people can share. It is not decoration. Full specification: [product](product.md#graph-specification).
 - **Surfaces:** Obsidian graph view (level 1); an HTML file (level 2); nest pages (level 3).
 - **Schema impact:** two human-owned fields for typed relations, `alternatives` and `works_with`: lists of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. Proposed in [decision 0007](decisions/0007-typed-relations-in-frontmatter.md).
-- **Target release:** marketing only, not scheduled. Graph views are built only as a shareable visual, if at all. Synthetic signals ([validation](validation.md): S1, H4) suggest little practical use; that is not evidence, and Q7 in the real interviews tests it.
+- **Target release:** marketing only, not scheduled. Graph views are built only as a shareable visual, if at all. Desk research ([validation](validation.md), Q7) found graph views widely reported as not useful for real work; that is secondhand evidence.
 - **Open questions:**
   - Does Obsidian's graph view count wikilinks inside frontmatter properties? If not, level 1 shows only body links.
   - Does node size encode connections or rating?

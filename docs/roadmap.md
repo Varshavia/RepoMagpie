@@ -2,7 +2,7 @@
 
 This file is the single source of truth for project status. It has two parts:
 - **Foundation** (steps 0, 1, 1.5, 2): what must exist before any product code.
-- **Release milestones** (v0.1 to v0.3, then Later): what each release ships. Scope follows the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md); the step 1.5 interviews may still change it.
+- **Release milestones** (v0.1 to v0.3, then Later): what each release ships. Scope follows the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md); the v0.1 beta may still change it.
 
 Each task is a checkbox. Tick it when the work is done. A step or milestone is done only when its **Done when** criteria are met. Work is committed in small pieces.
 
@@ -10,15 +10,15 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** step 1.5, validation (the maintainer's work): more interviews, including the two new questions. The accepted strategy is being applied to the docs.
-- **Next:** step 2, spec and tech-stack decision, including the note format and the two journals.
-- **Later:** v0.1 Remember, then v0.2 Trust, v0.3 Share.
+- **Now:** step 2, spec and tech-stack decision, including the note format and the two journals.
+- **Next:** v0.1 Remember.
+- **Later:** v0.2 Trust, v0.3 Share.
 
 | Part | Status |
 |---|---|
 | 0. Repository skeleton | ✅ done |
 | 1. Agent instructions | ✅ done |
-| 1.5. Validation | 🔶 in progress |
+| 1.5. Validation | ✅ done (desk research) |
 | 2. Spec and tech-stack decision | ⬜ |
 | v0.1 Remember | ⬜ |
 | v0.2 Trust | ⬜ |
@@ -53,15 +53,16 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 **Done when:** an agent asked to "commit this" refuses and prints a suggested commit message instead.
 
 ## 1.5. Validation
-The maintainer's work. Agent work pauses until the interview results arrive.
-- [ ] Interview at least 3 developers, one per profile: a heavy coding-agent user, a security-minded engineer, a student. Add more if the patterns are unclear. Real interviews so far: **0 of 3** (the hypotheses and interview S1 in validation.md are synthetic). Notes go in [validation.md](validation.md). Don't pitch the idea during interviews.
-- [ ] Hands-on review of competitors: GithubStarsManager, the Obsidian "GitHub Integration" plugin, and Starcat (README only; it's macOS-only).
-- [ ] Write the 30-second demo scenario.
-- [ ] Decide: soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)?
-- [ ] Decide: import stars as inbox suggestions?
+Closed with desk research instead of interviews ([decision 0014](decisions/0014-step-1-5-desk-research.md)). No interviews were run.
+- [x] Desk research in place of interviews: findings per question, limits and hypothesis status in [validation.md](validation.md). H1 (note-taking friction) is tested by the v0.1 beta.
+- [x] Competitor review, as desk research with sources in [competitors.md](competitors.md). The hands-on review was not done.
 - [x] Decide: the v0.1 command set and the release themes ([decision 0010](decisions/0010-v0-1-scope.md)).
 
-Interview questions (they ask about past behaviour, not hypothetical use):
+Moved out of this step:
+- Write the 30-second demo scenario: to v0.1 Launch (the demo GIF).
+- Decide: soften decision 0005; import stars as inbox suggestions: to step 2.
+
+Interview questions (not asked; kept for reference, they structure the desk research):
 1. When did you last go back to a repository you starred? How did you find it?
 2. Where do you look when you need a new tool or library?
 3. When did you last install something your coding agent suggested? Did you check it first? How?
@@ -78,7 +79,7 @@ Then, after the eight:
 
 Only after these may the interviewer show the one-liner and record the reaction.
 
-**Done when:** `docs/validation.md` has the interview notes and the competitor review, `vision.md` is updated from the findings, and every decision above has a decision record.
+**Done when** (original): `docs/validation.md` has the interview notes and the competitor review, `vision.md` is updated from the findings, and every decision above has a decision record. **Closed instead by** [decision 0014](decisions/0014-step-1-5-desk-research.md): desk research recorded, open decisions moved to step 2.
 
 ## 2. Spec and tech-stack decision
 Answer each open question and record the answer as a decision record. The v0.1 command set is decided in step 1.5, not here.
@@ -88,6 +89,8 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 - [ ] When the GitHub API reports no license, should `magpie note <url>` read license statements from the README / `SKILL.md` files? Leaning: record `unknown` (add it to the allowed license values if accepted) rather than `none`, and let the user verify. A wrong `none` is worse than no answer.
 - [ ] Note format and how a note is identified: by package or by repository ([decision 0010](decisions/0010-v0-1-scope.md)). The Verdict / Use when / Avoid when format is a hypothesis to test with Q8 ([strategy](strategy.md), §6).
 - [ ] How `magpie` finds the personal and project journals, and how it labels results from each ([decision 0013](decisions/0013-two-journal-scopes.md)).
+- [ ] Decide: soften [decision 0005](decisions/0005-human-written-usefulness.md) (AI suggests, human confirms)? Moved from step 1.5.
+- [ ] Decide: import stars as inbox suggestions? Moved from step 1.5.
 - [ ] Write `docs/spec.md`.
 
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
@@ -96,7 +99,7 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 
 # Release milestones
 
-Scope follows [decision 0010](decisions/0010-v0-1-scope.md) and [strategy](strategy.md) §7 and §15; the step 1.5 interviews may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
+Scope follows [decision 0010](decisions/0010-v0-1-scope.md) and [strategy](strategy.md) §7 and §15; the v0.1 beta may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
 
 ## v0.1 Remember
 The first public release: capture what you learned, find it again, and see it before your agent installs a dependency.
@@ -163,7 +166,8 @@ The first public release: capture what you learned, find it again, and see it be
 ### Launch
 See [marketing.md](marketing.md).
 - [ ] README rewrite for the accepted positioning, with one line about suggest
-- [ ] `v0.1.0-beta.N` pre-release for the validation interviewees ([release process](release.md))
+- [ ] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md))
+- [ ] Write the 30-second demo scenario (moved from step 1.5)
 - [ ] 30-second demo GIF: the "pdfkit moment"
 - [ ] Social preview image
 - [ ] Logo: a magpie, legible at 16 px
