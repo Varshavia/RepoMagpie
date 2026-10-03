@@ -17,7 +17,7 @@ The product's category moved:
 ## Rules every idea follows
 
 1. Plain Markdown with YAML frontmatter is the only source of truth. Indexes are rebuildable caches ([decision 0001](decisions/0001-plain-markdown-storage.md)).
-2. The user writes "When it's useful" ([decision 0005](decisions/0005-human-written-usefulness.md)). Whether AI may *suggest* a draft for the user to confirm is an open question for step 1.5.
+2. AI may draft "What it does" and "Use when"; the Verdict is human-only, and a note without one stays `inbox` ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)).
 3. One note per repository; skills are searchable lines ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 4. CLI first, `SKILL.md` for agents, MCP later as a thin layer ([decision 0002](decisions/0002-cli-first.md)).
 5. Two journal scopes with one format: a personal journal outside any repository, and a project journal in `.magpie/` ([decision 0013](decisions/0013-two-journal-scopes.md)). This repository holds neither, only the example vault ([decision 0003](decisions/0003-vault-outside-repo.md)).
@@ -53,7 +53,7 @@ The product's category moved:
   - **Hook mode:** in clients that support hooks, a hook runs recall before every matching shell command. It runs whether or not the agent remembers to.
   - **Skill mode:** RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Best effort: it depends on the agent following the instruction, but works in any client that supports skills.
 - **Surfaces:** agent hook (hook mode), `SKILL.md` (skill mode), and `magpie recall <package>` on the CLI.
-- **Schema impact:** a tool-owned `packages` field, a list of `ecosystem:name` entries (for example `["npm:@playwright/cli", "pypi:playwright"]`), detected from manifests such as `package.json`, `pyproject.toml` and `Cargo.toml`, so a package name maps to a note. How notes are identified is designed in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)).
+- **Schema impact:** a tool-owned `packages` field, a list of Package URLs (for example `["pkg:npm/%40playwright/cli", "pkg:pypi/playwright"]`, [decision 0017](decisions/0017-package-identity-purl.md)), detected from manifests such as `package.json`, `pyproject.toml` and `Cargo.toml`, so a package name maps to a note. How notes are identified is designed in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)).
 - **Target release:** v0.1, with hook mode for Claude Code at launch and skill mode elsewhere. This is the headline demo.
 - **Open questions:**
   - Which package managers are in v0.1?
@@ -92,7 +92,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Problem:** Stars show popularity, not *why* something is useful.
 - **Behaviour:**
   - `magpie publish` builds a static "nest" site from notes marked public: a searchable list, the graph (idea 10) and a `/uses` view (idea 7). It can be hosted on GitHub Pages.
-  - `magpie follow <nest-url>` imports another user's public "When it's useful" lines into your search results. They are clearly attributed and never mixed into your own notes.
+  - `magpie follow <nest-url>` imports another user's public verdicts and "Use when" lines into your search results. They are clearly attributed and never mixed into your own notes.
 - **Surfaces:** CLI (`magpie publish`, `magpie follow`); the nest site; search results.
 - **Schema impact:** a human-owned `public` field, `true` or `false`, default `false`. Private by default.
 - **Target release:** v0.3.
@@ -203,11 +203,10 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 ## Planned fields
 
-None of these are in the active schema or the template yet. Each joins the [note schema](note-schema.md) when its release starts.
+None of these are in the active schema or the template yet. Each joins the [note schema](note-schema.md) when its release starts. `packages` joined the active schema in v1, as a list of PURLs.
 
 | Field | Owner | Type | For | Target |
 |---|---|---|---|---|
-| `packages` | tool | list of `ecosystem:name` | proactive recall | v0.1 |
 | `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
 | `works_with` | human | list of wikilinks | typed edges | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
 | `reviewed_commit` | tool | commit SHA | drift | v0.2 |
