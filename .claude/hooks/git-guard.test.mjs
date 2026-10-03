@@ -48,6 +48,38 @@ const BLOCKED = [
   ["Bash", "git cherry-pick abc"],
   ["Bash", "git mv a b"],
   ["Bash", "git fetch"],
+  // A heredoc fed to an interpreter runs its body, so heredoc text must stay scanned.
+  ["Bash", "bash <<EOF\ngit push\nEOF"],
+  // gh: anything outside the read-only allowlist
+  ["Bash", "gh pr create --fill"],
+  ["Bash", "gh pr merge 12"],
+  ["Bash", "gh pr checkout 5"],
+  ["Bash", "gh issue create -t x -b y"],
+  ["Bash", "gh issue comment 3 -b hi"],
+  ["Bash", "gh repo delete o/r --yes"],
+  ["Bash", "gh release create v0.1.0"],
+  ["Bash", "gh workflow run ci.yml"],
+  ["Bash", "gh secret set TOKEN"],
+  ["Bash", "gh extension install o/r"],
+  ["Bash", "gh alias set co 'pr checkout'"],
+  ["Bash", "gh auth token"],
+  ["Bash", "gh auth status --show-token"],
+  ["Bash", "gh auth status -t"],
+  ["Bash", "gh -R o/r pr create"],
+  ["Bash", "gh repo view && gh pr create"],
+  ["Bash", 'bash -c "gh release delete v1"'],
+  ["PowerShell", "gh.exe pr create --fill"],
+  // gh api: non-GET methods and body fields
+  ["Bash", "gh api -X POST repos/o/r/issues"],
+  ["Bash", "gh api -XPATCH repos/o/r"],
+  ["Bash", "gh api --method PUT repos/o/r/subscription"],
+  ["Bash", "gh api --method=DELETE repos/o/r"],
+  ["Bash", "gh api repos/o/r/issues -f title=x"],
+  ["Bash", "gh api repos/o/r/issues -ftitle=x"],
+  ["Bash", "gh api repos/o/r/issues -F title=x"],
+  ["Bash", "gh api repos/o/r/issues --field=title=x"],
+  ["Bash", "gh api repos/o/r/issues --raw-field title=x"],
+  ["Bash", "gh api graphql --input query.json"],
 ];
 
 const ALLOWED = [
@@ -65,6 +97,24 @@ const ALLOWED = [
   ["Bash", "ls .git && cat .gitignore"],
   ["Bash", "npm test"],
   ["PowerShell", "Get-ChildItem; git status"],
+  // gh: read-only allowlist
+  ["Bash", "gh repo view"],
+  ["Bash", "gh repo view o/r --json licenseInfo,visibility"],
+  ["Bash", "gh issue list --state open"],
+  ["Bash", "gh issue view 3 --comments"],
+  ["Bash", "gh pr list"],
+  ["Bash", "gh pr view 12"],
+  ["Bash", "gh release list"],
+  ["Bash", "gh release view v0.1.0"],
+  ["Bash", "gh auth status"],
+  ["Bash", "gh --version"],
+  ["Bash", "gh api repos/o/r/private-vulnerability-reporting"],
+  ["Bash", "gh api -X GET repos/o/r"],
+  ["Bash", "gh api --method=get repos/o/r"],
+  ["Bash", "gh api repos/o/r/issues --paginate -q '.[].title'"],
+  ["Bash", "gh api -H 'Accept: application/vnd.github+json' repos/o/r"],
+  ["PowerShell", "gh.exe api repos/o/r"],
+  ["Bash", 'echo "gh pr create is blocked"'],
 ];
 
 for (const [tool, command] of BLOCKED) {

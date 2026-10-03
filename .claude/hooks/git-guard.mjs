@@ -1,4 +1,4 @@
-// PreToolUse hook: agents may run only read-only git subcommands.
+// PreToolUse hook: agents may run only read-only git subcommands and read-only gh commands.
 // Based on mattpocock/skills git-guardrails-claude-code, rewritten as an allowlist
 // that understands Bash and PowerShell command lines. Best effort, not a sandbox:
 // commands built at runtime (variables, eval of computed strings) are not detected.
@@ -7,6 +7,8 @@
 import { readFileSync } from "node:fs";
 
 const ALLOWED = new Set(["status", "diff", "log", "show", "blame", "ls-files", "check-ignore"]);
+// gh runs with the maintainer's GitHub credentials. "gh api" is handled separately (GET only).
+const GH_ALLOWED = new Set(["repo view", "issue list", "issue view", "pr list", "pr view", "release list", "release view", "auth status"]);
 // Global git options whose value is the next word.
 const OPTS_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"]);
 // Words that can precede the real command.
@@ -64,7 +66,40 @@ function gitSubcommand(words, i) {
   return null;
 }
 
-// Returns the first forbidden "git <subcommand>" in cmd, or null.
+// "gh api" may only send GET: no non-GET method, no body fields (they switch gh to POST).
+// Short flags may be combined (-iXPOST, -ftitle=x), so every short-flag word is scanned.
+function ghApiBlocked(args) {
+  for (let k = 0; k < args.length; k++) {
+    const w = args[k];
+    let method = null;
+    if (/^--(field|raw-field|input)(=|$)/.test(w)) return `gh api ${w}`;
+    if (/^--method(=|$)/.test(w)) method = w.includes("=") ? w.slice(w.indexOf("=") + 1) : args[++k] ?? "";
+    else if (/^-[^-]/.test(w)) {
+      if (/[fF]/.test(w)) return `gh api ${w}`;
+      const x = w.indexOf("X");
+      if (x > 0) method = w.slice(x + 1) || (args[++k] ?? "");
+    }
+    if (method !== null && method.toUpperCase() !== "GET") return `gh api -X ${method}`;
+  }
+  return null;
+}
+
+// Returns the forbidden part of a gh call whose arguments start at words[i], or null.
+// Flags before the command make a flag value look like the command, which blocks: fail-safe.
+function ghBlocked(words, i) {
+  const args = [];
+  for (; i < words.length && words[i] !== SEP; i++) args.push(words[i]);
+  const positional = args.filter((w) => !w.startsWith("-"));
+  if (positional.length === 0) return null; // gh, gh --version
+  if (positional[0] === "api") return ghApiBlocked(args);
+  const cmd = positional.slice(0, 2).join(" ");
+  if (!GH_ALLOWED.has(cmd)) return `gh ${cmd}`;
+  // auth status -t / --show-token prints the token.
+  if (cmd === "auth status" && args.some((w) => /^--show-token/.test(w) || /^-[^-]*t/.test(w))) return "gh auth status --show-token";
+  return null;
+}
+
+// Returns the first forbidden "git <subcommand>" or gh command in cmd, or null.
 function findBlocked(cmd, depth = 0) {
   const words = tokenize(cmd);
   let atCommand = true;
@@ -84,6 +119,9 @@ function findBlocked(cmd, depth = 0) {
     if (name === "git") {
       const sub = gitSubcommand(words, i + 1);
       if (sub !== null && !ALLOWED.has(sub)) return `git ${sub}`;
+    } else if (name === "gh") {
+      const hit = ghBlocked(words, i + 1);
+      if (hit) return hit;
     } else if (SHELLS.has(name)) {
       inShell = true;
       atCommand = true;
@@ -95,8 +133,10 @@ function findBlocked(cmd, depth = 0) {
 const command = JSON.parse(readFileSync(0, "utf8")).tool_input?.command;
 const blocked = typeof command === "string" && findBlocked(command);
 if (blocked) {
-  process.stderr.write(
-    `BLOCKED: "${blocked}" is not allowed. Agents may only run git ${[...ALLOWED].join(", ")}. ` +
-    "The maintainer does all staging, commits and pushes by hand; print a suggested commit message instead (see CLAUDE.md section 1).\n");
+  process.stderr.write(blocked.startsWith("gh ")
+    ? `BLOCKED: "${blocked}" is not allowed. Agents may only run gh ${[...GH_ALLOWED].join(", ")} (no --show-token), ` +
+      "and gh api with GET only (no -f, -F, --field, --raw-field, --input). The maintainer does all GitHub writes by hand (see CLAUDE.md section 1).\n"
+    : `BLOCKED: "${blocked}" is not allowed. Agents may only run git ${[...ALLOWED].join(", ")}. ` +
+      "The maintainer does all staging, commits and pushes by hand; print a suggested commit message instead (see CLAUDE.md section 1).\n");
   process.exit(2);
 }

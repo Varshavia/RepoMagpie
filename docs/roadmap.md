@@ -24,7 +24,7 @@ README, LICENSE (MIT), `.gitignore`, project docs.
 **Done when:** the repo explains what RepoMagpie is in under 30 seconds of reading, and the license is detected by GitHub.
 
 ## 1. Agent instructions
-`CLAUDE.md`, `AGENTS.md`, `.claude/settings.json` (git allowlist hook in `.claude/hooks/` + deny list).
+`CLAUDE.md`, `AGENTS.md`, `.claude/settings.json` (git and gh allowlist hook in `.claude/hooks/` + git deny list).
 **Done when:** an agent asked to "commit this" refuses and prints a suggested commit message instead.
 
 ## 2. Spec and tech-stack decision
