@@ -181,7 +181,7 @@ test("a rejected token is auth", async () => {
   const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(() => new Response("{}", { status: 401 })), token: TOKEN });
   assert.ok(!r.ok);
   assert.equal(r.problem.kind, "auth");
-  assert.match(r.problem.message, /GITHUB_TOKEN/);
+  assert.match(r.problem.message, /GITHUB_TOKEN may be invalid or expired/);
 });
 
 test("no answer within the timeout is timeout", async () => {
@@ -281,9 +281,9 @@ for (const [title, file, text, purl] of MANIFESTS) {
 // --- drafts: kind (first match wins) and tags ---
 
 const KIND_CASES: [string, Parameters<typeof draftKind>[0], string][] = [
-  ["plugin beats skill-pack", { plugin: true, skills: ["a"], bin: true, topics: ["awesome-list"] }, "plugin"],
-  ["skill-pack beats cli", { plugin: false, skills: ["a"], bin: true, topics: [] }, "skill-pack"],
-  ["cli beats awesome-list", { plugin: false, skills: [], bin: true, topics: ["awesome-list"] }, "cli"],
+  ["cli beats everything", { plugin: true, skills: ["a"], bin: true, topics: ["awesome-list"] }, "cli"],
+  ["skill-pack beats plugin", { plugin: true, skills: ["a"], bin: false, topics: ["awesome-list"] }, "skill-pack"],
+  ["plugin without SKILL.md", { plugin: true, skills: [], bin: false, topics: ["awesome-list"] }, "plugin"],
   ["awesome-list from topics", { plugin: false, skills: [], bin: false, topics: ["awesome-list"] }, "awesome-list"],
   ["otherwise other", { plugin: false, skills: [], bin: false, topics: ["pdf"] }, "other"],
   ["unknown skills count as none", { plugin: false, skills: null, bin: false, topics: [] }, "other"],
@@ -302,7 +302,7 @@ test("draftKind on the recorded repositories", async () => {
     assert.ok(r.ok);
     kinds.push(draftKind(r.metadata));
   }
-  assert.deepEqual(kinds, ["plugin", "skill-pack", "awesome-list"]);
+  assert.deepEqual(kinds, ["skill-pack", "cli", "awesome-list"]);
 });
 
 test("draftTags keeps only topics already in the tag list, sorted", () => {

@@ -116,9 +116,9 @@ export function packageFromManifest(file: Manifest, text: string): string | null
 
 // The drafted kind (spec §2): the first that matches.
 export function draftKind(metadata: Pick<RepoMetadata, "plugin" | "skills" | "bin" | "topics">): string {
-  if (metadata.plugin) return "plugin";
-  if (metadata.skills?.length) return "skill-pack";
   if (metadata.bin) return "cli";
+  if (metadata.skills?.length) return "skill-pack";
+  if (metadata.plugin) return "plugin";
   if (metadata.topics.includes("awesome-list")) return "awesome-list";
   return "other";
 }
@@ -160,7 +160,7 @@ function statusProblem(response: Response, slug: string, hasToken: boolean): Fet
     const until = reset ? `until ${new Date(reset * 1000).toISOString().slice(11, 16)} UTC` : retry ? `for ${retry} seconds` : "for now";
     return { kind: "rate-limit", message: `GitHub's rate limit is used up ${until}.${hasToken ? "" : " Set GITHUB_TOKEN to raise the limit."}` };
   }
-  if (status === 401) return { kind: "auth", message: "GitHub rejected GITHUB_TOKEN (401). Check it, or unset it to use GitHub without a token." };
+  if (status === 401) return { kind: "auth", message: "GitHub rejected the request (401): GITHUB_TOKEN may be invalid or expired. Check it, or unset it to use GitHub without a token." };
   if (status === 404) {
     return { kind: "not-found", message: `GitHub has no repository ${slug}, or it is private${hasToken ? " and GITHUB_TOKEN can't see it" : ""}.` };
   }
