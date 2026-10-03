@@ -149,7 +149,7 @@ For docs and CLI output: short sentences, active voice, concrete examples, no ma
 A private log of agent work lives in `.worklog/YYYY-MM-DD.md`, one file per day. It is git-ignored.
 
 - **At the start of every session**, before doing anything else, read the `## Pending` section and the last entry of the most recent `.worklog/` file.
-- **Multi-part briefs:** when the maintainer gives a brief with several parts, copy every part not yet done **verbatim** into a `## Pending` section at the top of today's file. Remove a part from Pending when it is completed. When you start a new day's file, move the Pending section into it.
+- **Multi-part briefs:** when the maintainer gives a brief with several parts, copy every part not yet done **verbatim** into a `## Pending` section at the top of today's file. Remove a part from Pending when it is completed. When you start a new day's file, move the Pending section into it. If the brief is stored as a file in `.worklog/briefs/`, that file is the verbatim copy: Pending may list piece names with a pointer to the brief instead.
 - **At the end of every task**, append an entry to today's file:
 
   ```markdown

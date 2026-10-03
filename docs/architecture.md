@@ -20,7 +20,7 @@ agent without a shell ─► MCP server ────────┴─► core �
 | **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | Step 7 |
 | **mcp** | Optional MCP server over the same core, for clients without a shell. | Step 7 (optional) |
 
-Decision 0002 also says "the core is a CLI". This document uses *core* only for the business-logic module.
+Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
 
 Implementation language: **TBD (roadmap step 2)**.
 
