@@ -76,10 +76,15 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | Path | What it is |
 |---|---|
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
+| `.github/workflows/` | CI: `ci.yml` runs tests, typecheck and hook tests (section 13). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
+| `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
+| `dist/` | Build output from `npm run build`. Git-ignored. |
+| `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
+| `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
 | `.gitignore` | Ignores secrets, build output, the personal vault, `.scratch/` and `.worklog/`. |
 | `AGENTS.md` | Points other coding agents to this file. |
 | `CHANGELOG.md` | User-visible changes per release (Keep a Changelog). |
@@ -139,7 +144,7 @@ After two failed attempts at the same problem, stop. Report what you tried, what
 ## 8. Project conventions
 
 - **Language:** everything in English — code, comments, docs, commit messages, CLI output, note templates.
-- **Status:** the language is TypeScript on Node.js ([decision 0015](docs/decisions/0015-typescript-on-node.md)). Product code is written in v0.1, on `feat/...` branches; until then, add no product code or package files. Every library still needs approval (section 9).
+- **Status:** the language is TypeScript on Node.js, ESM ([decision 0015](docs/decisions/0015-typescript-on-node.md)). Product code lives in `src/` (layout in `docs/architecture.md`) and is written on `feat/...` branches. Every new library still needs approval (section 9); the approved ones are in `docs/spec.md`, section 9.
   - **Exception:** agent dev tooling under `.claude/` (e.g. hook scripts in `.claude/hooks/`) is not part of the product and may use a runtime without a decision record.
 - **Docs are part of the product.** When behaviour changes, update the relevant doc in the same task.
 - **Decision records:** significant choices go in `docs/decisions/NNNN-short-title.md` using the format of the existing records.
@@ -174,7 +179,18 @@ For docs and CLI output: short sentences, active voice, concrete examples, no ma
 
 ## 13. Commands
 
-- **Hook tests:** `node --test ".claude/hooks/*.test.mjs"` from the repo root. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes.
+Run from the repo root. Node 22.18 or later runs the TypeScript source directly (type stripping).
+
+| Command | What it does |
+|---|---|
+| `npm ci` | Install exactly what `package-lock.json` lists. Use it instead of `npm install` unless a dependency was approved and is being added (section 9). |
+| `npm test` | Product tests: `node --test "src/**/*.test.ts"`. |
+| `npm run typecheck` | `tsc --noEmit` over `src/`. |
+| `npm run build` | Compile `src/` to `dist/` (tests excluded). `dist/` is git-ignored. |
+| `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
+| `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
+
+CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows.
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
 
 ## 14. Work log

@@ -6,4 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `magpie --version` and `magpie --help`. Help lists the v0.1 commands (`note`, `import`, `search`, `suggest`, `adopt`, `recall`, `init`); they are not implemented yet.
+
 [Unreleased]: https://github.com/Varshavia/RepoMagpie/commits/main

@@ -167,7 +167,8 @@ The first public release: capture what you learned, find it again, and see it be
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
 
 ### Development practice
-- [x] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor. Approved 2026-10-03: commander, MiniSearch, yaml, packageurl-js, typescript (dev); `engines.node >=22.12.0`.
+- [x] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor. Approved 2026-10-03: commander, MiniSearch, yaml, packageurl-js, typescript (dev), @types/node (dev); `engines.node >=22.12.0`.
+- [x] Scaffold: `package.json` with the approved libraries, TypeScript settings, the `src/` layout (`core/`, `cli/`, `hook/`), a minimal CLI (`magpie --version`, `magpie --help` listing the v0.1 commands as not implemented yet), and CI on Node 22, 24 and 26 × Linux and Windows.
 - [ ] Use `tdd` from `mattpocock/skills` while implementing v0.1, and its `code-review` before each pull request.
 - [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
 
