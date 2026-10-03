@@ -306,7 +306,7 @@ $ magpie suggest "a TypeScript CLI with tests"
 
 ### Libraries (dependency policy check)
 
-Every library needs the maintainer's approval before it is added (CLAUDE.md, section 9). The maintainer approved the five below on 2026-10-03. Figures from the npm registry and GitHub, checked 2026-10-03.
+Every library needs the maintainer's approval before it is added (CLAUDE.md, section 9). The maintainer approved all six below on 2026-10-03 (`@types/node` during the scaffold, when the typecheck needed it). Figures from the npm registry and GitHub, checked 2026-10-03.
 
 | Need | Library | Licence | Runtime deps | Unpacked size | Maintenance | Weekly downloads | Status |
 |---|---|---|---|---|---|---|---|
@@ -314,7 +314,8 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 | Keyword search | [MiniSearch](https://github.com/lucaong/minisearch) 7.2.0 | MIT | 0 | 807 kB (several builds) | released and last pushed 2025-09-16; small, stable | ~3.9M | approved |
 | YAML frontmatter | [yaml](https://github.com/eemeli/yaml) 2.9.1 | ISC | 0 | 670 kB | released 2026-09-11; repo active (2026-09-23) | ~258M | approved |
 | PURL | [packageurl-js](https://github.com/package-url/packageurl-js) 2.0.1 | MIT | 0 | 56 kB | released 2024-09-04; repo active (2026-08-24) | ~2.6M | approved |
-| Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 | 2 MB | released 2026-07-08 | ~355M | approved |
+| Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
+| Node type definitions (dev only) | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) `^22.20.5` | MIT | 1 (`undici-types` 6.21.0, MIT, no dependencies) | ~2.3 MB | released 2026-10-01; stays on major 22 to match the Node floor | ~535M | approved |
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.
@@ -341,5 +342,5 @@ None at the close of step 2. Answered on 2026-10-03:
 - **`init`:** offline by default; `--fetch` enables metadata fetching (section 2).
 - **Other clients:** hook mode is Claude Code only in v0.1; other clients use skill mode (section 6).
 - **Installs without package names:** ignored in v0.1; whole-manifest recall is listed for later (section 6).
-- **Libraries and Node floor:** the five libraries in section 9 are approved; `engines.node` is `>=22.12.0` ([decision 0015](decisions/0015-typescript-on-node.md)).
+- **Libraries and Node floor:** the libraries in section 9 are approved (`@types/node` added during the scaffold); `engines.node` is `>=22.12.0` ([decision 0015](decisions/0015-typescript-on-node.md)).
 - **Graph:** stays "if built" (roadmap, "Not scheduled").
