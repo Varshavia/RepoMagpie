@@ -132,7 +132,7 @@ After two failed attempts at the same problem, stop. Report what you tried, what
 ## 8. Project conventions
 
 - **Language:** everything in English — code, comments, docs, commit messages, CLI output, note templates.
-- **Status:** the tech stack is not chosen yet (see roadmap step 2). Do not introduce a language, framework, or package manager until the decision record exists in `docs/decisions/`.
+- **Status:** the language is TypeScript on Node.js ([decision 0015](docs/decisions/0015-typescript-on-node.md)). Product code is written in v0.1, on `feat/...` branches; until then, add no product code or package files. Every library still needs approval (section 9).
   - **Exception:** agent dev tooling under `.claude/` (e.g. hook scripts in `.claude/hooks/`) is not part of the product and may use a runtime without a decision record.
 - **Docs are part of the product.** When behaviour changes, update the relevant doc in the same task.
 - **Decision records:** significant choices go in `docs/decisions/NNNN-short-title.md` using the format of the existing records.

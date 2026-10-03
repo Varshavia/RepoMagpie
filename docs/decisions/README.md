@@ -13,7 +13,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0002 | [CLI first, SKILL.md, MCP later](0002-cli-first.md) | accepted |
 | 0003 | [Personal vault lives outside the repo](0003-vault-outside-repo.md) | accepted |
 | 0004 | [English everywhere](0004-english-everywhere.md) | accepted |
-| 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | accepted |
+| 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | superseded by 0018 |
 | 0006 | [One note per repository; skills are searchable lines](0006-skills-as-searchable-lines.md) | accepted |
 | 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | proposed |
 | 0008 | [Machine-readable output for every command](0008-machine-readable-output.md) | accepted |
@@ -23,3 +23,9 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
 | 0014 | [Close step 1.5 with desk research instead of interviews](0014-step-1-5-desk-research.md) | accepted |
+| 0015 | [Language and runtime: TypeScript on Node.js](0015-typescript-on-node.md) | accepted |
+| 0016 | [Journal locations and config resolution](0016-journal-locations-and-config.md) | accepted |
+| 0017 | [Package identity with Package URL (PURL)](0017-package-identity-purl.md) | accepted |
+| 0018 | [AI drafts, humans decide](0018-ai-drafts-humans-decide.md) | accepted (supersedes 0005) |
+| 0019 | [No star import in v0.1](0019-no-star-import-in-v0-1.md) | accepted |
+| 0020 | [Unknown licence](0020-unknown-license.md) | accepted |
