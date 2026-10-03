@@ -1,0 +1,32 @@
+{
+  "recorded": "2026-10-04",
+  "note": "GET responses from api.github.com, trimmed to the fields magpie reads. The file list is cut to its first 12 of 230 entries; the rest are more design-md/<brand>/ folders with DESIGN.md and README.md (no SKILL.md, no manifests).",
+  "responses": {
+    "/repos/voltagent/awesome-design-md": {
+      "full_name": "VoltAgent/awesome-design-md",
+      "html_url": "https://github.com/VoltAgent/awesome-design-md",
+      "description": "A collection of DESIGN.md files analysis by popular brand design systems. Drop one into your project and let coding agents generate a matching UI.",
+      "language": null,
+      "license": { "key": "mit", "spdx_id": "MIT" },
+      "topics": ["awesome-list", "design-md", "design-system", "design-tokens", "figma", "google-stitch", "landing-page", "vibe-coding", "vibe-design", "vibecoding"],
+      "default_branch": "main"
+    },
+    "/repos/voltagent/awesome-design-md/git/trees/main?recursive=1": {
+      "truncated": false,
+      "tree": [
+        { "path": ".github", "type": "tree" },
+        { "path": ".github/FUNDING.yml", "type": "blob" },
+        { "path": ".github/ISSUE_TEMPLATE", "type": "tree" },
+        { "path": ".github/ISSUE_TEMPLATE/design-md-request.yml", "type": "blob" },
+        { "path": ".gitignore", "type": "blob" },
+        { "path": "CONTRIBUTING.md", "type": "blob" },
+        { "path": "LICENSE", "type": "blob" },
+        { "path": "README.md", "type": "blob" },
+        { "path": "design-md", "type": "tree" },
+        { "path": "design-md/airbnb", "type": "tree" },
+        { "path": "design-md/airbnb/DESIGN.md", "type": "blob" },
+        { "path": "design-md/airbnb/README.md", "type": "blob" }
+      ]
+    }
+  }
+}
