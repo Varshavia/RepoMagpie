@@ -38,7 +38,7 @@ The product's category moved:
 | 7 | `/uses` page generator | Planned | v0.3 | Marketing feature |
 | 6 | Resurfacing digest | Later | — | Nice to have |
 | 9 | Daily find | Later | — | Distraction from the core |
-| 10 | Graph views | Marketing only | not scheduled | Graph views are rarely used for real work |
+| 10 | Graph views | Marketing only | not scheduled | Synthetic signals (S1, H4) suggest little practical use; real interviews test it (Q7) |
 
 ---
 
@@ -182,7 +182,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   Graph views are often admired but rarely used. Ours must earn its place by showing status at a glance (drift, inbox, gaps) and by being a visual people can share. It is not decoration. Full specification: [product](product.md#graph-specification).
 - **Surfaces:** Obsidian graph view (level 1); an HTML file (level 2); nest pages (level 3).
 - **Schema impact:** two human-owned fields for typed relations, `alternatives` and `works_with`: lists of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. Proposed in [decision 0007](decisions/0007-typed-relations-in-frontmatter.md).
-- **Target release:** marketing only, not scheduled. Graph views are rarely used for real work, so they are built only as a shareable visual, if at all.
+- **Target release:** marketing only, not scheduled. Graph views are built only as a shareable visual, if at all. Synthetic signals ([validation](validation.md): S1, H4) suggest little practical use; that is not evidence, and Q7 in the real interviews tests it.
 - **Open questions:**
   - Does Obsidian's graph view count wikilinks inside frontmatter properties? If not, level 1 shows only body links.
   - Does node size encode connections or rating?
