@@ -1,0 +1,34 @@
+{
+  "recorded": "2026-10-04",
+  "note": "GET responses from api.github.com, trimmed to the fields magpie reads.",
+  "responses": {
+    "/repos/multica-ai/andrej-karpathy-skills": {
+      "full_name": "multica-ai/andrej-karpathy-skills",
+      "html_url": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "description": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+      "language": null,
+      "license": null,
+      "topics": [],
+      "default_branch": "main"
+    },
+    "/repos/multica-ai/andrej-karpathy-skills/git/trees/main?recursive=1": {
+      "truncated": false,
+      "tree": [
+        { "path": ".claude-plugin", "type": "tree" },
+        { "path": ".claude-plugin/marketplace.json", "type": "blob" },
+        { "path": ".claude-plugin/plugin.json", "type": "blob" },
+        { "path": ".cursor", "type": "tree" },
+        { "path": ".cursor/rules", "type": "tree" },
+        { "path": ".cursor/rules/karpathy-guidelines.mdc", "type": "blob" },
+        { "path": "CLAUDE.md", "type": "blob" },
+        { "path": "CURSOR.md", "type": "blob" },
+        { "path": "EXAMPLES.md", "type": "blob" },
+        { "path": "README.md", "type": "blob" },
+        { "path": "README.zh.md", "type": "blob" },
+        { "path": "skills", "type": "tree" },
+        { "path": "skills/karpathy-guidelines", "type": "tree" },
+        { "path": "skills/karpathy-guidelines/SKILL.md", "type": "blob" }
+      ]
+    }
+  }
+}
