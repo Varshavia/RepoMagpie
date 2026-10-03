@@ -37,9 +37,17 @@ Behaviour:
 2. If a note in the target journal already has that PURL as its `id` or in `packages` (schema rule 6):
    - with text and an empty Verdict: write the Verdict and set `status: reviewed`;
    - with text and an existing Verdict: change nothing, print the note's path, exit 1 ("This note already has a Verdict; edit the file to change it");
-   - for a URL: append skill lines for newly detected skills only.
-3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and README, detect `SKILL.md` files, and draft "What it does" and "Use when" ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable.
-4. If the network fails, write the note without metadata and warn on stderr. Exit 0.
+   - without text and without a URL: change nothing, print the note's path, exit 0 (`"created": false`);
+   - for a URL: refresh the tool-owned fields (schema rule 2) and append skill lines for newly detected skills only.
+3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and file list (no README) and draft from them ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)):
+   - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty; an agent may draft more later through the skill.
+   - `kind`: the first that matches: `plugin` if the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`; `skill-pack` if any `SKILL.md` exists; `cli` if the root `package.json` has `bin`; `awesome-list` if the topics include `awesome-list`; otherwise `other`.
+   - `tags`: the topics that are already in the journal's `tags.md`; otherwise `[]`.
+   - `packages`: from the manifests at the repository root only: `package.json` `name` (skipped when `"private": true`), `pyproject.toml` `[project]` `name`, `Cargo.toml` `[package]` `name`.
+   - One skill line per `SKILL.md`, named after the folder that holds it.
+   - The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable. It is never printed or logged.
+4. If the network fails (offline, timeout after 10 seconds, rate limit), write the note without metadata and warn on stderr. Exit 0.
+5. `--to project` without a project journal creates `.magpie/` (with a `.gitignore` for `.cache/`) at the git root, or in the working directory outside git, and says so.
 
 ```
 $ magpie note pdfkit "avoid: async streams painful; use puppeteer"
@@ -59,9 +67,9 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - The separator after the target is ` — ` (em dash) or ` -- `. Labels are case-insensitive; parts are separated by ` | `.
 - `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label goes to "My notes" (schema rule 7).
-- Other lines are ignored. A line that can't be parsed or resolved is reported and skipped.
+- Other lines are ignored. A line that can't be parsed or resolved is reported as `failed` and skipped; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts).
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
-- An item whose note already exists is handled as in `note`, step 2.
+- An item whose note already exists is handled as in `note`, step 2. A `verdict:` for a note that already has a Verdict makes that line `failed`. `use:`, `avoid:` and unlabelled text for an existing note are ignored with a warning on that line, because those sections are human-owned (schema rule 2).
 - Exit 0 if every item succeeded or was skipped as unchanged; 1 if any item failed.
 
 `--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null}], "created": 4, "updated": 1, "failed": 0}`

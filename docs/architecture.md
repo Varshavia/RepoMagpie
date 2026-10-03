@@ -77,10 +77,10 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 `magpie import <file>` runs the same flow once per line ([decision 0010](decisions/0010-v0-1-scope.md)).
 
 1. **Resolve the target** to a PURL: a URL, a PURL, or a bare name typed by the nearest manifest ([spec](spec.md), section 4). A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-2. **URL only, fetch from GitHub:** description, language, license, topics and README. Detect `SKILL.md` files. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
+2. **URL only, fetch from GitHub:** description, language, license, topics and the file list (no README). Detect `SKILL.md` files and root manifests. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
 3. **No note yet:** write a new note with:
    - the user's text, as the Verdict (note schema, rule 7);
-   - for a URL: tool-owned fields, drafts of `kind`, `tags` (suggested from topics), "What it does" and "Use when" ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
+   - for a URL: tool-owned fields, drafts of `kind`, `tags` (topics already in `tags.md`) and "What it does" (the GitHub description) ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
    - defaults: `tried: false`, and `status` per note schema rule 1 (`reviewed` once the user gave a Verdict, otherwise `inbox`).
 4. **Note exists:** append skill lines for skills not listed yet, and refresh tool-owned fields. Write the Verdict only if it is empty; never overwrite one ([spec](spec.md), section 2). Never change other human-owned fields or sections (note schema, rule 2).
 5. **Search index:** marked stale; the next command that needs it rebuilds it.
