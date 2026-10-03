@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). First: the maintainer approves the libraries.
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved.
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -163,10 +163,10 @@ The first public release: capture what you learned, find it again, and see it be
 **Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes.
 
 ### `magpie init` (if time allows; otherwise v0.2)
-- [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use.
+- [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
 
 ### Development practice
-- [ ] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor (`>=22`, or `>=22.12.0` with commander 15).
+- [x] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor. Approved 2026-10-03: commander, MiniSearch, yaml, packageurl-js, typescript (dev); `engines.node >=22.12.0`.
 - [ ] Use `tdd` from `mattpocock/skills` while implementing v0.1, and its `code-review` before each pull request.
 - [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
 
@@ -204,6 +204,8 @@ See [marketing.md](marketing.md).
 - [ ] Resurfacing digest.
 - [ ] `magpie today`: one optional daily find.
 - [ ] A thin MCP server for clients without a shell ([decision 0002](decisions/0002-cli-first.md)).
+- [ ] Recall for installs without package names (`npm install`, `pip install -r requirements.txt`): check the whole manifest. Ignored in v0.1 ([spec](spec.md), section 6).
+- [ ] Hook mode for clients other than Claude Code, as their hooks allow passing context on an allowed command ([ideas](ideas.md#hook-support-in-major-clients)). v0.1 uses skill mode there.
 - [ ] *Obsidian extra (optional):* ready-made Dataview queries in `examples/vault/`.
 
 ## Not scheduled

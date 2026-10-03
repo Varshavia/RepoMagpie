@@ -58,7 +58,7 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 ```
 
 - The separator after the target is ` — ` (em dash) or ` -- `. Labels are case-insensitive; parts are separated by ` | `.
-- `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label becomes a draft "Use when" (schema rule 7).
+- `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label goes to "My notes" (schema rule 7).
 - Other lines are ignored. A line that can't be parsed or resolved is reported and skipped.
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
 - An item whose note already exists is handled as in `note`, step 2.
@@ -121,7 +121,10 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 
 ### `magpie init` (if time allows in v0.1; otherwise v0.2)
 
-Reads the project's manifests and creates a draft note, without a Verdict (`status: inbox`), for each direct dependency that has no note yet ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)). It writes to the project journal by default (`--to personal` to change that) and makes no network calls.
+Reads the project's manifests and creates a draft note, without a Verdict (`status: inbox`), for each direct dependency that has no note yet ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)). It writes to the project journal by default (`--to personal` to change that).
+
+- **Offline by default:** without flags, `init` makes no network calls; notes get `id`, `name` and `packages` from the manifests only.
+- **`--fetch`:** also fetch each dependency's repository metadata, as `note <url>` does. If the network fails, the note is written without metadata and a warning goes to stderr.
 
 ### `magpie hook claude-code`
 
@@ -211,7 +214,7 @@ Checked against the [Claude Code hooks reference](https://code.claude.com/docs/e
 | `uv add`, `uv pip install` | the names | pypi |
 | `cargo add` | the names | cargo |
 
-Flags and their values are skipped. An install without names (`npm install`, `pip install -r requirements.txt`) triggers no recall in v0.1.
+Flags and their values are skipped. An install without names (`npm install`, `pip install -r requirements.txt`) triggers no recall in v0.1 (see below).
 
 **Output** when at least one package has a note: one JSON document on stdout, exit 0.
 
@@ -230,7 +233,9 @@ Flags and their values are skipped. An install without names (`npm install`, `pi
 - **Fails open:** no note, an unparsable command, a missing journal, or any error means no output and exit 0. Errors go to a log file in the personal journal's `.cache/`, never to stdout.
 - **Fast:** the hook has the recall budget (section 7).
 
-**Skill mode** (other clients): RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Hook support in other clients is in [ideas](ideas.md#hook-support-in-major-clients).
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+
+**Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 
 ## 7. Performance budgets
 
@@ -293,7 +298,7 @@ $ magpie suggest "a TypeScript CLI with tests"
 
 ### Runtime and packaging ([decision 0015](decisions/0015-typescript-on-node.md))
 
-- **TypeScript on Node.js.** `engines.node` is `>=22`; CI runs the tests on Node 22, 24 and 26, on Linux and Windows. If commander 15 is approved, the floor becomes `>=22.12.0`, which it requires.
+- **TypeScript on Node.js.** `engines.node` is `>=22.12.0`, the floor commander 15 requires; CI runs the tests on Node 22, 24 and 26, on Linux and Windows.
 - **ESM only:** `"type": "module"`. The published package contains compiled JavaScript and one `bin` entry, `magpie`.
 - **Source under type stripping:** contributors run the `.ts` source directly on Node 22.18.0 or later. `tsconfig.json` follows the [Node.js recommendation](https://nodejs.org/api/typescript.html): `module: nodenext`, `target: esnext`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`. In practice: no enums or namespaces, types imported with `import type`, and file extensions in every import.
 - **Build:** `tsc` compiles to `dist/` for publishing only; tests run on the source.
@@ -301,21 +306,21 @@ $ magpie suggest "a TypeScript CLI with tests"
 
 ### Libraries (dependency policy check)
 
-Every library needs the maintainer's approval before it is added (CLAUDE.md, section 9). Figures from the npm registry and GitHub, checked 2026-10-03.
+Every library needs the maintainer's approval before it is added (CLAUDE.md, section 9). The maintainer approved the five below on 2026-10-03. Figures from the npm registry and GitHub, checked 2026-10-03.
 
 | Need | Library | Licence | Runtime deps | Unpacked size | Maintenance | Weekly downloads | Status |
 |---|---|---|---|---|---|---|---|
-| CLI parsing | [commander](https://github.com/tj/commander.js) 15.0.0 | MIT | 0 | 203 kB | released 2026-05-29; repo active (2026-10-01); requires Node ≥ 22.12.0 | ~625M | proposed |
-| Keyword search | [MiniSearch](https://github.com/lucaong/minisearch) 7.2.0 | MIT | 0 | 807 kB (several builds) | released and last pushed 2025-09-16; small, stable | ~3.9M | proposed |
-| YAML frontmatter | [yaml](https://github.com/eemeli/yaml) 2.9.1 | ISC | 0 | 670 kB | released 2026-09-11; repo active (2026-09-23) | ~258M | proposed |
-| PURL | [packageurl-js](https://github.com/package-url/packageurl-js) 2.0.1 | MIT | 0 | 56 kB | released 2024-09-04; repo active (2026-08-24) | ~2.6M | proposed |
-| Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 | 2 MB | released 2026-07-08 | ~355M | proposed |
+| CLI parsing | [commander](https://github.com/tj/commander.js) 15.0.0 | MIT | 0 | 203 kB | released 2026-05-29; repo active (2026-10-01); requires Node ≥ 22.12.0 | ~625M | approved |
+| Keyword search | [MiniSearch](https://github.com/lucaong/minisearch) 7.2.0 | MIT | 0 | 807 kB (several builds) | released and last pushed 2025-09-16; small, stable | ~3.9M | approved |
+| YAML frontmatter | [yaml](https://github.com/eemeli/yaml) 2.9.1 | ISC | 0 | 670 kB | released 2026-09-11; repo active (2026-09-23) | ~258M | approved |
+| PURL | [packageurl-js](https://github.com/package-url/packageurl-js) 2.0.1 | MIT | 0 | 56 kB | released 2024-09-04; repo active (2026-08-24) | ~2.6M | approved |
+| Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 | 2 MB | released 2026-07-08 | ~355M | approved |
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.
 - **Search:** [Orama](https://github.com/oramasearch/orama) 3.1.18 (Apache-2.0, 0 deps) is the upgrade path if semantic or hybrid search arrives (roadmap v0.3). FlexSearch (Apache-2.0) is fastest at very large scale but more complex than needed for a few thousand notes.
 - **YAML:** gray-matter 4.0.3 (MIT, 4 deps, last release 2021-04-24) and js-yaml 5.4.2 (MIT, 1 dep) were not chosen: keeping comments and formatting when a file is rewritten is a hard requirement, and `yaml` documents a Document API that does it.
-- **PURL:** a small own parser for the four types in use (github, npm, pypi, cargo), if packageurl-js is not approved.
+- **PURL:** a small own parser for the four types in use (github, npm, pypi, cargo) was the fallback; not needed now that packageurl-js is approved.
 
 ### Round-trip safety
 
@@ -330,9 +335,11 @@ Embeddings and semantic search, the MCP server, star import ([decision 0019](dec
 
 ## 11. Open questions
 
-- Does ECMA-427 go to ISO? No primary source found (0017).
-- `import`: should unlabelled text become a draft "Use when" (current rule) or go to "My notes"?
-- `init`: should it fetch metadata when online, or stay offline?
-- Recall in other clients whose pre-tool hook can't pass context on an allowed command (Gemini CLI, GitHub Copilot): show the note to the user only, or rely on skill mode?
-- Installs without package names (`npm install`, `pip install -r`): recall for the whole manifest in a later release?
-- Libraries in section 9 await the maintainer's approval; with commander 15, `engines.node` becomes `>=22.12.0`.
+None at the close of step 2. Answered on 2026-10-03:
+- **ISO:** PURL is in process to become an ISO standard ([purl-spec README](https://github.com/package-url/purl-spec#readme); [decision 0017](decisions/0017-package-identity-purl.md)).
+- **`import`:** text without a label goes to "My notes" (section 2).
+- **`init`:** offline by default; `--fetch` enables metadata fetching (section 2).
+- **Other clients:** hook mode is Claude Code only in v0.1; other clients use skill mode (section 6).
+- **Installs without package names:** ignored in v0.1; whole-manifest recall is listed for later (section 6).
+- **Libraries and Node floor:** the five libraries in section 9 are approved; `engines.node` is `>=22.12.0` ([decision 0015](decisions/0015-typescript-on-node.md)).
+- **Graph:** stays "if built" (roadmap, "Not scheduled").
