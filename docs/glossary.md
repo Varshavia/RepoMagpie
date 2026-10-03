@@ -62,7 +62,7 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **decision record** | A short file in `docs/decisions/` that records one significant decision: status, context, decision, consequences. A record may be revised on its branch until it is merged to `main`; after that it only gets editorial edits, and any other change needs a new record that supersedes it. |
 | **editorial edit** | A change to a decision record merged to `main` that fixes typos, broken links or terminology without changing its substance. Defined in [decisions/README.md](decisions/README.md). |
 | **example vault** | `examples/vault/`: the vault in this repository that holds sample notes, built from the seed repositories. It is the only place notes live in this repo. |
-| **git-guard** | The agent hook in `.claude/hooks/` that lets coding agents run only read-only git and gh commands. |
+| **git-guard** | The agent hook in `.claude/hooks/` that lets coding agents run only read-only git and gh commands, and blocks shell commands that write files (in-place edits, `tee`, redirection to a file, PowerShell `Set-Content`/`Add-Content`/`Out-File`), so files are written only with the Edit/Write tools. |
 | **Obsidian extras** | Optional parts that need Obsidian (Templater template, Dataview queries, graph preset). Notes, `magpie`, search and the agent skill work without them. |
 | **scratch space** | `.scratch/`: the git-ignored folder for temporary files that agents create. |
 | **seed repository** (seed repo) | One of the first repositories explored for this project, listed in [seed-repos.md](seed-repos.md). Each becomes a note in the example vault. |

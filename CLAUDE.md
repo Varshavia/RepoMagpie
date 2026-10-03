@@ -10,7 +10,14 @@ The maintainer does all staging, commits and pushes by hand, and every GitHub wr
 - **Every other git command is forbidden**, including `add`, `rm`, `mv`, `restore`, `clean`, `revert`, `cherry-pick`, `stash`, `config`, `init` and `worktree`.
 - **The only gh commands you may run:** `gh repo view`, `gh issue list`, `gh issue view`, `gh pr list`, `gh pr view`, `gh release list`, `gh release view`, `gh auth status` (without `--show-token`), and `gh api` with GET only: no `-X`/`--method` other than GET, and no `-f`, `-F`, `--field`, `--raw-field` or `--input`. Every other gh command is forbidden. `gh` runs with the maintainer's GitHub credentials.
 - This is enforced by a PreToolUse hook (`.claude/hooks/git-guard.mjs`, needs Node.js on `PATH`). The hook is the real guard. The deny list in `.claude/settings.json` is a partial backup layer: it matches only command prefixes and covers only the most damaging git and gh commands, in case the hook can't run (for example, Node.js is missing). Never try to work around either.
-- **Write and edit files with the Edit/Write tools**, never with shell heredocs or echo redirection. git-guard scans heredoc text as commands on purpose: a heredoc fed to an interpreter (`bash <<EOF`) runs its body. Don't change that.
+- **Write and edit files with the Edit/Write tools**, never from the shell. The hook blocks, in Bash and PowerShell and in chained commands:
+  - in-place edits: `sed -i` / `--in-place`, `perl -i` / `-pi`, `ruby -i`, `awk -i inplace`;
+  - `tee` writing to a file;
+  - redirection to a file: `>`, `>>`, `>|`, `&>`, `2>` and the like. Allowed targets are `/dev/null`, `NUL`, `$null`, and stream forms such as `2>&1` or `>&2`;
+  - PowerShell `Set-Content`, `Add-Content` and `Out-File`.
+
+  Read-only commands, `grep` and `sed` without `-i`, `node --test`, npm/npx, and piping to stdout stay allowed. The check is best effort: other ways to write files (for example a script that opens a file) are not detected, and the rule still applies to them.
+- git-guard scans heredoc text as commands on purpose: a heredoc fed to an interpreter (`bash <<EOF`) runs its body. Don't change that.
 - Never add a `Co-Authored-By` line or any AI attribution anywhere.
 
 The maintainer prefers **small, frequent commits**. Split work so each piece can be committed on its own, and stop at natural commit points instead of doing everything at once.
@@ -168,7 +175,7 @@ For docs and CLI output: short sentences, active voice, concrete examples, no ma
 ## 13. Commands
 
 - **Hook tests:** `node --test ".claude/hooks/*.test.mjs"` from the repo root. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes.
-- **PowerShell live check:** passed on 2026-10-03. `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
+- **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
 
 ## 14. Work log
 
