@@ -119,15 +119,15 @@ The first public release: capture what you learned, find it again, and see it be
 **Done when:** every note in `examples/vault/` validates against the schema.
 
 ### `magpie note <name-or-url> "text"`
-- [ ] Capture a verdict in one line, for example `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. No template to fill.
-- [ ] Given a GitHub URL, fetch description, language, license, topics and README, and turn topics into tag suggestions.
-- [ ] Detect `SKILL.md` files and write one skill line per skill. A skill URL creates or updates the parent repository note ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
+- [x] Capture a verdict in one line, for example `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. No template to fill.
+- [x] Given a GitHub URL, fetch description, language, license, topics and the file list (no README), and keep the topics already in `tags.md` as tags ([spec](spec.md), section 2).
+- [x] Detect `SKILL.md` files and write one skill line per skill. A skill URL creates or updates the parent repository note ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 
 **Done when:** a note can be captured with one command in about ten seconds and validates against the schema; running it on every seed repository URL produces valid drafts; and it never overwrites human-owned fields or sections of an existing note.
 
 ### `magpie import <file>`
-- [ ] The bulk form of `magpie note`, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
-- [ ] The free text becomes the draft Verdict, Use when and Avoid when.
+- [x] The bulk form of `magpie note`, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
+- [x] `verdict:` becomes the Verdict (the user's own words); `use:` and `avoid:` become draft Use when and Avoid when; other text goes to My notes.
 
 **Done when:** importing a file with one line per seed repository produces one valid note per line.
 
