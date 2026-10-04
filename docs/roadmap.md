@@ -138,12 +138,12 @@ The first public release: capture what you learned, find it again, and see it be
 **Done when:** for a fixed set of 10 test questions, the expected note is in the top 3. (Met: `src/core/search-quality.test.ts`, over the example vault.)
 
 ### Proactive recall
-- [ ] `magpie recall <package>` on the CLI, across both journals.
-- [ ] Map package names to notes (how: step 2 spec).
-- [ ] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. Recall informs and never blocks.
+- [x] `magpie recall <package>` on the CLI, across both journals.
+- [x] Map package names to notes ([spec](spec.md), section 5): exact by PURL, then name-only, including GitHub repository names.
+- [x] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. It never denies: an avoid note asks the user to confirm; other notes inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
 - [ ] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing.
 
-**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user, and the install still goes ahead.
+**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`; the live check in a Claude Code session is still to do. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
 
 ### Local app
 `magpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).

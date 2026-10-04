@@ -80,12 +80,12 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 |---|---|
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
 | `.github/workflows/` | CI: `ci.yml` runs tests, typecheck and hook tests (section 13). |
-| `.scratch/` | Agent scratch space for temporary files. Git-ignored. |
+| `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
-| `scripts/` | Benchmarks (`npm run bench`). Typechecked, not built or published. |
+| `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`) and the link check (`npm run check:links`). Typechecked (the `.ts` files), not built or published. |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
 | `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
@@ -190,15 +190,16 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | Command | What it does |
 |---|---|
 | `npm ci` | Install exactly what `package-lock.json` lists. Use it instead of `npm install` unless a dependency was approved and is being added (section 9). |
-| `npm test` | Product tests: `node --test "src/**/*.test.ts"`. |
-| `npm run typecheck` | `tsc --noEmit` over `src/`. |
+| `npm test` | Product tests (`node --test "src/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
+| `npm run typecheck` | `tsc --noEmit` over `src/` and `scripts/`. |
 | `npm run build` | Compile `src/` to `dist/` (tests excluded). `dist/` is git-ignored. |
-| `npm run bench` | Build, then time `magpie search` on 2,000 generated notes against the budget in spec §7 (median and p95; exit 1 over budget). Run it when search or the index changes. |
+| `npm run bench` | Build, then time `magpie search`, `magpie recall` and the hook on 2,000 generated notes against the budgets in spec §7 (median and p95; exit 1 over budget). Run it when search, recall, the hook or the caches change. `node scripts/bench-*.ts --report-only` never fails on timing (CI uses it). |
+| `npm run check:links` | Check every relative link and `#anchor` in the Markdown files. Run it after editing docs. |
 | `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
 | `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
 
-CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows.
+CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows, and one job with `npm run check:links` and the benchmarks (report only).
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
 
 ## 14. Work log
