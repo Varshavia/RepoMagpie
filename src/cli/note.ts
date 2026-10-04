@@ -13,6 +13,7 @@ import {
   noteFor,
   readTagList,
   resolvePersonalJournal,
+  samePath,
   type NoteEntry,
 } from "../core/journals.ts";
 import { readNote } from "../core/note.ts";
@@ -28,15 +29,21 @@ export interface Journal {
   path: string;
   scope: "personal" | "project";
   warnings: string[];
+  error: string | null; // set when this journal can't be used; nothing may be written to it
 }
 
 // The journal to write to (spec §3). A project journal that doesn't exist yet is created on the
-// first write, at the git root or in the working directory (spec §2 note step 5).
+// first write, at the git root or in the working directory (spec §2 note step 5). The personal
+// journal's folder is never taken as the project journal.
 export function locateJournal(scope: Journal["scope"], options: GlobalOptions, io: Io): Journal {
   const personal = resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home });
-  if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings };
+  if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings, error: null };
   const found = findProjectJournal({ cwd: io.cwd, personalJournal: personal.path, flag: options.project });
-  return { path: found ?? join(findProjectRoot(io.cwd), ".magpie"), scope, warnings: personal.warnings };
+  const path = found ?? join(findProjectRoot(io.cwd), ".magpie");
+  const error = samePath(path, personal.path)
+    ? `${path} is your personal journal, so it can't be the project journal. Run this inside a project, or pass --project <dir>.`
+    : null;
+  return { path, scope, warnings: personal.warnings, error };
 }
 
 export interface Item {
@@ -61,7 +68,8 @@ export interface ItemResult {
 }
 
 // Creates or updates the note for one item. `notes` is the journal's note list; a new note is
-// added to it, so a later item can find it. With `dryRun`, nothing is written.
+// added to it, so a later item can find it. With `dryRun`, nothing is written: the text that
+// would have been written is kept in `notes`, so later items see the same state as a real run.
 export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, io: Io, dryRun = false): Promise<ItemResult> {
   const entry = noteFor(notes, item.purl);
   const path = entry?.path ?? join(journal.path, "notes", fileNameFor(item.purl));
@@ -70,11 +78,11 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
     ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices });
 
-  if (!entry && existsSync(path)) {
-    const other = notes.find((note) => note.path === path)?.id;
-    return fail(fileNameClash(item.purl, other) ?? `${path} has no readable id, so it was left unchanged.`, path);
+  const atPath = notes.find((note) => note.path === path);
+  if (!entry && (atPath || existsSync(path))) {
+    return fail(fileNameClash(item.purl, atPath?.id) ?? `${path} has no readable id, so it was left unchanged.`, path);
   }
-  const existing = entry ? readFileSync(entry.path, "utf8") : null;
+  const existing = entry ? (entry.text ?? readFileSync(entry.path, "utf8")) : null;
 
   let metadata: RepoMetadata | null = null;
   const verdictTaken = existing !== null && Boolean(item.verdict?.trim()) && readNote(existing).verdict !== "";
@@ -93,7 +101,10 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const capture = captureNote(existing, { ...item, metadata, today: io.today(), tagList: readTagList(journal.path) });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
-  if (capture.text !== null && !dryRun) {
+  if (capture.text !== null && dryRun) {
+    if (entry) entry.text = capture.text;
+    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text: capture.text });
+  } else if (capture.text !== null) {
     try {
       if (journal.scope === "project" && createProjectJournal(journal.path)) notices.push(`Created the project journal: ${journal.path}`);
       mkdirSync(dirname(path), { recursive: true });
@@ -114,12 +125,14 @@ export interface NoteOptions extends GlobalOptions {
 export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, io: Io): Promise<number> {
   const journal = locateJournal(options.to, options, io);
   const json = Boolean(options.json);
+  const stop = (error: string, code: number) => {
+    if (json) io.out(`${JSON.stringify({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, error })}\n`);
+    else io.err(`magpie note: ${error}\n`);
+    return code;
+  };
+  if (journal.error) return stop(journal.error, 1);
   const resolved = await resolveInput(target, options.type, json, io);
-  if (!resolved.ok) {
-    if (json) io.out(`${JSON.stringify({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, error: resolved.error })}\n`);
-    else io.err(`magpie note: ${resolved.error}\n`);
-    return 2;
-  }
+  if (!resolved.ok) return stop(resolved.error, 2);
 
   const r = await saveItem(journal, listNotes(journal.path), { purl: resolved.purl, skillPath: resolved.skillPath, source: target, verdict: text }, io);
   const warnings = [...journal.warnings, ...r.notices, ...r.warnings];

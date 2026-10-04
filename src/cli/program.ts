@@ -2,6 +2,7 @@ import { Command, CommanderError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
 import type { Env } from "../core/journals.ts";
 import { packageVersion } from "../core/version.ts";
+import { importCommand, type ImportOptions } from "./import.ts";
 import { noteCommand, type NoteOptions } from "./note.ts";
 
 // Everything a command needs from the outside world. main.ts passes the real ones; tests pass
@@ -20,7 +21,6 @@ export interface Io {
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
-  { usage: "import <file>", summary: "add many notes from a file" },
   { usage: "search <query>", summary: "keyword search across both journals" },
   { usage: "suggest [description]", summary: "show the notes that fit this project" },
   { usage: "adopt <name>", summary: "copy a note into the project journal" },
@@ -49,6 +49,16 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .addOption(new Option("--to <journal>", "the journal to write to").choices(["personal", "project"]).default("personal"))
     .action(async (target: string, text: string | undefined, _options: unknown, command: Command) => {
       code = await noteCommand(target, text, command.optsWithGlobals<NoteOptions>(), io);
+    });
+
+  program
+    .command("import")
+    .description("add many notes from a file")
+    .argument("<file>", 'a file whose "- " lines are items: - <url-or-name> — verdict: ... | use: ... | avoid: ...')
+    .addOption(new Option("--to <journal>", "the journal to write to").choices(["personal", "project"]).default("personal"))
+    .option("--dry-run", "report what would happen; write nothing")
+    .action(async (file: string, _options: unknown, command: Command) => {
+      code = await importCommand(file, command.optsWithGlobals<ImportOptions>(), io);
     });
 
   for (const { usage, summary } of NOT_YET) {
