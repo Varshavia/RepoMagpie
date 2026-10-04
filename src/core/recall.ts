@@ -1,0 +1,169 @@
+// Recall (spec §2 recall, §5 matching): the notes in both journals for a package, before it is
+// installed. Each journal's notes are summarised once into <journal>/.cache/recall-index.json
+// (note-cache.ts), so a lookup reads one file instead of every note. Never prints.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { PackageURL } from "packageurl-js";
+import { normalizePackage, type PackageType } from "./identity.ts";
+import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env } from "./journals.ts";
+import { DRAFT_MARKER, readNote } from "./note.ts";
+import { noteSignature, readCache, writeCache } from "./note-cache.ts";
+
+export const RECALL_CACHE = "recall-index.json";
+const CACHE_VERSION = 1;
+
+type ListName = "use_when" | "avoid_when";
+
+// What recall needs from one note.
+export interface RecallEntry {
+  file: string;
+  id: string;
+  name: string;
+  keys: [string, string][]; // [PURL type, name with namespace] for the id and every package
+  verdict: string; // "" when empty
+  avoidWhen: string[];
+  useWhen: string[];
+  drafts: ListName[];
+  status: "inbox" | "reviewed";
+}
+
+export interface RecallSource {
+  scope: "project" | "personal";
+  path: string;
+  entries: RecallEntry[];
+}
+
+export interface RecallMatch {
+  query: string;
+  id: string;
+  journal: RecallSource["scope"];
+  confidence: "exact" | "name-only";
+  name: string;
+  verdict: string | null;
+  avoid_when: string[];
+  use_when: string[];
+  drafts: ListName[];
+  status: "inbox" | "reviewed";
+  path: string;
+}
+
+// The journals recall reads (spec §3): the personal journal and, if found, the project journal,
+// which is never the personal journal's folder nor the home directory's own .magpie.
+export function openRecallSources(options: { home: string; env: Env; cwd: string; homeFlag?: string; projectFlag?: string }): { sources: RecallSource[]; warnings: string[] } {
+  const personal = resolvePersonalJournal({ home: options.home, env: options.env, cwd: options.cwd, flag: options.homeFlag });
+  const project = findProjectJournal({ cwd: options.cwd, home: options.home, personalJournal: personal.path, flag: options.projectFlag });
+  const sources: RecallSource[] = [{ scope: "personal", path: personal.path, entries: loadRecallEntries(personal.path).entries }];
+  if (project && !samePath(project, personal.path) && !samePath(project, homeJournal(options.home))) {
+    sources.unshift({ scope: "project", path: project, entries: loadRecallEntries(project).entries });
+  }
+  return { sources, warnings: personal.warnings };
+}
+
+// One journal's entries, from the cache when it matches the notes on disk.
+export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean } {
+  const { files, signature } = noteSignature(journal);
+  const cached = readCache(journal, RECALL_CACHE, CACHE_VERSION, signature);
+  if (Array.isArray(cached)) return { entries: cached as RecallEntry[], rebuilt: false };
+  const entries = files.flatMap((file) => entryOf(readFileSync(join(journal, "notes", file), "utf8"), file) ?? []);
+  if (files.length) writeCache(journal, RECALL_CACHE, CACHE_VERSION, signature, entries);
+  return { entries, rebuilt: true };
+}
+
+function entryOf(text: string, file: string): RecallEntry | null {
+  const note = readNote(text);
+  const fm = note.frontmatter;
+  if (typeof fm.id !== "string") return null; // a note without a readable id can't match
+  const packages = Array.isArray(fm.packages) ? fm.packages.filter((p): p is string => typeof p === "string") : [];
+  const keys = [fm.id, ...packages].flatMap((purl) => {
+    try {
+      const p = PackageURL.fromString(purl);
+      return [[p.type, p.namespace ? `${p.namespace}/${p.name}` : p.name] as [string, string]];
+    } catch {
+      return [];
+    }
+  });
+  const section = (name: string) => note.sections.find((s) => s.name === name);
+  return {
+    file,
+    id: fm.id,
+    name: typeof fm.name === "string" ? fm.name : file.replace(/\.md$/, ""),
+    keys,
+    verdict: note.verdict,
+    avoidWhen: items(section("Avoid when")?.body ?? ""),
+    useWhen: items(section("Use when")?.body ?? ""),
+    drafts: [section("Use when")?.draft ? "use_when" : null, section("Avoid when")?.draft ? "avoid_when" : null].filter((d): d is ListName => d !== null),
+    status: note.status,
+  };
+}
+
+// A section's items: one per bullet, without comments and the draft marker. A line that isn't a
+// bullet starts an item of its own, unless it is indented under the previous one.
+function items(body: string): string[] {
+  const out: string[] = [];
+  for (const line of body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (bullet) out.push(bullet[1].trim());
+    else if (/^\s/.test(line) && out.length) out[out.length - 1] += ` ${line.trim()}`;
+    else out.push(line.trim());
+  }
+  return out;
+}
+
+// Names compare as their registry does for exact matches, and loosely for name-only ones.
+const exactName = (type: string, name: string) => (type === "pypi" ? name.toLowerCase().replace(/[-_.]+/g, "-") : type === "cargo" ? name : name.toLowerCase());
+const looseName = (name: string) => name.toLowerCase().replace(/[-_.]+/g, "-");
+
+// The packages a query may mean: a PURL's own type, or the query under each of `types`.
+function candidates(query: string, types: PackageType[]): { type: string; name: string }[] {
+  if (query.trim().startsWith("pkg:")) {
+    try {
+      const p = PackageURL.fromString(query.trim());
+      return [{ type: p.type, name: p.namespace ? `${p.namespace}/${p.name}` : p.name }];
+    } catch {
+      return [];
+    }
+  }
+  return types.map((type) => ({ type, name: normalizePackage(query, type) })).filter((c) => c.name);
+}
+
+// The matches for one query across the journals (spec §5): exact matches from every journal,
+// project first; name-only matches only when no journal has an exact one.
+export function recall(sources: RecallSource[], query: string, types: PackageType[]): RecallMatch[] {
+  const wanted = candidates(query, types);
+  const kinds = new Set(wanted.map((c) => c.type));
+  const ordered = [...sources].sort((a, b) => (a.scope === b.scope ? 0 : a.scope === "project" ? -1 : 1));
+  const exact: RecallMatch[] = [];
+  const nameOnly: RecallMatch[] = [];
+  for (const source of ordered) {
+    for (const entry of source.entries) {
+      const isExact = entry.keys.some(([type, name]) => wanted.some((c) => c.type === type && exactName(type, c.name) === exactName(type, name)));
+      const isNameOnly = !isExact && entry.keys.some(([type, name]) =>
+        !kinds.has(type) && wanted.some((c) => looseName(c.name) === looseName(type === "github" ? name.split("/").pop() ?? "" : name)));
+      if (isExact) exact.push(match(query, source, entry, "exact"));
+      else if (isNameOnly) nameOnly.push(match(query, source, entry, "name-only"));
+    }
+  }
+  return exact.length ? exact : nameOnly;
+}
+
+function match(query: string, source: RecallSource, entry: RecallEntry, confidence: RecallMatch["confidence"]): RecallMatch {
+  return {
+    query,
+    id: entry.id,
+    journal: source.scope,
+    confidence,
+    name: entry.name,
+    verdict: entry.verdict || null,
+    avoid_when: entry.avoidWhen,
+    use_when: entry.useWhen,
+    drafts: entry.drafts,
+    status: entry.status,
+    path: join(source.path, "notes", entry.file),
+  };
+}
+
+// An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
+export function isAvoid(match: Pick<RecallMatch, "verdict" | "avoid_when">): boolean {
+  return /^avoid\b/i.test(match.verdict ?? "") || match.avoid_when.length > 0;
+}
