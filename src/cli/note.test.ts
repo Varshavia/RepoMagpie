@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch, recorded, type Call } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
+import { STARTER_TAGS } from "../core/journals.ts";
 import { readNote, validate } from "../core/note.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
@@ -81,6 +82,23 @@ test("a GitHub URL creates a note from GitHub's metadata, with tags from tags.md
   assert.equal(note.frontmatter.status, "inbox");
   assert.match(readFileSync(path, "utf8"), /- `dev` —\n- `playwright-cli` —/);
   valid(path);
+});
+
+test("the first note in a new journal writes the starter tag list and drafts tags from it", async () => {
+  const box = sandbox();
+  const responses = recorded("microsoft--playwright-cli");
+  const repo = responses["/repos/microsoft/playwright-cli"] as object;
+  const fetch = fakeFetch({ ...responses, "/repos/microsoft/playwright-cli": { ...repo, topics: ["playwright", "testing"] } });
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL], { fetch });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), STARTER_TAGS);
+  assert.deepEqual(readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter.tags, ["testing"]);
+});
+
+test("an existing tags.md is never overwritten", async () => {
+  const box = sandbox({ "journal/tags.md": "- `mine`\n" });
+  await magpie(box, ["note", "pkg:npm/pdfkit"]);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `mine`\n");
 });
 
 test("a GitHub URL for an existing note refreshes tool-owned fields and adds new skills only; human content stays", async () => {
@@ -223,6 +241,7 @@ test("--to project without a project journal creates .magpie/ at the git root an
   assert.match(r.err, new RegExp(`Created the project journal: ${journal.replace(/\\/g, "\\\\")}`));
   assert.match(r.err, /✔ Saved to the project journal: pdfkit/);
   assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n");
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), STARTER_TAGS);
   assert.ok(existsSync(join(journal, "notes", "npm--pdfkit.md")));
 });
 
