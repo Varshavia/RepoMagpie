@@ -1,17 +1,17 @@
 // magpie note <name-or-url> ["text"] (spec §2), and the journal and save steps import reuses.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { captureNote, type Capture } from "../core/capture.ts";
 import { fetchRepository, type RepoMetadata } from "../core/github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "../core/identity.ts";
 import {
-  createProjectJournal,
+  createJournal,
   findManifests,
   findProjectJournal,
   findProjectRoot,
+  journalTagList,
   listNotes,
   noteFor,
-  readTagList,
   resolvePersonalJournal,
   samePath,
   type NoteEntry,
@@ -98,7 +98,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     }
   }
 
-  const capture = captureNote(existing, { ...item, metadata, today: io.today(), tagList: readTagList(journal.path) });
+  const capture = captureNote(existing, { ...item, metadata, today: io.today(), tagList: journalTagList(journal.path) });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
   if (capture.text !== null && dryRun) {
@@ -106,8 +106,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text: capture.text });
   } else if (capture.text !== null) {
     try {
-      if (journal.scope === "project" && createProjectJournal(journal.path)) notices.push(`Created the project journal: ${journal.path}`);
-      mkdirSync(dirname(path), { recursive: true });
+      if (createJournal(journal.path, journal.scope) && journal.scope === "project") notices.push(`Created the project journal: ${journal.path}`);
       writeFileSync(path, capture.text);
     } catch (error) {
       return fail(`Couldn't write ${path}: ${(error as Error).message}`, null);

@@ -81,14 +81,44 @@ export function findManifests(cwd: string): Manifest[] {
   }
 }
 
-// Creates a project journal folder with a .gitignore for .cache/ (spec §3). Returns false
-// when the folder already existed; an existing .gitignore is kept.
-export function createProjectJournal(path: string): boolean {
+// The tag list a new journal starts with: the example vault's ten tags (examples/vault/tags.md;
+// a test keeps the two in step).
+export const STARTER_TAGS = `# Tags
+
+The tag list for this journal. Use only these tags in notes; add a line here before using a new one. Tags are lowercase kebab-case.
+
+- \`agent-skills\` — repositories whose main content is agent skills
+- \`browser-automation\` — driving a browser from code or an agent
+- \`code-understanding\` — making sense of an unfamiliar codebase
+- \`coding-guidelines\` — rules that shape how an agent writes code
+- \`data-engineering\` — data pipelines, lakehouses, streaming
+- \`design\` — visual design and design systems
+- \`frontend\` — building web user interfaces
+- \`react\` — React and Next.js
+- \`testing\` — tests and end-to-end checks
+- \`workflow\` — engineering workflow: specs, TDD, code review
+`;
+
+// Prepares a journal for a note (spec §3): notes/, and for a project journal a .gitignore for
+// .cache/. A journal created now (no notes/ yet) also gets the starter tag list, unless it has a
+// tags.md. Existing files are never overwritten. Returns true when the journal folder was created.
+export function createJournal(path: string, scope: "personal" | "project"): boolean {
   const created = !existsSync(path);
-  mkdirSync(path, { recursive: true });
+  const notes = join(path, "notes");
+  const isNew = !existsSync(notes);
+  mkdirSync(notes, { recursive: true });
+  const tags = join(path, "tags.md");
+  if (isNew && !existsSync(tags)) writeFileSync(tags, STARTER_TAGS);
   const ignore = join(path, ".gitignore");
-  if (!existsSync(ignore)) writeFileSync(ignore, ".cache/\n");
+  if (scope === "project" && !existsSync(ignore)) writeFileSync(ignore, ".cache/\n");
   return created;
+}
+
+// The tag list to draft tags from: tags.md; for a journal not created yet, the starter list it
+// will get; otherwise none.
+export function journalTagList(path: string): string[] {
+  if (existsSync(join(path, "tags.md"))) return readTagList(path);
+  return existsSync(join(path, "notes")) ? [] : parseTagList(STARTER_TAGS);
 }
 
 export interface NoteEntry {

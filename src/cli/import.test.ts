@@ -134,7 +134,7 @@ test("--dry-run reports what would happen and writes nothing", async () => {
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /^line 3: created pkg:github\/microsoft\/playwright-cli$/m);
   assert.match(r.err, /^Dry run: nothing was written\.$/m);
-  assert.equal(existsSync(box.journal), false);
+  assert.equal(existsSync(box.journal), false); // no notes, no tags.md
 });
 
 test("--dry-run gives the same results as a real run when lines repeat a subject", async () => {

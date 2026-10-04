@@ -6,7 +6,9 @@ import { join, parse } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   configPath,
-  createProjectJournal,
+  createJournal,
+  journalTagList,
+  STARTER_TAGS,
   findManifests,
   findProjectJournal,
   findProjectRoot,
@@ -211,18 +213,50 @@ test("the example vault's tag list parses to its ten tags", () => {
   assert.ok(tags.includes("agent-skills"));
 });
 
-// Creating a project journal (spec §2 note step 5)
+// Creating a journal (spec §2 note step 5, §3): notes/, the starter tag list, and for a project
+// journal a .gitignore for .cache/
 
-test("createProjectJournal makes the folder and a .gitignore for .cache/", () => {
+test("createJournal makes a project journal: notes/, a .gitignore for .cache/ and the starter tag list", () => {
   const root = fixture({ ".git/": null });
   const journal = join(root, ".magpie");
-  assert.equal(createProjectJournal(journal), true);
+  assert.equal(createJournal(journal, "project"), true);
+  assert.ok(existsSync(join(journal, "notes")));
   assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n");
-  assert.equal(createProjectJournal(journal), false);
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), STARTER_TAGS);
+  assert.equal(createJournal(journal, "project"), false);
 });
 
-test("createProjectJournal keeps an existing .gitignore", () => {
-  const root = fixture({ ".magpie/.gitignore": "mine\n" });
-  assert.equal(createProjectJournal(join(root, ".magpie")), false);
+test("createJournal makes a personal journal without a .gitignore; a folder that exists (it holds config.yaml) still gets the starter", () => {
+  const home = fixture({ ".magpie/config.yaml": "personal_journal:\n" });
+  const journal = join(home, ".magpie");
+  assert.equal(createJournal(journal, "personal"), false); // the folder existed
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), STARTER_TAGS);
+  assert.equal(existsSync(join(journal, ".gitignore")), false);
+});
+
+test("createJournal never overwrites an existing tags.md or .gitignore", () => {
+  const root = fixture({ ".magpie/.gitignore": "mine\n", ".magpie/tags.md": "- `mine`\n" });
+  createJournal(join(root, ".magpie"), "project");
   assert.equal(readFileSync(join(root, ".magpie", ".gitignore"), "utf8"), "mine\n");
+  assert.equal(readFileSync(join(root, ".magpie", "tags.md"), "utf8"), "- `mine`\n");
+});
+
+test("a journal that already has notes/ but no tags.md is not given one (the user removed it)", () => {
+  const journal = fixture({ "notes/": null });
+  createJournal(journal, "personal");
+  assert.equal(existsSync(join(journal, "tags.md")), false);
+});
+
+test("the starter tag list has exactly the example vault's ten tag lines", () => {
+  const example = readFileSync(fileURLToPath(new URL("../../examples/vault/tags.md", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+  const tagLines = (text: string) => text.split("\n").filter((line) => line.startsWith("- `"));
+  assert.deepEqual(tagLines(STARTER_TAGS), tagLines(example));
+  assert.equal(parseTagList(STARTER_TAGS).length, 10);
+  assert.doesNotMatch(STARTER_TAGS, /\]\(/); // no links that would break inside a user's journal
+});
+
+test("journalTagList: tags.md if there is one; the starter list for a journal not created yet; otherwise none", () => {
+  assert.deepEqual(journalTagList(fixture({ "tags.md": "- `pdf`\n", "notes/": null })), ["pdf"]);
+  assert.deepEqual(journalTagList(fixture({})), parseTagList(STARTER_TAGS));
+  assert.deepEqual(journalTagList(fixture({ "notes/": null })), []);
 });
