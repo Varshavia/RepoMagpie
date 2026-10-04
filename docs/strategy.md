@@ -90,7 +90,7 @@ Every existing tool judges a package against global data: CVEs, malware database
 
 ### The core loop
 1. **Capture in one line.** `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ten seconds, no template to fill.
-2. **Recall at install.** When the agent runs `npm install pdfkit`, a hook shows the verdict to the agent and the user. Inform only, never block.
+2. **Recall at install.** When the agent runs `npm install pdfkit`, a hook shows the verdict to the agent and the user. It never denies: an avoid note asks the user to confirm; other notes only inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
 3. **Cold start from your manifests.** `magpie init` reads `package.json`, `pyproject.toml` and `Cargo.toml` and creates draft notes for the dependencies you already use. The journal is never empty, and it starts from real decisions instead of stars.
 
 ### Two journal scopes, one format

@@ -130,9 +130,14 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 
 - Arguments: package names, optionally with a version or extras (`pdfkit@1.2.0`, `requests[socks]>=2`), or PURLs.
 - Flags: `--type npm|pypi|cargo`, `--full` (show every section).
-- Matching follows section 5. No match: nothing on stdout, exit 0.
+- **The type of a bare name:** `--type` if given; otherwise the nearest manifest, as for `note` (section 4). When the manifests don't settle it (none, or several), the name is looked up under every type they allow (all three when there is none), and a match under any of them counts as exact. `recall` never prompts and never fails for an ambiguous name.
+- Matching follows section 5. Output: one recall card per match (section 8), project journal first, then the personal one. No match: nothing on stdout, a short message on stderr (`No note for pdfkit.`), exit 0.
 
-`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "status": "reviewed", "path": "..."}]}`
+`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "drafts": ["use_when"], "status": "reviewed", "path": "..."}]}`
+
+- `verdict` is `null` when the note has none (it is `inbox`), as in `search`.
+- `avoid_when` and `use_when` hold one item per bullet, without the draft marker and comments.
+- `drafts` names which of `avoid_when` and `use_when` are still drafts (schema rule 3); `[]` when none.
 
 ### `magpie init` (if time allows in v0.1; otherwise v0.2)
 
@@ -144,6 +149,9 @@ Reads the project's manifests and creates a draft note, without a Verdict (`stat
 ### `magpie hook claude-code`
 
 Internal: the command the Claude Code hook runs (section 6). Not meant to be typed by people.
+
+- Flag: `--inform-only` (never ask; for unattended `-p` runs). `--help` prints the settings snippet.
+- Always exits 0, even for a usage error such as a mistyped flag: exit 2 from a `PreToolUse` hook would block the tool call.
 
 ### `magpie ui`
 
@@ -243,7 +251,11 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 
 **Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
 
-**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal: when `--project`, or the folder `--to project` would create, names it, the command fails with exit 1 and writes nothing.
+**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`), the home directory, or the filesystem root; the home directory itself is not searched. The walk for the project root (where `--to project` creates `.magpie/`) stops at the home directory too, so a git repository at home (dotfiles) never makes home the project root.
+
+Two folders are never a project journal:
+- **The personal journal's folder**, or a `.magpie` directly inside it. When `--project`, or the folder `--to project` would create, names one of them, the command fails with exit 1 and writes nothing.
+- **The home directory's own `.magpie`** (`~/.magpie`), even when `MAGPIE_HOME` or the config file puts the personal journal elsewhere: it is reserved for the default personal journal. Writing commands fail with exit 1 and write nothing; `search` doesn't read it as the project journal.
 
 **Reading both:** search, suggest and recall read both journals. Each result says which journal it came from. When both journals have a note for the same PURL, the project journal's note comes first: it is the team's decision for this project.
 
@@ -271,8 +283,11 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 
 **Recall:**
 1. **Exact:** a note whose `id` or `packages` contains the same type and name. Versions are ignored. Confidence: `exact`.
-2. **Name-only:** otherwise, a note with the same name under another type (for example `pkg:pypi/pdfkit` for an npm install). Confidence: `name-only`, shown as lower confidence.
+2. **Name-only:** otherwise, a note with the same name under another type (for example `pkg:pypi/pdfkit` for an npm install). A GitHub repository note whose repository name is the package name (`pkg:github/foliojs/pdfkit` for `pdfkit`) also matches this way. Confidence: `name-only`, shown as lower confidence.
 3. Otherwise no match.
+
+- **Both journals together:** if either journal has an exact match, only exact matches are shown, project journal first. Name-only matches are shown only when neither journal has an exact one.
+- **Comparing names:** case-insensitive, and `_`, `.` and `-` count as the same character (PyPI's rule, applied to every type for name-only matches). An npm scope is part of the name: `@types/node` doesn't match `node`.
 
 **Suggest** narrows; the agent decides:
 1. Collect keywords: dependency names from the manifests, `keywords` and `description` from `package.json` or `pyproject.toml`, and the README's first heading and paragraph. Or the words of the description.
@@ -283,7 +298,7 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 
 ## 6. Hook contract (Claude Code)
 
-Checked against the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) on 2026-10-03.
+Checked against the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) on 2026-10-03, and again on 2026-10-04: the input has `tool_name`, `tool_input.command` and `cwd`; the output fields below; `permissionDecision` `"ask"`; the 10,000-character cap on `additionalContext` and `systemMessage`.
 
 **Setup** (user settings or the project's `.claude/settings.json`):
 
@@ -314,22 +329,41 @@ Checked against the [Claude Code hooks reference](https://code.claude.com/docs/e
 
 Flags and their values are skipped. An install without names (`npm install`, `pip install -r requirements.txt`) triggers no recall in v0.1 (see below).
 
-**Output** when at least one package has a note: one JSON document on stdout, exit 0.
+**Output** when at least one package has a note: one JSON document on stdout, exit 0 ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
+
+An **avoid note** (its Verdict starts with the word "avoid", in any case, or its "Avoid when" section has text, drafted or not) that matches **exactly** asks the user. A name-only match never asks: it informs, labelled `(name match only)`. The reason is shown in Claude Code's permission prompt; `additionalContext` gives the agent the same note.
 
 ```json
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
-    "additionalContext": "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer (personal journal, ~/.magpie/notes/npm--pdfkit.md)"
-  },
-  "systemMessage": "magpie: pdfkit — avoid: async streams painful; use puppeteer"
+    "permissionDecision": "ask",
+    "permissionDecisionReason": "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\n~/.magpie/notes/npm--pdfkit.md",
+    "additionalContext": "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs (personal journal, ~/.magpie/notes/npm--pdfkit.md)"
+  }
 }
 ```
 
-- `additionalContext` reaches the agent; `systemMessage` is shown to the user.
-- **Never blocks:** the hook never sets `permissionDecision` and never exits with code 2. Without a `permissionDecision`, Claude Code's normal permission flow continues.
+**Any other match** informs only, with no permission decision:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "additionalContext": "Note from your journal: puppeteer — default for PDF rendering in new projects (project journal, ~/code/app/.magpie/notes/npm--puppeteer.md)"
+  },
+  "systemMessage": "magpie: puppeteer — default for PDF rendering in new projects"
+}
+```
+
+- `additionalContext` reaches the agent next to the tool's result; `systemMessage` is shown to the user; `permissionDecisionReason` is shown to the user in the permission prompt.
+- Each match is one line of `additionalContext` (and of `systemMessage`): the name, the Verdict (or `[inbox] no verdict yet`), "Avoid when" when the note has it, `(name match only)` for a name-only match, then the journal and path. A path in the home directory starts with `~`.
+- When a command installs several packages, one document covers them all. If any of them has an avoid note, the whole call asks, and the reason lists every avoid note first.
+- **Never denies:** the hook never returns `"deny"` and never exits with code 2. Its strongest answer is `"ask"`; the user decides. In an unattended `-p` run, Claude Code itself denies any call that would prompt, and the agent reads the reason (decision 0024).
+- **`--inform-only`:** `magpie hook claude-code --inform-only` never asks: avoid notes are reported like any other match. Use it for unattended `-p` runs, where an ask would stop the install.
 - **Fails open:** no note, an unparsable command, a missing journal, or any error means no output and exit 0. Errors go to a log file in the personal journal's `.cache/`, never to stdout.
 - **Fast:** the hook has the recall budget (section 7).
+- Each text stays under 10,000 characters, Claude Code's cap for `additionalContext` and `systemMessage`; the reason is kept to the same limit.
 
 **Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
@@ -342,9 +376,11 @@ Flags and their values are skipped. An install without names (`npm install`, `pi
 | `recall`, and the hook | under 150 ms | 2,000 notes, warm cache |
 | `search`, `suggest` | under 500 ms | 2,000 notes, warm cache |
 
-**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated; no network. `npm run bench` runs it for `search` (`scripts/bench-search.ts`); it exits 1 over the budget.
+**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-recall.ts`) and exits 1 over a budget. CI runs both with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
 
-**Cache:** the index lives in `<journal>/.cache/search-index.json` ([decision 0001](decisions/0001-plain-markdown-storage.md)). It records each note file's modification time and size, and is rebuilt when a note is added, removed or changed. It is safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next search. It stores file names, not paths, so a journal can be moved.
+**Caches:** two per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index) and `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"). Each records every note file's modification time and size, and is rebuilt when a note is added, removed or changed. Both are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
+
+**Hook start-up:** `magpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
 
 ## 8. Output design
 
@@ -356,7 +392,7 @@ Flags and their values are skipped. An install without names (`npm install`, `pi
 - **Colour only carries meaning:** the "Avoid when" label and the `[inbox]` status. Every coloured item also has a text label, so nothing depends on colour alone.
 - **No colour** when stdout is not a terminal, or when `NO_COLOR` is set to a non-empty value ([no-color.org](https://no-color.org/)). `--json` output is never coloured.
 - **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `magpie search pdf | head` shows results only.
-- **Width:** in a terminal, long lines are cut to the terminal width with `…`; when piped, nothing is cut.
+- **Width:** the Verdict is never cut. In a terminal, a result is a metadata line (rank, name, type, journal), cut to the terminal width with `…`, then the Verdict on its own lines, indented under the name and wrapped at spaces (a word longer than the line is broken, not dropped). When piped, each result is one line and nothing is cut.
 - **Labels:** draft text is labelled `(draft)`; a name-only recall match is labelled `(name match only)`.
 - **`--json`** shapes are in section 2. They are a public interface: changing one is a breaking change ([release process](release.md)).
 
@@ -373,13 +409,25 @@ pdfkit · npm · personal journal
   ~/.magpie/notes/npm--pdfkit.md
 ```
 
-Search results:
+Search results in a terminal:
 
 ```
 $ magpie search pdf
-1  pdfkit                  npm     personal  Verdict: avoid: async streams painful; use puppeteer
-2  puppeteer               npm     project   Verdict: default for PDF rendering in new projects
-3  pdf-lib                 npm     personal  [inbox] no verdict yet
+1  pdfkit     npm  personal
+   Verdict: avoid: async streams painful; use puppeteer
+2  puppeteer  npm  project
+   Verdict: default for PDF rendering in new projects
+3  pdf-lib    npm  personal
+   [inbox] no verdict yet
+```
+
+Piped, one line per result:
+
+```
+$ magpie search pdf | cat
+1  pdfkit     npm  personal  Verdict: avoid: async streams painful; use puppeteer
+2  puppeteer  npm  project   Verdict: default for PDF rendering in new projects
+3  pdf-lib    npm  personal  [inbox] no verdict yet
 ```
 
 Suggest list (the hint goes to stderr):

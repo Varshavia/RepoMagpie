@@ -18,7 +18,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | proposed |
 | 0008 | [Machine-readable output for every command](0008-machine-readable-output.md) | accepted |
 | 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted |
-| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021) |
+| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024) |
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
@@ -32,3 +32,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0021 | [Local UI server](0021-local-ui-server.md) | accepted |
 | 0022 | [Frontend stack](0022-frontend-stack.md) | accepted |
 | 0023 | [The API is the `--json` contract](0023-api-is-the-json-contract.md) | accepted |
+| 0024 | [Recall asks on avoid notes](0024-recall-asks-on-avoid-notes.md) | accepted (refines 0010) |

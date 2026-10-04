@@ -51,7 +51,7 @@ Every command also offers a machine-readable mode, for example `--json`, for age
 ### Agent layer
 
 - RepoMagpie's `SKILL.md` teaches agents to use the CLI: note, search, suggest, adopt and recall. For `suggest`, magpie narrows the candidates by keyword and tags, and the agent makes the final choice.
-- Proactive recall shows the user's note before an agent installs a package. It informs and never blocks. Example of what the agent shows the user:
+- Proactive recall shows the user's note before an agent installs a package. It never denies an install: for an avoid note, Claude Code asks the user to confirm, with the note as the reason; other notes only inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)). Example of what the agent shows the user:
 
   > Note from your journal: left-pad 2/5 — 'abandoned, use String.prototype.padStart'.
 
