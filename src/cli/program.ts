@@ -1,9 +1,11 @@
-import { Command, CommanderError, Option } from "commander";
+import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
 import type { Env } from "../core/journals.ts";
+import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
 import { importCommand, type ImportOptions } from "./import.ts";
 import { noteCommand, type NoteOptions } from "./note.ts";
+import { searchCommand, type SearchOptions } from "./search.ts";
 
 // Everything a command needs from the outside world. main.ts passes the real ones; tests pass
 // temporary folders and recorded responses.
@@ -17,11 +19,11 @@ export interface Io {
   today: () => string; // YYYY-MM-DD, local time
   interactive: boolean; // stdin and stdout are terminals
   ask: (question: string) => Promise<string>; // one line typed in the terminal
+  columns?: number; // the terminal's width when stdout is a terminal; undefined when piped
 }
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
-  { usage: "search <query>", summary: "keyword search across both journals" },
   { usage: "suggest [description]", summary: "show the notes that fit this project" },
   { usage: "adopt <name>", summary: "copy a note into the project journal" },
   { usage: "recall <package...>", summary: "show your notes before an install" },
@@ -61,6 +63,18 @@ export async function run(argv: string[], io: Io): Promise<number> {
       code = await importCommand(file, command.optsWithGlobals<ImportOptions>(), io);
     });
 
+  program
+    .command("search")
+    .description("keyword search across both journals")
+    .argument("<query>", "words to look for")
+    .option("--tag <tag>", "only notes with this tag (repeatable: every tag must match)", (tag: string, tags: string[]) => [...tags, tag], [])
+    .addOption(new Option("--kind <kind>", "only notes of this kind").choices(KINDS))
+    .addOption(new Option("--journal <journal>", "search one journal only").choices(["personal", "project"]))
+    .option("--limit <n>", "show at most n results", positiveInteger, 10)
+    .action(async (query: string, _options: unknown, command: Command) => {
+      code = await searchCommand(query, command.optsWithGlobals<SearchOptions>(), io);
+    });
+
   for (const { usage, summary } of NOT_YET) {
     const name = usage.split(" ")[0];
     program.command(usage).description(`[not implemented yet] ${summary}`).action(() => {
@@ -77,4 +91,10 @@ export async function run(argv: string[], io: Io): Promise<number> {
     return 2; // every other commander error is a mistake in the command line
   }
   return code;
+}
+
+function positiveInteger(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) throw new InvalidArgumentError("Use a whole number of 1 or more.");
+  return n;
 }
