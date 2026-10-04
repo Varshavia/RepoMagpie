@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { run } from "./program.ts";
 
-const NOT_YET = ["import", "search", "suggest", "adopt", "recall", "init"];
+const NOT_YET = ["search", "suggest", "adopt", "recall", "init"];
 const version: string = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
 
 // These tests never reach a journal or the network: every call below fails fast if they do.
@@ -30,10 +30,11 @@ test("--version prints the package version", async () => {
   assert.equal(r.out.trim(), version);
 });
 
-test("--help lists note, and every v0.1 command not built yet as not implemented yet", async () => {
+test("--help lists note and import, and every v0.1 command not built yet as not implemented yet", async () => {
   const r = await magpie("--help");
   assert.equal(r.code, 0);
   assert.match(r.out, /^\s+note \[options\] <name-or-url> \[text\]\s+capture a verdict in one line$/m);
+  assert.match(r.out, /^\s+import \[options\] <file>\s+add many notes from a file$/m);
   for (const command of NOT_YET) {
     assert.match(r.out, new RegExp(`^\\s+${command}\\b.*not implemented yet`, "m"), command);
   }

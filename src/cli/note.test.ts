@@ -1,58 +1,14 @@
-import { after, test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch, recorded, type Call } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
 import { readNote, validate } from "../core/note.ts";
-import { run, type Io } from "./program.ts";
+import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
-// Every test gets its own temporary home, journal and project; the real home is never used,
-// and fetch answers from recorded responses only.
-const roots: string[] = [];
-after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-
-function sandbox(files: Record<string, string | null> = {}) {
-  const root = mkdtempSync(join(tmpdir(), "magpie-note-"));
-  roots.push(root);
-  for (const [path, content] of Object.entries({ "home/": null, "project/.git/": null, ...files })) {
-    const full = join(root, path);
-    if (content === null) mkdirSync(full, { recursive: true });
-    else {
-      mkdirSync(parse(full).dir, { recursive: true });
-      writeFileSync(full, content);
-    }
-  }
-  return {
-    root,
-    journal: join(root, "journal"),
-    home: join(root, "home"),
-    project: join(root, "project"),
-    note: (name: string) => join(root, "journal", "notes", name),
-  };
-}
-
-type Box = ReturnType<typeof sandbox>;
-
-async function magpie(box: Box, argv: string[], over: Partial<Io> = {}) {
-  let out = "";
-  let err = "";
-  const io: Io = {
-    out: (s) => { out += s; },
-    err: (s) => { err += s; },
-    env: { MAGPIE_HOME: box.journal },
-    cwd: box.project,
-    home: box.home,
-    fetch: fakeFetch({}),
-    today: () => "2026-10-04",
-    interactive: false,
-    ask: () => Promise.reject(new Error("no prompt expected")),
-    ...over,
-  };
-  const code = await run(argv, io);
-  return { code, out, err };
-}
+// Every test gets its own temporary home, journal and project (fixtures/sandbox.ts); the real
+// home is never used, and fetch answers from recorded responses only.
 
 const PLAYWRIGHT_URL = "https://github.com/microsoft/playwright-cli";
 const playwright = () => fakeFetch(recorded("microsoft--playwright-cli"));
@@ -278,6 +234,36 @@ test("--to project --json reports the journal as project and the creation as a w
   assert.equal(json.path, join(box.project, ".magpie", "notes", "npm--pdfkit.md"));
   assert.match(json.warnings[0], /Created the project journal/);
   assert.equal(r.err, "");
+});
+
+// The personal journal's folder is never the project journal (spec §3), also with --to project.
+
+const PERSONAL_GUARD = /is your personal journal, so it can't be the project journal/;
+
+test("--to project where <root>/.magpie is the personal journal fails; nothing is written", async () => {
+  const box = sandbox({ "home/.git/": null }); // a home folder under git, e.g. a dotfiles repository
+  const env = {}; // personal journal: the default, <home>/.magpie
+  await magpie(box, ["note", "pkg:npm/pdfkit", "ok"], { cwd: box.home, env });
+  const personal = join(box.home, ".magpie");
+  const r = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project"], { cwd: box.home, env });
+  assert.equal(r.code, 1);
+  assert.match(r.err, PERSONAL_GUARD);
+  assert.equal(existsSync(join(personal, "notes", "npm--chalk.md")), false);
+  assert.equal(existsSync(join(personal, ".gitignore")), false);
+});
+
+test("--project naming the personal journal (by its root or the folder itself) fails, also under --json", async () => {
+  const box = sandbox();
+  const env = {}; // personal journal: <home>/.magpie
+  for (const project of [box.home, join(box.home, ".magpie")]) {
+    const r = await magpie(box, ["note", "pkg:npm/chalk", "--to", "project", "--project", project, "--json"], { env });
+    assert.equal(r.code, 1);
+    const json = JSON.parse(r.out);
+    assert.equal(json.journal, "project");
+    assert.equal(json.path, null);
+    assert.match(json.error, PERSONAL_GUARD);
+  }
+  assert.equal(existsSync(join(box.home, ".magpie")), false);
 });
 
 test("--home beats MAGPIE_HOME", async () => {

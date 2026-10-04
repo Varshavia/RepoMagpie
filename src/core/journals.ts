@@ -95,6 +95,7 @@ export interface NoteEntry {
   path: string;
   id: string | undefined; // undefined when the frontmatter has no readable id
   packages: string[];
+  text?: string; // set by a dry run: the text that would have been written
 }
 
 // Every note in <journal>/notes/ with its id and packages.
@@ -137,6 +138,11 @@ function isDirectory(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Whether two paths name the same folder; case-insensitive on Windows.
+export function samePath(a: string, b: string): boolean {
+  return comparable(a) === comparable(b);
 }
 
 // Paths compare case-insensitively on Windows.
