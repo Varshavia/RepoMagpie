@@ -20,7 +20,7 @@ The maintainer does all staging, commits and pushes by hand, and every GitHub wr
 - git-guard scans heredoc text as commands on purpose: a heredoc fed to an interpreter (`bash <<EOF`) runs its body. Don't change that.
 - Never add a `Co-Authored-By` line or any AI attribution anywhere.
 
-The maintainer prefers **small, frequent commits**. Split work so each piece can be committed on its own, and stop at natural commit points instead of doing everything at once.
+The maintainer prefers **small, frequent commits**. Split work so each piece can be committed on its own. Commit splits use **whole files only** (`git add <file>`), never parts of a file, even if that means fewer, larger commits; each commit must pass the tests when applied in order.
 
 ### Branches
 
@@ -40,14 +40,16 @@ From [decision 0012](docs/decisions/0012-branch-workflow.md):
 
 **At the start of every task:** run `git status`, report the current branch, and stop if you are on `main` when the task needs a branch (section 1, "Branches").
 
-**At the end of every task:**
+**Branch workflow:** a brief covers a whole branch. Work through all its pieces without stopping between them. Stop early only for a real question (section 6). Append a work log entry after each piece, so the log stays current.
+
+**At the end of the branch (or of a task that is not a branch brief):**
 1. Go through the definition of done (section 7).
 2. Append an entry to today's work log (section 14).
-3. Print the list of files you created, changed or deleted.
-4. Print a suggested commit message in Conventional Commits format (section 11).
-5. Stop and wait for the maintainer.
-
-**At the end of a branch:** draft the pull-request description (section 1, "Branches").
+3. Give one report: what changed, evidence, decisions you made, open questions.
+4. Print the list of files you created, changed or deleted.
+5. Print a commit split: whole files only, in order, each with a Conventional Commits message (section 11), each passing the tests.
+6. Draft the pull-request description in `.scratch/pr-<branch-name>.md` (section 1, "Branches").
+7. Stop and wait for the maintainer.
 
 ## 3. Read the docs first
 
@@ -82,9 +84,11 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
+| `scripts/` | Benchmarks (`npm run bench`). Typechecked, not built or published. |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
 | `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
+| `.gitattributes` | Every text file is stored and checked out with LF line endings. |
 | `.gitignore` | Ignores secrets, build output, the personal vault, `.scratch/` and `.worklog/`. |
 | `AGENTS.md` | Points other coding agents to this file. |
 | `CHANGELOG.md` | User-visible changes per release (Keep a Changelog). |
@@ -128,8 +132,8 @@ After two failed attempts at the same problem, stop. Report what you tried, what
 - For each question, give the options and your recommendation.
 - Never ask what the docs already answer. Point to the doc instead.
 - **Minor questions** (wording, file placement, test details, small consistency fixes inside the current piece's scope): apply your own recommendation and keep going. List each one under "Decisions I made" in your report, and in the work log entry's "Decisions & assumptions" line.
-- **Stop and ask only for:** product decisions, anything that changes the meaning of a decision record, security-related changes beyond what the piece asked, scope expansion beyond the current piece, or anything irreversible.
-- Either way, still stop after every piece with the file list and a commit message.
+- **Stop and ask only for a real question:** the spec or docs are silent or ambiguous on a behaviour, a new dependency, a security-related change, a product decision, anything that changes the meaning of a decision record, scope expansion beyond the brief, or anything irreversible. Batch them: do the pieces that don't depend on the answer first, then ask.
+- Otherwise don't stop between pieces; report everything once, at the end of the branch (section 2).
 
 ## 7. Definition of done
 
@@ -187,6 +191,7 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | `npm test` | Product tests: `node --test "src/**/*.test.ts"`. |
 | `npm run typecheck` | `tsc --noEmit` over `src/`. |
 | `npm run build` | Compile `src/` to `dist/` (tests excluded). `dist/` is git-ignored. |
+| `npm run bench` | Build, then time `magpie search` on 2,000 generated notes against the budget in spec §7 (median and p95; exit 1 over budget). Run it when search or the index changes. |
 | `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
 | `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
