@@ -189,6 +189,7 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | `npm run build` | Compile `src/` to `dist/` (tests excluded). `dist/` is git-ignored. |
 | `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
 | `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
+| `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
 
 CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows.
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
