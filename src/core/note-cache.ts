@@ -1,0 +1,49 @@
+// Caches derived from a journal's notes, in <journal>/.cache/ (spec §7, decision 0001): valid while
+// every note file has the modification time and size recorded with it; rebuildable and safe to
+// delete. A cache that can't be read is rebuilt; one that can't be written only costs time.
+// Stores file names, not paths, so a journal can be moved. Never prints.
+import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+export type Signature = Record<string, [number, number]>; // note file name → [mtimeMs, size]
+
+// The note files of a journal, sorted, and their signature.
+export function noteSignature(journal: string): { files: string[]; signature: Signature } {
+  const folder = join(journal, "notes");
+  let files: string[];
+  try {
+    files = readdirSync(folder).filter((name) => name.endsWith(".md")).sort();
+  } catch {
+    files = [];
+  }
+  const signature: Signature = {};
+  for (const file of files) {
+    const { mtimeMs, size } = statSync(join(folder, file));
+    signature[file] = [mtimeMs, size];
+  }
+  return { files, signature };
+}
+
+// The cached data, when the cache file exists, has this version and matches the signature.
+export function readCache(journal: string, name: string, version: number, signature: Signature): unknown {
+  try {
+    const cached = JSON.parse(readFileSync(join(journal, ".cache", name), "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
+    if (cached?.version === version && JSON.stringify(cached.files) === JSON.stringify(signature)) return cached.data;
+  } catch {
+    // No cache, or one that can't be read.
+  }
+  return undefined;
+}
+
+// Writes the cache whole, then renames it into place, so a reader never sees half a file.
+export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
+  try {
+    mkdirSync(join(journal, ".cache"), { recursive: true });
+    const file = join(journal, ".cache", name);
+    const temporary = `${file}.${process.pid}.tmp`;
+    writeFileSync(temporary, JSON.stringify({ version, files: signature, data }));
+    renameSync(temporary, file);
+  } catch {
+    // A cache that can't be written only costs time on the next run.
+  }
+}
