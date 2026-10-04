@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { draftKind, draftTags, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
 
@@ -191,6 +192,31 @@ test("no answer within the timeout is timeout", async () => {
   assert.ok(!r.ok);
   assert.equal(r.problem.kind, "timeout");
   assert.match(r.problem.message, /didn't answer/);
+});
+
+// The timeout must keep the process alive on its own: a fetch that never answers holds no
+// handle, so an unref'd timer would let the event loop empty and the promise never settle.
+// Run in a separate process, where nothing else keeps the loop alive.
+test("the timeout fires even when nothing else keeps the process alive", () => {
+  const script = `
+    import { fetchRepository } from ${JSON.stringify(new URL("./github.ts", import.meta.url).href)};
+    const hang = (_input, init) => new Promise((_resolve, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)));
+    const r = await fetchRepository("pkg:github/a/b", { fetch: hang, timeoutMs: 50 });
+    console.log(r.ok ? "ok" : r.problem.kind);`;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 10_000 });
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), "timeout");
+});
+
+test("a request that answers in time leaves no timer behind", () => {
+  const script = `
+    import { fetchRepository } from ${JSON.stringify(new URL("./github.ts", import.meta.url).href)};
+    const started = Date.now();
+    await fetchRepository("pkg:github/a/b", { fetch: () => Promise.resolve(new Response("{}", { status: 404 })), timeoutMs: 5_000 });
+    process.on("exit", () => console.log(Date.now() - started < 2_000 ? "quick" : "waited for the timer"));`;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 10_000 });
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), "quick");
 });
 
 test("no connection is offline, with the system's error code", async () => {

@@ -138,8 +138,12 @@ async function get(path: string, slug: string, options: Options, raw = false): P
     "User-Agent": `repomagpie/${packageVersion()}`,
   };
   if (token) headers.Authorization = `Bearer ${token}`;
+  // A ref'd timer, cleared in finally: it keeps the process alive while a request hangs
+  // (AbortSignal.timeout's timer is unref'd, so the event loop could empty first).
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("GitHub didn't answer in time.", "TimeoutError")), timeoutMs);
   try {
-    const response = await fetch(API + path, { method: "GET", headers, signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(API + path, { method: "GET", headers, signal: controller.signal });
     if (response.ok) return { ok: true, text: await response.text() };
     return { ok: false, problem: statusProblem(response, slug, Boolean(token)) };
   } catch (error) {
@@ -149,6 +153,8 @@ async function get(path: string, slug: string, options: Options, raw = false): P
     }
     const code = cause?.code ? ` (${cause.code})` : "";
     return { ok: false, problem: { kind: "offline", message: `Can't reach GitHub${code}. Check your connection.` } };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
