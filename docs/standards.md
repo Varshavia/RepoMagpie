@@ -28,7 +28,7 @@ See [decision 0002](decisions/0002-cli-first.md). Summary: the Playwright team r
 - Google's open format (Apache 2.0, from Stitch) for describing a design system to AI agents: YAML tokens plus prose rationale. Still alpha; Google says to expect changes.
 - Ready-made examples: <https://github.com/VoltAgent/awesome-design-md>.
 
-**For RepoMagpie:** write our own `DESIGN.md` in v0.1 Launch, before the logo, landing page and any other visual work. Don't build tooling that depends on the exact spec.
+**For RepoMagpie:** our own [`DESIGN.md`](../DESIGN.md) is written before any UI code, the logo, the landing page and any other visual work. It follows the format's stable core (the token groups and the section order of the [spec](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md), version `alpha` on 2026-10-04) and avoids alpha-only details. Don't build tooling that depends on the exact spec.
 
 ## AGENTS.md / CLAUDE.md — **adopt**
 
