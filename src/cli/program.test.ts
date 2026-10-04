@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { run } from "./program.ts";
 
-const NOT_YET = ["suggest", "adopt", "recall", "init"];
+const NOT_YET = ["suggest", "adopt", "init"];
 const version: string = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
 
 // These tests never reach a journal or the network: every call below fails fast if they do.
@@ -30,22 +30,24 @@ test("--version prints the package version", async () => {
   assert.equal(r.out.trim(), version);
 });
 
-test("--help lists note, import and search, and every v0.1 command not built yet as not implemented yet", async () => {
+test("--help lists note, import, search, recall and hook, and every v0.1 command not built yet as not implemented yet", async () => {
   const r = await magpie("--help");
   assert.equal(r.code, 0);
   assert.match(r.out, /^\s+note \[options\] <name-or-url> \[text\]\s+capture a verdict in one line$/m);
   assert.match(r.out, /^\s+import \[options\] <file>\s+add many notes from a file$/m);
   assert.match(r.out, /^\s+search \[options\] <query>\s+keyword search across both journals$/m);
+  assert.match(r.out, /^\s+recall \[options\] <package\.\.\.>\s+show your notes before an install$/m);
+  assert.match(r.out, /^\s+hook\s+adapters that agent hooks run/m);
   for (const command of NOT_YET) {
     assert.match(r.out, new RegExp(`^\\s+${command}\\b.*not implemented yet`, "m"), command);
   }
 });
 
 test("a v0.1 command not built yet says so and exits 1", async () => {
-  const r = await magpie("recall", "pdfkit");
+  const r = await magpie("suggest");
   assert.equal(r.code, 1);
   assert.equal(r.out, "");
-  assert.match(r.err, /magpie recall: not implemented yet/);
+  assert.match(r.err, /magpie suggest: not implemented yet/);
 });
 
 test("a choice outside --to's list is a usage error (exit 2)", async () => {
