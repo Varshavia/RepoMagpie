@@ -1,17 +1,13 @@
-import { after, test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { scratchBase } from "./fixtures/scratch.ts";
 import { CACHE_FILE, loadIndex, noteDocuments } from "./search-index.ts";
 
-// Every journal lives in its own temporary folder.
-const roots: string[] = [];
-after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-
+// Every journal lives in its own scratch folder.
 function journal(notes: Record<string, string>): string {
-  const root = mkdtempSync(join(tmpdir(), "magpie-index-"));
-  roots.push(root);
+  const root = scratchBase("index");
   mkdirSync(join(root, "notes"));
   for (const [file, text] of Object.entries(notes)) writeFileSync(join(root, "notes", file), text);
   return root;
@@ -190,8 +186,7 @@ test("a cache that can't be written doesn't stop the search", () => {
 });
 
 test("a journal without notes, or that doesn't exist, gives an empty index and writes nothing", () => {
-  const empty = mkdtempSync(join(tmpdir(), "magpie-index-"));
-  roots.push(empty);
+  const empty = scratchBase("index");
   assert.equal(loadIndex(empty).index.documentCount, 0);
   assert.equal(loadIndex(join(empty, "missing")).index.documentCount, 0);
   assert.equal(existsSync(join(empty, ".cache")), false);

@@ -1,6 +1,6 @@
 // magpie note <name-or-url> ["text"] (spec §2), and the journal and save steps import reuses.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { captureNote, type Capture } from "../core/capture.ts";
 import { fetchRepository, type RepoMetadata } from "../core/github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "../core/identity.ts";
@@ -9,6 +9,7 @@ import {
   findManifests,
   findProjectJournal,
   findProjectRoot,
+  homeJournal,
   journalTagList,
   listNotes,
   noteFor,
@@ -34,15 +35,18 @@ export interface Journal {
 
 // The journal to write to (spec §3). A project journal that doesn't exist yet is created on the
 // first write, at the git root or in the working directory (spec §2 note step 5). The personal
-// journal's folder is never taken as the project journal.
+// journal's folder is never taken as the project journal, nor as its project root.
 export function locateJournal(scope: Journal["scope"], options: GlobalOptions, io: Io): Journal {
   const personal = resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home });
   if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings, error: null };
-  const found = findProjectJournal({ cwd: io.cwd, personalJournal: personal.path, flag: options.project });
-  const path = found ?? join(findProjectRoot(io.cwd), ".magpie");
-  const error = samePath(path, personal.path)
-    ? `${path} is your personal journal, so it can't be the project journal. Run this inside a project, or pass --project <dir>.`
-    : null;
+  const found = findProjectJournal({ cwd: io.cwd, home: io.home, personalJournal: personal.path, flag: options.project });
+  const path = found ?? join(findProjectRoot(io.cwd, io.home), ".magpie");
+  const hint = "Run this inside a project, or pass --project <dir>.";
+  const error = samePath(path, personal.path) || samePath(dirname(path), personal.path)
+    ? `${path} is your personal journal, so it can't be the project journal. ${hint}`
+    : samePath(path, homeJournal(io.home))
+      ? `${path} is reserved for the default personal journal, so it can't be the project journal. ${hint}`
+      : null;
   return { path, scope, warnings: personal.warnings, error };
 }
 

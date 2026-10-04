@@ -285,6 +285,54 @@ test("--project naming the personal journal (by its root or the folder itself) f
   assert.equal(existsSync(join(box.home, ".magpie")), false);
 });
 
+test("the personal journal's own folder as the project root fails (custom MAGPIE_HOME): by --project, or as the working directory", async () => {
+  // The journal is its own git repository (a backed-up journal), so walking up from it stops there and
+  // never leaves the sandbox: on Windows the temp folder is under the real home, next to ~/.magpie.
+  const box = sandbox({ "journal/.git/": null });
+  await magpie(box, ["note", "pkg:npm/pdfkit", "ok"]); // creates the personal journal, <root>/journal
+  const cases: [string[], string][] = [
+    [["--project", box.journal], box.root],
+    [[], box.journal],
+  ];
+  for (const [flags, cwd] of cases) {
+    const r = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project", ...flags], { cwd });
+    assert.equal(r.code, 1, `${flags.join(" ")} in ${cwd}: ${r.err}`);
+    assert.match(r.err, PERSONAL_GUARD);
+  }
+  assert.equal(existsSync(join(box.journal, ".magpie")), false);
+  assert.equal(existsSync(join(box.journal, "notes", "npm--chalk.md")), false);
+});
+
+const HOME_GUARD = /is reserved for the default personal journal, so it can't be the project journal/;
+
+test("the home directory's own .magpie is never the project journal, even with a custom MAGPIE_HOME", async () => {
+  const box = sandbox({ "home/.magpie/notes/": null, "home/code/": null });
+  const homeJournal = join(box.home, ".magpie");
+  for (const [flags, cwd] of [[[], box.home], [["--project", box.home], box.root], [["--project", homeJournal], box.root]] as [string[], string][]) {
+    const r = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project", ...flags], { cwd });
+    assert.equal(r.code, 1, `${flags.join(" ")} in ${cwd}: ${r.err}`);
+    assert.match(r.err, HOME_GUARD);
+  }
+  assert.equal(existsSync(join(homeJournal, "notes", "npm--chalk.md")), false);
+  assert.equal(existsSync(join(homeJournal, ".gitignore")), false);
+
+  // Below home, outside any repository: the project journal is created in the working directory.
+  const below = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project"], { cwd: join(box.home, "code") });
+  assert.equal(below.code, 0, below.err);
+  assert.ok(existsSync(join(box.home, "code", ".magpie", "notes", "npm--chalk.md")));
+});
+
+test("search never reads the home directory's own .magpie as the project journal", async () => {
+  const box = sandbox({
+    "home/.magpie/notes/npm--chalk.md": "---\nid: pkg:npm/chalk\nname: chalk\n---\n\n## Verdict\nfine\n",
+    "home/code/": null,
+  });
+  const r = await magpie(box, ["search", "chalk", "--json"], { cwd: join(box.home, "code") });
+  assert.deepEqual(JSON.parse(r.out).results, []);
+  const flagged = await magpie(box, ["search", "chalk", "--json", "--project", box.home]);
+  assert.deepEqual(JSON.parse(flagged.out).results, []);
+});
+
 test("--home beats MAGPIE_HOME", async () => {
   const box = sandbox();
   const other = join(box.root, "other");

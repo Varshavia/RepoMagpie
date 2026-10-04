@@ -1,21 +1,17 @@
 // Test helper: runs magpie in a temporary home, journal and project, with recorded responses
 // instead of the network. The real home directory is never used.
 // Not part of the build (tsconfig.build.json excludes fixtures/).
-import { after } from "node:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch } from "../../core/fixtures/fake-fetch.ts";
+import { scratchBase } from "../../core/fixtures/scratch.ts";
 import { run, type Io } from "../program.ts";
 
-const roots: string[] = [];
-after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-
-// A temporary folder with home/, project/.git and the given files (null: a folder).
+// A scratch folder (under <repo>/.scratch/tests/, with its own .git, so no walk ever leaves it) with
+// home/, project/.git and the given files (null: a folder).
 // The personal journal is <root>/journal (MAGPIE_HOME), created by the first write.
 export function sandbox(files: Record<string, string | null> = {}) {
-  const root = mkdtempSync(join(tmpdir(), "magpie-cli-"));
-  roots.push(root);
+  const root = scratchBase("cli");
   for (const [path, content] of Object.entries({ "home/": null, "project/.git/": null, ...files })) {
     const full = join(root, path);
     if (content === null) mkdirSync(full, { recursive: true });

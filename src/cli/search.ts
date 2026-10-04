@@ -1,5 +1,5 @@
 // magpie search <query> (spec §2, §5, §8): keyword search across both journals.
-import { findProjectJournal, resolvePersonalJournal, samePath } from "../core/journals.ts";
+import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath } from "../core/journals.ts";
 import { searchJournals, type JournalSource, type SearchResult } from "../core/search.ts";
 import { loadIndex } from "../core/search-index.ts";
 import type { GlobalOptions } from "./note.ts";
@@ -22,10 +22,10 @@ export async function searchCommand(query: string, options: SearchOptions, io: I
   }
 
   const personal = resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home });
-  const project = findProjectJournal({ cwd: io.cwd, personalJournal: personal.path, flag: options.project });
+  const project = findProjectJournal({ cwd: io.cwd, home: io.home, personalJournal: personal.path, flag: options.project });
   const sources: JournalSource[] = [];
   if (options.journal !== "project") sources.push({ scope: "personal", path: personal.path, index: loadIndex(personal.path).index });
-  if (options.journal !== "personal" && project && !samePath(project, personal.path)) {
+  if (options.journal !== "personal" && project && !samePath(project, personal.path) && !samePath(project, homeJournal(io.home))) {
     sources.push({ scope: "project", path: project, index: loadIndex(project).index });
   }
   const all = searchJournals(sources, query, { limit: Infinity, tags: options.tag, kind: options.kind });
@@ -47,23 +47,46 @@ export async function searchCommand(query: string, options: SearchOptions, io: I
 
 const INBOX = "[inbox]";
 
-// One line per result: rank, name, PURL type, journal, then the Verdict (spec §8). In a terminal,
-// lines are cut to its width, and [inbox] is coloured unless NO_COLOR is set.
+// Rank, name, PURL type, journal, then the Verdict (spec §8). Piped: one line per result, nothing
+// cut. In a terminal: the metadata line is cut to its width, and the Verdict follows on its own
+// lines, indented under the name and wrapped, never cut; [inbox] is coloured unless NO_COLOR is set.
 function render(results: SearchResult[], io: Io): string[] {
-  const color = io.columns !== undefined && !io.env.NO_COLOR;
   const rows = results.map((r, i) => {
     const lead = r.verdict === null ? `${INBOX} no verdict yet` : `${r.type === "skill" ? "Skill" : "Verdict"}: ${r.verdict}`;
     return [String(i + 1), r.skill ? `${r.name} › ${r.skill}` : r.name, r.id?.match(/^pkg:([^/]+)\//)?.[1] ?? "-", r.journal, lead];
   });
   const widths = [0, 1, 2, 3].map((column) => Math.max(...rows.map((row) => row[column].length)));
-  return rows.map((row) => {
-    const prefix = row.slice(0, 4).map((cell, column) => cell.padEnd(widths[column])).join("  ");
-    const start = prefix.length + 2; // where the Verdict column starts
-    let line = `${prefix}  ${row[4]}`;
-    if (io.columns !== undefined && line.length > io.columns) line = `${line.slice(0, Math.max(io.columns - 1, 0))}…`;
-    if (color && row[4].startsWith(INBOX) && line.length >= start + INBOX.length) {
-      line = `${line.slice(0, start)}\u001b[33m${INBOX}\u001b[39m${line.slice(start + INBOX.length)}`;
-    }
-    return line;
+  const metadata = (row: string[]) => row.slice(0, 4).map((cell, column) => cell.padEnd(widths[column])).join("  ");
+  if (io.columns === undefined) return rows.map((row) => `${metadata(row)}  ${row[4]}`);
+
+  const columns = io.columns;
+  const color = !io.env.NO_COLOR;
+  const indent = " ".repeat(widths[0] + 2);
+  return rows.flatMap((row) => {
+    let line = metadata(row).trimEnd();
+    if (line.length > columns) line = `${line.slice(0, Math.max(columns - 1, 0))}…`;
+    const lead = wrap(row[4], Math.max(columns - indent.length, 1)).map((part) => indent + part);
+    if (color && row[4].startsWith(INBOX)) lead[0] = lead[0].replace(INBOX, `\u001b[33m${INBOX}\u001b[39m`);
+    return [line, ...lead];
   });
+}
+
+// Splits text into lines of at most `width` characters at spaces; a longer word is broken.
+function wrap(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (let word of text.split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length <= width) {
+      line += ` ${word}`;
+      continue;
+    }
+    if (line) lines.push(line);
+    while (word.length > width) {
+      lines.push(word.slice(0, width));
+      word = word.slice(width);
+    }
+    line = word;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
 }

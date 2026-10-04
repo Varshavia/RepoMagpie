@@ -46,16 +46,17 @@ export function resolvePersonalJournal(options: { home: string; env: Env; cwd: s
 
 // --project, or the first .magpie/ folder walking up from the working directory.
 // --project names the project root, like git -C; a path to the .magpie folder itself also works.
-// The walk stops at the git root (a folder containing .git) or the filesystem root,
-// and never takes the personal journal's folder.
-export function findProjectJournal(options: { cwd: string; personalJournal: string; flag?: string }): string | null {
-  const { cwd, personalJournal, flag } = options;
+// The walk stops at the git root (a folder containing .git), the home directory or the filesystem
+// root. It never takes the personal journal's folder, nor the home directory's own .magpie.
+export function findProjectJournal(options: { cwd: string; home: string; personalJournal: string; flag?: string }): string | null {
+  const { cwd, home, personalJournal, flag } = options;
   if (flag) {
     const path = resolve(cwd, flag);
     return basename(path) === ".magpie" ? path : join(path, ".magpie");
   }
   const personal = comparable(personalJournal);
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    if (samePath(dir, home)) return null;
     const candidate = join(dir, ".magpie");
     if (isDirectory(candidate) && comparable(candidate) !== personal) return candidate;
     if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return null;
@@ -63,11 +64,18 @@ export function findProjectJournal(options: { cwd: string; personalJournal: stri
 }
 
 // The nearest folder with .git, walking up; outside git, the working directory itself.
-export function findProjectRoot(cwd: string): string {
+// The walk stops at the home directory: a git repository at home (dotfiles) is not a project.
+export function findProjectRoot(cwd: string, home: string): string {
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    if (samePath(dir, home)) return resolve(cwd);
     if (existsSync(join(dir, ".git"))) return dir;
     if (dirname(dir) === dir) return resolve(cwd);
   }
+}
+
+// The home directory's own .magpie, which is reserved for the default personal journal.
+export function homeJournal(home: string): string {
+  return join(home, ".magpie");
 }
 
 const MANIFESTS: readonly Manifest[] = ["package.json", "pyproject.toml", "Cargo.toml"];
