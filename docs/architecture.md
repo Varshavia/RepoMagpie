@@ -34,7 +34,8 @@ src/
   core/        journals: discovery and config (decision 0016)
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
-               index: build, cache and query (MiniSearch)
+               search-index: one journal's index and its cache (MiniSearch)
+               search: filters, ranking and results across journals
                match: recall and suggest rules
                github: repository metadata and SKILL.md detection
                capture: what note and import write for one item
@@ -42,8 +43,10 @@ src/
   hook/        claude-code.ts: stdin JSON → install detection → recall → stdout JSON
 skill/
   SKILL.md     no code
-test/          node:test; fixture journals; no network
+scripts/       benchmarks (npm run bench); not part of the package
 ```
+
+Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in temporary folders and no network.
 
 `cli/` and `hook/` import from `core/` only. `core/` never prints and never reads `process.argv`.
 
