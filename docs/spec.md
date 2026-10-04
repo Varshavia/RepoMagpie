@@ -83,6 +83,10 @@ Keyword search across both journals.
 
 - Flags: `--tag <tag>` (repeatable), `--kind <kind>`, `--journal personal|project`, `--limit <n>` (default 10).
 - Results are notes and completed skill lines ([decision 0006](decisions/0006-skills-as-searchable-lines.md)), Verdict first. `inbox` notes rank below `reviewed` ones; draft text is labelled.
+- **Ranking:** every `reviewed` result comes before any `inbox` one; relevance orders results within each group. Completed skill lines rank as `reviewed`, because their text is human-written.
+- **Skill results:** `verdict` is the skill line's own text; `name` and `id` are the parent note's; `skill` is the skill's name.
+- **Filters:** `--tag` given more than once means every tag must be present. `--tag` and `--kind` filter skill results by their parent note's tags and kind.
+- **Both journals:** when both have a note for the same PURL, both are shown, the project journal's directly before the personal one (section 3).
 - No matches: a short message on stderr, exit 0.
 
 `--json`: `{"query": "...", "results": [{"id": "...", "journal": "project", "type": "note|skill", "skill": null, "name": "...", "verdict": "...", "status": "reviewed", "score": 3.2, "path": "..."}]}`
@@ -156,6 +160,8 @@ Internal: the command the Claude Code hook runs (section 6). Not meant to be typ
   .gitignore      project journal only; contains ".cache/"
 ```
 
+**Creating a journal:** `magpie` creates a journal when it writes the first note into it: the `notes/` folder, a `.gitignore` for a project journal, and a starter `tags.md` with ten tags (the same as `examples/vault/tags.md`) when there is no `tags.md` yet. Existing files are never overwritten, and a journal that already has `notes/` doesn't get a `tags.md` again. Tags for that first note are drafted from the starter list.
+
 **Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
 
 **Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal: when `--project`, or the folder `--to project` would create, names it, the command fails with exit 1 and writes nothing.
@@ -194,7 +200,7 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 2. Score notes by keyword search (as in `search`) plus one point per matching tag.
 3. Return the top candidates, Verdict first, `reviewed` before `inbox`, with "already used" marked.
 
-**Search** indexes, per note: `name`, `id`, `tags`, Verdict, "Use when", "Avoid when", "What it does" and "My notes"; and each completed skill line as its own document. Prefix and fuzzy matching are on.
+**Search** indexes, per note: `name`, `id`, `tags`, Verdict, "Use when", "Avoid when", "What it does" and "My notes"; and each completed skill line as its own document. Prefix and fuzzy matching are on. Results rank `reviewed` (and completed skill lines) before `inbox`, then by relevance; a skill result's Verdict is its own text (section 2).
 
 ## 6. Hook contract (Claude Code)
 
@@ -257,9 +263,9 @@ Flags and their values are skipped. An install without names (`npm install`, `pi
 | `recall`, and the hook | under 150 ms | 2,000 notes, warm cache |
 | `search`, `suggest` | under 500 ms | 2,000 notes, warm cache |
 
-**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated; no network.
+**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated; no network. `npm run bench` runs it for `search` (`scripts/bench-search.ts`); it exits 1 over the budget.
 
-**Cache:** the index lives in `<journal>/.cache/` and is rebuilt when a note file is newer than the index ([decision 0001](decisions/0001-plain-markdown-storage.md)).
+**Cache:** the index lives in `<journal>/.cache/search-index.json` ([decision 0001](decisions/0001-plain-markdown-storage.md)). It records each note file's modification time and size, and is rebuilt when a note is added, removed or changed. It is safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next search. It stores file names, not paths, so a journal can be moved.
 
 ## 8. Output design
 
