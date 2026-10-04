@@ -132,10 +132,10 @@ The first public release: capture what you learned, find it again, and see it be
 **Done when:** importing a file with one line per seed repository produces one valid note per line.
 
 ### `magpie search`
-- [ ] Keyword search over frontmatter and text, across both journals.
-- [ ] Each completed skill line is its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
+- [x] Keyword search over frontmatter and text, across both journals.
+- [x] Each completed skill line is its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 
-**Done when:** for a fixed set of 10 test questions, the expected note is in the top 3.
+**Done when:** for a fixed set of 10 test questions, the expected note is in the top 3. (Met: `src/core/search-quality.test.ts`, over the example vault.)
 
 ### `magpie suggest`
 - [ ] Input: a project's manifests and README, or a free-text description.
