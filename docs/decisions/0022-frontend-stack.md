@@ -1,6 +1,6 @@
 # 0022 — Frontend stack
 
-**Status:** proposed (2026-10-04). It becomes accepted when the maintainer approves the dependencies below (CLAUDE.md, section 9). No dependency is added before then.
+**Status:** accepted (2026-10-04). The maintainer approved the dependencies below on 2026-10-04 (CLAUDE.md, section 9).
 
 ## Context
 The local app ([0021](0021-local-ui-server.md)) needs a frontend. It is served by `magpie ui` as a static bundle, so frontend libraries are bundled at publish time: they are **devDependencies**, and the npm package's runtime dependencies don't grow.
@@ -17,7 +17,7 @@ Budgets the stack must meet ([UI](../ui.md), "Budgets"): at most 200 kB gzipped 
 - **Fonts:** the system font stack and a system monospace. No remote fonts, no bundled font files.
 - **End-to-end tests:** `@playwright/test`, in one CI job, Chromium only. During development, the agent uses `playwright-cli` (a tool on the agent's machine, not a project dependency) to drive the running app and take screenshots.
 
-**Dependencies proposed for approval** (figures from the npm registry, 2026-10-04):
+**Dependencies, approved by the maintainer on 2026-10-04** (figures from the npm registry, 2026-10-04):
 
 | Package | Version | Licence | Runtime deps | Kind | Why |
 |---|---|---|---|---|---|

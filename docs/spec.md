@@ -415,7 +415,7 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 | Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
 | Node type definitions (dev only) | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) `^22.20.5` | MIT | 1 (`undici-types` 6.21.0, MIT, no dependencies) | ~2.3 MB | released 2026-10-01; stays on major 22 to match the Node floor | ~535M | approved |
 
-The local app's frontend libraries (React, Vite, `@playwright/test` and their types) are proposed in [decision 0022](decisions/0022-frontend-stack.md) and not approved yet. They would be devDependencies: the app ships as a built bundle, so the package's runtime dependencies stay the four above.
+The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle, so the package's runtime dependencies stay the four above.
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.

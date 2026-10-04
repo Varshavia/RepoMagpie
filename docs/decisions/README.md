@@ -30,5 +30,5 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0019 | [No star import in v0.1](0019-no-star-import-in-v0-1.md) | accepted |
 | 0020 | [Unknown licence](0020-unknown-license.md) | accepted |
 | 0021 | [Local UI server](0021-local-ui-server.md) | accepted |
-| 0022 | [Frontend stack](0022-frontend-stack.md) | proposed (dependencies await approval) |
+| 0022 | [Frontend stack](0022-frontend-stack.md) | accepted |
 | 0023 | [The API is the `--json` contract](0023-api-is-the-json-contract.md) | accepted |
