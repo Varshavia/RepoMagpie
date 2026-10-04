@@ -40,7 +40,7 @@ Compared with a typical star manager:
 | When it helps | When you search | When you search, and before your agent installs |
 | Storage | App database / plugin data | Plain Markdown files you own |
 | Sharing | None | A project journal committed with the code |
-| Primary interface | GUI app | CLI + `SKILL.md` (agent-native), any Markdown editor |
+| Primary interface | GUI app | CLI + `SKILL.md` (agent-native), any Markdown editor; an optional local app over the same files |
 
 ## Two journals
 
@@ -58,7 +58,7 @@ Magpies are known for collecting shiny things and keeping them in their nest. Th
 
 - **Not a security scanner.** RepoMagpie never claims to detect malware or vulnerabilities. It shows what you and your team recorded.
 - **Not a star importer.** `magpie import` adds lines you wrote, not your stars. Imported notes land as `status: inbox`, and none becomes `reviewed` without your own judgment.
-- **Not a hosted service.** No accounts, no server, no telemetry by default.
+- **Not a hosted service.** No accounts, no remote server, no telemetry by default. The local app (`magpie ui`) is a process you start on your own machine; it listens on `127.0.0.1` only, and only while it runs ([decision 0021](decisions/0021-local-ui-server.md)).
 - **Not tied to Obsidian.** Journals are Obsidian-friendly, but Obsidian is optional.
 - **Not an installer.** RepoMagpie never installs packages or skills. `magpie adopt` prints the install command; you or your agent run it.
 

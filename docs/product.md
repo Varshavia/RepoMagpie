@@ -4,11 +4,12 @@ What RepoMagpie looks like to its users. Nothing is built yet. The v0.1 command 
 
 ## Surfaces
 
-There is no desktop app and no server. RepoMagpie has five surfaces:
+There is no desktop app and no remote server. RepoMagpie has six surfaces:
 
 | Surface | What it is | Release |
 |---|---|---|
 | CLI | `magpie`, the primary interface | v0.1 |
+| Local app | `magpie ui`: an Obsidian-inspired app in the browser, served from your machine on `127.0.0.1` ([UI](ui.md), [decision 0021](decisions/0021-local-ui-server.md)) | v0.1 |
 | Agent layer | RepoMagpie's `SKILL.md`, plus a hook for proactive recall (Claude Code first) | v0.1 |
 | Journals | A personal journal and project journals: Markdown files, used in Obsidian or any editor | v0.1 |
 | Nest | A static site of public notes, built by `magpie publish` | v0.3 |
@@ -86,7 +87,7 @@ A single self-contained HTML file. Marketing only, not scheduled. See [Graph spe
 ## Visual identity
 
 - Obsidian-inspired, dark-first, calm, information-dense.
-- A `DESIGN.md` is written in v0.1 Launch, before the logo, social preview, landing page and demo GIF, so they share one visual language. [`VoltAgent/awesome-design-md`](https://github.com/VoltAgent/awesome-design-md) is a reference only. See [standards](standards.md).
+- [`DESIGN.md`](../DESIGN.md) is written before any UI code (for the local app) and before the logo, social preview, landing page and demo GIF, so they share one visual language. [`VoltAgent/awesome-design-md`](https://github.com/VoltAgent/awesome-design-md) is a reference for its structure only. See [standards](standards.md).
 - The logo is a magpie, legible at 16 px.
 
 ## Graph specification
