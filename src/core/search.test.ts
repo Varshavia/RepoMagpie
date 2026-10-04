@@ -1,19 +1,15 @@
-import { after, test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { scratchBase } from "./fixtures/scratch.ts";
 import { searchJournals, type JournalSource } from "./search.ts";
 import { loadIndex } from "./search-index.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
-// Journals in temporary folders, written in the canonical format.
-const roots: string[] = [];
-after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-
+// Journals in scratch folders, written in the canonical format.
 function source(scope: JournalSource["scope"], notes: (Partial<NewNote> & { id: string; file: string })[], extra: Record<string, string> = {}): JournalSource {
-  const path = mkdtempSync(join(tmpdir(), "magpie-search-"));
-  roots.push(path);
+  const path = scratchBase("search");
   mkdirSync(join(path, "notes"));
   for (const { file, ...note } of notes) {
     writeFileSync(join(path, "notes", file), renderNote({ name: note.id.split("/").pop() ?? "", explored: "2026-10-04", kind: "library", tags: [], ...note }));

@@ -111,14 +111,30 @@ test("colour only in a terminal, only for [inbox], and never with NO_COLOR or --
   assert.ok(!json.out.includes("\u001b"));
 });
 
-test("in a terminal, long lines are cut to its width with …; piped, nothing is cut", async () => {
+test("in a terminal, the Verdict gets its own indented lines, wrapped and never cut; only the metadata line is cut", async () => {
   const box = sandbox(FILES);
-  const terminal = await magpie(box, ["search", "pdf"], { columns: 40, env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
+  const env = { MAGPIE_HOME: box.journal, NO_COLOR: "1" };
+  const terminal = await magpie(box, ["search", "pdf"], { columns: 24, env });
   const lines = terminal.out.trimEnd().split("\n");
-  assert.ok(lines.every((line) => line.length <= 40), lines.join("\n"));
-  assert.ok(lines.some((line) => line.endsWith("…")));
+  assert.ok(lines.every((line) => line.length <= 24), lines.join("\n"));
+  assert.match(lines[0], /^1  (pdfkit|puppeteer) /);
+  assert.ok(lines.some((line) => /^\d  \S.*…$/.test(line)), "a metadata line is cut with …");
+  // Each result: one metadata line, then the lead text on lines indented under the name.
+  const results = terminal.out.trimEnd().split(/\n(?=\d  )/).map((block) => block.split("\n"));
+  assert.equal(results.length, 3);
+  for (const [, ...rest] of results) assert.ok(rest.length >= 1 && rest.every((line) => line.startsWith("   ") && !line.endsWith("…")), rest.join("\n"));
+  const lead = (i: number) => results[i].slice(1).map((line) => line.trim()).join(" ");
+  assert.ok([lead(0), lead(1)].includes("Verdict: avoid: async streams painful; use puppeteer"));
+  assert.ok([lead(0), lead(1)].includes("Verdict: default for PDF rendering in new projects"));
+  assert.equal(lead(2), "[inbox] no verdict yet");
+
+  // A word longer than the width is broken across lines, never dropped.
+  const long = await magpie(box, ["search", "pdf"], { columns: 10, env });
+  assert.ok(long.out.replace(/\n {3}/g, "").includes("puppeteer"));
+
   const piped = await magpie(box, ["search", "pdf"]);
-  assert.ok(piped.out.includes("default for PDF rendering in new projects"));
+  assert.equal(piped.out.trimEnd().split("\n").length, 3);
+  assert.ok(piped.out.includes("Verdict: default for PDF rendering in new projects"));
 });
 
 test("the index is cached in each journal's .cache/ and follows edits", async () => {
