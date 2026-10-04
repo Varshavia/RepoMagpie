@@ -11,9 +11,11 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **completed skill line** | A skill line with text after the dash. Search returns it as its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). |
 | **core** | The module that holds all business logic. `magpie` and the MCP server are thin layers over it ([decision 0002](decisions/0002-cli-first.md), [architecture](architecture.md)). |
 | **daily find** | Planned (later): `magpie today` suggests one trending repository that matches the user's tags. Optional and quiet. See [ideas](ideas.md), idea 9. |
+| **design token** | A named value in [`DESIGN.md`](../DESIGN.md), such as a colour, a type style, a spacing step or a radius. The local app uses the tokens as CSS custom properties, and the terminal theme for the demo GIF takes its colours from them, so every surface shares one visual language. |
 | **digest** | Planned (later): a periodic "You saved X three months ago. Still useful?" list that resurfaces old notes. See [ideas](ideas.md), idea 6. |
 | **draft** | Content the tool writes once, at note creation, into a human-owned field or section: `kind`, `tags`, "What it does", "Use when", and "Avoid when" from `import`'s `avoid:` text. A drafted section starts with `<!-- magpie:draft -->`; deleting the marker accepts it. The user may change a draft; the tool never touches it again ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). |
 | **drift** | Planned (v0.2): a change upstream since the user reviewed a repository or skill. `magpie drift` lists notes with drift. See [ideas](ideas.md), idea 2. |
+| **edit conflict** | A note changed on disk (in Obsidian, another editor or the CLI) after the local app read it. Every read returns the note's version, a SHA-256 hash of the file; a write with an old version gets 409, nothing is written, and the app offers to reload ([decision 0023](decisions/0023-api-is-the-json-contract.md)). |
 | **empty skill line** | A skill line with nothing after the dash. Search ignores it. |
 | **fail open** | When something goes wrong, do nothing rather than block. The recall hook prints nothing and exits 0 on any error, so an install is never stopped by `magpie` ([spec](spec.md), section 6). |
 | **follow** | Planned (v0.3): `magpie follow <nest-url>` adds another user's public notes to your search results, attributed and kept apart from your notes. See [ideas](ideas.md), idea 3. |
@@ -27,6 +29,8 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **journal discovery** | How `magpie` finds the journals: the personal journal by flag, `MAGPIE_HOME`, config file or default `~/.magpie/`; the project journal by `--project` (the project root) or by walking up from the working directory to the first `.magpie/`, stopping at the git root ([decision 0016](decisions/0016-journal-locations-and-config.md)). |
 | **kind** | The frontmatter field that says what a repository is: `skill-pack`, `cli`, `library`, and so on. The list is in the [note schema](note-schema.md). |
 | **lenient read, strict write** | `magpie` reads hand-written notes even when fields or sections are missing or out of order, but always writes notes in the canonical format, and never rewrites a human section ([note schema](note-schema.md), rule 8). |
+| **live update** | A message from `magpie ui` to the local app, over Server-Sent Events, that notes changed on disk, so the app refreshes what it shows. The server watches both journals' `notes/` folders and also checks them every 5 seconds ([UI](ui.md), "Live updates"). |
+| **local app** | Planned (v0.1): the Obsidian-inspired view of the journals in the browser, served by `magpie ui` on `127.0.0.1` only, while the user runs it. It reads and writes the same Markdown notes through the same core as the CLI. No remote server, no accounts ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). |
 | **magpie** | The RepoMagpie command-line tool, e.g. `magpie note pdfkit "avoid: …"`. `magpie note <url> "…"` also fetches the repository's facts from GitHub. Not built yet. |
 | **MCP server** | A planned thin layer over the core for agent clients without a shell ([decision 0002](decisions/0002-cli-first.md)). |
 | **nest** | Planned (v0.3): a static site built by `magpie publish` from the notes a user marked public. See [ideas](ideas.md), idea 3. |
@@ -38,6 +42,7 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **repository** (repo) | A GitHub repository. Each repository has at most one note. |
 | **reviewed** | The `status` of a note whose Verdict has human-written text ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). |
 | **search index** | A cache built from the notes to answer searches. It can be deleted and rebuilt from the files at any time ([decision 0001](decisions/0001-plain-markdown-storage.md)). |
+| **session token** | A random secret that `magpie ui` creates each time it starts. It is in the URL the command prints, is exchanged once for an `HttpOnly` cookie, and is sent again in a header on every write. Without it, no other page or process can use the local app's API ([UI](ui.md), "Security"). |
 | **skill** | A folder with a `SKILL.md` file, following the Agent Skills standard. In RepoMagpie a skill is recorded as a skill line, never as its own note. |
 | **skill line** | One line under "Notable skills" in a note: `` - `skill-name` — when it's useful ``. |
 | **skill pack** | A repository whose main content is agent skills. Its `kind` is `skill-pack`. |

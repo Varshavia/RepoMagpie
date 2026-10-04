@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved.
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: recall → UI server → UI app → suggest and adopt → agent skill and launch.
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -102,10 +102,10 @@ Moved out of this step:
 
 # Release milestones
 
-Scope follows [decision 0010](decisions/0010-v0-1-scope.md) and [strategy](strategy.md) §7 and §15; the v0.1 beta may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
+Scope follows [decision 0010](decisions/0010-v0-1-scope.md) (extended by [0021](decisions/0021-local-ui-server.md) with the local app) and [strategy](strategy.md) §7 and §15; the v0.1 beta may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
 
 ## v0.1 Remember
-The first public release: capture what you learned, find it again, and see it before your agent installs a dependency.
+The first public release: capture what you learned, find it again, and see it before your agent installs a dependency. The sections below are in build order from recall on: recall → local app (server, then app) → suggest and adopt → agent skill and launch ([decision 0021](decisions/0021-local-ui-server.md)).
 
 ### Journals and example vault
 - [x] Finalise [note-schema.md](note-schema.md) with the format from the step 2 spec (v1).
@@ -137,6 +137,38 @@ The first public release: capture what you learned, find it again, and see it be
 
 **Done when:** for a fixed set of 10 test questions, the expected note is in the top 3. (Met: `src/core/search-quality.test.ts`, over the example vault.)
 
+### Proactive recall
+- [ ] `magpie recall <package>` on the CLI, across both journals.
+- [ ] Map package names to notes (how: step 2 spec).
+- [ ] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. Recall informs and never blocks.
+- [ ] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing.
+
+**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user, and the install still goes ahead.
+
+### Local app
+`magpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).
+
+UI server (`feat/ui-server`, after `feat/recall`):
+- [ ] Core: `setSection`, edits of the human-owned keys (`kind`, `tags`, `tried`, `rating`) and note versions (`sha256`), with round-trip tests ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
+- [ ] Core: the shared JSON documents: Settings, Tag list, Note list, Note, Note preview ([spec](spec.md), section 2).
+- [ ] `magpie ui [--port <n>] [--no-open]`: loopback only, the URL with a session token, opens the browser, stops on Ctrl+C ([spec](spec.md), section 2).
+- [ ] The API endpoints ([UI](ui.md), "API"); each response equals the CLI's `--json` for the same input.
+- [ ] Every security rule in [UI](ui.md), "Security", each with a test.
+- [ ] Live updates: `fs.watch` on both `notes/` folders, a signature check every 5 s, Server-Sent Events.
+
+**Done when:** the server tests cover every endpoint and every security rule; a note edited in another editor reaches an open events stream within 5 seconds; and a write with an old version gets 409 and changes nothing.
+
+UI app (`feat/ui-app`, after `feat/ui-server`):
+- [ ] The maintainer approves [decision 0022](decisions/0022-frontend-stack.md)'s dependencies.
+- [ ] The build: a static bundle in `dist/ui/`, served by `magpie ui`, with a bundle-size check (at most 200 kB gzipped).
+- [ ] The layout and components from `DESIGN.md`: three panes, the command palette, dark and light themes.
+- [ ] Inbox review, search, the note view, add and import, read-only settings, and the "Check a package" box ([UI](ui.md), "Screens and flows").
+- [ ] Every state, the keyboard map and the accessibility rules ([UI](ui.md), "States", "Accessibility").
+- [ ] End-to-end tests with `@playwright/test` in one CI job, Chromium only; screenshots in light and dark for the pull request.
+- [ ] Before the pull request: `web-design-guidelines` and `writing-guidelines` passes, findings fixed or listed.
+
+**Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI.
+
 ### `magpie suggest`
 - [ ] Input: a project's manifests and README, or a free-text description.
 - [ ] Narrow candidates from both journals by keyword and tags; no embeddings.
@@ -149,14 +181,6 @@ The first public release: capture what you learned, find it again, and see it be
 - [ ] Print the install command. Never install anything.
 
 **Done when:** after `adopt`, the project journal holds the note and nothing was installed.
-
-### Proactive recall
-- [ ] `magpie recall <package>` on the CLI, across both journals.
-- [ ] Map package names to notes (how: step 2 spec).
-- [ ] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. Recall informs and never blocks.
-- [ ] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing.
-
-**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user, and the install still goes ahead.
 
 ### Agent skill
 - [ ] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall.
@@ -175,7 +199,7 @@ The first public release: capture what you learned, find it again, and see it be
 
 ### Launch
 See [marketing.md](marketing.md).
-- [ ] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand.
+- [x] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand. (Written on `docs/ui`; the local app uses it too.)
 - [ ] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards.
 - [ ] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`.
 - [ ] End-to-end check and screenshots of the landing page, and screenshots for the README, with `microsoft/playwright-cli`.
