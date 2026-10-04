@@ -15,6 +15,7 @@ process.exitCode = await run(process.argv.slice(2), {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   },
   interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  columns: process.stdout.isTTY ? process.stdout.columns : undefined,
   ask: async (question) => {
     const terminal = createInterface({ input: process.stdin, output: process.stderr });
     try {
