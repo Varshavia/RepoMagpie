@@ -68,6 +68,7 @@ Before starting any task, read the documents relevant to it:
 | Touching the note format, templates, or parsers | `docs/note-schema.md` |
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
 | Writing README, docs, or anything user-facing | `docs/vision.md`, `docs/marketing.md` |
+| Working on the local app (`magpie ui`, `src/server/`, `ui/`) or any visual surface | `docs/ui.md`, `DESIGN.md` |
 
 If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, record it as part of the same task: ordinary docs are updated in place; decision records merged to `main` are superseded by a new record (before the merge, they may be revised on their branch).
 
@@ -81,7 +82,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `.github/workflows/` | CI: `ci.yml` runs tests, typecheck and hook tests (section 13). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
-| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, research, and `decisions/` (decision records). |
+| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
 | `scripts/` | Benchmarks (`npm run bench`). Typechecked, not built or published. |
@@ -94,6 +95,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `CHANGELOG.md` | User-visible changes per release (Keep a Changelog). |
 | `CLAUDE.md` | This rulebook. |
 | `CONTRIBUTING.md` | How to contribute while the project is early: issues and ideas yes, pull requests not yet. |
+| `DESIGN.md` | The visual language: design tokens (colour, type, spacing, radius), components and writing tone, for the local app, the landing page and the demo GIF. |
 | `LICENSE` | MIT. |
 | `README.md` | Landing page: what RepoMagpie is and how it will work. |
 | `SECURITY.md` | How to report a vulnerability privately (GitHub private vulnerability reporting). |
