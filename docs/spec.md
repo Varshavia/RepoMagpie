@@ -145,6 +145,85 @@ Reads the project's manifests and creates a draft note, without a Verdict (`stat
 
 Internal: the command the Claude Code hook runs (section 6). Not meant to be typed by people.
 
+### `magpie ui`
+
+Starts the local app: a server on `127.0.0.1` that serves the app and a JSON API over the same core ([decision 0021](decisions/0021-local-ui-server.md)). Full behaviour, security rules and endpoints: [UI](ui.md).
+
+| Flag | Meaning |
+|---|---|
+| `--port <n>` | The port to listen on. Default: a free port chosen by the operating system |
+| `--no-open` | Don't open the browser; only print the URL |
+
+1. Listen on `127.0.0.1` only. A port in use is an error that names the port (exit 1); a port that isn't a number from 1 to 65535 is a usage error (exit 2).
+2. Print the URL, with the session token, on stdout: `http://127.0.0.1:<port>/?token=<token>`.
+3. Open the default browser unless `--no-open`. If that fails, say so on stderr; the printed URL still works.
+4. Run until Ctrl+C (SIGINT) or SIGTERM, then close the watchers and the server, and exit 0.
+
+`--json`: once the server listens, `{"url": "http://127.0.0.1:<port>/?token=<token>", "port": 4321}`, then it runs as without `--json`.
+
+### Shared JSON documents
+
+Documents that the local app's API returns and no v0.1 command prints yet ([decision 0023](decisions/0023-api-is-the-json-contract.md)). Like the `--json` documents above, they are a public interface, and a future command that shows the same data prints the same document. Keys are snake_case; dates are `YYYY-MM-DD` strings; a failure adds `"error"` as in section 1.
+
+**Settings.** The journals in use, and whether a GitHub token is set. The token's value never appears.
+
+```json
+{"version": "0.1.0",
+ "journals": {"personal": {"path": "/home/ana/.magpie", "exists": true},
+              "project": {"path": "/work/app/.magpie", "exists": false}},
+ "github_token_set": true}
+```
+
+`journals.project` is `null` when there is no project journal and no project root to create one in (section 3).
+
+**Tag list.** One journal's tags, from its `tags.md`, or the starter list for a journal not created yet (section 3).
+
+```json
+{"journal": "personal", "tags": ["testing", "pdf", "agent-skills"]}
+```
+
+**Note list.** The notes in one journal, after the filters, sorted by `name`. Each item is a summary; the full note is the Note document.
+
+```json
+{"journal": "personal", "count": 2,
+ "notes": [{"id": "pkg:npm/pdfkit", "file": "npm--pdfkit.md", "name": "pdfkit", "kind": "library",
+            "tags": ["pdf"], "status": "reviewed", "verdict": "avoid: async streams painful; use puppeteer",
+            "tried": true, "rating": 2, "explored": "2026-10-03", "read_only": false},
+           {"id": null, "file": "npm--broken.md", "name": null, "kind": null, "tags": [], "status": "inbox",
+            "verdict": "", "tried": false, "rating": null, "explored": null, "read_only": true}]}
+```
+
+**Note.** One note, as read, with the version a write must send back ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
+
+```json
+{"id": "pkg:npm/pdfkit", "journal": "personal", "file": "npm--pdfkit.md", "path": "/home/ana/.magpie/notes/npm--pdfkit.md",
+ "version": "sha256:9f2c…", "read_only": false, "status": "reviewed",
+ "verdict": "avoid: async streams painful; use puppeteer",
+ "frontmatter": {"id": "pkg:npm/pdfkit", "name": "pdfkit", "kind": "library", "tags": ["pdf"], "tried": true, "...": "..."},
+ "sections": [{"name": "Verdict", "heading": "Verdict", "body": "avoid: async streams painful; use puppeteer\n", "draft": false},
+              {"name": null, "heading": "Benchmarks", "body": "...", "draft": false}],
+ "skills": [{"name": "pdf-forms", "text": "fill PDF forms from a script"}, {"name": "pdf-merge", "text": ""}],
+ "warnings": []}
+```
+
+- `frontmatter` holds the fields as written, unknown ones included. `status` and `verdict` are derived from the Verdict (schema rule 1), whatever the `status` field says.
+- `sections` keeps the file's order. `name` is the canonical section name, or `null` for a section the schema doesn't know; `body` is as written, comments included; `draft` is true when the body starts with the draft marker (schema rule 3).
+- `skills` lists the lines under "Notable skills"; `text` is `""` for an empty skill line (schema rule 4).
+- `read_only` is true when the frontmatter can't be read. `id` is then `null`, and `warnings` says why. The app shows such a note read-only, addressed by its `file` name (see [UI](ui.md), "API").
+
+**Note preview.** What `magpie note <target>` would write, without writing anything. For a GitHub URL it fetches the metadata, read-only.
+
+```json
+{"id": "pkg:github/microsoft/playwright-cli", "journal": "personal", "path": "/home/ana/.magpie/notes/github--microsoft--playwright-cli.md",
+ "exists": false, "verdict": null, "name": "microsoft/playwright-cli", "url": "https://github.com/microsoft/playwright-cli",
+ "what_it_does": "...", "language": "TypeScript", "license": "Apache-2.0", "topics": ["playwright"],
+ "kind": "cli", "tags": ["testing"], "packages": ["pkg:npm/%40playwright/cli"], "skills": ["playwright-cli"],
+ "warnings": []}
+```
+
+- `exists` is true when the journal already has a note for that PURL (schema rule 6); `verdict` is then that note's Verdict, or `""` when it is empty, so the app can say "This note already has a Verdict" before the person writes one.
+- `what_it_does`, `kind` and `tags` are the drafts `note` would write (step 3 above). Without metadata (a registry name, or offline), the metadata fields are `null` or empty, and `warnings` says why.
+
 ## 3. The two journals
 
 ([Decision 0013](decisions/0013-two-journal-scopes.md), [decision 0016](decisions/0016-journal-locations-and-config.md).)
@@ -335,6 +414,8 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 | PURL | [packageurl-js](https://github.com/package-url/packageurl-js) 2.0.1 | MIT | 0 | 56 kB | released 2024-09-04; repo active (2026-08-24) | ~2.6M | approved |
 | Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
 | Node type definitions (dev only) | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) `^22.20.5` | MIT | 1 (`undici-types` 6.21.0, MIT, no dependencies) | ~2.3 MB | released 2026-10-01; stays on major 22 to match the Node floor | ~535M | approved |
+
+The local app's frontend libraries (React, Vite, `@playwright/test` and their types) are proposed in [decision 0022](decisions/0022-frontend-stack.md) and not approved yet. They would be devDependencies: the app ships as a built bundle, so the package's runtime dependencies stay the four above.
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.

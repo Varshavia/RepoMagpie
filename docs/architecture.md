@@ -10,6 +10,7 @@ From [decision 0002](decisions/0002-cli-first.md): business logic lives in one c
 human ─────────────────────► magpie (CLI) ──┐
 agent with a shell ─► SKILL.md ─► magpie ───┤
 agent hook (recall) ─► magpie ──────────────┤
+browser (local app) ─► magpie ui (server) ──┤
 agent without a shell ─► MCP server ────────┴─► core ─┬─► personal journal (Markdown files)
                                                       ├─► project journal (.magpie/)
                                                       └─► search index (cache)
@@ -21,6 +22,8 @@ agent without a shell ─► MCP server ────────┴─► core �
 | **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
 | **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
 | **hook** | The Claude Code adapter (`magpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never blocks and fails open ([spec](spec.md), section 6). | v0.1 |
+| **server** | `magpie ui`: a loopback-only HTTP server that serves the local app and a JSON API. It parses requests, calls the core and returns the same JSON documents as the CLI's `--json`; it has no logic of its own ([decision 0021](decisions/0021-local-ui-server.md), [decision 0023](decisions/0023-api-is-the-json-contract.md), [UI](ui.md)). | v0.1 |
+| **app** | The local app: a static bundle in the browser that talks only to the server's API ([decision 0022](decisions/0022-frontend-stack.md)). | v0.1 |
 | **mcp** | Optional MCP server over the same core, for clients without a shell. | later |
 
 Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
@@ -41,14 +44,16 @@ src/
                capture: what note and import write for one item
   cli/         one module per command; human and --json output
   hook/        claude-code.ts: stdin JSON → install detection → recall → stdout JSON
+  server/      magpie ui: node:http only; security checks, routes, live updates (fs.watch + SSE)
+ui/            the local app's source (stack proposed in decision 0022); built into dist/ui/
 skill/
   SKILL.md     no code
 scripts/       benchmarks (npm run bench); not part of the package
 ```
 
-Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in temporary folders and no network.
+Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in temporary folders and no network. The app's end-to-end tests use `@playwright/test` once [decision 0022](decisions/0022-frontend-stack.md) is accepted ([UI](ui.md), "Design process and testing").
 
-`cli/` and `hook/` import from `core/` only. `core/` never prints and never reads `process.argv`.
+`cli/`, `hook/` and `server/` import from `core/` only. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API.
 
 ### Future components
 
@@ -97,6 +102,13 @@ Planned parts of the core and cli layers, by target release. Details: [product](
    - semantic search over the note text (roadmap v0.3).
 3. **Results** are notes and completed skill lines (decision 0006). Empty skill lines are ignored (note schema, rule 4). Notes in `inbox` rank below `reviewed` notes ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)).
 4. **Output:** short and parseable, like every `magpie` command (decision 0002), with a machine-readable mode (decision 0008).
+
+## Data flow: the local app
+
+1. **Start.** `magpie ui` finds the journals as every command does (config resolution, below), listens on `127.0.0.1`, and prints the URL with the session token ([spec](spec.md), section 2).
+2. **Requests.** Each API request passes the security checks ([UI](ui.md), "Security"), then calls the same core functions as the CLI, and returns the same JSON document as the matching `--json` output, or a shared document ([spec](spec.md), "Shared JSON documents").
+3. **Edits.** A write carries the note's `version`. Core compares it with the file and edits only the changed part, through round-trip-safe functions; a mismatch is a 409 and nothing is written ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
+4. **Live updates.** The server watches both `notes/` folders, checks their signature every 5 seconds as well, and tells the app over Server-Sent Events. The search cache is rebuilt as for the CLI.
 
 ## Config resolution
 
