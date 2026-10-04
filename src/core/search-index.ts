@@ -2,13 +2,14 @@
 // lines, cached in <journal>/.cache/. The cache is rebuildable and safe to delete; it is rebuilt
 // when any note is added, removed or changed, and a cache that can't be read is rebuilt silently.
 // Reads and writes only inside the journal; never prints.
-import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import MiniSearch, { type Options } from "minisearch";
 import { DRAFT_MARKER, readNote } from "./note.ts";
+import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const CACHE_FILE = "search-index.json";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // 2: the index sits under "data" (note-cache.ts)
 
 // One searchable document: a note, or one completed skill line of a note (decision 0006).
 export interface SearchDoc {
@@ -80,45 +81,20 @@ export function noteDocuments(text: string, file: string): SearchDoc[] {
 
 // The index of one journal, from the cache when it matches the notes on disk.
 export function loadIndex(journal: string): { index: JournalIndex; rebuilt: boolean } {
-  const folder = join(journal, "notes");
-  const files = noteFiles(folder);
-  const signature: Record<string, [number, number]> = {};
-  for (const file of files) {
-    const { mtimeMs, size } = statSync(join(folder, file));
-    signature[file] = [mtimeMs, size];
-  }
-
-  const cacheFile = join(journal, ".cache", CACHE_FILE);
-  try {
-    const cached = JSON.parse(readFileSync(cacheFile, "utf8")) as { version?: number; files?: unknown; index?: unknown } | null;
-    if (cached?.version === CACHE_VERSION && JSON.stringify(cached.files) === JSON.stringify(signature)) {
-      return { index: MiniSearch.loadJS(cached.index as Parameters<typeof MiniSearch.loadJS>[0], INDEX_OPTIONS) as JournalIndex, rebuilt: false };
+  const { files, signature } = noteSignature(journal);
+  const cached = readCache(journal, CACHE_FILE, CACHE_VERSION, signature);
+  if (cached !== undefined) {
+    try {
+      return { index: MiniSearch.loadJS(cached as Parameters<typeof MiniSearch.loadJS>[0], INDEX_OPTIONS) as JournalIndex, rebuilt: false };
+    } catch {
+      // A cache with a broken index: rebuild below.
     }
-  } catch {
-    // No cache, or one that can't be read: rebuild below.
   }
 
   const index = new MiniSearch<SearchDoc>(INDEX_OPTIONS);
-  index.addAll(files.flatMap((file) => noteDocuments(readFileSync(join(folder, file), "utf8"), file)));
-  if (files.length) {
-    try {
-      mkdirSync(join(journal, ".cache"), { recursive: true });
-      const temporary = `${cacheFile}.${process.pid}.tmp`; // written whole, then renamed into place
-      writeFileSync(temporary, JSON.stringify({ version: CACHE_VERSION, files: signature, index }));
-      renameSync(temporary, cacheFile);
-    } catch {
-      // A cache that can't be written only costs time on the next search.
-    }
-  }
+  index.addAll(files.flatMap((file) => noteDocuments(readFileSync(join(journal, "notes", file), "utf8"), file)));
+  if (files.length) writeCache(journal, CACHE_FILE, CACHE_VERSION, signature, index);
   return { index, rebuilt: true };
-}
-
-function noteFiles(folder: string): string[] {
-  try {
-    return readdirSync(folder).filter((name) => name.endsWith(".md")).sort();
-  } catch {
-    return [];
-  }
 }
 
 // Section text for the index: without the draft marker and comments, trailing spaces trimmed.
