@@ -35,6 +35,7 @@
     "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
+    "bench": "npm run build && node scripts/bench-search.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
