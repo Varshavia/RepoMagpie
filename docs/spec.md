@@ -9,6 +9,7 @@ Nothing here is built yet. v0.1 is implemented on `feat/...` branches ([decision
 - **Command name:** `magpie`. The npm package is `repomagpie`; its single `bin` entry is `magpie`, so `npx repomagpie` runs it ([npx docs](https://docs.npmjs.com/cli/v11/commands/npx)) ([decision 0015](decisions/0015-typescript-on-node.md)).
 - **Streams:** data goes to stdout; messages, warnings and errors go to stderr.
 - **`--json`** on every command prints one JSON document to stdout and nothing else ([decision 0008](decisions/0008-machine-readable-output.md)). Its shape is part of the public interface. Under `--json`, `magpie` never prompts.
+- **`--json` on failure** (exit 1 or 2): the same document as on success, plus an `"error"` field with the message. Fields that aren't known are `null`, lists are empty, and counts are 0. Example: `{"id": null, "journal": "personal", "path": null, "created": false, "status": null, "warnings": [], "error": "Not a supported input. ..."}`. A usage error that the command-line parser catches (an unknown flag, a missing argument) prints its message on stderr only.
 - **Interactive prompts** happen only when stdin and stdout are terminals and `--json` is not set.
 - **Global flags:** `--json`, `--home <dir>` (personal journal), `--project <dir>` (project root, like `git -C`; a path to its `.magpie` folder also works), `--help`, `--version`.
 - **Exit codes:**
@@ -67,12 +68,14 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - The separator after the target is ` — ` (em dash) or ` -- `. Labels are case-insensitive; parts are separated by ` | `.
 - `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label goes to "My notes" (schema rule 7).
+- A line may hold the target alone (`- pkg:npm/pdfkit`). Each `use:` or `avoid:` part becomes one bullet; unlabelled parts become one line each in "My notes". A label with no text is ignored. Two `verdict:` parts make the line `failed`. Only lines that start with `- ` at the left margin are items.
+- Output: one result line per item on stdout (`line 3: created pkg:npm/pdfkit`); errors and warnings on stderr, prefixed with the line number; then a summary on stderr (`2 created, 1 updated, 0 unchanged, 1 failed.`). Later lines see the notes earlier lines wrote, also in a dry run. A dry run still fetches GitHub metadata (read-only) to report what would happen.
 - Other lines are ignored. A line that can't be parsed or resolved is reported as `failed` and skipped; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts).
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
 - An item whose note already exists is handled as in `note`, step 2. A `verdict:` for a note that already has a Verdict makes that line `failed`. `use:`, `avoid:` and unlabelled text for an existing note are ignored with a warning on that line, because those sections are human-owned (schema rule 2).
 - Exit 0 if every item succeeded or was skipped as unchanged; 1 if any item failed.
 
-`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null}], "created": 4, "updated": 1, "failed": 0}`
+`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null, "warnings": []}], "created": 4, "updated": 1, "failed": 0}`
 
 ### `magpie search <query>`
 
@@ -155,7 +158,7 @@ Internal: the command the Claude Code hook runs (section 6). Not meant to be typ
 
 **Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
 
-**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal.
+**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`) or the filesystem root. The personal journal's folder is never taken as a project journal: when `--project`, or the folder `--to project` would create, names it, the command fails with exit 1 and writes nothing.
 
 **Reading both:** search, suggest and recall read both journals. Each result says which journal it came from. When both journals have a note for the same PURL, the project journal's note comes first: it is the team's decision for this project.
 
