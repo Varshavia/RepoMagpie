@@ -17,6 +17,11 @@ const MANIFEST_TYPES: Record<Manifest, PackageType> = {
   "Cargo.toml": "cargo",
 };
 
+// The package types the given manifests imply, each once.
+export function manifestTypes(manifests: Manifest[]): PackageType[] {
+  return [...new Set(manifests.map((m) => MANIFEST_TYPES[m]))];
+}
+
 // PURL types v0.1 supports.
 const SUPPORTED_TYPES = new Set(["github", "npm", "pypi", "cargo"]);
 
