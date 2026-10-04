@@ -45,7 +45,7 @@ The product's category moved:
 ## 1. Proactive recall
 
 - **Problem:** The journal only helps if the user remembers to query it.
-- **Behaviour:** When a coding agent is about to install a dependency (`npm install`, `pnpm add`, `yarn add`, `pip install`, `uv add`, `cargo add`, …), RepoMagpie checks the personal and project journals. If a note matches, it shows the verdict first, then when to use or avoid the package, gotchas, and better-rated alternatives. Recall informs only: it never blocks the install and never asks for confirmation. Example:
+- **Behaviour:** When a coding agent is about to install a dependency (`npm install`, `pnpm add`, `yarn add`, `pip install`, `uv add`, `cargo add`, …), RepoMagpie checks the personal and project journals. If a note matches, it shows the verdict first, then when to use or avoid the package, gotchas, and better-rated alternatives. Recall never denies an install. For a note the user marked "avoid" (the Verdict starts with "avoid", or "Avoid when" has content), the Claude Code hook asks the user to confirm, with the note as the reason; every other match informs only ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)). Example:
 
   > Note from your journal: left-pad 2/5 — 'abandoned, use String.prototype.padStart'.
 

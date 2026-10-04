@@ -16,8 +16,43 @@ RepoMagpie keeps that knowledge as plain Markdown notes, and shows it to your co
 
 1. You capture a verdict in one line: `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Give it a GitHub URL instead of a name and it also fetches the repository's facts. Or import a list you already wrote with `magpie import <file>`.
 2. Notes live in your **personal journal** (private, outside any repository) or in a project's **project journal** (`.magpie/`, committed with the code, shared with your team through git).
-3. When your agent runs `npm install pdfkit`, a hook shows it your verdict first. It informs and never blocks. Claude Code comes first; other agents follow the same instruction through `SKILL.md`.
+3. When your agent runs `npm install pdfkit`, a hook shows it your verdict first. It never denies an install: if your note says to avoid the package, Claude Code asks you to confirm, with your note on screen; otherwise it only informs. Claude Code comes first; other agents follow the same instruction through `SKILL.md`.
 4. When you start a project, `magpie suggest` shows what you already have that fits, and `magpie adopt` copies a note into the project.
+
+## Setup
+
+### More GitHub requests
+
+`magpie note <github-url>` and `magpie import` read repositories from GitHub's API. Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), hand its token to magpie for the current shell:
+
+```powershell
+$env:GITHUB_TOKEN = gh auth token
+```
+
+```bash
+export GITHUB_TOKEN=$(gh auth token)
+```
+
+magpie reads the token only from `GITHUB_TOKEN`, sends it only to `api.github.com`, and never prints it.
+
+### Recall in Claude Code
+
+Add this hook to your user settings (`~/.claude/settings.json`) or to a project's `.claude/settings.json`. magpie never edits a settings file for you.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash|PowerShell",
+        "hooks": [ { "type": "command", "command": "magpie hook claude-code" } ] }
+    ]
+  }
+}
+```
+
+Before Claude Code runs an install such as `npm install pdfkit`, the hook looks the package up in your journals. A note that says to avoid it makes Claude Code ask you first, with the note in the prompt. Any other note goes to the agent as context. If nothing matches, or anything goes wrong, the hook stays silent and the install runs as usual. `magpie hook claude-code --help` prints the same snippet.
+
+For unattended runs (`claude -p`), where nobody can answer a prompt, Claude Code turns a question into a refusal. Use `"command": "magpie hook claude-code --inform-only"` there: avoid notes then reach the agent as context, and the install goes ahead.
 
 ## Principles
 

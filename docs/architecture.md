@@ -21,7 +21,7 @@ agent without a shell ─► MCP server ────────┴─► core �
 | **core** | Reads and writes notes in both journals ([decision 0013](decisions/0013-two-journal-scopes.md)), applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index, and answers recall. | v0.1 |
 | **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
 | **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
-| **hook** | The Claude Code adapter (`magpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never blocks and fails open ([spec](spec.md), section 6). | v0.1 |
+| **hook** | The Claude Code adapter (`magpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never denies (an avoid note asks the user; [decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)) and fails open ([spec](spec.md), section 6). | v0.1 |
 | **server** | `magpie ui`: a loopback-only HTTP server that serves the local app and a JSON API. It parses requests, calls the core and returns the same JSON documents as the CLI's `--json`; it has no logic of its own ([decision 0021](decisions/0021-local-ui-server.md), [decision 0023](decisions/0023-api-is-the-json-contract.md), [UI](ui.md)). | v0.1 |
 | **app** | The local app: a static bundle in the browser that talks only to the server's API ([decision 0022](decisions/0022-frontend-stack.md)). | v0.1 |
 | **mcp** | Optional MCP server over the same core, for clients without a shell. | later |
@@ -37,21 +37,24 @@ src/
   core/        journals: discovery and config (decision 0016)
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
+               note-cache: the caches in <journal>/.cache/ and their file signature
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
-               match: recall and suggest rules
+               install-detect: package installs in a shell command line
+               recall: recall's matching rules, the journals it reads, its cache
+               match: suggest rules
                github: repository metadata and SKILL.md detection
                capture: what note and import write for one item
-  cli/         one module per command; human and --json output
-  hook/        claude-code.ts: stdin JSON → install detection → recall → stdout JSON
+  cli/         one module per command, loaded only when it runs; human and --json output
+  hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
   server/      magpie ui: node:http only; security checks, routes, live updates (fs.watch + SSE)
 ui/            the local app's source (stack proposed in decision 0022); built into dist/ui/
 skill/
   SKILL.md     no code
-scripts/       benchmarks (npm run bench); not part of the package
+scripts/       the test runner with the ~/.magpie canary, benchmarks, the link check; not part of the package
 ```
 
-Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in temporary folders and no network. The app's end-to-end tests use `@playwright/test` once [decision 0022](decisions/0022-frontend-stack.md) is accepted ([UI](ui.md), "Design process and testing").
+Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's end-to-end tests will use `@playwright/test` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
 
 `cli/`, `hook/` and `server/` import from `core/` only. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API.
 
@@ -78,7 +81,7 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 1. **The hook fires.** In Claude Code, a `PreToolUse` hook on the `Bash` or `PowerShell` tool runs `magpie hook claude-code` with the tool call as JSON on stdin.
 2. **Find installs.** The hook splits the command line the way git-guard does and picks out install commands and their package names ([spec](spec.md), section 6).
 3. **Look up notes** for those packages in the project and personal journals: an exact PURL match first, then a name-only match, marked as lower confidence ([spec](spec.md), section 5).
-4. **Inform, never block.** If a note matches, the hook returns its Verdict as `additionalContext` for the agent and `systemMessage` for the user, and sets no permission decision. If nothing matches, or anything fails, it prints nothing and exits 0.
+4. **Ask or inform, never deny.** If an avoid note matches, the hook returns `permissionDecision: "ask"` with the note as the reason, and the user decides. Any other match returns the Verdict as `additionalContext` for the agent and `systemMessage` for the user, with no permission decision ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)). If nothing matches, or anything fails, it prints nothing and exits 0.
 5. **Skill mode** in other clients: `SKILL.md` tells the agent to run `magpie recall <package>` itself before installing.
 
 ## Data flow: `magpie note <name-or-url> "text"`
