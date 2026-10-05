@@ -8,6 +8,16 @@ import { readNote } from "./note.ts";
 
 export type Env = Record<string, string | undefined>;
 
+// What finding the journals needs: the home directory, the environment, the working directory, and
+// the --home and --project flags.
+export interface Place {
+  home: string;
+  env: Env;
+  cwd: string;
+  homeFlag?: string;
+  projectFlag?: string;
+}
+
 export interface PersonalJournal {
   path: string;
   source: "flag" | "env" | "config" | "default";

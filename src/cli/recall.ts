@@ -1,11 +1,10 @@
 // magpie recall <package...> (spec §2, §5, §8): the notes for packages before an install.
 import { readFileSync } from "node:fs";
 import { sep } from "node:path";
-import { findManifests } from "../core/journals.ts";
-import { manifestTypes, type PackageType } from "../core/identity.ts";
+import type { PackageType } from "../core/identity.ts";
 import { DRAFT_MARKER, readNote } from "../core/note.ts";
-import { openRecallSources, recall, type RecallMatch } from "../core/recall.ts";
-import type { GlobalOptions } from "./note.ts";
+import { runRecall, type RecallMatch } from "../core/recall.ts";
+import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface RecallOptions extends GlobalOptions {
@@ -13,18 +12,10 @@ export interface RecallOptions extends GlobalOptions {
   full?: boolean;
 }
 
-const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];
-
 export async function recallCommand(queries: string[], options: RecallOptions, io: Io): Promise<number> {
-  // A bare name's type: --type, else the nearest manifest; unsettled means every type (spec §2).
-  const fromManifests = manifestTypes(findManifests(io.cwd));
-  const types = options.type ? [options.type] : fromManifests.length ? fromManifests : ALL_TYPES;
-  const { sources, warnings } = openRecallSources({ home: io.home, env: io.env, cwd: io.cwd, homeFlag: options.home, projectFlag: options.project });
-  const results = queries.map((query) => ({ query, matches: recall(sources, query, types) }));
-
+  const { document, results, warnings } = runRecall(queries, options.type, contextOf(io, options));
   if (options.json) {
-    const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => match);
-    io.out(`${JSON.stringify({ matches })}\n`);
+    io.out(`${JSON.stringify(document)}\n`);
     return 0;
   }
   for (const warning of warnings) io.err(`warning: ${warning}\n`);

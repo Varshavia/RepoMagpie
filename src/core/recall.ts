@@ -4,8 +4,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PackageURL } from "packageurl-js";
-import { normalizePackage, type PackageType } from "./identity.ts";
-import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env } from "./journals.ts";
+import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
+import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
 import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
@@ -161,6 +161,25 @@ function match(query: string, source: RecallSource, entry: RecallEntry, confiden
     status: entry.status,
     path: join(source.path, "notes", entry.file),
   };
+}
+
+const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];
+
+export interface RecallRun {
+  document: { matches: Omit<RecallMatch, "name">[] }; // the --json document (spec §2)
+  results: { query: string; matches: RecallMatch[] }[];
+  warnings: string[];
+}
+
+// magpie recall <package...>. A bare name's type: `type`, else the nearest manifest; unsettled
+// means every type (spec §2).
+export function runRecall(queries: string[], type: PackageType | undefined, place: Place): RecallRun {
+  const fromManifests = manifestTypes(findManifests(place.cwd));
+  const types = type ? [type] : fromManifests.length ? fromManifests : ALL_TYPES;
+  const { sources, warnings } = openRecallSources(place);
+  const results = queries.map((query) => ({ query, matches: recall(sources, query, types) }));
+  const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => match);
+  return { document: { matches }, results, warnings };
 }
 
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
