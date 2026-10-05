@@ -2,6 +2,7 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import { client, send, type Reply } from "./fixtures/http.ts";
@@ -10,6 +11,7 @@ import { startServer } from "./server.ts";
 // Every security rule in docs/ui.md §3, each with its own test, against an in-process server on a
 // free port, over a scratch journal. The real home and journal are never used.
 
+const APP = fileURLToPath(new URL("./fixtures/app/", import.meta.url)); // stands in for dist/ui/
 const SECRET = "SECRET-OUTSIDE-THE-JOURNALS";
 const GITHUB_TOKEN = "ghp_test_token_never_in_a_response_42";
 const PDFKIT = "---\nid: pkg:npm/pdfkit\nname: pdfkit\nexplored: 2026-10-03\nkind: library\ntags: [pdf]\ntried: true\nrating:\nstatus: reviewed\n---\n\n## Verdict\navoid: async streams painful\n";
@@ -27,6 +29,7 @@ async function start(t: TestContext, env: Record<string, string> = {}) {
     context: { home: box.home, env: { MAGPIE_HOME: box.journal, ...env }, cwd: box.project, fetch: fakeFetch(recorded("microsoft--playwright-cli")), today: () => "2026-10-04" },
     open: async (target) => { opened.push(target); },
     log: (line) => { logged.push(line); },
+    assets: APP,
   });
   t.after(() => server.close());
   return { box, server, http: client(server), opened, logged };

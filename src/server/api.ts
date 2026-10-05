@@ -11,6 +11,7 @@ import {
   previewNote,
   settingsDocument,
   tagListDocument,
+  tagListPath,
   type NoteAddress,
 } from "../core/documents.ts";
 import type { PackageType } from "../core/identity.ts";
@@ -133,10 +134,17 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
       POST: async ({ body }) => {
         const journal = scope(body.journal);
         if (!journal) return bad({ opened: false, path: null }, JOURNAL);
-        const address = addressOf(body.id, body.file);
-        if (!address) return bad({ opened: false, path: null }, "Give either id or file.");
-        const { path } = locateNote(journal, address, context);
-        if (!path) return { status: 404, document: { opened: false, path: null, error: "No note with that id or file name in this journal." } };
+        let path: string | null;
+        if (body.tag_list !== undefined) {
+          if (body.tag_list !== true || body.id !== undefined || body.file !== undefined) return bad({ opened: false, path: null }, "Give either id, file or tag_list: true.");
+          path = tagListPath(journal, context);
+          if (!path) return { status: 404, document: { opened: false, path: null, error: "This journal has no tags.md yet." } };
+        } else {
+          const address = addressOf(body.id, body.file);
+          if (!address) return bad({ opened: false, path: null }, "Give either id or file.");
+          path = locateNote(journal, address, context).path;
+          if (!path) return { status: 404, document: { opened: false, path: null, error: "No note with that id or file name in this journal." } };
+        }
         try {
           await open(path);
         } catch (error) {

@@ -2,6 +2,7 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
 import { noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
 import { noteVersion } from "../core/edit.ts";
@@ -38,7 +39,7 @@ A PDF library.
 `;
 const LEFT_PAD = "---\nid: pkg:npm/left-pad\nname: left-pad\nexplored: 2026-10-03\nkind: library\ntags: []\ntried: false\nrating:\nstatus: inbox\n---\n\n## Verdict\n";
 
-async function start(t: TestContext, options: { open?: (path: string) => Promise<void> } = {}) {
+async function start(t: TestContext, options: { open?: (path: string) => Promise<void>; assets?: string } = {}) {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--left-pad.md": LEFT_PAD,
@@ -50,7 +51,7 @@ async function start(t: TestContext, options: { open?: (path: string) => Promise
   const fetch = fakeFetch(recorded("microsoft--playwright-cli"));
   const context: Context = { home: box.home, env: { MAGPIE_HOME: box.journal }, cwd: box.project, fetch, today: () => "2026-10-04" };
   const opened: string[] = [];
-  const server = await startServer({ context, open: options.open ?? (async (path) => { opened.push(path); }), log: () => {} });
+  const server = await startServer({ context, open: options.open ?? (async (path) => { opened.push(path); }), log: () => {}, assets: options.assets });
   t.after(() => server.close());
   return { box, context, fetch, http: client(server), opened };
 }
@@ -195,10 +196,32 @@ test("POST /api/open opens the note's file in the default editor", async (t) => 
   assert.equal((await http.write("POST", "/api/open", { journal: "personal" })).status, 400);
 });
 
+test("POST /api/open with tag_list opens the journal's tags.md", async (t) => {
+  const { http, box, opened } = await start(t);
+  assert.deepEqual(parsed(await http.write("POST", "/api/open", { journal: "personal", tag_list: true })), { status: 200, document: { opened: true, path: join(box.journal, "tags.md") } });
+  assert.deepEqual(opened, [join(box.journal, "tags.md")]);
+  // The project journal in this sandbox has no tags.md.
+  assert.deepEqual(parsed(await http.write("POST", "/api/open", { journal: "project", tag_list: true })), {
+    status: 404,
+    document: { opened: false, path: null, error: "This journal has no tags.md yet." },
+  });
+  for (const body of [{ journal: "personal", tag_list: true, id: "pkg:npm/pdfkit" }, { journal: "personal", tag_list: "yes" }, { journal: "personal", tag_list: true, file: "../x" }]) {
+    assert.equal((await http.write("POST", "/api/open", body)).status, 400, JSON.stringify(body));
+  }
+  assert.equal(opened.length, 1);
+});
+
 test("POST /api/open says so when the editor can't be started", async (t) => {
   const { http, box } = await start(t, { open: () => Promise.reject(new Error("spawn xdg-open ENOENT")) });
   assert.deepEqual(parsed(await http.write("POST", "/api/open", { journal: "personal", id: "pkg:npm/pdfkit" })), {
     status: 422,
     document: { opened: false, path: box.note("npm--pdfkit.md"), error: "Couldn't open the note: spawn xdg-open ENOENT" },
   });
+});
+
+test("without a built app, the page says how to build it, and the API still works", async (t) => {
+  const { http } = await start(t, { assets: fileURLToPath(new URL("./fixtures/no-such-folder/", import.meta.url)) });
+  assert.deepEqual(parsed(await http.get("/")), { status: 404, document: { error: "The app isn't built. Run npm run build, then start magpie ui again." } });
+  assert.equal((await http.get("/assets/index.js")).status, 404);
+  assert.equal((await http.get("/api/notes?journal=personal")).status, 200);
 });
