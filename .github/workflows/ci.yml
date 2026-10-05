@@ -55,3 +55,24 @@ jobs:
         run: node scripts/bench-search.ts --report-only
       - name: Recall and hook benchmark (report only)
         run: node scripts/bench-recall.ts --report-only
+
+  # The local app (docs/ui.md §10, §11): the built bundle against its size budget, then the
+  # end-to-end tests against magpie ui on a temporary journal. Chromium only.
+  app:
+    name: App build and end-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Bundle size (at most 200 kB gzipped)
+        run: npm run check:bundle
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
