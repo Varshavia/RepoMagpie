@@ -36,3 +36,8 @@ vault/
 
 # Agent scratch space: never commit
 .scratch/
+
+# Agent skills installed per project: never commit
+.agents/
+.claude/skills/
+skills-lock.json
