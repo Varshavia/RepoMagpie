@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="magpie-token" content="">
+<title>magpie</title>
+<link rel="stylesheet" href="/assets/app.css">
+<script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+<header>
+  <h1>magpie</h1>
+  <p>A placeholder for the local app. The full app comes next.</p>
+</header>
+<main>
+  <section aria-labelledby="journals-title">
+    <h2 id="journals-title">Journals</h2>
+    <dl id="settings"><dt>Loading</dt><dd>…</dd></dl>
+  </section>
+  <section aria-labelledby="personal-title">
+    <h2 id="personal-title">Personal journal</h2>
+    <p class="status" id="personal-status">Loading notes…</p>
+    <ul id="personal-notes"></ul>
+  </section>
+  <section aria-labelledby="project-title">
+    <h2 id="project-title">Project journal</h2>
+    <p class="status" id="project-status">Loading notes…</p>
+    <ul id="project-notes"></ul>
+  </section>
+  <section aria-labelledby="preview-title">
+    <h2 id="preview-title">Check a write</h2>
+    <p>Previews what <code>magpie note</code> would write, without writing. This proves the write header works.</p>
+    <form id="preview">
+      <label for="target">Package, PURL or URL</label>
+      <input id="target" name="target" value="pkg:npm/pdfkit" autocomplete="off">
+      <button type="submit">Preview</button>
+    </form>
+    <pre id="preview-result" aria-live="polite"></pre>
+  </section>
+</main>
+</body>
+</html>
