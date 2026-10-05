@@ -9,6 +9,7 @@ import type { ImportOptions } from "./import.ts";
 import type { NoteOptions } from "./note.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
+import type { UiOptions } from "./ui.ts";
 
 // Each command's module is loaded only when that command runs, so a quick command (recall) doesn't
 // pay for the others' libraries (spec §7 budgets).
@@ -27,6 +28,8 @@ export interface Io {
   ask: (question: string) => Promise<string>; // one line typed in the terminal
   columns?: number; // the terminal's width when stdout is a terminal; undefined when piped
   stdin?: () => Promise<string>; // all of standard input (the hook reads Claude Code's JSON from it)
+  openExternal?: (target: string) => Promise<void>; // opens a URL or file in the default app (magpie ui); default: the platform's command
+  untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
 }
 
 // The v0.1 commands not built yet (spec section 2).
@@ -92,6 +95,15 @@ export async function run(argv: string[], io: Io): Promise<number> {
     });
 
   program
+    .command("ui")
+    .description("open the local app in your browser")
+    .option("--port <n>", "the port to listen on (default: a free one)", portNumber)
+    .option("--no-open", "don't open the browser; only print the URL")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./ui.ts")).uiCommand(command.optsWithGlobals<UiOptions>(), io);
+    });
+
+  program
     .command("hook")
     .description("adapters that agent hooks run (not typed by people)")
     .command("claude-code")
@@ -120,6 +132,12 @@ export async function run(argv: string[], io: Io): Promise<number> {
     return 2; // every other commander error is a mistake in the command line
   }
   return code;
+}
+
+function portNumber(value: string): number {
+  const n = Number(value);
+  if (!/^\d+$/.test(value) || n < 1 || n > 65535) throw new InvalidArgumentError("Use a port number from 1 to 65535.");
+  return n;
 }
 
 function positiveInteger(value: string): number {
