@@ -33,8 +33,11 @@
   "scripts": {
     "test": "node scripts/test.ts",
     "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
-    "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p ui",
+    "build": "tsc -p tsconfig.build.json && vite build ui",
+    "dev:ui": "vite ui",
+    "check:bundle": "node scripts/check-bundle.ts",
+    "test:e2e": "playwright test -c ui/playwright.config.ts",
     "bench": "npm run build && node scripts/bench-search.ts && node scripts/bench-recall.ts",
     "check:links": "node scripts/check-links.mjs",
     "prepublishOnly": "npm run build"
@@ -46,7 +49,14 @@
     "yaml": "2.9.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.20.5",
-    "typescript": "7.0.2"
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.2"
   }
 }
