@@ -52,6 +52,8 @@ Add this hook to your user settings (`~/.claude/settings.json`) or to a project'
 
 Before Claude Code runs an install such as `npm install pdfkit`, the hook looks the package up in your journals. A note that says to avoid it makes Claude Code ask you first, with the note in the prompt. Any other note goes to the agent as context. If nothing matches, or anything goes wrong, the hook stays silent and the install runs as usual. `magpie hook claude-code --help` prints the same snippet.
 
+Tested live on 2026-10-04: an install with an avoid note made Claude Code ask first, both in its default permission mode and in auto mode.
+
 For unattended runs (`claude -p`), where nobody can answer a prompt, Claude Code turns a question into a refusal. Use `"command": "magpie hook claude-code --inform-only"` there: avoid notes then reach the agent as context, and the install goes ahead.
 
 ## Principles
