@@ -37,7 +37,7 @@ src/
   core/        journals: discovery and config (decision 0016)
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
-               note-cache: the caches in <journal>/.cache/ and their file signature
+               note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
                install-detect: package installs in a shell command line
@@ -53,15 +53,18 @@ src/
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
   server/      magpie ui, node:http only: server (security checks, routing, events stream), api (endpoints →
                core), live (fs.watch + signature check), open (the platform's open command)
-ui/            the local app's source (decision 0022), built into dist/ui/; until then placeholder/, a static page
+ui/            the local app (decision 0022): React and Vite, built into dist/ui/ (npm run build)
+  src/         App.tsx, components/ (one per pane and screen), api.ts (the only way to the journals),
+               logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette)
+  e2e/         @playwright/test against magpie ui on a temporary journal; screenshots with SCREENS=1
 skill/
   SKILL.md     no code
 scripts/       the test runner with the ~/.magpie canary, benchmarks, the link check; not part of the package
 ```
 
-Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's end-to-end tests will use `@playwright/test` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
+Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's logic tests (`ui/src/logic/*.test.ts`) run in `npm test` too. Its end-to-end tests use `@playwright/test` against `magpie ui` on a journal in `.scratch/e2e/` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
 
-`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API.
+`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API. It imports only types from `core/` (the API's documents); three values it needs at run time (the kinds, the draft marker, the avoid rule) are mirrored in `ui/src/logic/schema.ts`, and a test keeps them equal to core's.
 
 ### Future components
 

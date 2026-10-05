@@ -251,7 +251,7 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 <journal>/
   notes/          one note per subject (note schema)
   tags.md         the journal's tag list
-  .cache/         the search index; rebuildable, never committed
+  .cache/         the caches (section 7); rebuildable, never committed
   config.yaml     personal journal only
   .gitignore      project journal only; contains ".cache/"
 ```
@@ -388,7 +388,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 
 **Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-recall.ts`) and exits 1 over a budget. CI runs both with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
 
-**Caches:** two per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index) and `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"). Each records every note file's modification time and size, and is rebuilt when a note is added, removed or changed. Both are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
+**Caches:** three per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"), and `note-list.json` (each note's summary in the Note list document, for the local app). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed; the note list reads again only the notes that were added or changed. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
 
 **Hook start-up:** `magpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
 

@@ -2,7 +2,9 @@
 
 The local app is an Obsidian-inspired view of your journals in the browser, served from your own machine by `magpie ui`. It reads and writes the same Markdown notes as the CLI, through the same core. Decisions: [0021](decisions/0021-local-ui-server.md) (local server), [0022](decisions/0022-frontend-stack.md) (frontend stack), [0023](decisions/0023-api-is-the-json-contract.md) (the API is the `--json` contract). Visual language: [`DESIGN.md`](../DESIGN.md).
 
-The server (sections 2 to 6) is built on `feat/ui-server`. Until the app is built on `feat/ui-app` ([roadmap](roadmap.md), v0.1, "Local app"), `magpie ui` serves a placeholder page from `ui/placeholder/`: it lists both journals' notes through the API, follows live updates, and previews a note with a write request, which proves the session token flow.
+The server (sections 2 to 6) is built on `feat/ui-server`, the app (sections 7 to 11) on `feat/ui-app`. `npm run build` builds the app from `ui/` into `dist/ui/`, which `magpie ui` serves and the npm package includes. Run from the source without a build, `magpie ui` still answers the API, and its page says to run `npm run build`.
+
+**Developing the app:** start `magpie ui --no-open` on a scratch journal (CLAUDE.md, section 13), then `MAGPIE_UI_URL=<the printed URL> npm run dev:ui`. Vite's dev server forwards `/api` to that server with the session cookie, the `X-Magpie-Token` header and the Origin it expects. The dev server has no Content-Security-Policy; `magpie ui` always sends one (section 3).
 
 ## 1. Architecture
 
@@ -100,12 +102,12 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | POST | `/api/note/preview` | `{"target", "type"?, "to"}` | **Note preview** document (fetches GitHub metadata, writes nothing) |
 | POST | `/api/note` | `{"target", "text"?, "type"?, "to"}` | Exactly `magpie note --json` |
 | POST | `/api/import` | `{"text", "to", "dry_run"}` | Exactly `magpie import --json` |
-| POST | `/api/open` | `{"journal", "id"}`, or `{"journal", "file"}` for a read-only note | `{"opened": true, "path": "..."}`: opens the note in the default editor |
+| POST | `/api/open` | `{"journal", "id"}`, or `{"journal", "file"}` for a read-only note, or `{"journal", "tag_list": true}` for the journal's `tags.md` | `{"opened": true, "path": "..."}`: opens the note, or `tags.md`, in the default editor |
 | GET | `/api/events` | | `text/event-stream`: `notes-changed` with `{"journal", "files": [...]}`; a comment every 30 s keeps the stream open |
 | GET | `/api/recall` | `?package=` (repeatable), `&type=` | Exactly `magpie recall --json` |
 
 - `journal` is required where it is listed for a `GET`. In a `POST` body, `to` may be left out and means `personal`, as `--to` does on the CLI.
-- `POST /api/open` that can't start the editor answers 422 with `{"opened": false, "path": "...", "error": "..."}`.
+- `POST /api/open` that can't start the editor answers 422 with `{"opened": false, "path": "...", "error": "..."}`. With `tag_list`, a journal without `tags.md` answers 404; `tag_list` with `id` or `file`, or with any value but `true`, answers 400.
 - `GET /api/events` starts with the comment `: connected`.
 - A 405 names the allowed methods in an `Allow` header. `HEAD` and `OPTIONS` are not supported.
 
@@ -132,27 +134,28 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 
 **Layout:** three panes, like Obsidian ([`DESIGN.md`](../DESIGN.md), Layout).
 - **Left sidebar:** journal switcher (Personal / Project), Inbox with a count, kinds, tags, settings.
-- **Centre:** the list or the results.
+- **Centre:** the list or the results. Rows have two lines: the name (the full name on hover) and the package type, then the Verdict, or "no verdict yet". The Inbox badge appears in All notes and search, not in the Inbox, where every row is an inbox note.
 - **Right:** the note.
 - **Command palette** on Ctrl/Cmd+K, for search and every action.
 
 1. **Inbox review.** The flow that fights note-taking friction (hypothesis H1, [validation](validation.md)).
    - Inbox notes in a list; `j`/`k` move, `Enter` opens.
-   - The Verdict editor has focus; `Ctrl+Enter` saves. Kind, tags (from `tags.md`), tried and rating are next to it.
-   - Saving a Verdict moves the note to reviewed and selects the next inbox note.
+   - The Verdict editor has focus; `Ctrl+Enter` saves. Kind, tags (from `tags.md`, with "Edit tag list", which opens `tags.md` in your editor), tried and rating are next to it.
+   - Above the editor, short: "What it does" and "Use when", each cut to three bullets or lines with "Show all".
+   - Saving a Verdict moves the note to reviewed and opens the next inbox note with its editor focused. An unsaved Verdict stays with its note while you move through the list.
    - **Goal:** review a note in under 15 seconds.
 2. **Search.** The same ranking as `magpie search`: Verdict first; filters for journal, kind, tag and status; completed skill lines as their own results.
 3. **Note view.**
-   - The Verdict as the hero; then Use when and Avoid when.
-   - "What it does", with a visible draft badge while it is a draft.
-   - Skill lines.
-   - Metadata chips: licence, language, PURL packages.
+   - The Verdict as the hero, marked with the accent; then Use when and Avoid when. The "Avoid when" label is red only when the section has text.
+   - "What it does", with a visible draft badge while it is a draft, and "Accept".
+   - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
+   - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, PURL packages, tags.
    - Actions: open the repository, open in an editor, open in Obsidian, copy the PURL.
 4. **Add.**
    - Paste a URL, PURL or name; see the fetched preview; write the Verdict; save. The same logic as `magpie note`.
-   - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`.
-5. **Settings** (read-only in v0.1): journal paths, whether `GITHUB_TOKEN` is set, the version, links to the docs.
-6. **Recall** (once `feat/recall` exists): a "Check a package" box that shows what the hook would say.
+   - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`. Changing the lines needs a new check before importing.
+5. **Settings** (read-only in v0.1): journal paths, whether `GITHUB_TOKEN` is set, the version, links to the docs. Also the theme (the system's, dark or light), saved in the browser only.
+6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
 7. **Later, not v0.1:** suggest and adopt panels (they ship with those commands), export or nest (v0.3). A graph tab: open question (section 13).
 
 **Keyboard map**
@@ -161,7 +164,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 |---|---|
 | Ctrl/Cmd+K | Command palette |
 | `/` | Search |
-| `j` / `k` | Next / previous row |
+| `j` / `k` (or ↓ / ↑) | Next / previous row |
 | `Enter` | Open the selected note |
 | `e` | Edit the Verdict |
 | Ctrl+Enter | Save |
@@ -176,16 +179,20 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | State | Shown as |
 |---|---|
 | Loading | Skeleton rows shaped like the content; no spinners in lists |
-| Empty | One sentence and one action, for example "Your inbox is empty. Add a repository with Ctrl+K." |
+| Empty | One sentence and one action, for example "Your inbox is empty. Add a repository here, or from the palette (Ctrl+K)." |
 | Error | What happened and what to do, for example "This note changed on disk since you opened it. Reload to see the new version." |
 | Offline | GitHub is unreachable: adding a URL saves the note without metadata, with a warning, as `magpie note` does. Everything else works, because it is local |
+| Connection lost | `magpie ui` stopped: a strip across the top says the notes are safe on disk and to start `magpie ui` again. It goes away when the events stream reconnects |
 | Read-only | A note that can't be parsed: the read-only banner and "Open in editor" |
-| Conflict | The conflict banner and "Reload" |
+| Conflict | The conflict banner and "Reload". It also appears while you edit, as soon as a live update shows the file changed. Reload shows the file as it is now and keeps your unsaved changes in the form |
+| Unsaved changes | The browser asks before the page closes or reloads |
 
 ## 9. Accessibility
 
 - Full keyboard use, and a visible focus ring everywhere (`focus` token, 3:1 or more).
-- Landmarks (`nav` for the sidebar, `main` for the list, `article` for the note) and a label on every control.
+- Landmarks (`nav` for the sidebar, `main` for the list, `article` for the note) and a label on every control. One `h1` per screen; the note's name is an `h2`, its sections `h3`.
+- A "Skip to the main pane" link is the first Tab stop. The palette and the keyboard map are modal: what is behind them is `inert`.
+- Lists are listboxes: focus stays on the list, and the selected row is its active descendant.
 - AA contrast for all text, checked for every token pair in [`DESIGN.md`](../DESIGN.md).
 - Never colour alone: every status, label and selection also has a word or a shape. The same rule as the CLI ([spec](spec.md), section 8).
 - `prefers-color-scheme` and `prefers-reduced-motion` are respected.
@@ -194,10 +201,12 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 
 | Budget | Limit | Checked by |
 |---|---|---|
-| The app's bundle | At most 200 kB gzipped | A size check before each UI pull request, and in CI |
-| First render with 2,000 notes | Under 1 s on a mid-range laptop | An end-to-end measurement on a generated journal |
+| The app's bundle | At most 200 kB gzipped | `npm run check:bundle` (scripts and styles in `dist/ui/`, gzip level 9), before each UI pull request and in CI |
+| First render with 2,000 notes | Under 1 s on a mid-range laptop, with a warm cache, as for search and recall ([spec](spec.md), section 7) | The end-to-end test "2,000 notes": from the URL `magpie ui` printed to the first rows on screen. It also reports the cold first run, which builds the note-list cache |
 | Long lists | Virtualised: only visible rows are in the DOM | A unit test of the windowing; the 2,000-note measurement |
 | Search from the app | The same as `magpie search`: under 500 ms with a warm cache ([spec](spec.md), section 7) | The search benchmark |
+
+Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (JavaScript 86.9 kB, CSS 4.6 kB, HTML 0.4 kB); first render with 2,000 notes 417 ms with a warm cache, 944 ms cold. `GET /api/notes` on 2,000 notes takes about 37 ms with the note-list cache and about 500 ms without it.
 
 ## 11. Design process and testing
 
@@ -208,17 +217,18 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | `VoltAgent/awesome-design-md` | Reference for the structure of [`DESIGN.md`](../DESIGN.md) (token groups, colour roles, components with variants, prose subsections), studied in the Linear, Raycast and Vercel entries. No palette or identity copied |
 | `Leonxlnx/taste-skill` | Character: avoiding the template look, one radius rule, skeletons and empty states, contrast checks. Its scope excludes dashboards, so it doesn't shape the dense lists. Adopted and skipped rules: [decision 0022](decisions/0022-frontend-stack.md) |
 | `vercel-labs/agent-skills` | `web-design-guidelines`: a review pass on every screen before each UI pull request, with findings fixed or listed. `react-best-practices`: during implementation. `writing-guidelines`: all UI copy |
-| `microsoft/playwright-cli` | During development: the agent drives the running app to check flows and capture screenshots for pull requests and the README |
+| `microsoft/playwright-cli` | During development: the agent drives the running app to check flows and capture screenshots for pull requests and the README. On `feat/ui-app` it wasn't installed on the agent's machine; the screenshots came from the end-to-end suite (`SCREENS=1`) instead |
 | `Egonex-AI/Understand-Anything` | Optional, for the maintainer: map the codebase once the app lands |
 | `mattpocock/skills` | `tdd` for server and app logic; `code-review` before each pull request |
 
 **Tests**
 - **Server** (`node:test`, an in-process server on a random port): every endpoint; each response compared with the CLI's `--json` output for the same input; every security rule in section 3 (bad Host, missing token or header, cross-origin and Origin-less writes, traversal attempts, 409 on conflicts, 413, 415).
 - **Core:** round-trip tests for `setSection` and human-field edits, as for `setToolFields`.
-- **App logic** (reducers, formatting, keyboard maps, list windowing): unit tests.
-- **End-to-end** (`@playwright/test`, Chromium only, one CI job): the inbox review, search, add and import flows against a temporary journal; screenshots in light and dark for the pull request.
+- **App logic** (`ui/src/logic/`: list windowing, the keyboard map, note text, the edit request, import labels, palette matching, and the values the app mirrors from core): unit tests with `node:test`, run by `npm test`.
+- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault. The flows: inbox review, search, add, import, a 409 conflict, live updates, read-only notes, the palette and keyboard map, the skip link, no CSP violations, and the 2,000-note first render. `npm run build` first, then `npm run test:e2e`.
+- **Screenshots:** `SCREENS=1 npm run test:e2e` writes every screen and state in dark and light to `.scratch/screens/` (`ui/e2e/screens.spec.ts`); CI skips them.
 - **Before each UI pull request:** a `web-design-guidelines` pass, the bundle-size check, and a `writing-guidelines` pass on the copy.
-- **CI:** the existing matrix, plus one job that builds the app and runs the end-to-end tests.
+- **CI:** the existing matrix, plus one job ("App build and end-to-end tests") that builds the app, checks the bundle size and runs the end-to-end tests.
 
 ## 12. Verified facts
 
@@ -231,7 +241,7 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | `obsidian://` to open a note | `obsidian://open?path=<URI-encoded absolute path>` opens the file in "the most specific vault which contains the specified file path"; values must be URI-encoded; the scheme registers itself on Windows and macOS, and needs manual setup on Linux | [Obsidian URI help](https://obsidian.md/help/Extending+Obsidian/Obsidian+URI) |
 | React's size against the 200 kB budget | Production builds, gzipped: `react` 4.5 kB, `react-dom` client 107.9 kB (unminified as published), `scheduler` 2.4 kB | The published files of `react`/`react-dom` 19.3.0, measured ([0022](decisions/0022-frontend-stack.md)) |
 
-**Still open:** what Obsidian does when a journal is not inside any vault it knows (the path open then has nothing to open). To be tried on `feat/ui-app`; until then, "Open in Obsidian" is shown only as a secondary action.
+**Still open:** what Obsidian does when a journal is not inside any vault it knows (the path open then has nothing to open). Not tried on `feat/ui-app` (no Obsidian on the agent's machine). "Open in Obsidian" is a secondary button, styled like "Open in editor" (the maintainer's design review, 2026-10-06).
 
 ## 13. Open questions
 

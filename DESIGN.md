@@ -99,6 +99,7 @@ spacing:
   xxl: 32px
   section: 48px
   row-height: 32px
+  list-row-height: 52px
   sidebar-width: 232px
   list-width: 360px
 components:
@@ -126,7 +127,7 @@ components:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
     typography: "{typography.body-md}"
-    height: 32px
+    height: 52px
     padding: 0 12px
   list-row-hover:
     backgroundColor: "{colors.surface-1}"
@@ -291,7 +292,7 @@ This file describes how RepoMagpie looks and reads: the local app (`magpie ui`),
 
 **Principles**
 - **The Verdict is the hero.** Every list row and every note leads with it ([decision 0018](docs/decisions/0018-ai-drafts-humans-decide.md)). A note without one says so plainly.
-- **Dense, not cramped.** 32 px rows, 14 px body text, generous line height inside the note.
+- **Dense, not cramped.** Two-line list rows of 52 px, 14 px body text, generous line height inside the note.
 - **Keyboard-first.** Every action has a key, focus is always visible, and the command palette (Ctrl/Cmd+K) reaches everything.
 - **Colour carries meaning only** (inbox, reviewed, draft, avoid, selection, focus), and never alone: every coloured item also has a word or a shape.
 - **Dark first.** Dark is the default; light is a full theme, not an afterthought. Both follow `prefers-color-scheme`.
@@ -301,7 +302,7 @@ This file describes how RepoMagpie looks and reads: the local app (`magpie ui`),
 The palette is two neutral ramps (dark and light) with one accent and three semantic colours. Token names without a prefix are the dark theme; `light-` names are the light theme. In CSS, each token becomes a custom property (`--canvas`, `--ink`, …), and the light theme redefines them under `prefers-color-scheme: light` or an explicit theme setting.
 
 ### Brand & Accent
-- **Accent (`accent`, dark #3CC8B4; light #0B7A6E):** the magpie's blue-green. Used for the primary button, the selected row's wash, the focus ring and selected filters. Never for large areas, never as a gradient.
+- **Accent (`accent`, dark #3CC8B4; light #0B7A6E):** the magpie's blue-green. Used for the primary button, the selected row's wash and edge, the focus ring, selected filters, and the Verdict's edge. Never for large areas, never as a gradient.
 - **Accent text (`accent-text`):** the accent when it is text on a surface; a step lighter (dark) or darker (light) so it passes AA.
 - **Accent wash (`accent-wash`):** the selected row's background. Text on it stays `ink`.
 - **On accent (`on-accent`):** text on the accent: deep green-black on dark, white on light.
@@ -364,7 +365,7 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 ## Layout
 
 ### Spacing System
-A 4 px base: `xxs` 2, `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32, `section` 48. Rows are 32 px high (`row-height`); sidebar items 28 px.
+A 4 px base: `xxs` 2, `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32, `section` 48. List rows are 52 px high, two lines (`list-row-height`); palette rows 32 px (`row-height`); sidebar items 28 px.
 
 ### Three panes
 - **Sidebar** (`sidebar-width`, 232 px): journal switcher (Personal / Project), Inbox with a count, kinds, tags, settings.
@@ -396,9 +397,10 @@ No other radii, and no mixing within one component.
 Every interactive component has these states: default, hover, focus-visible (a 2 px `focus` ring, offset 2 px), active or selected, disabled (opacity 0.5, no pointer events), and, where it applies, loading and error.
 
 - **Sidebar item:** icon, label, count on the right. Active: `surface-3` and `ink`.
-- **List row:** name, PURL type, Verdict (or `[inbox] no verdict yet`), journal. Selected: `accent-wash`. Keyboard focus moves the selection (`j`/`k`); `Enter` opens.
-- **Verdict hero:** the Verdict in `verdict` type on `surface-1`. Empty: "No verdict yet" in `ink-muted` with a "Write the Verdict" action.
-- **Section label:** "Use when", "Avoid when" (in `danger`), "What it does", and so on.
+- **List row:** two lines. Line 1: the name (cut with `…`, the full name on hover) and the PURL type on the right; in search, also the journal. Line 2: the Verdict in `ink-muted`, or "no verdict yet". The "Inbox" badge appears where a list mixes statuses, not in the Inbox itself. Selected: `accent-wash` and a 2 px `accent` edge on the left. Keyboard focus moves the selection (`j`/`k`); `Enter` opens.
+- **Verdict hero:** the Verdict in `verdict` type on `surface-1`, with a 3 px `accent` edge on the left in both themes, so it stands out from the page in light too. Empty: "No verdict yet" in `ink-muted`, with a `hairline-strong` edge and a "Write the Verdict" action.
+- **Section label:** "Use when", "Avoid when", "What it does", and so on. "Avoid when" is `danger` only when the section has text; an empty one stays `ink-subtle`.
+- **Links:** `ink` with an underline in `hairline-strong`, `currentColor` on hover. The underline marks a link, not the colour.
 - **Draft badge:** "Draft" next to a drafted section's label; an "Accept" action removes the marker ([decision 0023](docs/decisions/0023-api-is-the-json-contract.md)).
 - **Status badge:** "Inbox" (amber) or "Reviewed" (green), always with the word.
 - **Chip:** tags and filters. Selected: `accent-wash` and `accent-text`.
@@ -414,7 +416,7 @@ Every interactive component has these states: default, hover, focus-visible (a 2
 ## Do's and Don'ts
 
 - **Do** lead with the Verdict everywhere.
-- **Do** use the accent only for selection, focus and the one primary action in view.
+- **Do** use the accent only for selection, focus, the one primary action in view, and the Verdict's edge.
 - **Do** pair every colour with a word or a shape.
 - **Do** keep everything reachable from the keyboard, and show the key.
 - **Don't** add gradients, glows, glass effects or decorative shadows.
