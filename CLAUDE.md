@@ -84,7 +84,8 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
-| `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
+| `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `server/` (`magpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
+| `ui/` | The local app's source. Until `feat/ui-app`, only `placeholder/`: the static page `magpie ui` serves ([UI](docs/ui.md)). |
 | `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`) and the link check (`npm run check:links`). Typechecked (the `.ts` files), not built or published. |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
@@ -198,6 +199,7 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
 | `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
+| `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts ui --no-open` | Start the local app's server on a scratch journal and print its URL; Ctrl+C stops it. Without `MAGPIE_HOME`, the app reads and edits the real `~/.magpie`. Run it in the background and stop it when done. |
 
 CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows, and one job with `npm run check:links` and the benchmarks (report only).
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.

@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: recall → UI server → UI app → suggest and adopt → agent skill and launch.
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: UI app → suggest and adopt → agent skill and launch (recall and the UI server are built).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -143,20 +143,21 @@ The first public release: capture what you learned, find it again, and see it be
 - [x] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. It never denies: an avoid note asks the user to confirm; other notes inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
 - [ ] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing.
 
-**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`; the live check in a Claude Code session is still to do. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
+**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`. Live check in a Claude Code session on 2026-10-04: an avoid note made Claude Code ask, in the default permission mode and in auto mode. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
 
 ### Local app
 `magpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).
 
 UI server (`feat/ui-server`, after `feat/recall`):
-- [ ] Core: `setSection`, edits of the human-owned keys (`kind`, `tags`, `tried`, `rating`) and note versions (`sha256`), with round-trip tests ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
-- [ ] Core: the shared JSON documents: Settings, Tag list, Note list, Note, Note preview ([spec](spec.md), section 2).
-- [ ] `magpie ui [--port <n>] [--no-open]`: loopback only, the URL with a session token, opens the browser, stops on Ctrl+C ([spec](spec.md), section 2).
-- [ ] The API endpoints ([UI](ui.md), "API"); each response equals the CLI's `--json` for the same input.
-- [ ] Every security rule in [UI](ui.md), "Security", each with a test.
-- [ ] Live updates: `fs.watch` on both `notes/` folders, a signature check every 5 s, Server-Sent Events.
+- [x] Core: `setSection`, edits of the human-owned keys (`kind`, `tags`, `tried`, `rating`) and note versions (`sha256`), with round-trip tests ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
+- [x] Core: the shared JSON documents: Settings, Tag list, Note list, Note, Note preview ([spec](spec.md), section 2).
+- [x] `magpie ui [--port <n>] [--no-open]`: loopback only, the URL with a session token, opens the browser, stops on Ctrl+C ([spec](spec.md), section 2).
+- [x] The API endpoints ([UI](ui.md), "API"); each response equals the CLI's `--json` for the same input.
+- [x] Every security rule in [UI](ui.md), "Security", each with a test.
+- [x] Live updates: `fs.watch` on both `notes/` folders, a signature check every 5 s, Server-Sent Events.
+- [x] A placeholder page until the app: lists notes through the API and proves the token flow.
 
-**Done when:** the server tests cover every endpoint and every security rule; a note edited in another editor reaches an open events stream within 5 seconds; and a write with an old version gets 409 and changes nothing.
+**Done when:** the server tests cover every endpoint and every security rule; a note edited in another editor reaches an open events stream within 5 seconds; and a write with an old version gets 409 and changes nothing. (Met on `feat/ui-server`: `src/server/security.test.ts`, `api.test.ts` and `live.test.ts`; the 5-second check runs with the default timings. Also checked by hand on 2026-10-05 against the built CLI with curl: an outside edit reached the events stream, and a stale write got 409.)
 
 UI app (`feat/ui-app`, after `feat/ui-server`):
 - [ ] The maintainer approves [decision 0022](decisions/0022-frontend-stack.md)'s dependencies.
