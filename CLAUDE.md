@@ -85,8 +85,8 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), research, and `decisions/` (decision records). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `server/` (`magpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
-| `ui/` | The local app's source. Until `feat/ui-app`, only `placeholder/`: the static page `magpie ui` serves ([UI](docs/ui.md)). |
-| `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`) and the link check (`npm run check:links`). Typechecked (the `.ts` files), not built or published. |
+| `ui/` | The local app (React, Vite): `src/` (components, the API client, and `logic/` with unit tests), `e2e/` (Playwright), its `tsconfig.json`, `vite.config.ts` and `playwright.config.ts`. Built into `dist/ui/`, which `magpie ui` serves ([UI](docs/ui.md)). |
+| `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`), the link check (`npm run check:links`) and the app's size check (`npm run check:bundle`). Typechecked (the `.ts` files), not built or published. |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
 | `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
@@ -191,17 +191,20 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | Command | What it does |
 |---|---|
 | `npm ci` | Install exactly what `package-lock.json` lists. Use it instead of `npm install` unless a dependency was approved and is being added (section 9). |
-| `npm test` | Product tests (`node --test "src/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
-| `npm run typecheck` | `tsc --noEmit` over `src/` and `scripts/`. |
-| `npm run build` | Compile `src/` to `dist/` (tests excluded). `dist/` is git-ignored. |
+| `npm test` | Product tests (`node --test "src/**/*.test.ts" "ui/src/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
+| `npm run typecheck` | `tsc --noEmit` over `src/` and `scripts/`, then over `ui/` (its own `tsconfig.json`). |
+| `npm run build` | Compile `src/` to `dist/` (tests excluded), then build the local app from `ui/` into `dist/ui/` with Vite. `dist/` is git-ignored. |
+| `npm run check:bundle` | The app's size in `dist/ui/`, gzipped, against its 200 kB budget (exit 1 over). Run after `npm run build` when `ui/` changes. |
+| `PLAYWRIGHT_BROWSERS_PATH="$PWD/.scratch/ms-playwright" npm run test:e2e` | The app's end-to-end tests (Chromium) against `magpie ui` on journals in `.scratch/e2e/`. Run `npm run build` first. Install the browser once with the same variable and `npx playwright install chromium`, so it stays inside the repo (section 10). `SCREENS=1` also writes screenshots of every screen to `.scratch/screens/`. |
+| `MAGPIE_UI_URL=<printed URL> npm run dev:ui` | Vite's dev server for `ui/`, forwarding `/api` to a running `magpie ui --no-open` (the row below). No CSP there; `magpie ui` always sends one. |
 | `npm run bench` | Build, then time `magpie search`, `magpie recall` and the hook on 2,000 generated notes against the budgets in spec §7 (median and p95; exit 1 over budget). Run it when search, recall, the hook or the caches change. `node scripts/bench-*.ts --report-only` never fails on timing (CI uses it). |
 | `npm run check:links` | Check every relative link and `#anchor` in the Markdown files. Run it after editing docs. |
 | `npm run test:hooks` | Hook tests: `node --test ".claude/hooks/*.test.mjs"`. Node 21+ needs the glob form; a bare directory is not searched. Run it whenever `.claude/hooks/` changes. |
 | `node src/cli/main.ts --help` | Run the CLI from source; `node dist/cli/main.js` runs the build. |
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
-| `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts ui --no-open` | Start the local app's server on a scratch journal and print its URL; Ctrl+C stops it. Without `MAGPIE_HOME`, the app reads and edits the real `~/.magpie`. Run it in the background and stop it when done. |
+| `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts ui --no-open` | Start the local app's server on a scratch journal and print its URL; Ctrl+C stops it. It serves the app from `dist/ui/`, so run `npm run build` first. Without `MAGPIE_HOME`, the app reads and edits the real `~/.magpie`. Run it in the background and stop it when done. |
 
-CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows, and one job with `npm run check:links` and the benchmarks (report only).
+CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows; one job with `npm run check:links` and the benchmarks (report only); and one job that builds, runs `npm run check:bundle` and the end-to-end tests (Chromium).
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
 
 ## 14. Work log

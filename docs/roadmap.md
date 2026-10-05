@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: UI app → suggest and adopt → agent skill and launch (recall and the UI server are built).
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: suggest and adopt → agent skill and launch (recall, the UI server and the UI app are built).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -160,15 +160,15 @@ UI server (`feat/ui-server`, after `feat/recall`):
 **Done when:** the server tests cover every endpoint and every security rule; a note edited in another editor reaches an open events stream within 5 seconds; and a write with an old version gets 409 and changes nothing. (Met on `feat/ui-server`: `src/server/security.test.ts`, `api.test.ts` and `live.test.ts`; the 5-second check runs with the default timings. Also checked by hand on 2026-10-05 against the built CLI with curl: an outside edit reached the events stream, and a stale write got 409.)
 
 UI app (`feat/ui-app`, after `feat/ui-server`):
-- [ ] The maintainer approves [decision 0022](decisions/0022-frontend-stack.md)'s dependencies.
-- [ ] The build: a static bundle in `dist/ui/`, served by `magpie ui`, with a bundle-size check (at most 200 kB gzipped).
-- [ ] The layout and components from `DESIGN.md`: three panes, the command palette, dark and light themes.
-- [ ] Inbox review, search, the note view, add and import, read-only settings, and the "Check a package" box ([UI](ui.md), "Screens and flows").
-- [ ] Every state, the keyboard map and the accessibility rules ([UI](ui.md), "States", "Accessibility").
-- [ ] End-to-end tests with `@playwright/test` in one CI job, Chromium only; screenshots in light and dark for the pull request.
-- [ ] Before the pull request: `web-design-guidelines` and `writing-guidelines` passes, findings fixed or listed.
+- [x] The maintainer approves [decision 0022](decisions/0022-frontend-stack.md)'s dependencies (2026-10-04; installed on `feat/ui-app`).
+- [x] The build: a static bundle in `dist/ui/`, served by `magpie ui`, with a bundle-size check (at most 200 kB gzipped).
+- [x] The layout and components from `DESIGN.md`: three panes, the command palette, dark and light themes.
+- [x] Inbox review, search, the note view, add and import, read-only settings, and the "Check a package" box ([UI](ui.md), "Screens and flows").
+- [x] Every state, the keyboard map and the accessibility rules ([UI](ui.md), "States", "Accessibility").
+- [x] End-to-end tests with `@playwright/test` in one CI job, Chromium only; screenshots in light and dark for the pull request.
+- [x] Before the pull request: `web-design-guidelines` and `writing-guidelines` passes, findings fixed or listed.
 
-**Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI.
+**Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI. (On `feat/ui-app`, 2026-10-06, Windows dev machine: the inbox review end-to-end test reviews a note by keyboard in under a second of test time; first render with 2,000 notes 417 ms with a warm cache, 944 ms cold; the bundle 91.8 kB gzipped. CI runs the end-to-end flows in the "App build and end-to-end tests" job; not yet seen green in CI.)
 
 ### `magpie suggest`
 - [ ] Input: a project's manifests and README, or a free-text description.

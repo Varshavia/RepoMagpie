@@ -8,7 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `magpie ui` starts a local server on `127.0.0.1` and opens your journals in the browser. For now it shows a placeholder page that lists your notes; the full app follows. The server reads and writes notes through the same code as the CLI, and its API returns the same JSON as `--json`. It answers only requests with the session token from the printed URL, refuses writes from other pages, never sends `GITHUB_TOKEN` to the browser, and reports notes changed in another editor. Flags: `--port`, `--no-open`, `--json`. Ctrl+C stops it.
+- `magpie ui` starts a local server on `127.0.0.1` and opens your journals in the browser. The server reads and writes notes through the same code as the CLI, and its API returns the same JSON as `--json`. It answers only requests with the session token from the printed URL, refuses writes from other pages, never sends `GITHUB_TOKEN` to the browser, and reports notes changed in another editor. Flags: `--port`, `--no-open`, `--json`. Ctrl+C stops it.
+- The local app in `magpie ui`, dark or light, keyboard first:
+  - **Inbox review:** press Enter, write the Verdict, press Ctrl+Enter; the next inbox note opens. Kind, tags, tried and rating sit next to the Verdict, with "What it does" and "Use when" above it.
+  - **Note view:** the Verdict first, then Use when and Avoid when. Accept or edit drafts, edit sections, and open the note in your editor or Obsidian.
+  - **Search:** with filters for journal, status, kind and tag. A command palette on Ctrl/Cmd+K finds notes and runs every action.
+  - **Add and Import:** preview a note before you save it; check import lines before you import them.
+  - **Check a package:** shows what the Claude Code hook would say before an install.
+  - **Settings:** the journals, whether `GITHUB_TOKEN` is set, the version and the theme.
+  - **Safe edits:** a note changed in another editor shows a banner with "Reload", and your unsaved text stays; nothing is overwritten.
+- "Edit tag list" opens the journal's `tags.md` in your editor.
+- A third cache, `<journal>/.cache/note-list.json`, keeps the app's note list fast: 2,000 notes load in about 40 ms instead of 500 ms.
 
 - `magpie --version` and `magpie --help`. Help lists the v0.1 commands (`note`, `import`, `search`, `recall`, `ui`, `suggest`, `adopt`, `init`); `suggest`, `adopt` and `init` are not implemented yet.
 - `magpie search <query>` searches both journals, with prefix and fuzzy matching. Each completed skill line is its own result. Results lead with the Verdict, say which journal they came from, and put reviewed notes before inbox ones. In a terminal the Verdict gets its own wrapped lines and is never cut. Flags: `--tag` (repeatable), `--kind`, `--journal`, `--limit`, `--json`.
