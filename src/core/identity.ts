@@ -34,7 +34,8 @@ export function resolveTarget(input: string, options: { manifests?: Manifest[]; 
   const text = input.trim();
   if (text.startsWith("pkg:")) return fromPurl(text);
   if (/^https?:\/\//i.test(text)) return fromUrl(text);
-  if (!/^(@[^\s/@]+\/)?[^\s/@][^\s/]*$/.test(text)) return { kind: "rejected", reason: UNSUPPORTED };
+  // No v0.1 registry allows \, : or % in a name, or a leading dot, so paths are never names.
+  if (!/^(@[^\s/@\\:%]+\/)?[^\s/@.\\:%][^\s/\\:%]*$/.test(text)) return { kind: "rejected", reason: UNSUPPORTED };
 
   const candidates = [...new Set((options.manifests ?? []).map((m) => MANIFEST_TYPES[m]))];
   const type = options.type ?? (candidates.length === 1 ? candidates[0] : undefined);
