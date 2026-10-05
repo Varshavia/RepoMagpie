@@ -3,7 +3,7 @@
 // (token exchange or cookie), the route and method, then for writes the Origin, the X-Magpie-Token
 // header, the content type and the body size. Then api.ts calls core. No CORS headers, ever.
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join } from "node:path";
@@ -18,7 +18,7 @@ export interface ServerOptions {
   port?: number; // 0 or none: a free port chosen by the operating system
   open: (path: string) => Promise<void>; // opens a note in the default editor (POST /api/open)
   log: (line: string) => void; // details of unexpected errors, for the terminal
-  assets?: string; // the app's folder; default ui/placeholder/
+  assets?: string; // the app's folder; default dist/ui/ (npm run build)
   live?: LiveOptions & { keepAliveMs?: number };
 }
 
@@ -33,7 +33,9 @@ export interface UiServer {
 const HOST = "127.0.0.1";
 const MAX_BODY = 1024 * 1024;
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-const DEFAULT_ASSETS = fileURLToPath(new URL("../../ui/placeholder/", import.meta.url));
+// dist/ui/ from both src/server/ (run from source) and dist/server/ (the package).
+const DEFAULT_ASSETS = fileURLToPath(new URL("../../dist/ui/", import.meta.url));
+const NOT_BUILT = "The app isn't built. Run npm run build, then start magpie ui again.";
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -85,7 +87,7 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
 
     if (path === "/" || path.startsWith("/assets/")) {
       const file = path === "/" ? assets.get("index.html") : assets.get(path.slice("/assets/".length));
-      if (!file) return json(res, 404, { error: "Not found." });
+      if (!file) return json(res, 404, { error: assets.size ? "Not found." : NOT_BUILT });
       if (method !== "GET") return notAllowed(res, ["GET"]);
       // The page gets the token for the X-Magpie-Token header, only with the session cookie.
       const body = path === "/" ? Buffer.from(file.body.toString("utf8").replace(TOKEN_META, `<meta name="magpie-token" content="${token}">`)) : file.body;
@@ -210,9 +212,11 @@ function readBody(req: IncomingMessage): Promise<Buffer | null> {
 }
 
 // The app's files, listed once at startup: the only files the server ever serves. A request names
-// one of them exactly or gets 404; its path is never joined to a folder.
+// one of them exactly or gets 404; its path is never joined to a folder. No folder (the app isn't
+// built, when run from source): no files; the API still works.
 function loadAssets(folder: string): Map<string, { body: Buffer; type: string }> {
   const files = new Map<string, { body: Buffer; type: string }>();
+  if (!existsSync(folder)) return files;
   for (const entry of readdirSync(folder, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const full = join(entry.parentPath, entry.name);
