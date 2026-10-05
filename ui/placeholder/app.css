@@ -1,0 +1,58 @@
+/* The placeholder page, with a few DESIGN.md tokens. Dark first; light under prefers-color-scheme. */
+:root {
+  --canvas: #0E1012;
+  --surface-1: #15181B;
+  --hairline: #2A3036;
+  --border-input: #5F6973;
+  --ink: #E6E8EB;
+  --ink-muted: #A8AFB7;
+  --accent-text: #5FD6C4;
+  --focus: #5FD6C4;
+  --warning: #E2B54A;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --canvas: #FAFAF9;
+    --surface-1: #F2F3F4;
+    --hairline: #DADDE1;
+    --border-input: #7D868F;
+    --ink: #15181B;
+    --ink-muted: #4A525A;
+    --accent-text: #0A6E63;
+    --focus: #0A6E63;
+    --warning: #875700;
+    color-scheme: light;
+  }
+}
+
+body {
+  margin: 0 auto;
+  max-width: 48rem;
+  padding: 2rem 1rem;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+h1 { font-size: 20px; margin: 0; color: var(--accent-text); }
+h2 { font-size: 15px; margin: 2rem 0 0.5rem; }
+p, .status { color: var(--ink-muted); }
+code, pre, dd, input { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+dt { color: var(--ink-muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+
+ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+li { display: flex; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--hairline); }
+.name { font-weight: 600; min-width: 12rem; }
+.label { color: var(--warning); }
+
+input { background: var(--surface-1); color: var(--ink); border: 1px solid var(--border-input); border-radius: 6px; padding: 0.4rem 0.5rem; width: 20rem; }
+button { background: var(--surface-1); color: var(--ink); border: 1px solid var(--border-input); border-radius: 6px; padding: 0.4rem 0.8rem; font: inherit; }
+label { display: block; margin-bottom: 0.25rem; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+pre { background: var(--surface-1); padding: 0.75rem; border-radius: 6px; overflow: auto; }
+pre:empty { display: none; }
