@@ -1,0 +1,285 @@
+// magpie note and magpie import (spec §2): the journal to write to, and saving one item (find the
+// note, fetch GitHub metadata, capture, write). Each run returns its --json document, which the CLI
+// prints and the local app's API returns as is (decision 0023). Writes notes; never prints.
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { captureNote, type Capture } from "./capture.ts";
+import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
+import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
+import { parseImport } from "./import.ts";
+import {
+  createJournal,
+  findManifests,
+  findProjectJournal,
+  findProjectRoot,
+  homeJournal,
+  journalTagList,
+  listNotes,
+  noteFor,
+  resolvePersonalJournal,
+  samePath,
+  type NoteEntry,
+  type Place,
+} from "./journals.ts";
+import { readNote } from "./note.ts";
+import type { Outcome } from "./outcome.ts";
+
+// Where the journals are, plus what a write needs from the outside world.
+export interface Context extends Place {
+  fetch: Fetch;
+  today: () => string; // YYYY-MM-DD, local time
+}
+
+export interface Journal {
+  path: string;
+  scope: "personal" | "project";
+  warnings: string[];
+  error: string | null; // set when this journal can't be used; nothing may be written to it
+}
+
+// The journal to write to (spec §3). A project journal that doesn't exist yet is created on the
+// first write, at the git root or in the working directory (spec §2 note step 5). The personal
+// journal's folder is never taken as the project journal, nor as its project root.
+export function locateJournal(scope: Journal["scope"], place: Place): Journal {
+  const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
+  if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings, error: null };
+  const found = findProjectJournal({ cwd: place.cwd, home: place.home, personalJournal: personal.path, flag: place.projectFlag });
+  const path = found ?? join(findProjectRoot(place.cwd, place.home), ".magpie");
+  const hint = "Run this inside a project, or pass --project <dir>.";
+  const error = samePath(path, personal.path) || samePath(dirname(path), personal.path)
+    ? `${path} is your personal journal, so it can't be the project journal. ${hint}`
+    : samePath(path, homeJournal(place.home))
+      ? `${path} is reserved for the default personal journal, so it can't be the project journal. ${hint}`
+      : null;
+  return { path, scope, warnings: personal.warnings, error };
+}
+
+export interface Item {
+  purl: string;
+  source: string;
+  skillPath?: string;
+  verdict?: string;
+  useWhen?: string[];
+  avoidWhen?: string[];
+  myNotes?: string;
+}
+
+export interface ItemResult {
+  id: string;
+  path: string | null;
+  result: Capture["result"];
+  name: string | null;
+  status: Capture["status"];
+  error: string | null;
+  warnings: string[];
+  notices: string[]; // things done on the way, such as creating the project journal
+  text: string | null; // the note's text after this item (written, or what a dry run would write); null when failed
+}
+
+// Creates or updates the note for one item. `notes` is the journal's note list; a new note is
+// added to it, so a later item can find it. With `dryRun`, nothing is written: the text that
+// would have been written is kept in `notes`, so later items see the same state as a real run.
+export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, context: Context, dryRun = false): Promise<ItemResult> {
+  const entry = noteFor(notes, item.purl);
+  const path = entry?.path ?? join(journal.path, "notes", fileNameFor(item.purl));
+  const warnings: string[] = [];
+  const notices: string[] = [];
+  const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
+    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null });
+
+  const atPath = notes.find((note) => note.path === path);
+  if (!entry && (atPath || existsSync(path))) {
+    return fail(fileNameClash(item.purl, atPath?.id) ?? `${path} has no readable id, so it was left unchanged.`, path);
+  }
+  const existing = entry ? (entry.text ?? readFileSync(entry.path, "utf8")) : null;
+
+  let metadata: RepoMetadata | null = null;
+  const verdictTaken = existing !== null && Boolean(item.verdict?.trim()) && readNote(existing).verdict !== "";
+  if (item.purl.startsWith("pkg:github/") && !verdictTaken) {
+    const fetched = await fetchRepository(item.purl, { fetch: context.fetch, token: context.env.GITHUB_TOKEN || undefined });
+    if (fetched.ok) {
+      metadata = fetched.metadata;
+      warnings.push(...fetched.warnings);
+    } else if (fetched.problem.kind === "not-found" || fetched.problem.kind === "auth") {
+      return fail(fetched.problem.message, entry?.path ?? null);
+    } else {
+      warnings.push(`Couldn't fetch GitHub metadata: ${fetched.problem.message} ${existing ? "The note's GitHub fields were not refreshed." : "The note was saved without it."}`);
+    }
+  }
+
+  const capture = captureNote(existing, { ...item, metadata, today: context.today(), tagList: journalTagList(journal.path) });
+  warnings.push(...capture.warnings);
+  if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
+  if (capture.text !== null && dryRun) {
+    if (entry) entry.text = capture.text;
+    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text: capture.text });
+  } else if (capture.text !== null) {
+    try {
+      if (createJournal(journal.path, journal.scope) && journal.scope === "project") notices.push(`Created the project journal: ${journal.path}`);
+      writeFileSync(path, capture.text);
+    } catch (error) {
+      return fail(`Couldn't write ${path}: ${(error as Error).message}`, null);
+    }
+    if (!entry) notes.push({ path, id: item.purl, packages: metadata?.packages ?? [] });
+  }
+  return {
+    id: entry?.id ?? item.purl,
+    path,
+    result: capture.result,
+    name: capture.name,
+    status: capture.status,
+    error: null,
+    warnings,
+    notices,
+    text: capture.text ?? existing,
+  };
+}
+
+export type Resolved = { ok: true; purl: string; skillPath?: string } | { ok: false; error: string };
+
+// Spec §4: a bare name is typed by the nearest manifests, by --type, or by `ask` (a prompt in a
+// terminal). Without `ask`, an ambiguous name fails with a hint to add --type.
+export async function resolveInput(target: string, type: PackageType | undefined, cwd: string, ask?: (question: string) => Promise<string>): Promise<Resolved> {
+  const bare = !/^(pkg:|https?:\/\/)/i.test(target.trim());
+  if (type && !bare) return { ok: false, error: "--type only applies to a bare package name." };
+  let resolution = resolveTarget(target, { manifests: bare ? findManifests(cwd) : [], type });
+  if (resolution.kind === "ambiguous") {
+    const choices: PackageType[] = resolution.candidates.length ? resolution.candidates : ["npm", "pypi", "cargo"];
+    if (!ask) return { ok: false, error: `${target} could be ${choices.join(", ")}. Add --type ${choices.join("|")}.` };
+    const answer = (await ask(`Which package type is ${target}? (${choices.join(", ")}) `)).trim() as PackageType;
+    if (!choices.includes(answer)) return { ok: false, error: `Not one of ${choices.join(", ")}: ${answer || "(nothing)"}.` };
+    resolution = resolveTarget(target, { type: answer });
+  }
+  if (resolution.kind === "rejected") return { ok: false, error: resolution.reason };
+  if (resolution.kind === "ambiguous") return { ok: false, error: `Add --type for ${target}.` };
+  return { ok: true, purl: resolution.purl, skillPath: resolution.skillPath };
+}
+
+export interface NoteRequest {
+  target: string;
+  text?: string;
+  type?: PackageType;
+  to: Journal["scope"];
+}
+
+// The --json document of magpie note (spec §2).
+export interface NoteJson {
+  id: string | null;
+  journal: Journal["scope"];
+  path: string | null;
+  created: boolean;
+  status: Capture["status"];
+  warnings: string[];
+  error?: string;
+}
+
+export interface NoteRun {
+  outcome: Outcome;
+  document: NoteJson;
+  journal: Journal;
+  saved: ItemResult | null; // null when the command stopped before saving
+}
+
+// magpie note <name-or-url> ["text"]: resolve the target, then save it in the journal.
+export async function runNote(request: NoteRequest, context: Context, ask?: (question: string) => Promise<string>): Promise<NoteRun> {
+  const journal = locateJournal(request.to, context);
+  const stop = (error: string, outcome: Outcome): NoteRun => ({
+    outcome,
+    journal,
+    saved: null,
+    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, error },
+  });
+  if (journal.error) return stop(journal.error, "failed");
+  const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
+  if (!resolved.ok) return stop(resolved.error, "usage");
+
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text };
+  const saved = await saveItem(journal, listNotes(journal.path), item, context);
+  const document: NoteJson = {
+    id: saved.id,
+    journal: journal.scope,
+    path: saved.path,
+    created: saved.result === "created",
+    status: saved.status,
+    warnings: [...journal.warnings, ...saved.notices, ...saved.warnings],
+  };
+  if (saved.error !== null) document.error = saved.error;
+  return { outcome: saved.error === null ? "ok" : "failed", document, journal, saved };
+}
+
+export interface ImportRequest {
+  text: string; // the import file's contents
+  to: Journal["scope"];
+  dryRun?: boolean;
+}
+
+export interface LineResult {
+  line: number;
+  target: string;
+  id: string | null;
+  result: Capture["result"];
+  error: string | null;
+  warnings: string[];
+}
+
+// The --json document of magpie import (spec §2).
+export interface ImportJson {
+  items: { line: number; id: string | null; result: Capture["result"]; error: string | null; warnings: string[] }[];
+  created: number;
+  updated: number;
+  failed: number;
+  error?: string;
+}
+
+export interface ImportRun {
+  outcome: Outcome;
+  document: ImportJson;
+  journal: Journal;
+  results: LineResult[];
+  notices: string[];
+}
+
+export function importFailure(error: string): ImportJson {
+  return { items: [], created: 0, updated: 0, failed: 0, error };
+}
+
+// magpie import: one item per "- " line. One bad line never stops the rest; import never prompts.
+export async function runImport(request: ImportRequest, context: Context): Promise<ImportRun> {
+  const journal = locateJournal(request.to, context);
+  if (journal.error) return { outcome: "failed", document: importFailure(journal.error), journal, results: [], notices: [] };
+
+  const notes = listNotes(journal.path);
+  const manifests = findManifests(context.cwd);
+  const notices = new Set<string>();
+  const results: LineResult[] = [];
+  for (const item of parseImport(request.text)) {
+    const failed = (error: string, id: string | null = null): LineResult => ({ line: item.line, target: item.target, id, result: "failed", error, warnings: [] });
+    if (item.error) {
+      results.push(failed(item.error));
+      continue;
+    }
+    const resolution = resolveTarget(item.target, { manifests });
+    if (resolution.kind === "ambiguous") {
+      const types: PackageType[] = resolution.candidates.length ? resolution.candidates : ["npm", "pypi", "cargo"];
+      results.push(failed(`${item.target} could be ${types.join(", ")}; write a PURL instead, such as pkg:${types[0]}/${item.target}.`));
+      continue;
+    }
+    if (resolution.kind === "rejected") {
+      results.push(failed(resolution.reason));
+      continue;
+    }
+    const { useWhen, avoidWhen, verdict, myNotes } = item;
+    const saved = await saveItem(journal, notes, { purl: resolution.purl, skillPath: resolution.skillPath, source: item.target, verdict, useWhen, avoidWhen, myNotes }, context, request.dryRun);
+    for (const notice of saved.notices) notices.add(notice);
+    results.push({ line: item.line, target: item.target, id: saved.id, result: saved.result, error: saved.error, warnings: saved.warnings });
+  }
+
+  const count = (result: Capture["result"]) => results.filter((r) => r.result === result).length;
+  const document: ImportJson = {
+    items: results.map(({ line, id, result, error, warnings }) => ({ line, id, result, error, warnings })),
+    created: count("created"),
+    updated: count("updated"),
+    failed: count("failed"),
+  };
+  return { outcome: count("failed") ? "failed" : "ok", document, journal, results, notices: [...notices] };
+}

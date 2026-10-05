@@ -1,8 +1,7 @@
-// magpie search <query> (spec §2, §5, §8): keyword search across both journals.
-import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath } from "../core/journals.ts";
-import { searchJournals, type JournalSource, type SearchResult } from "../core/search.ts";
-import { loadIndex } from "../core/search-index.ts";
-import type { GlobalOptions } from "./note.ts";
+// magpie search <query> (spec §2, §5, §8): the human output of core's runSearch.
+import { exitCode } from "../core/outcome.ts";
+import { runSearch, type JournalSource, type SearchResult } from "../core/search.ts";
+import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface SearchOptions extends GlobalOptions {
@@ -13,35 +12,23 @@ export interface SearchOptions extends GlobalOptions {
 }
 
 export async function searchCommand(query: string, options: SearchOptions, io: Io): Promise<number> {
-  const json = Boolean(options.json);
-  if (!query.trim()) {
-    const error = "Give a search query, for example: magpie search pdf";
-    if (json) io.out(`${JSON.stringify({ query, results: [], error })}\n`);
-    else io.err(`magpie search: ${error}\n`);
-    return 2;
+  const run = runSearch({ query, tags: options.tag, kind: options.kind, journal: options.journal, limit: options.limit }, contextOf(io, options));
+  if (options.json) {
+    io.out(`${JSON.stringify(run.document)}\n`);
+    return exitCode(run.outcome);
   }
-
-  const personal = resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home });
-  const project = findProjectJournal({ cwd: io.cwd, home: io.home, personalJournal: personal.path, flag: options.project });
-  const sources: JournalSource[] = [];
-  if (options.journal !== "project") sources.push({ scope: "personal", path: personal.path, index: loadIndex(personal.path).index });
-  if (options.journal !== "personal" && project && !samePath(project, personal.path) && !samePath(project, homeJournal(io.home))) {
-    sources.push({ scope: "project", path: project, index: loadIndex(project).index });
+  if (run.document.error) {
+    io.err(`magpie search: ${run.document.error}\n`);
+    return exitCode(run.outcome);
   }
-  const all = searchJournals(sources, query, { limit: Infinity, tags: options.tag, kind: options.kind });
-  const results = all.slice(0, options.limit);
-
-  if (json) {
-    io.out(`${JSON.stringify({ query, results })}\n`);
-    return 0;
-  }
-  for (const warning of personal.warnings) io.err(`warning: ${warning}\n`);
+  const { results } = run.document;
+  for (const warning of run.warnings) io.err(`warning: ${warning}\n`);
   if (!results.length) {
     io.err(`No matches for "${query}".\n`);
     return 0;
   }
   for (const line of render(results, io)) io.out(`${line}\n`);
-  if (all.length > results.length) io.err(`${results.length} of ${all.length} results. Use --limit to see more.\n`);
+  if (run.total > results.length) io.err(`${results.length} of ${run.total} results. Use --limit to see more.\n`);
   return 0;
 }
 

@@ -1,7 +1,9 @@
 // magpie search across journals (spec §2, §3, §5): filters, ranking and the result shape.
-// Pure over the loaded indexes; never prints.
+// searchJournals is pure over the loaded indexes; runSearch opens them. Never prints.
 import { join } from "node:path";
-import type { JournalIndex, SearchDoc } from "./search-index.ts";
+import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
+import type { Outcome } from "./outcome.ts";
+import { loadIndex, type JournalIndex, type SearchDoc } from "./search-index.ts";
 
 export interface JournalSource {
   scope: "personal" | "project";
@@ -68,4 +70,37 @@ export function searchJournals(sources: JournalSource[], query: string, filters:
     }
   }
   return ordered.slice(0, filters.limit);
+}
+
+export interface SearchRequest {
+  query: string;
+  tags?: string[];
+  kind?: string;
+  journal?: JournalSource["scope"]; // one journal only
+  limit: number;
+}
+
+export interface SearchRun {
+  outcome: Outcome;
+  document: { query: string; results: SearchResult[]; error?: string }; // the --json document (spec §2)
+  total: number; // results before the limit
+  warnings: string[];
+}
+
+// magpie search: both journals (or one), the project journal never being the personal journal's
+// folder nor the home directory's own .magpie (spec §3).
+export function runSearch(request: SearchRequest, place: Place): SearchRun {
+  const { query } = request;
+  if (!query.trim()) {
+    return { outcome: "usage", document: { query, results: [], error: "Give a search query, for example: magpie search pdf" }, total: 0, warnings: [] };
+  }
+  const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
+  const project = findProjectJournal({ cwd: place.cwd, home: place.home, personalJournal: personal.path, flag: place.projectFlag });
+  const sources: JournalSource[] = [];
+  if (request.journal !== "project") sources.push({ scope: "personal", path: personal.path, index: loadIndex(personal.path).index });
+  if (request.journal !== "personal" && project && !samePath(project, personal.path) && !samePath(project, homeJournal(place.home))) {
+    sources.push({ scope: "project", path: project, index: loadIndex(project).index });
+  }
+  const all = searchJournals(sources, query, { limit: Infinity, tags: request.tags, kind: request.kind });
+  return { outcome: "ok", document: { query, results: all.slice(0, request.limit) }, total: all.length, warnings: personal.warnings };
 }

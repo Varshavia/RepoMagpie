@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { hookOutput } from "../hook/claude-code.ts";
-import type { GlobalOptions } from "./note.ts";
+import type { GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface HookOptions extends GlobalOptions {
