@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { fakeFetch, recorded } from "./fixtures/fake-fetch.ts";
@@ -159,6 +159,33 @@ test("Note list filters: status, kind, and every tag", () => {
   assert.deepEqual(files({ tags: ["pdf"] }), ["npm--pdfkit.md"]);
   assert.deepEqual(files({ tags: ["pdf", "testing"] }), []);
   assert.deepEqual(noteListDocument("project", {}, s.context).document.notes.map((n) => n.id), ["pkg:npm/puppeteer"]);
+});
+
+test("Note list cache: .cache/note-list.json; unchanged notes come from it, changed and new notes from disk", () => {
+  const s = setup();
+  const first = noteListDocument("personal", {}, s.context).document;
+  const cacheFile = join(s.journal, ".cache", "note-list.json");
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: Record<string, unknown>; data: Record<string, { name: string | null }> };
+  assert.deepEqual(Object.keys(cache.data).sort(), first.notes.map((n) => n.file).sort());
+
+  // A summary for an unchanged file is taken from the cache, not read again (the planted name shows it).
+  cache.data["npm--pdfkit.md"] = { ...cache.data["npm--pdfkit.md"], name: "from the cache" };
+  writeFileSync(cacheFile, JSON.stringify(cache));
+  assert.equal(noteListDocument("personal", {}, s.context).document.notes.find((n) => n.file === "npm--pdfkit.md")?.name, "from the cache");
+
+  // A changed file is read again; a new one is read; a deleted one is gone.
+  writeFileSync(s.note("npm--pdfkit.md"), PDFKIT.replace("name: pdfkit", "name: pdfkit-renamed"));
+  writeFileSync(s.note("npm--puppeteer.md"), PUPPETEER);
+  rmSync(s.note("npm--broken.md"));
+  const next = noteListDocument("personal", {}, s.context).document;
+  assert.deepEqual(next.notes.map((n) => n.name), ["microsoft/playwright-cli", "pdfkit-renamed", "puppeteer"]);
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(cacheFile, "utf8")).data).sort(), ["github--microsoft--playwright-cli.md", "npm--pdfkit.md", "npm--puppeteer.md"]);
+
+  // Without the cache, or with one that can't be read, the same document.
+  writeFileSync(cacheFile, "{not json");
+  assert.deepEqual(noteListDocument("personal", {}, s.context).document, next);
+  rmSync(cacheFile);
+  assert.deepEqual(noteListDocument("personal", {}, s.context).document, next);
 });
 
 // --- Note ---

@@ -7,6 +7,7 @@ import { basename, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { journalTagList, listNotes, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
+import { noteSignature, readCacheEntries, writeCache } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
 import { packageVersion } from "./version.ts";
@@ -83,11 +84,33 @@ export interface NoteFilters {
 export function noteListDocument(scope: Scope, filters: NoteFilters, place: Place): Result<NoteListJson> {
   const journal = locateJournal(scope, place);
   if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], error: journal.error } };
-  const notes = noteFiles(journal.path)
-    .map((file) => summary(file, readNote(readFileSync(join(journal.path, "notes", file), "utf8"))))
+  const notes = summaries(journal.path)
     .filter((n) => (!filters.status || n.status === filters.status) && (!filters.kind || n.kind === filters.kind) && (filters.tags ?? []).every((tag) => n.tags.includes(tag)))
     .sort((a, b) => compare((a.name ?? a.file).toLowerCase(), (b.name ?? b.file).toLowerCase()) || compare(a.file, b.file));
   return { outcome: "ok", document: { journal: scope, count: notes.length, notes } };
+}
+
+// Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
+// and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
+const NOTE_LIST_CACHE = "note-list.json";
+const NOTE_LIST_VERSION = 1;
+
+function summaries(journal: string): NoteSummary[] {
+  const { files, signature } = noteSignature(journal);
+  const cached = readCacheEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION);
+  const data: Record<string, NoteSummary> = {};
+  let changed = !cached || Object.keys(cached.files).length !== files.length;
+  for (const file of files) {
+    const before = cached?.files[file];
+    const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
+    if (hit) data[file] = hit as NoteSummary;
+    else {
+      data[file] = summary(file, readNote(readFileSync(join(journal, "notes", file), "utf8")));
+      changed = true;
+    }
+  }
+  if (changed && files.length) writeCache(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, signature, data);
+  return files.map((file) => data[file]);
 }
 
 function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {
@@ -136,6 +159,14 @@ export function locateNote(scope: Scope, address: NoteAddress, place: Place): { 
   if ("id" in address) return { journal, path: listNotes(journal.path).find((entry) => entry.id === address.id)?.path ?? null };
   const file = noteFiles(journal.path).find((name) => name === address.file);
   return { journal, path: file ? join(journal.path, "notes", file) : null };
+}
+
+// The journal's tags.md, when it exists ("Edit tag list" in the app opens it).
+export function tagListPath(scope: Scope, place: Place): string | null {
+  const journal = locateJournal(scope, place);
+  if (journal.error) return null;
+  const path = join(journal.path, "tags.md");
+  return existsSync(path) ? path : null;
 }
 
 export function noteDocument(scope: Scope, address: NoteAddress, place: Place): Result<NoteJson> {

@@ -35,6 +35,19 @@ export function readCache(journal: string, name: string, version: number, signat
   return undefined;
 }
 
+// The cached signature and per-file data, whatever the notes are now, for a cache whose entries are
+// reused file by file (the note list). Undefined when there is none, or it can't be read.
+export function readCacheEntries(journal: string, name: string, version: number): { files: Signature; data: Record<string, unknown> } | undefined {
+  try {
+    const cached = JSON.parse(readFileSync(join(journal, ".cache", name), "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
+    const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+    if (cached?.version === version && isObject(cached.files) && isObject(cached.data)) return { files: cached.files as Signature, data: cached.data };
+  } catch {
+    // No cache, or one that can't be read.
+  }
+  return undefined;
+}
+
 // Writes the cache whole, then renames it into place, so a reader never sees half a file.
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
   try {
