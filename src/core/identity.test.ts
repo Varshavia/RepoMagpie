@@ -66,6 +66,14 @@ const REJECTED = [
   "pkg:maven/org.apache/commons",
   "notes/loose-file.md",
   "",
+  // Paths and encoded paths are never package names: no v0.1 registry allows \, : or %, or a
+  // leading dot.
+  "..\\secret.md",
+  "C:\\Windows\\win.ini",
+  "C:secret.md",
+  "%2e%2e%2fsecret.md",
+  "..",
+  ".hidden",
 ];
 
 for (const input of REJECTED) {
