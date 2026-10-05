@@ -1,6 +1,6 @@
 # Architecture
 
-How RepoMagpie fits together. Nothing is built yet; v0.1 is built from the [spec](spec.md). Terms are defined in the [glossary](glossary.md).
+How RepoMagpie fits together. v0.1 is being built from the [spec](spec.md); the [roadmap](roadmap.md) says which parts exist. Terms are defined in the [glossary](glossary.md).
 
 ## Layers
 
@@ -45,10 +45,15 @@ src/
                match: suggest rules
                github: repository metadata and SKILL.md detection
                capture: what note and import write for one item
+               save: the journal to write to, saving one item; note and import runs with their --json documents
+               documents: the shared JSON documents (Settings, Tag list, Note list, Note, Note preview) and editing a note
+               edit: a person's edit of one note, checked and applied all or nothing; note versions (sha256)
+               outcome: how a run ended, as an exit code (CLI) or an HTTP status (server)
   cli/         one module per command, loaded only when it runs; human and --json output
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
-  server/      magpie ui: node:http only; security checks, routes, live updates (fs.watch + SSE)
-ui/            the local app's source (stack proposed in decision 0022); built into dist/ui/
+  server/      magpie ui, node:http only: server (security checks, routing, events stream), api (endpoints →
+               core), live (fs.watch + signature check), open (the platform's open command)
+ui/            the local app's source (decision 0022), built into dist/ui/; until then placeholder/, a static page
 skill/
   SKILL.md     no code
 scripts/       the test runner with the ~/.magpie canary, benchmarks, the link check; not part of the package
@@ -56,7 +61,7 @@ scripts/       the test runner with the ~/.magpie canary, benchmarks, the link c
 
 Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's end-to-end tests will use `@playwright/test` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
 
-`cli/`, `hook/` and `server/` import from `core/` only. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API.
+`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API.
 
 ### Future components
 

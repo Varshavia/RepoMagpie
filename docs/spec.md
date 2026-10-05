@@ -2,7 +2,7 @@
 
 What `magpie` v0.1 does, command by command. It turns the [roadmap](roadmap.md)'s step 2 decisions (0015–0020) into behaviour that can be built and tested. The note format is in the [note schema](note-schema.md); terms are in the [glossary](glossary.md).
 
-Nothing here is built yet. v0.1 is implemented on `feat/...` branches ([decision 0012](decisions/0012-branch-workflow.md)).
+v0.1 is implemented on `feat/...` branches; the [roadmap](roadmap.md) says which commands exist ([decision 0012](decisions/0012-branch-workflow.md)).
 
 ## 1. Conventions
 
@@ -163,11 +163,11 @@ Starts the local app: a server on `127.0.0.1` that serves the app and a JSON API
 | `--no-open` | Don't open the browser; only print the URL |
 
 1. Listen on `127.0.0.1` only. A port in use is an error that names the port (exit 1); a port that isn't a number from 1 to 65535 is a usage error (exit 2).
-2. Print the URL, with the session token, on stdout: `http://127.0.0.1:<port>/?token=<token>`.
-3. Open the default browser unless `--no-open`. If that fails, say so on stderr; the printed URL still works.
+2. Print the URL, with the session token, on stdout: `http://127.0.0.1:<port>/?token=<token>`; then `Press Ctrl+C to stop.` on stderr.
+3. Open the default browser unless `--no-open`. If that fails, say so on stderr (`Couldn't open the browser: <reason>. Open the URL above yourself.`); the printed URL still works.
 4. Run until Ctrl+C (SIGINT) or SIGTERM, then close the watchers and the server, and exit 0.
 
-`--json`: once the server listens, `{"url": "http://127.0.0.1:<port>/?token=<token>", "port": 4321}`, then it runs as without `--json`.
+`--json`: once the server listens, `{"url": "http://127.0.0.1:<port>/?token=<token>", "port": 4321}`, then it runs as without `--json`. If the server can't start: `{"url": null, "port": 4321, "error": "port 4321 is in use. ..."}`, exit 1.
 
 ### Shared JSON documents
 
@@ -217,7 +217,15 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 - `frontmatter` holds the fields as written, unknown ones included. `status` and `verdict` are derived from the Verdict (schema rule 1), whatever the `status` field says.
 - `sections` keeps the file's order. `name` is the canonical section name, or `null` for a section the schema doesn't know; `body` is as written, comments included; `draft` is true when the body starts with the draft marker (schema rule 3).
 - `skills` lists the lines under "Notable skills"; `text` is `""` for an empty skill line (schema rule 4).
-- `read_only` is true when the frontmatter can't be read. `id` is then `null`, and `warnings` says why. The app shows such a note read-only, addressed by its `file` name (see [UI](ui.md), "API").
+- `read_only` is true when the frontmatter can't be read or has no `id`. `id` is then `null`, and `warnings` says why. The app shows such a note read-only, addressed by its `file` name (see [UI](ui.md), "API"). The Note list's `read_only` follows the same rule.
+
+**Editing a note.** The app's edit of one note ([decision 0023](decisions/0023-api-is-the-json-contract.md)) is `{"journal", "id", "version", "verdict"?, "sections"?, "fields"?, "accept_drafts"?}`. All edits are applied, or none:
+- `version` must be the file's current version (`sha256:<hex>` of its bytes); otherwise nothing is written, and the answer is the Note document as the file is now, plus `"error"`.
+- `verdict`: one line. It fills an empty Verdict as `magpie note` does (comments in the section stay); otherwise it replaces the section's body. `""` clears it. `status` follows: `reviewed` with a Verdict, `inbox` without.
+- `sections`: `{"<section name>": "<body>"}` for the schema's sections except the Verdict. The body replaces the section's body, without blank lines around it, followed by one blank line before the next section. A drafted section loses its draft marker (schema rule 3), unless the body is unchanged. A missing section is inserted before the next section in schema order. A body can't hold a `## ` heading.
+- `fields`: `kind` (one of the schema's kinds), `tags` (lowercase kebab-case), `tried` (true or false), `rating` (1 to 5, or `null`). A block list stays a block list. Any other key, `status` and the tool-owned fields included, is refused.
+- `accept_drafts`: section names whose draft marker is removed; the text stays.
+- The answer is the Note document after the edit. Everything outside the edited parts stays byte for byte.
 
 **Note preview.** What `magpie note <target>` would write, without writing anything. For a GitHub URL it fetches the metadata, read-only.
 
@@ -231,6 +239,7 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 
 - `exists` is true when the journal already has a note for that PURL (schema rule 6); `verdict` is then that note's Verdict, or `""` when it is empty, so the app can say "This note already has a Verdict" before the person writes one.
 - `what_it_does`, `kind` and `tags` are the drafts `note` would write (step 3 above). Without metadata (a registry name, or offline), the metadata fields are `null` or empty, and `warnings` says why.
+- For a note that exists, the fields show the note as `note <target>` would leave it (tool-owned fields refreshed). The preview runs the same steps as `note` without writing: a GitHub repository that doesn't exist, or a token GitHub rejects, is a failure, as for `note`.
 
 ## 3. The two journals
 
@@ -273,7 +282,7 @@ Every note's `id` is a Package URL ([decision 0017](decisions/0017-package-ident
 | A PURL | itself, without its version |
 | A bare name | typed by the nearest manifest: `package.json` → npm, `pyproject.toml` → pypi, `Cargo.toml` → cargo. More than one, or none: ask in a terminal; otherwise fail with exit 2 and suggest `--type` |
 
-Any other input (articles, gists, loose Markdown files) is rejected with exit 2 in v0.1.
+Any other input (articles, gists, loose Markdown files) is rejected with exit 2 in v0.1. A bare name never holds `\`, `:` or `%`, or starts with a dot (no v0.1 registry allows them), so a file path is never taken for a package name.
 
 **Case-only name clash:** Cargo names are case-sensitive, but note file names are lowercase (npm and PyPI PURLs are lowercased, so they can't clash). If the file for a new subject already holds a note with a different id (`pkg:cargo/Inflector` vs `pkg:cargo/inflector`), `note`, `import` and `adopt` refuse with an error that names both PURLs and the file, and exit 1 ([note schema](note-schema.md)).
 
@@ -359,6 +368,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 - `additionalContext` reaches the agent next to the tool's result; `systemMessage` is shown to the user; `permissionDecisionReason` is shown to the user in the permission prompt.
 - Each match is one line of `additionalContext` (and of `systemMessage`): the name, the Verdict (or `[inbox] no verdict yet`), "Avoid when" when the note has it, `(name match only)` for a name-only match, then the journal and path. A path in the home directory starts with `~`.
 - When a command installs several packages, one document covers them all. If any of them has an avoid note, the whole call asks, and the reason lists every avoid note first.
+- **Live test (2026-10-04):** in a Claude Code session with the hook installed, an install of a package with an avoid note prompted the user (`"ask"`), both in the default permission mode and in auto mode.
 - **Never denies:** the hook never returns `"deny"` and never exits with code 2. Its strongest answer is `"ask"`; the user decides. In an unattended `-p` run, Claude Code itself denies any call that would prompt, and the agent reads the reason (decision 0024).
 - **`--inform-only`:** `magpie hook claude-code --inform-only` never asks: avoid notes are reported like any other match. Use it for unattended `-p` runs, where an ask would stop the install.
 - **Fails open:** no note, an unparsable command, a missing journal, or any error means no output and exit 0. Errors go to a log file in the personal journal's `.cache/`, never to stdout.

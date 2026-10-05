@@ -2,7 +2,7 @@
 
 The local app is an Obsidian-inspired view of your journals in the browser, served from your own machine by `magpie ui`. It reads and writes the same Markdown notes as the CLI, through the same core. Decisions: [0021](decisions/0021-local-ui-server.md) (local server), [0022](decisions/0022-frontend-stack.md) (frontend stack), [0023](decisions/0023-api-is-the-json-contract.md) (the API is the `--json` contract). Visual language: [`DESIGN.md`](../DESIGN.md).
 
-Nothing here is built yet. The server is built on `feat/ui-server` (after `feat/recall`), the app on `feat/ui-app` ([roadmap](roadmap.md), v0.1, "Local app").
+The server (sections 2 to 6) is built on `feat/ui-server`. Until the app is built on `feat/ui-app` ([roadmap](roadmap.md), v0.1, "Local app"), `magpie ui` serves a placeholder page from `ui/placeholder/`: it lists both journals' notes through the API, follows live updates, and previews a note with a write request, which proves the session token flow.
 
 ## 1. Architecture
 
@@ -28,7 +28,7 @@ Code layout: `src/server/` (the HTTP layer) and `ui/` (the app's source); see [a
 
 1. Starts the server on `127.0.0.1`, on a free port chosen by the operating system, or on `--port`. A port in use is an error (exit 1) that names the port.
 2. Prints the URL, with the session token, on stdout.
-3. Opens the default browser with a platform command (`open` on macOS, `xdg-open` on Linux, `cmd /c start` on Windows; no dependency), unless `--no-open`. If that fails, it says so and the printed URL still works.
+3. Opens the default browser with a platform command (`open` on macOS, `xdg-open` on Linux, `cmd /c start` on Windows; no dependency), unless `--no-open`. If that fails, it says so and the printed URL still works. "Open in editor" (`POST /api/open`) uses the same commands. On Windows, cmd reads its own command line, so the target goes in double quotes, and a target holding `"` or `%` is refused with a message instead of being passed on.
 4. Runs until Ctrl+C, then stops the watchers and closes the server.
 
 Global flags (`--home`, `--project`) choose the journals, as for every command ([spec](spec.md), section 1).
@@ -42,7 +42,7 @@ Every rule here is required and has a test on `feat/ui-server` (section 11).
 | Listen on `127.0.0.1` only, never `0.0.0.0` or `::` | Nothing on the network can connect | The server's address is `127.0.0.1` |
 | A random session token per run (32 bytes from `node:crypto`), only in the opening URL | Another local process or web page can't guess it | Requests without the token or cookie get 401 |
 | The token is exchanged once for a cookie: `magpie_<port>=<token>; HttpOnly; SameSite=Strict; Path=/`, then a 303 redirect to `/` drops it from the address bar | Scripts can't read the cookie; the token leaves the URL and history | The exchange sets the cookie and redirects; a wrong token gets 401 |
-| Every API request needs the cookie; every write (`POST`, `PATCH`) also needs a matching `X-Magpie-Token` header | A cross-site form or link can't write: it can't set the header | A write with the cookie but no header gets 403 |
+| Every request except the token exchange needs the cookie: the page, its files and the API; every write (`POST`, `PATCH`) also needs a matching `X-Magpie-Token` header | A cross-site form or link can't write: it can't set the header | A write with the cookie but no header gets 403 |
 | **Host check:** `Host` must be `127.0.0.1:<port>` or `localhost:<port>` | Against DNS rebinding | Any other Host gets 403 |
 | **Origin check** on writes: `Origin` must be `http://127.0.0.1:<port>` or `http://localhost:<port>`; a missing Origin is refused | Pages on other local ports are "same-site" for cookies (ports don't count), so the origin is checked | Cross-origin and Origin-less writes get 403 |
 | **No CORS headers**, ever | Other origins can't read responses | No response has `Access-Control-*` |
@@ -81,6 +81,8 @@ The rules are [decision 0023](decisions/0023-api-is-the-json-contract.md)'s:
 - A note whose frontmatter can't be read is read-only, with a warning and "Open in editor".
 - **Conflicts:** every read returns `version` (`sha256:<hex>` of the file). Every write sends it back. If the file changed, the answer is 409 with the current version, nothing is written, and the app shows the conflict banner with "Reload".
 
+The exact rules for each kind of edit: [spec](spec.md), "Shared JSON documents", "Editing a note". Core: `setSection`, `setHumanFields` and `acceptDraft` in `src/core/write.ts`; `editNote` and `noteVersion` in `src/core/edit.ts`.
+
 ## 6. API
 
 All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, except `/api/events`. A failure returns the endpoint's success document plus `"error"` ([spec](spec.md), section 1); for endpoints without a success document, `{"error": "..."}`.
@@ -100,7 +102,12 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | POST | `/api/import` | `{"text", "to", "dry_run"}` | Exactly `magpie import --json` |
 | POST | `/api/open` | `{"journal", "id"}`, or `{"journal", "file"}` for a read-only note | `{"opened": true, "path": "..."}`: opens the note in the default editor |
 | GET | `/api/events` | | `text/event-stream`: `notes-changed` with `{"journal", "files": [...]}`; a comment every 30 s keeps the stream open |
-| GET | `/api/recall` | `?package=` (repeatable), `&type=` | Exactly `magpie recall --json` (once `feat/recall` exists) |
+| GET | `/api/recall` | `?package=` (repeatable), `&type=` | Exactly `magpie recall --json` |
+
+- `journal` is required where it is listed for a `GET`. In a `POST` body, `to` may be left out and means `personal`, as `--to` does on the CLI.
+- `POST /api/open` that can't start the editor answers 422 with `{"opened": false, "path": "...", "error": "..."}`.
+- `GET /api/events` starts with the comment `: connected`.
+- A 405 names the allowed methods in an `Allow` header. `HEAD` and `OPTIONS` are not supported.
 
 "Open the repository", "Open in Obsidian" and "Copy PURL" happen in the browser, from the note's fields; they need no endpoint. Obsidian is opened with `obsidian://open?path=<URI-encoded absolute path>` (section 12).
 
@@ -229,5 +236,4 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 ## 13. Open questions
 
 - **Graph tab.** The UI brief lists a graph tab for v0.2. [Ideas](ideas.md) (idea 10) and [product](product.md) keep graph views "marketing only, not scheduled", based on the desk research. Which holds?
-- **Dependencies.** [Decision 0022](decisions/0022-frontend-stack.md)'s packages need approval before `feat/ui-app`.
-- **Read-only notes by file name.** A note whose frontmatter can't be read has no `id`, so "Open in editor" addresses it by its `file` name, matched against core's listing of `notes/` (section 3). This goes one step beyond "notes are addressed by PURL". The alternative: such notes only show their path, with no open action.
+- **Read-only notes by file name.** A note whose frontmatter can't be read has no `id`, so "Open in editor" addresses it by its `file` name, matched against core's listing of `notes/` (section 3). This goes one step beyond "notes are addressed by PURL". The alternative: such notes only show their path, with no open action. Built as in section 3 on `feat/ui-server`, with a traversal test for every parameter; waiting for the maintainer's confirmation.
