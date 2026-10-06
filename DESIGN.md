@@ -437,6 +437,8 @@ Short and optional. State changes fade or slide in 120 ms (small) or 180 ms (pan
 
 One family: Phosphor, regular weight, 16 px in rows and buttons, 20 px in the sidebar, stroke-based outlines in `currentColor`. Shipped as inline SVG components with Phosphor's MIT licence notice ([decision 0022](docs/decisions/0022-frontend-stack.md)); no icon font, nothing drawn by hand. An icon never stands alone without a label or a tooltip.
 
+The logo is the one drawn graphic: a magpie in profile on a rounded `light-canvas` tile, in `light-ink` with a `light-canvas` flank, and the tail in `light-accent` (5:1 on the tile; `accent` would be under 2:1). The tile keeps it readable on light and dark pages and in a browser tab at 16 px. Files: [`docs/assets/logo.svg`](docs/assets/logo.svg) (also the app's favicon) and the social preview [`docs/assets/social-preview.png`](docs/assets/social-preview.png) (1280×640, on `canvas`).
+
 ## Writing
 
 The same rules as the CLI (CLAUDE.md, section 12): short sentences, active voice, concrete words, no marketing adjectives.
