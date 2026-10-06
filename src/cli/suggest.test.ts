@@ -34,14 +34,14 @@ test("candidates on stdout, Verdict first, then the in-use avoid group; the coun
 test("a description replaces the manifests' words", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["suggest", "run TypeScript directly"]);
-  assert.match(r.out, /^1  tsx\s+npm\s+personal\s+\[inbox\] no verdict yet  Why: matched run, typescript, directly\n/);
+  assert.match(r.out, /^1  tsx\s+npm\s+personal\s+\[inbox\] no verdict yet  Why: matched typescript, directly\n/);
 });
 
 test("the why line names the dependencies a note matched, then the other words", async () => {
   const box = sandbox({
     "journal/notes/github--microsoft--playwright-cli.md": note({ id: "pkg:github/microsoft/playwright-cli", name: "microsoft/playwright-cli", verdict: "lets my agent test a web app in a browser" }),
-    "journal/notes/npm--react.md": note({ id: "pkg:npm/react", verdict: "dashboards for an agent tool" }),
-    "project/package.json": JSON.stringify({ description: "An agent tool", devDependencies: { "@playwright/test": "*", "@types/node": "*" } }),
+    "journal/notes/npm--react.md": note({ id: "pkg:npm/react", verdict: "charts and dashboards for an agent" }),
+    "project/package.json": JSON.stringify({ description: "An agent dashboard with charts", devDependencies: { "@playwright/test": "*", "@types/node": "*" } }),
   });
   const r = await magpie(box, ["suggest"], { columns: 60, env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
   assert.equal(r.out, [
@@ -49,8 +49,8 @@ test("the why line names the dependencies a note matched, then the other words",
     "   Verdict: lets my agent test a web app in a browser",
     "   Why: dependency @playwright/test; matched agent",
     "2  react                     npm     personal",
-    "   Verdict: dashboards for an agent tool",
-    "   Why: matched agent, tool",
+    "   Verdict: charts and dashboards for an agent",
+    "   Why: matched agent, dashboard, charts",
     "",
   ].join("\n"));
 });

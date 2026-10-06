@@ -131,11 +131,19 @@ const STOP_WORDS = new Set(("a all also an and any are as at be but by can do fo
   "my no not of on only or our so that the their them then there these this to up us use used uses using via was we what when which while " +
   "who will with you your").split(" "));
 
-// The keywords of some texts: lowercase words, each once, in order; no stop words, no numbers.
-// Package names split into their words (@types/node → types, node).
+// Words common to almost any project's manifests and README, so they say nothing about this one:
+// as keywords they only bring coincidences (a README's "before it installs one", @types/*, *-js).
+const COMMON_WORDS = new Set(("about after again before both does each end every first get gets like make makes many most much new " +
+  "next one other out over own same see should some such than two very way well where why would " +
+  "app apps based build checkout code dependencies dependency easy fast file files install installed installing installs js " +
+  "library libraries lightweight modern package packages plugin plugins project projects run runs simple small support supports " +
+  "tool tools ts type types").split(" "));
+
+// The keywords of some texts: lowercase words, each once, in order; no stop words, no common words,
+// no numbers. Package names split into their words (@types/node → node).
 export function keywordsOf(texts: string[]): string[] {
   const words = texts.flatMap((text) => text.toLowerCase().split(/[^a-z0-9]+/));
-  return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !/^\d+$/.test(word)))];
+  return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
 }
 
 // A keyword as suggest looks it up: one trailing "s" dropped from words of four letters or more.

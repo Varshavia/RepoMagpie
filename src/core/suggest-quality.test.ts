@@ -53,8 +53,15 @@ test("RepoMagpie itself: the agent tools it uses, playwright-cli first through @
   const found = run.document.candidates.map((c) => c.id);
   assert.equal(found[0], "pkg:github/microsoft/playwright-cli", `order: ${found.join(", ")}`);
   assert.deepEqual(run.document.candidates[0].why.dependencies, ["@playwright/test"]);
-  for (const expected of ["pkg:github/vercel-labs/agent-skills", "pkg:github/multica-ai/andrej-karpathy-skills", "pkg:github/mattpocock/skills"]) {
+  // mattpocock/skills is not expected (since 2026-10-06): it matched RepoMagpie only through words
+  // any project has, "code" (code-review), "plugin" and "install" ("Install selectively"). With
+  // those left out it scores 0.05 of playwright-cli, under the cutoff; keywords can't tell it apart
+  // from other skill packs. magpie search still finds it.
+  for (const expected of ["pkg:github/vercel-labs/agent-skills", "pkg:github/multica-ai/andrej-karpathy-skills"]) {
     assert.ok(found.includes(expected), `${expected} missing: ${found.join(", ")}`);
   }
   assert.ok(!found.includes(LAKEHOUSE), `order: ${found.join(", ")}`);
+  // The why lines name what the project is about, not words any project has (2026-10-06).
+  const common = ["about", "code", "js", "installs", "before", "every", "one", "types", "plugin", "dependency", "dependencies"];
+  for (const c of run.document.candidates) assert.deepEqual(c.why.keywords.filter((k) => common.includes(k)), [], c.name);
 });

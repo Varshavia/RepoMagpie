@@ -197,8 +197,20 @@ test("nothing to go on: no manifest, no README and no description, or a descript
 });
 
 test("keywords: lowercase words, each once, without stop words and numbers; package names split into words", () => {
-  assert.deepEqual(keywordsOf(["A TypeScript CLI, with the tests", "@types/node", "react-dom 19", "CLI"]), ["typescript", "cli", "tests", "types", "node", "react", "dom"]);
+  assert.deepEqual(keywordsOf(["A TypeScript CLI, with the tests", "@types/node", "react-dom 19", "CLI"]), ["typescript", "cli", "tests", "node", "react", "dom"]);
   assert.deepEqual(keywordsOf(["Let an agent test all of it, and also just more"]), ["agent", "test"]);
+});
+
+test("keywords: words common to any project say nothing about this one and are left out", () => {
+  const readme = "Remembers what you learned about every dependency, and tells your coding agent before it installs one. Code for end-to-end tests.";
+  assert.deepEqual(keywordsOf([readme, "packageurl-js", "actions/checkout", "@vitejs/plugin-react", "@types/node"]),
+    ["remembers", "learned", "tells", "coding", "agent", "tests", "packageurl", "actions", "vitejs", "react", "node"]);
+});
+
+test("why: a common word in a note never shows as a match", () => {
+  const p = place({ "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: "about PDF code: installs fast" }) });
+  const run = runSuggest({ description: "PDF code about installs", limit: 5 }, { ...p, cwd: p.root });
+  assert.deepEqual(run.document.candidates.map((c) => c.why.keywords), [["pdf"]]);
 });
 
 test("one point per matching tag; a hyphenated tag matches when each of its words is a keyword", () => {
