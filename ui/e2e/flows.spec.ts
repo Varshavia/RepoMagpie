@@ -1,7 +1,7 @@
 // End-to-end flows of the local app (docs/ui.md §11) against magpie ui on a temporary journal:
 // inbox review, search, add, import, conflicts, live updates, the palette and the keyboard map.
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
 import { runSuggest } from "../../src/core/suggest.ts";
@@ -54,6 +54,18 @@ test("inbox review: kind, tags, tried and rating are saved with the Verdict", as
   expect(text).toMatch(/tags: \[agent-skills, code-understanding, testing\]/);
   expect(text).toMatch(/tried: true/);
   expect(text).toMatch(/rating: 4/);
+});
+
+test("note view: Tried and the rating under the title; nothing for a note neither tried nor rated", async ({ page, magpie }) => {
+  const file = magpie.note("github--egonex-ai--understand-anything.md");
+  writeFileSync(file, readFileSync(file, "utf8").replace("tried: false", "tried: true").replace(/^rating:.*$/m, "rating: 3"));
+  await magpie.open(page);
+  const inbox = page.getByRole("listbox", { name: "Inbox" });
+  await inbox.getByRole("option").filter({ hasText: "Understand-Anything" }).click();
+  await expect(page.locator(".note-head").getByText("Tried · rated 3 of 5")).toBeVisible();
+  await inbox.getByRole("option").filter({ hasNotText: "Understand-Anything" }).first().click();
+  await expect(page.locator(".note-head h2")).not.toHaveText("Egonex-AI/Understand-Anything");
+  await expect(page.locator(".note-head .note-tried")).toHaveCount(0);
 });
 
 test("search: / focuses the box, Verdicts first, Enter opens the note; the status filter applies", async ({ page, magpie }) => {
@@ -197,7 +209,7 @@ test("palette: Ctrl/Cmd+K finds a note and runs an action; ? shows the keyboard 
 });
 
 test("palette: a word finds what magpie search finds, by name and by tag, in its order", async ({ page, magpie }) => {
-  const { document } = runSearch({ query: "design", limit: 6 }, { home: magpie.root, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project });
+  const { document } = runSearch({ query: "design", limit: 6 }, { home: magpie.home, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project });
   const expected = document.results.map((r) => (r.type === "skill" ? `${r.skill} · ${r.name}` : r.name));
   expect(expected).toEqual(expect.arrayContaining(["VoltAgent/awesome-design-md", "Leonxlnx/taste-skill"])); // by name; tagged design
   await magpie.open(page);
@@ -321,9 +333,46 @@ test("the CSP holds: no violation while the app runs", async ({ page, magpie }) 
   expect(violations).toEqual([]);
 });
 
+test("paths under the home directory show with ~, as magpie recall prints them: note view, Check a package, Settings, Suggest", async ({ page, magpie }) => {
+  const shown = async () => page.locator("body").innerText();
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Render PDF invoices" }));
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await expect(page.getByRole("article").getByText(`~${sep}.magpie${sep}notes${sep}npm--pdfkit.md`)).toBeVisible();
+  expect(await shown()).not.toContain(magpie.home);
+
+  await page.getByRole("button", { name: "Check a package" }).click();
+  await page.getByLabel("Packages").fill("pdfkit puppeteer");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByText(`~${sep}.magpie${sep}notes${sep}npm--pdfkit.md`)).toBeVisible();
+  expect(await shown()).not.toContain(magpie.home);
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByText(`~${sep}.magpie`, { exact: true })).toBeVisible();
+  expect(await shown()).not.toContain(magpie.home);
+
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  await expect(page.getByText(/From the manifests and README in ~/)).toBeVisible();
+  expect(await shown()).not.toContain(magpie.home);
+});
+
+test("the favicon: the magpie mark, an SVG served by magpie ui", async ({ page, magpie }) => {
+  await magpie.open(page);
+  const href = await page.locator('link[rel="icon"]').getAttribute("href");
+  expect(href).toBeTruthy();
+  const icon = await page.evaluate(async (url) => {
+    const r = await fetch(url);
+    return { status: r.status, type: r.headers.get("content-type") ?? "", text: await r.text() };
+  }, href ?? "");
+  expect(icon.status).toBe(200);
+  expect(icon.type).toContain("image/svg+xml");
+  expect(icon.text).toContain("<title");
+});
+
 test("suggest: what magpie suggest finds for this project, in its order; the in-use avoid note apart; a description instead", async ({ page, magpie }) => {
   writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", dependencies: { pdfkit: "*" } }));
-  const place = { home: magpie.root, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project };
+  const place = { home: magpie.home, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project };
   const expected = runSuggest({ limit: 20 }, place).document;
   expect(expected.candidates.length).toBeGreaterThan(1);
   expect(expected.in_use_avoid.map((m) => m.id)).toEqual(["pkg:npm/pdfkit"]);
