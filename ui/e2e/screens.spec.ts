@@ -101,6 +101,7 @@ test("read-only note", async ({ page, magpie }) => {
 
 test("conflict", async ({ page, magpie }) => {
   await magpie.open(page);
+  await expect(page.getByRole("listbox", { name: "Inbox" }).getByRole("option").first()).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("textbox", { name: "Verdict" })).toBeFocused();
   await page.keyboard.type("my unsaved Verdict");
@@ -142,4 +143,29 @@ test("no tag list", async ({ page, magpie }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("article").getByRole("button", { name: "Create tag list" })).toBeVisible();
   await shoot(page, "14-no-tag-list");
+});
+
+test("suggest for this project", async ({ page, magpie }) => {
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", keywords: ["agent-skills", "testing"], dependencies: { pdfkit: "*" } }));
+  writeFileSync(join(magpie.project, "README.md"), "# Checkout tests\n\nEnd-to-end tests for the checkout, written and run by a coding agent.\n");
+  await magpie.open(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
+  await expect(rows.last()).toContainText("In use, avoid");
+  await rows.first().click();
+  await expect(page.getByRole("article").getByRole("heading", { level: 2 })).toBeVisible();
+  await shoot(page, "15-suggest");
+});
+
+test("adopt to project", async ({ page, magpie }) => {
+  writeFileSync(join(magpie.project, "package.json"), "{}");
+  await magpie.open(page);
+  await allNotes(page);
+  await page.getByRole("option", { name: /^pdfkit / }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await expect(page.getByText("anyone who can read this repository can read this note.")).toBeVisible();
+  await shoot(page, "16-adopt-confirm");
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByText("npm install pdfkit")).toBeVisible();
+  await shoot(page, "17-adopt-done");
 });

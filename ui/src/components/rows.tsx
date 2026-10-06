@@ -3,6 +3,7 @@
 // an inbox note.
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import type { SearchResult } from "../api.ts";
+import type { SuggestItem } from "../logic/suggest.ts";
 import { StatusBadge } from "./common.tsx";
 
 const typeOf = (id: string | null) => id?.match(/^pkg:([^/]+)/)?.[1] ?? "";
@@ -19,6 +20,25 @@ export function NoteRow({ note, showInbox }: { note: NoteSummary; showInbox: boo
         <span className="row-meta">{typeOf(note.id)}</span>
       </span>
       <span className="row-verdict">{note.read_only ? "can't be read; open it in an editor" : note.verdict || "no verdict yet"}</span>
+    </>
+  );
+}
+
+// A suggestion: a candidate, or a dependency you noted to avoid (labelled in words, not by colour alone).
+export function SuggestRow({ item }: { item: SuggestItem }) {
+  return (
+    <>
+      <span className="row-line">
+        <span className="row-name" title={item.name}>
+          {item.name}
+        </span>
+        {item.kind === "avoid" ? <span className="badge avoid">{item.nameOnly ? "In use, avoid (name match)" : "In use, avoid"}</span> : null}
+        {item.status === "inbox" ? <StatusBadge status="inbox" /> : null}
+        <span className="row-meta">
+          {item.type} · {item.journal}
+        </span>
+      </span>
+      <span className="row-verdict">{item.verdict ?? "no verdict yet"}</span>
     </>
   );
 }

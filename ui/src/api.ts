@@ -1,13 +1,15 @@
 // The app's only way to the journals: magpie ui's API (docs/ui.md §6). Reads carry the session
 // cookie (the browser sends it); writes also carry the X-Magpie-Token header from the page's meta tag.
 // Every document type comes from core, so the app reads exactly what the CLI's --json prints.
+import type { AdoptJson } from "../../src/core/adopt.ts";
 import type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
 import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
 import type { SearchResult } from "../../src/core/search.ts";
+import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult };
+export type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -73,4 +75,6 @@ export const api = {
   open: (journal: Scope, address: Address) => write<{ opened: boolean; path: string | null }>("POST", "/api/open", { journal, ...addressParams(address) }),
   openTagList: (journal: Scope) => write<{ opened: boolean; path: string | null }>("POST", "/api/open", { journal, tag_list: true }),
   recall: (packages: string[], type?: PackageType) => get<RecallJson>("/api/recall", { package: packages, type }),
+  suggest: (params: { description?: string; limit: number }) => get<SuggestJson>("/api/suggest", { description: params.description, limit: String(params.limit) }),
+  adopt: (target: string) => write<AdoptJson>("POST", "/api/adopt", { target }),
 };

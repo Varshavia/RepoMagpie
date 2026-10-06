@@ -2,13 +2,14 @@
 // The Verdict leads; then Use when and Avoid when, the other sections, skill lines, metadata and
 // actions. Every write sends the version the note was read with; a 409 shows the conflict banner.
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type Address, type NoteJson, type Scope } from "../api.ts";
+import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, type Form, type Patch } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { editableBody, firstEntries, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
+import type { ProjectState } from "./fields.tsx";
 import { ReviewForm } from "./ReviewForm.tsx";
 
 export interface NotePaneProps {
@@ -27,7 +28,12 @@ export interface NotePaneProps {
   onLeave: () => void; // Esc from an editor: back to the list
   onToast: (text: string) => void;
   onBack: () => void; // the back button in the one-pane layout
+  project: ProjectState; // "none": no project to adopt into
+  onAdopted: () => void;
+  onOpenNote: (journal: Scope, id: string) => void;
 }
+
+type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
 
 // Sections shown even when empty, so the person can fill them.
 const ALWAYS = ["Use when", "Avoid when"];
@@ -38,7 +44,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack } = props;
+  const { journal, address, noteKey, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -49,6 +55,7 @@ export function NotePane(props: NotePaneProps) {
   const [removed, setRemoved] = useState(false);
   const [section, setSection] = useState<{ name: string; text: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [adopting, setAdopting] = useState<Adopting>(null);
   const verdictRef = useRef<HTMLTextAreaElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const focusHandled = useRef(0);
@@ -221,6 +228,29 @@ export function NotePane(props: NotePaneProps) {
     }
   }
 
+  // magpie adopt: copies the note into the project journal and names the install command; it never
+  // installs anything. Only after the confirm, which says who can read the project journal.
+  async function adopt() {
+    if (!note?.id) return;
+    setAdopting({ step: "confirm", busy: true, error: null });
+    try {
+      const doc = await api.adopt(note.id);
+      setAdopting({ step: "done", doc });
+      onAdopted();
+    } catch (error) {
+      setAdopting({ step: "confirm", busy: false, error: (error as ApiError).message });
+    }
+  }
+
+  async function copyInstall(command: string) {
+    try {
+      await navigator.clipboard.writeText(command);
+      onToast("Install command copied");
+    } catch {
+      setActionError("Couldn't copy the command. Select it and copy it yourself.");
+    }
+  }
+
   async function editTagList() {
     setActionError(null);
     try {
@@ -280,10 +310,61 @@ export function NotePane(props: NotePaneProps) {
                 Open in Obsidian
               </a>
             ) : null}
+            {journal === "personal" && project !== "none" && note.id && !note.read_only ? (
+              <button type="button" className="button secondary" onClick={() => setAdopting({ step: "confirm", busy: false, error: null })} aria-expanded={adopting !== null}>
+                <Icon name="users" />
+                Adopt to project
+              </button>
+            ) : null}
           </div>
         </header>
 
         <div className="stack">
+          {adopting?.step === "confirm" ? (
+            <div className="adopt-panel" role="group" aria-label="Adopt to project">
+              <p>
+                Copy this note into the project journal, with today's date as <code translate="no">adopted</code>. magpie names the install command; it installs nothing.
+              </p>
+              <p>The project journal is committed with the code; anyone who can read this repository can read this note.</p>
+              {adopting.error ? <FieldError>{adopting.error}</FieldError> : null}
+              <div className="form-actions">
+                <button type="button" className="button secondary" onClick={adopt} disabled={adopting.busy}>
+                  {adopting.busy ? "Copying…" : "Copy to the project journal"}
+                </button>
+                <button type="button" className="button ghost" onClick={() => setAdopting(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : adopting?.step === "done" ? (
+            <div className="adopt-panel" role="group" aria-label="Adopted">
+              <p>Copied to the project journal.</p>
+              {adopting.doc.install || adopting.doc.install_choices.length ? (
+                <>
+                  {adopting.doc.install_choices.length ? <p>{`This repository publishes ${adopting.doc.install_choices.length} packages; install the one you need:`}</p> : null}
+                  {(adopting.doc.install ? [adopting.doc.install] : adopting.doc.install_choices).map((command) => (
+                    <p className="install-line" key={command}>
+                      <code translate="no">{command}</code>
+                      <button type="button" className="button ghost icon-button" onClick={() => copyInstall(command)} aria-label={`Copy ${command}`} title="Copy the install command">
+                        <Icon name="copy" />
+                      </button>
+                    </p>
+                  ))}
+                  <p className="field-help">Run it yourself when you are ready; magpie never installs anything.</p>
+                </>
+              ) : (
+                <p className="field-help">No install command for a GitHub repository.</p>
+              )}
+              <div className="form-actions">
+                <button type="button" className="button secondary" onClick={() => adopting.doc.id && onOpenNote("project", adopting.doc.id)}>
+                  Open the project's note
+                </button>
+                <button type="button" className="button ghost" onClick={() => setAdopting(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : null}
           {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
           {removed ? <Banner tone="warning">Another program deleted this note's file. Choose another note.</Banner> : null}
           {conflict ? (
