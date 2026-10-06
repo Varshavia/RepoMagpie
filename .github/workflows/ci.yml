@@ -32,8 +32,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:hooks
       - run: npm run build
-      - name: Smoke test the built CLI
-        run: node dist/cli/main.js --version
+      - name: The built CLI answers as the source does
+        run: npm run check:build
 
   # Links in the docs, and the performance budgets of spec section 7. The benchmarks only report:
   # timing on shared runners varies too much to fail a build on it.

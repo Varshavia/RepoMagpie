@@ -1,5 +1,5 @@
 // Test helper: a fetch that answers from recorded GitHub responses (fixtures/github/*.json).
-// Not part of the build (tsconfig.build.json excludes fixtures/).
+// Not part of the build (it bundles only what src/cli/main.ts imports).
 import { readFileSync } from "node:fs";
 import type { Fetch } from "../github.ts";
 
