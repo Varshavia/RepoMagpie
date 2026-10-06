@@ -20,7 +20,7 @@ agent without a shell ─► MCP server ────────┴─► core �
 |---|---|---|
 | **core** | Reads and writes notes in both journals ([decision 0013](decisions/0013-two-journal-scopes.md)), applies the ownership rules of the [note schema](note-schema.md), fetches repository data from GitHub, builds and queries the search index, and answers recall. | v0.1 |
 | **cli** | `magpie`: parses arguments, calls the core, prints short, parseable output, plus a machine-readable mode such as `--json` on every command ([decision 0008](decisions/0008-machine-readable-output.md)). | v0.1 |
-| **skill** | RepoMagpie's own `SKILL.md`: teaches agents to call `magpie`. Contains no logic. | v0.1 |
+| **skill** | RepoMagpie's own `SKILL.md` (`skills/repomagpie/`): teaches agents to call `magpie` with `--json`. Contains no logic. | v0.1 |
 | **hook** | The Claude Code adapter (`magpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never denies (an avoid note asks the user; [decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)) and fails open ([spec](spec.md), section 6). | v0.1 |
 | **server** | `magpie ui`: a loopback-only HTTP server that serves the local app and a JSON API. It parses requests, calls the core and returns the same JSON documents as the CLI's `--json`; it has no logic of its own ([decision 0021](decisions/0021-local-ui-server.md), [decision 0023](decisions/0023-api-is-the-json-contract.md), [UI](ui.md)). | v0.1 |
 | **app** | The local app: a static bundle in the browser that talks only to the server's API ([decision 0022](decisions/0022-frontend-stack.md)). | v0.1 |
@@ -59,8 +59,10 @@ ui/            the local app (decision 0022): React and Vite, built into dist/ui
   src/         App.tsx, components/ (one per pane and screen), api.ts (the only way to the journals),
                logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette)
   e2e/         @playwright/test against magpie ui on a temporary journal; screenshots with SCREENS=1
-skill/
-  SKILL.md     no code
+skills/
+  repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
+               SKILL.md, and references/json.md (the --json fields it reads); src/cli/skill.test.ts
+               checks it against magpie --help and the spec's --json shapes
 scripts/       the test runner with the ~/.magpie canary, benchmarks, the link check; not part of the package
 ```
 
@@ -92,7 +94,7 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 2. **Find installs.** The hook splits the command line the way git-guard does and picks out install commands and their package names ([spec](spec.md), section 6).
 3. **Look up notes** for those packages in the project and personal journals: an exact PURL match first, then a name-only match, marked as lower confidence ([spec](spec.md), section 5).
 4. **Ask or inform, never deny.** If an avoid note matches, the hook returns `permissionDecision: "ask"` with the note as the reason, and the user decides. Any other match returns the Verdict as `additionalContext` for the agent and `systemMessage` for the user, with no permission decision ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)). If nothing matches, or anything fails, it prints nothing and exits 0.
-5. **Skill mode** in other clients: `SKILL.md` tells the agent to run `magpie recall <package>` itself before installing.
+5. **Skill mode** in other clients: `SKILL.md` tells the agent to run `magpie recall <package> --json` itself before installing, and to ask the user first on an exact match with an avoid note, by the same rule as the hook.
 
 ## Data flow: `magpie note <name-or-url> "text"`
 
