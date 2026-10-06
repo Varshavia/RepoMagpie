@@ -74,13 +74,16 @@ test("a wrong token, and a request without token or cookie, get 401", async (t) 
 });
 
 test("a write with the cookie but without a matching X-Magpie-Token header gets 403", async (t) => {
-  const { http, server } = await start(t);
+  const { http, server, box } = await start(t);
   for (const token of [undefined, "", "0".repeat(64), `${server.token}0`, server.token.slice(1)]) {
     const r = await http.write("POST", "/api/note", { target: "pkg:npm/left-pad", to: "personal" }, { "x-magpie-token": token });
     assert.equal(r.status, 403, String(token));
   }
   const patch = await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: "x" }, { "x-magpie-token": undefined });
   assert.equal(patch.status, 403);
+  const adopt = await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { "x-magpie-token": undefined });
+  assert.equal(adopt.status, 403);
+  assert.equal(existsSync(join(box.project, ".magpie")), false);
 });
 
 test("a bad Host gets 403, before anything else (DNS rebinding)", async (t) => {
@@ -105,6 +108,8 @@ test("cross-origin and Origin-less writes get 403", async (t) => {
   assert.equal(existsSync(box.note("npm--left-pad.md")), false);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "project" }, { origin })).status, 403, `tags ${origin}`);
   assert.equal(existsSync(join(box.project, ".magpie", "tags.md")), false);
+  for (const origin of origins) assert.equal((await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { origin })).status, 403, `adopt ${origin}`);
+  assert.equal(existsSync(join(box.project, ".magpie")), false);
   for (const origin of [`http://127.0.0.1:${server.port}`, `http://localhost:${server.port}`]) {
     const r = await http.write("POST", "/api/note/preview", { target: "pkg:npm/left-pad", to: "personal" }, { origin });
     assert.equal(r.status, 200, origin);
@@ -178,11 +183,17 @@ test("no path from a request reaches the file system: traversal in every paramet
     ok(await http.write("POST", "/api/note/preview", { target: p, to: "personal" }), `preview target ${p}`);
     ok(await http.write("POST", "/api/note", { target: p, text: "x", to: "personal" }), `note target ${p}`);
     ok(await http.write("POST", "/api/note", { target: "pkg:npm/left-pad", to: p }), `note to ${p}`);
+    ok(await http.write("POST", "/api/adopt", { target: p }), `adopt target ${p}`);
+    ok(await http.get(`/api/suggest?journal=${q}`), `suggest journal ${p}`);
+    const suggested = await http.get(`/api/suggest?description=${q}`);
+    assert.ok(suggested.status === 200 || suggested.status === 400, `suggest description ${p}: ${suggested.status}`);
+    noSecret(suggested, `suggest description ${p}`);
     const imported = await http.write("POST", "/api/import", { text: `- ${p} — verdict: x`, to: "personal", dry_run: true });
     assert.ok(imported.status === 422 || imported.status === 400, `import ${p}`);
     noSecret(imported, `import ${p}`);
   }
   assert.deepEqual(opened, []);
+  assert.equal(existsSync(join(box.project, ".magpie")), false, "no adopt wrote anything");
   for (const q of [SECRET, "secret"]) assert.deepEqual(JSON.parse((await http.get(`/api/search?q=${encodeURIComponent(q)}`)).body).results, [], q);
   noSecret(await http.get("/api/recall?package=secret&type=npm"), "recall");
 });
@@ -222,6 +233,8 @@ test("GITHUB_TOKEN never reaches the browser: no response contains its value", a
     await http.get("/api/note?journal=personal&file=npm--broken.md"),
     await http.get("/api/search?q=pdf"),
     await http.get("/api/recall?package=pdfkit"),
+    await http.get("/api/suggest?description=pdf"),
+    await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/microsoft/playwright-cli", to: "personal" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/nobody/nothing", to: "personal" }),
     await http.write("POST", "/api/note", { target: "https://github.com/microsoft/playwright-cli", to: "personal" }),
@@ -245,6 +258,8 @@ test("an unknown path gets 404, a wrong method 405, and a bug 500 without intern
   assert.equal(wrong.status, 405);
   assert.equal(wrong.headers.allow, "GET, PATCH, POST");
   assert.equal((await http.write("POST", "/api/settings", {})).status, 405);
+  assert.equal((await http.get("/api/adopt")).status, 405);
+  assert.equal((await http.write("POST", "/api/suggest", {})).status, 405);
   mkdirSync(join(box.journal, "notes", "folder.md")); // a folder where a note should be: reading it throws
   const bug = await http.get("/api/notes?journal=personal");
   assert.equal(bug.status, 500);

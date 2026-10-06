@@ -97,6 +97,53 @@ test("GET /api/recall returns exactly magpie recall --json", async (t) => {
   assert.equal((await http.get("/api/recall?package=pdfkit&type=maven")).status, 400);
 });
 
+test("GET /api/suggest returns exactly magpie suggest --json", async (t) => {
+  const { box, fetch, http } = await start(t);
+  writeFileSync(join(box.project, "package.json"), JSON.stringify({ description: "PDF invoices", dependencies: { pdfkit: "*" } }));
+  const cases: [string, string[]][] = [
+    ["", ["suggest"]],
+    ["description=left%20pad%20strings", ["suggest", "left pad strings"]],
+    ["description=pdf&journal=personal&limit=1", ["suggest", "pdf", "--journal", "personal", "--limit", "1"]],
+    ["description=", ["suggest", ""]],
+  ];
+  for (const [query, argv] of cases) {
+    const expected = await cli(box, argv, fetch);
+    assert.deepEqual(parsed(await http.get(`/api/suggest?${query}`)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, query);
+  }
+  // Both pdfkit notes have "Avoid when" text, so both are avoid notes (decision 0024); project first.
+  const avoid = parsed(await http.get("/api/suggest")).document as { in_use_avoid: { id: string; journal: string }[] };
+  assert.deepEqual(avoid.in_use_avoid.map((m) => `${m.journal} ${m.id}`), ["project pkg:npm/pdfkit", "personal pkg:npm/pdfkit"]);
+  for (const query of ["limit=0", "limit=x", "journal=both"]) assert.equal((await http.get(`/api/suggest?${query}`)).status, 400, query);
+});
+
+test("POST /api/adopt returns exactly magpie adopt --json and writes the same note", async (t) => {
+  const { box, fetch, http } = await start(t);
+  const copy = join(box.project, ".magpie", "notes", "npm--left-pad.md");
+  const expected = await cli(box, ["adopt", "pkg:npm/left-pad"], fetch);
+  assert.equal(expected.code, 0);
+  const written = readFileSync(copy, "utf8");
+  rmSync(copy);
+  assert.deepEqual(parsed(await http.write("POST", "/api/adopt", { target: "pkg:npm/left-pad" })), { status: 200, document: expected.document });
+  assert.equal(readFileSync(copy, "utf8"), written);
+  assert.match(written, /\nadopted: 2026-10-04\n/);
+
+  const cases: [Record<string, unknown>, string[]][] = [
+    [{ target: "pkg:npm/left-pad" }, ["adopt", "pkg:npm/left-pad"]], // already in the project now
+    [{ target: "pkg:npm/nothing" }, ["adopt", "pkg:npm/nothing"]],
+    [{ target: "left-pad", type: "npm" }, ["adopt", "left-pad", "--type", "npm"]],
+    [{ target: "https://example.com/an-article" }, ["adopt", "https://example.com/an-article"]],
+  ];
+  for (const [body, argv] of cases) {
+    const cliResult = await cli(box, argv, fetch);
+    assert.deepEqual(parsed(await http.write("POST", "/api/adopt", body)), { status: STATUS_FOR_EXIT[cliResult.code], document: cliResult.document }, JSON.stringify(body));
+  }
+  for (const body of [{}, { target: 3 }, { target: "pkg:npm/x", type: "maven" }]) {
+    const r = parsed(await http.write("POST", "/api/adopt", body));
+    assert.equal(r.status, 400, JSON.stringify(body));
+    assert.deepEqual(Object.keys(r.document as object), ["id", "from", "to", "install", "install_choices", "error"], "the success shape plus error (spec §1)");
+  }
+});
+
 test("POST /api/note returns exactly magpie note --json and writes the same note", async (t) => {
   const { box, fetch, http } = await start(t);
   const cases: [Record<string, unknown>, string[], string | null][] = [
