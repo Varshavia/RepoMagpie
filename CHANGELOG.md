@@ -12,12 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The local app in `magpie ui`, dark or light, keyboard first:
   - **Inbox review:** press Enter, write the Verdict, press Ctrl+Enter; the next inbox note opens. Kind, tags, tried and rating sit next to the Verdict, with "What it does" and "Use when" above it.
   - **Note view:** the Verdict first, then Use when and Avoid when. Accept or edit drafts, edit sections, and open the note in your editor or Obsidian.
-  - **Search:** with filters for journal, status, kind and tag. A command palette on Ctrl/Cmd+K finds notes and runs every action.
+  - **Search:** with filters for journal, status, kind and tag. A command palette on Ctrl/Cmd+K shows what `magpie search` finds and runs every action. It says "Searching…" until the search answers.
   - **Add and Import:** preview a note before you save it; check import lines before you import them.
   - **Check a package:** shows what the Claude Code hook would say before an install.
   - **Settings:** the journals, whether `GITHUB_TOKEN` is set, the version and the theme.
   - **Safe edits:** a note changed in another editor shows a banner with "Reload", and your unsaved text stays; nothing is overwritten.
-- "Edit tag list" opens the journal's `tags.md` in your editor.
+- "Edit tag list" opens the journal's `tags.md` in your editor. A journal without `tags.md` shows "Create tag list" instead, which writes the starter list when you click it. A `tags.md` without tags says so in the sidebar, with "Edit tag list".
+- Package URLs are shown decoded, for example `pkg:npm/@playwright/cli` and the package `@playwright/cli`, in the app and in `magpie import` output. `--json`, the files and a copied PURL keep the encoded form.
 - A third cache, `<journal>/.cache/note-list.json`, keeps the app's note list fast: 2,000 notes load in about 40 ms instead of 500 ms.
 
 - `magpie --version` and `magpie --help`. Help lists the v0.1 commands (`note`, `import`, `search`, `recall`, `ui`, `suggest`, `adopt`, `init`); `suggest`, `adopt` and `init` are not implemented yet.
@@ -29,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A new journal starts with a starter `tags.md` of ten tags. An existing `tags.md` is never overwritten.
 - `magpie note <name-or-url> ["text"]` captures a one-line Verdict for a package or repository, for example `magpie note pdfkit "avoid: async streams painful"`.
 - `magpie note <github-url>` creates a note from the repository's GitHub metadata: licence, language, topics, packages from root manifests, a drafted kind and "What it does", and one skill line per `SKILL.md`. Run it again to refresh those fields and add new skills; your own text is never changed.
-- `magpie import <file>` adds one note per `- <url-or-name> — verdict: ... | use: ... | avoid: ...` line, with `--dry-run` to preview. One bad line never stops the rest.
+- `magpie import <file>` adds one note per `- <url-or-name> — verdict: ... | use: ... | avoid: ...` line, with `--dry-run` to preview. One bad line never stops the rest. A list copied out of a chat works too: items may also start with `* `, `+ ` or `\- `. A file without items gets a hint that says what its first line starts with.
 - Global flags `--json`, `--home <dir>` and `--project <dir>`; `note` and `import` take `--to personal|project`. A project journal is created at the git root on first use.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.

@@ -69,6 +69,8 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 - The separator after the target is ` — ` (em dash) or ` -- `. Labels are case-insensitive; parts are separated by ` | `.
 - `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label goes to "My notes" (schema rule 7).
 - A line may hold the target alone (`- pkg:npm/pdfkit`). Each `use:` or `avoid:` part becomes one bullet; unlabelled parts become one line each in "My notes". A label with no text is ignored. Two `verdict:` parts make the line `failed`. Only lines that start with `- ` at the left margin are items.
+- Lenient read, for a list copied out of a chat or another editor: an item may also start with `* `, `+ ` or an escaped `\- `; a non-breaking space after the marker counts as a space; a UTF-8 BOM is ignored.
+- A file without items is not an error (exit 0). The hint on stderr names what the first line with text starts with instead: `No items found in list.md. Each item is a line that starts with "- ". Line 1 starts with "1.".`
 - Output: one result line per item on stdout (`line 3: created pkg:npm/pdfkit`); errors and warnings on stderr, prefixed with the line number; then a summary on stderr (`2 created, 1 updated, 0 unchanged, 1 failed.`). Later lines see the notes earlier lines wrote, also in a dry run. A dry run still fetches GitHub metadata (read-only) to report what would happen.
 - Other lines are ignored. A line that can't be parsed or resolved is reported as `failed` and skipped; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts).
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
@@ -184,10 +186,10 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 
 `journals.project` is `null` when there is no project journal and no project root to create one in (section 3).
 
-**Tag list.** One journal's tags, from its `tags.md`, or the starter list for a journal not created yet (section 3).
+**Tag list.** One journal's tags, from its `tags.md`, or the starter list for a journal not created yet (section 3). `exists` says whether the journal has its `tags.md`.
 
 ```json
-{"journal": "personal", "tags": ["testing", "pdf", "agent-skills"]}
+{"journal": "personal", "tags": ["testing", "pdf", "agent-skills"], "exists": true}
 ```
 
 **Note list.** The notes in one journal, after the filters, sorted by `name`. Each item is a summary; the full note is the Note document.
@@ -257,6 +259,8 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 ```
 
 **Creating a journal:** `magpie` creates a journal when it writes the first note into it: the `notes/` folder, a `.gitignore` for a project journal, and a starter `tags.md` with ten tags (the same as `examples/vault/tags.md`) when there is no `tags.md` yet. Existing files are never overwritten, and a journal that already has `notes/` doesn't get a `tags.md` again. Tags for that first note are drafted from the starter list.
+
+**A journal without `tags.md`:** `magpie` never adds one on its own to a journal that has `notes/`. In the local app, "Create tag list" writes the starter list on the user's click ([UI](ui.md), section 7). That is a human action, like editing `tags.md` by hand (schema rule 5); it never overwrites an existing `tags.md`.
 
 **Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
 
@@ -404,6 +408,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 - **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `magpie search pdf | head` shows results only.
 - **Width:** the Verdict is never cut. In a terminal, a result is a metadata line (rank, name, type, journal), cut to the terminal width with `…`, then the Verdict on its own lines, indented under the name and wrapped at spaces (a word longer than the line is broken, not dropped). When piped, each result is one line and nothing is cut.
 - **Labels:** draft text is labelled `(draft)`; a name-only recall match is labelled `(name match only)`.
+- **PURLs for people:** human output shows a PURL decoded (`pkg:npm/@babel/core`, not `pkg:npm/%40babel/core`), and a package by its name (`@babel/core`). `--json`, the files and the API keep the encoded id.
 - **`--json`** shapes are in section 2. They are a public interface: changing one is a breaking change ([release process](release.md)).
 
 **Example renderings** (illustrative)
