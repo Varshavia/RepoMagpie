@@ -90,7 +90,17 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 
 magpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `magpie ui` listens on `127.0.0.1` only.
 
-The only network requests are to GitHub's API, when you give `magpie note`, `magpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. Without a token, GitHub allows 60 requests an hour. There is no telemetry.
+The only network requests are to GitHub's API, when you give `magpie note`, `magpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry.
+
+Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give magpie its token for the current shell to raise the limit:
+
+```bash
+export GITHUB_TOKEN=$(gh auth token)
+```
+
+```powershell
+$env:GITHUB_TOKEN = gh auth token
+```
 
 ## Platforms
 
