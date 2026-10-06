@@ -2,6 +2,7 @@
 // returns core's document with the status for its outcome; no logic of its own (decision 0023).
 // Security checks happen before a request gets here (server.ts).
 import {
+  createTagList,
   emptyNote,
   emptyPreview,
   locateNote,
@@ -57,7 +58,12 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
     "/api/tags": {
       GET: ({ query }) => {
         const journal = scope(query.get("journal"));
-        return journal ? reply(tagListDocument(journal, context)) : bad({ journal: null, tags: [] }, JOURNAL);
+        return journal ? reply(tagListDocument(journal, context)) : bad({ journal: null, tags: [], exists: false }, JOURNAL);
+      },
+      // "Create tag list": the starter list, for a journal without tags.md; never overwrites one.
+      POST: ({ body }) => {
+        const journal = scope(body.journal);
+        return journal ? reply(createTagList(journal, context)) : bad({ journal: null, tags: [], exists: false }, JOURNAL);
       },
     },
 
