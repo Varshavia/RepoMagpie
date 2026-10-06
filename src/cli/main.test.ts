@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url";
 import { scratchBase } from "../core/fixtures/scratch.ts";
 import { renderNote } from "../core/write.ts";
 
-const version: string = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
+const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+const version: string = pkg.version;
+
+test("the published package has no runtime dependencies: the build bundles the libraries (decision 0025)", () => {
+  assert.equal(pkg.dependencies, undefined);
+  for (const name of ["commander", "minisearch", "packageurl-js", "yaml"]) assert.ok(pkg.devDependencies[name], `${name} in devDependencies`);
+});
 
 test("the hook's fast path (no other flags) answers like the full CLI, from stdin", () => {
   const root = scratchBase("main");
