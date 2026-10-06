@@ -1,6 +1,9 @@
 // End-to-end flows of the local app (docs/ui.md §11) against magpie ui on a temporary journal:
 // inbox review, search, add, import, conflicts, live updates, the palette and the keyboard map.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { STARTER_TAGS } from "../../src/core/journals.ts";
+import { runSearch } from "../../src/core/search.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
 
@@ -101,6 +104,19 @@ test("import: check the lines (nothing written), then import them", async ({ pag
   await expect(page.getByRole("main").getByRole("button", { name: "Import", exact: true })).toBeDisabled();
 });
 
+test("import: a list copied out of a chat is read leniently; without items, the hint names the first line", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  const lines = page.getByLabel("Lines");
+  await lines.fill("1. pkg:npm/left-pad — verdict: fine");
+  await expect(page.getByText('No items yet. Each item is a line that starts with "- ". Line 1 starts with "1.".')).toBeVisible();
+  await lines.fill("\\- pkg:npm/left-pad — verdict: fine\n* pkg:npm/chalk\n+ pkg:pypi/requests");
+  await expect(page.getByText("3 items.")).toBeVisible();
+  await page.getByRole("button", { name: "Check lines" }).click();
+  await expect(page.getByText("magpie wrote nothing yet: 3 to create, 0 to update, 0 unchanged, 0 failing.")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "pkg:npm/left-pad" })).toBeVisible();
+});
+
 test("conflict: a save against an old version gets 409; the banner reloads; nothing was overwritten", async ({ page, magpie }) => {
   await magpie.open(page);
   // Make every edit carry an old version, as if the file had changed since it was read.
@@ -170,6 +186,91 @@ test("palette: Ctrl/Cmd+K finds a note and runs an action; ? shows the keyboard 
   await expect(page.getByRole("dialog", { name: "Keyboard" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("palette: a word finds what magpie search finds, by name and by tag, in its order", async ({ page, magpie }) => {
+  const { document } = runSearch({ query: "design", limit: 6 }, { home: magpie.root, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project });
+  const expected = document.results.map((r) => (r.type === "skill" ? `${r.skill} · ${r.name}` : r.name));
+  expect(expected).toEqual(expect.arrayContaining(["VoltAgent/awesome-design-md", "Leonxlnx/taste-skill"])); // by name; tagged design
+  await magpie.open(page);
+  await page.keyboard.press(`${MOD}+k`);
+  await page.keyboard.type("design");
+  // Inside the palette: the inbox list behind it has the same note names.
+  const notes = page.getByRole("dialog", { name: "Command palette" }).getByRole("group", { name: "Notes and skills" });
+  await expect(notes.getByRole("option").locator(".label")).toHaveText(expected);
+});
+
+test("palette: no 'nothing matches' before the search answers; a failed search says why", async ({ page, magpie }) => {
+  let answer: () => void = () => {};
+  const answered = new Promise<void>((resolve) => (answer = resolve));
+  await page.route("**/api/search?*", async (route) => {
+    await answered;
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ query: "design", results: [], error: "The search index can't be read." }) });
+  });
+  await magpie.open(page);
+  await page.keyboard.press(`${MOD}+k`);
+  await page.keyboard.type("design");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await expect(palette.getByText("Searching…")).toBeVisible();
+  await expect(palette).not.toContainText("Nothing matches");
+  answer();
+  await expect(palette.getByText("The search index can't be read.")).toBeVisible();
+  await expect(palette).not.toContainText("Nothing matches");
+});
+
+test("a scoped npm package is shown as people write it; the copied PURL stays encoded", async ({ page, magpie, context }) => {
+  writeFileSync(magpie.note("npm--babel--core.md"), renderNote({ id: "pkg:npm/%40babel/core", name: "@babel/core", explored: "2026-10-06", kind: "library", tags: [], verdict: "fine", packages: ["pkg:npm/%40babel/core"] }));
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("option", { name: /microsoft\/playwright-cli/ }).click();
+  const note = page.getByRole("article");
+  await expect(note.getByRole("list", { name: "Details" }).getByText("@playwright/cli", { exact: true })).toBeVisible();
+  await expect(note).not.toContainText("%40");
+  await page.getByRole("option", { name: /@babel\/core/ }).click();
+  await expect(note.getByText("pkg:npm/@babel/core", { exact: true })).toBeVisible();
+  await expect(note).not.toContainText("%40");
+  await note.getByRole("button", { name: "Copy PURL" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("pkg:npm/%40babel/core");
+});
+
+test("a journal without tags.md: an empty state, and the starter list only on the user's click", async ({ page, magpie }) => {
+  const tagList = join(magpie.journal, "tags.md");
+  rmSync(tagList);
+  await magpie.open(page);
+  const tags = page.getByRole("navigation", { name: "Journals and screens" });
+  await expect(tags.getByText("No tag list yet.")).toBeVisible();
+  // The review form offers the same, instead of opening a file that isn't there.
+  await page.keyboard.press("Enter");
+  const form = page.getByRole("article");
+  await expect(form.getByRole("button", { name: "Create tag list" })).toBeVisible();
+  await expect(form.getByRole("button", { name: "Edit tag list" })).toHaveCount(0);
+  expect(existsSync(tagList)).toBe(false);
+
+  await tags.getByRole("button", { name: "Create tag list" }).click();
+  await expect(tags.getByText("No tag list yet.")).toHaveCount(0);
+  expect(readFileSync(tagList, "utf8")).toBe(STARTER_TAGS);
+  await expect(form.getByRole("button", { name: "workflow" })).toBeVisible(); // a starter tag to pick
+  await expect(form.getByRole("button", { name: "Edit tag list" })).toBeVisible();
+});
+
+test("a tags.md without tags: an empty state with 'Edit tag list', which opens tags.md", async ({ page, magpie }) => {
+  const tagList = join(magpie.journal, "tags.md");
+  writeFileSync(tagList, "# Tags\n\nNo tags yet.\n");
+  const opened: unknown[] = [];
+  // Don't start an editor on the test machine; record the request instead.
+  await page.route("**/api/open", async (route) => {
+    opened.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ opened: true, path: tagList }) });
+  });
+  await magpie.open(page);
+  const nav = page.getByRole("navigation", { name: "Journals and screens" });
+  await expect(nav.getByText("Your tag list is empty.")).toBeVisible();
+  await expect(nav.getByText("No tag list yet.")).toHaveCount(0);
+  await nav.getByRole("button", { name: "Edit tag list" }).click();
+  await expect(page.getByText("Opened tags.md in your editor")).toBeVisible();
+  expect(opened).toEqual([{ journal: "personal", tag_list: true }]);
+  expect(readFileSync(tagList, "utf8")).toBe("# Tags\n\nNo tags yet.\n");
 });
 
 test("keyboard: j/k move the selection, g i and g s switch screens", async ({ page, magpie }) => {

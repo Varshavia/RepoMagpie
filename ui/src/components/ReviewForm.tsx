@@ -14,6 +14,8 @@ interface Props {
   onLeave: () => void;
   onEditTags: () => void;
   tagList: string[];
+  noTagList: boolean; // the journal has no tags.md: "Create tag list" instead of "Edit tag list"
+  onCreateTagList: () => void;
   saving: boolean;
   dirty: boolean;
   error: string | null;
@@ -21,7 +23,7 @@ interface Props {
   verdictChanged: boolean;
 }
 
-export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, saving, dirty, error, verdictRef, verdictChanged }: Props) {
+export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged }: Props) {
   const id = useId();
   const keys = (e: KeyboardEvent) => {
     if ((IS_MAC ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
@@ -104,10 +106,17 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
             <span className="field-label" id={`${id}-tags`}>
               Tags
             </span>
-            <button type="button" className="button ghost" onClick={onEditTags} title="Open the journal's tags.md in your editor">
-              <Icon name="pencil" />
-              Edit tag list
-            </button>
+            {noTagList ? (
+              <button type="button" className="button ghost" onClick={onCreateTagList} title="Write the starter tags.md to this journal">
+                <Icon name="plus" />
+                Create tag list
+              </button>
+            ) : (
+              <button type="button" className="button ghost" onClick={onEditTags} title="Open the journal's tags.md in your editor">
+                <Icon name="pencil" />
+                Edit tag list
+              </button>
+            )}
           </div>
           {tags.length ? (
             <div className="chips" role="group" aria-labelledby={`${id}-tags`}>
@@ -125,7 +134,7 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
               ))}
             </div>
           ) : (
-            <p className="field-help">No tags yet. Edit the tag list to add one.</p>
+            <p className="field-help">{noTagList ? "This journal has no tag list yet. Create it to pick tags." : "No tags yet. Edit the tag list to add one."}</p>
           )}
         </div>
       </div>

@@ -28,6 +28,16 @@ export function sidebarCounts(notes: NoteSummary[]): Counts {
   };
 }
 
+// The sidebar's Tags section, from the Tag list document: "missing" for a journal with notes but no
+// tags.md ("Create tag list"), "empty" for a tags.md without tags ("Edit tag list"). A journal not
+// created yet gets the starter list with its first note, so it is "ready".
+export type TagListState = "missing" | "empty" | "ready";
+
+export function tagListState(doc: { tags: string[]; exists: boolean }): TagListState {
+  if (doc.tags.length) return "ready";
+  return doc.exists ? "empty" : "missing";
+}
+
 export function filterNotes(notes: NoteSummary[], view: ListView): NoteSummary[] {
   switch (view.list) {
     case "all":

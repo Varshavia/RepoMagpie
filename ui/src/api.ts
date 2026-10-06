@@ -7,7 +7,7 @@ import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.
 import type { SearchResult } from "../../src/core/search.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, ImportJson, SavedNoteJson, SearchResult };
+export type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -61,6 +61,7 @@ const addressParams = (address: Address) => ("id" in address ? { id: address.id 
 export const api = {
   settings: () => get<SettingsJson>("/api/settings"),
   tags: (journal: Scope) => get<TagListJson>("/api/tags", { journal }),
+  createTagList: (journal: Scope) => write<TagListJson>("POST", "/api/tags", { journal }),
   notes: (journal: Scope) => get<NoteListJson>("/api/notes", { journal }),
   note: (journal: Scope, address: Address) => get<NoteJson>("/api/note", { journal, ...addressParams(address) }),
   patch: (patch: Patch) => write<NoteJson>("PATCH", "/api/note", patch),

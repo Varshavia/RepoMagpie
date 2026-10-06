@@ -1,7 +1,7 @@
 // The local app (docs/ui.md §7): three panes, the command palette, the keyboard map, live updates
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type ApiError, type NoteJson, type Scope, type SearchResult, type SettingsJson } from "./api.ts";
+import { api, type ApiError, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { ProjectState } from "./components/fields.tsx";
@@ -18,7 +18,7 @@ import { VirtualList } from "./components/VirtualList.tsx";
 import { Icon } from "./icons.tsx";
 import type { Form } from "./logic/edits.ts";
 import { keyAction, type Action, type Pending } from "./logic/keys.ts";
-import { filterNotes, nextAfter, noteKey, sidebarCounts } from "./logic/notes.ts";
+import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
@@ -34,6 +34,8 @@ export function App() {
   const [journal, setJournal] = useState<Scope>("personal");
   const [lists, setLists] = useState<Record<Scope, ListState>>({ personal: { status: "loading" }, project: { status: "loading" } });
   const [tagLists, setTagLists] = useState<Record<Scope, string[]>>({ personal: [], project: [] });
+  // No tags.md, or one without tags: the Tags section shows an empty state (docs/ui.md §7).
+  const [tagState, setTagState] = useState<Record<Scope, TagListState>>({ personal: "ready", project: "ready" });
   const [view, setView] = useState<View>({ page: "inbox" });
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ key: string | null; n: number }>({ key: null, n: 0 });
@@ -66,9 +68,39 @@ export function App() {
     );
   }, []);
 
-  const loadTags = useCallback((scope: Scope) => {
-    api.tags(scope).then((doc) => setTagLists((t) => ({ ...t, [scope]: doc.tags })), () => {});
+  const showTags = useCallback((doc: TagListJson) => {
+    setTagLists((t) => ({ ...t, [doc.journal]: doc.tags }));
+    setTagState((t) => ({ ...t, [doc.journal]: tagListState(doc) }));
   }, []);
+
+  const loadTags = useCallback((scope: Scope) => {
+    api.tags(scope).then(showTags, () => {});
+  }, [showTags]);
+
+  // Writes the starter list only now, on the user's click (spec §3).
+  const createTagList = useCallback(
+    (scope: Scope) => {
+      api.createTagList(scope).then(
+        (doc) => {
+          showTags(doc);
+          toast("Created tags.md with the starter list");
+        },
+        (error: ApiError) => toast(error.message),
+      );
+    },
+    [showTags, toast],
+  );
+
+  // "Edit tag list" in the sidebar; the list is read again when you come back to the page.
+  const editTagList = useCallback(
+    (scope: Scope) => {
+      api.openTagList(scope).then(
+        () => toast("Opened tags.md in your editor"),
+        (error: ApiError) => toast(error.message),
+      );
+    },
+    [toast],
+  );
 
   const loadSettings = useCallback(() => {
     api.settings().then(
@@ -315,6 +347,8 @@ export function App() {
       editRequest={editRequest}
       live={live[scope]}
       tagList={tagLists[scope]}
+      noTagList={tagState[scope] === "missing"}
+      onCreateTagList={() => createTagList(scope)}
       drafts={drafts}
       onSaved={onSaved}
       onLeave={() => listRef.current?.focus()}
@@ -451,6 +485,9 @@ export function App() {
           setSelected(null);
         }}
         counts={counts}
+        tagList={tagState[journal]}
+        onCreateTagList={() => createTagList(journal)}
+        onEditTagList={() => editTagList(journal)}
         view={view}
         onView={go}
         inert={behind}

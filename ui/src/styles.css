@@ -303,6 +303,7 @@ kbd {
 .nav-item .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item .count { color: var(--ink-subtle); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .nav-item .hash { color: var(--ink-subtle); }
+.nav-empty > p { padding: var(--xs) var(--sm); color: var(--ink-subtle); font-size: 13px; }
 
 .sidebar-foot { margin-top: auto; }
 

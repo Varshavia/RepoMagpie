@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { oneLine } from "../logic/edits.ts";
+import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, FieldError } from "./common.tsx";
 import { JournalChoice, TypeChoice, type ProjectState } from "./fields.tsx";
@@ -157,7 +158,7 @@ export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props)
         <div className="page-section" role="status">
           <div className="banner muted">
             <Icon name="check" />
-            <span className="text">{`${saved.created ? "Saved to" : "Updated in"} your ${saved.journal} journal: ${saved.id}${saved.status === "inbox" ? ". It is in the Inbox until it has a Verdict." : "."}`}</span>
+            <span className="text">{`${saved.created ? "Saved to" : "Updated in"} your ${saved.journal} journal: ${saved.id && readablePurl(saved.id)}${saved.status === "inbox" ? ". It is in the Inbox until it has a Verdict." : "."}`}</span>
             {saved.id ? (
               <button type="button" className="button secondary" onClick={() => onOpenNote(saved.journal, saved.id as string)}>
                 Open the note
@@ -176,14 +177,16 @@ export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props)
 }
 
 function Preview({ preview, onOpen }: { preview: NotePreviewJson; onOpen: () => void }) {
-  const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...preview.packages].filter((c): c is string => Boolean(c));
+  const packages = preview.packages.map((p) => packageLabel(p).name);
+  const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...packages].filter((c): c is string => Boolean(c));
+  const id = preview.id && readablePurl(preview.id);
   return (
     <section className="page-section preview" aria-label="Preview">
       <div className="note-title-row">
-        <h2 className="preview-name">{preview.name ?? preview.id}</h2>
+        <h2 className="preview-name">{preview.name ?? id}</h2>
         <span className="badge plain">{preview.exists ? "Already in this journal" : "New note"}</span>
       </div>
-      <p className="mono note-purl">{preview.id}</p>
+      <p className="mono note-purl">{id}</p>
       {preview.exists && preview.verdict ? (
         <Banner
           tone="muted"
