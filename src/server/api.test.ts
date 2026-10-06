@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
 import { noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
 import { noteVersion } from "../core/edit.ts";
+import { STARTER_TAGS } from "../core/journals.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
 import type { Context } from "../core/save.ts";
@@ -209,6 +210,18 @@ test("POST /api/open with tag_list opens the journal's tags.md", async (t) => {
     assert.equal((await http.write("POST", "/api/open", body)).status, 400, JSON.stringify(body));
   }
   assert.equal(opened.length, 1);
+});
+
+test("POST /api/tags writes the starter list to a journal without tags.md; never over an existing one", async (t) => {
+  const { http, box, context } = await start(t);
+  const created = parsed(await http.write("POST", "/api/tags", { journal: "project" }));
+  assert.deepEqual(created, { status: 200, document: tagListDocument("project", context).document });
+  assert.equal((created.document as { exists: boolean }).exists, true);
+  assert.equal(readFileSync(join(box.project, ".magpie", "tags.md"), "utf8"), STARTER_TAGS);
+  const kept = parsed(await http.write("POST", "/api/tags", { journal: "personal" }));
+  assert.deepEqual(kept.document, { journal: "personal", tags: ["pdf", "testing"], exists: true });
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
+  assert.equal((await http.write("POST", "/api/tags", { journal: "elsewhere" })).status, 400);
 });
 
 test("POST /api/open says so when the editor can't be started", async (t) => {

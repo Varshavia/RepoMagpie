@@ -6,6 +6,7 @@ import { editNote, noteVersion } from "./edit.ts";
 import { fakeFetch, recorded } from "./fixtures/fake-fetch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import {
+  createTagList,
   locateNote,
   noteDocument,
   noteListDocument,
@@ -124,13 +125,36 @@ test("Settings: a project journal not created yet is where it would be; none whe
 
 // --- Tag list ---
 
-test("Tag list: the journal's tags.md, or the starter list for a journal not created yet", () => {
+test("Tag list: the journal's tags.md, or the starter list for a journal not created yet; exists says whether tags.md is there", () => {
   const s = setup();
-  assert.deepEqual(tagListDocument("personal", s.context), { outcome: "ok", document: { journal: "personal", tags: ["pdf", "testing"] } });
-  assert.deepEqual(tagListDocument("project", s.context).document, { journal: "project", tags: [] });
+  assert.deepEqual(tagListDocument("personal", s.context), { outcome: "ok", document: { journal: "personal", tags: ["pdf", "testing"], exists: true } });
+  assert.deepEqual(tagListDocument("project", s.context).document, { journal: "project", tags: [], exists: false });
   const fresh = join(s.base, "fresh");
   mkdirSync(join(fresh, ".git"), { recursive: true });
-  assert.deepEqual(tagListDocument("project", { ...s.context, cwd: fresh }).document, { journal: "project", tags: parseTagList(STARTER_TAGS) });
+  assert.deepEqual(tagListDocument("project", { ...s.context, cwd: fresh }).document, { journal: "project", tags: parseTagList(STARTER_TAGS), exists: false });
+});
+
+// Only on the user's click in the app (spec §3, schema rule 5): magpie never adds it on its own to a
+// journal that has notes.
+test("createTagList writes the starter list to a journal without tags.md, and returns the Tag list", () => {
+  const s = setup();
+  const result = createTagList("project", s.context);
+  assert.deepEqual(result, { outcome: "ok", document: { journal: "project", tags: parseTagList(STARTER_TAGS), exists: true } });
+  assert.equal(readFileSync(join(s.project, ".magpie", "tags.md"), "utf8"), STARTER_TAGS);
+});
+
+test("createTagList never overwrites an existing tags.md; it returns that list", () => {
+  const s = setup();
+  assert.deepEqual(createTagList("personal", s.context), { outcome: "ok", document: { journal: "personal", tags: ["pdf", "testing"], exists: true } });
+  assert.equal(readFileSync(join(s.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
+});
+
+test("createTagList without a project journal fails, as the Tag list does, and writes nothing", () => {
+  const s = setup();
+  const result = createTagList("project", { ...s.context, cwd: s.context.home });
+  assert.equal(result.outcome, "failed");
+  assert.deepEqual({ ...result.document, error: undefined }, { journal: "project", tags: [], exists: false, error: undefined });
+  assert.deepEqual(readdirSync(s.context.home), []);
 });
 
 // --- Note list ---

@@ -103,6 +103,8 @@ test("cross-origin and Origin-less writes get 403", async (t) => {
     assert.equal(r.status, 403, String(origin));
   }
   assert.equal(existsSync(box.note("npm--left-pad.md")), false);
+  for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "project" }, { origin })).status, 403, `tags ${origin}`);
+  assert.equal(existsSync(join(box.project, ".magpie", "tags.md")), false);
   for (const origin of [`http://127.0.0.1:${server.port}`, `http://localhost:${server.port}`]) {
     const r = await http.write("POST", "/api/note/preview", { target: "pkg:npm/left-pad", to: "personal" }, { origin });
     assert.equal(r.status, 200, origin);
@@ -167,6 +169,7 @@ test("no path from a request reaches the file system: traversal in every paramet
     ok(await http.get(`/api/note?journal=${q}&id=pkg%3Anpm%2Fpdfkit`), `journal ${p}`);
     ok(await http.get(`/api/notes?journal=${q}`), `notes journal ${p}`);
     ok(await http.get(`/api/tags?journal=${q}`), `tags journal ${p}`);
+    ok(await http.write("POST", "/api/tags", { journal: p }), `create tags journal ${p}`);
     ok(await http.get(`/api/search?q=pdf&journal=${q}`), `search journal ${p}`);
     ok(await http.write("PATCH", "/api/note", { journal: "personal", id: p, version: "sha256:0", fields: { rating: 1 } }), `patch id ${p}`);
     ok(await http.write("PATCH", "/api/note", { journal: p, id: "pkg:npm/pdfkit", version: "sha256:0" }), `patch journal ${p}`);

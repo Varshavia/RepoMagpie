@@ -2,10 +2,10 @@
 // Note list, Note and Note preview, and the edit of one note. The local app's API returns them as
 // they are. Notes are found only by their id, or by a file name equal to one in the journal's
 // notes/ listing: no request text is ever joined to a path. Never prints.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
-import { journalTagList, listNotes, type Place } from "./journals.ts";
+import { journalTagList, listNotes, STARTER_TAGS, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
 import { noteSignature, readCacheEntries, writeCache } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
@@ -43,13 +43,30 @@ export function settingsDocument(place: Place): SettingsJson {
 export interface TagListJson {
   journal: Scope;
   tags: string[];
+  exists: boolean; // whether the journal has its tags.md
   error?: string;
 }
 
 export function tagListDocument(scope: Scope, place: Place): Result<TagListJson> {
   const journal = locateJournal(scope, place);
-  if (journal.error) return { outcome: "failed", document: { journal: scope, tags: [], error: journal.error } };
-  return { outcome: "ok", document: { journal: scope, tags: journalTagList(journal.path) } };
+  if (journal.error) return { outcome: "failed", document: { journal: scope, tags: [], exists: false, error: journal.error } };
+  return { outcome: "ok", document: { journal: scope, tags: journalTagList(journal.path), exists: existsSync(join(journal.path, "tags.md")) } };
+}
+
+// "Create tag list" in the app: the starter list, written to a journal without tags.md, only on the
+// user's click (spec §3, schema rule 5). An existing tags.md is never overwritten.
+export function createTagList(scope: Scope, place: Place): Result<TagListJson> {
+  const journal = locateJournal(scope, place);
+  if (journal.error) return tagListDocument(scope, place);
+  try {
+    mkdirSync(journal.path, { recursive: true });
+    writeFileSync(join(journal.path, "tags.md"), STARTER_TAGS, { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      return { outcome: "failed", document: { journal: scope, tags: [], exists: false, error: `Couldn't write tags.md: ${(error as Error).message}` } };
+    }
+  }
+  return tagListDocument(scope, place);
 }
 
 // --- Note list ---
