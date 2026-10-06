@@ -102,7 +102,7 @@ Shows what the user already has that fits a project.
 - It narrows candidates by keyword and tags (section 5) and prints them Verdict first. The coding agent makes the semantic choice, guided by RepoMagpie's `SKILL.md`. No embeddings in v0.1.
 - Flags: `--limit <n>` (default 20), `--journal personal|project` (one journal, for the candidates and the avoid group).
 - **The project's own dependencies are never candidates.** A dependency that has an avoid note (decision 0024's rule, as in section 6) is listed apart, in `in_use_avoid`, whatever the keywords: "Already in use, you noted to avoid".
-- **Nothing to go on** (no manifest, no README and no description, or a description of stop words only): a usage error (exit 2) that asks for a description.
+- **Nothing to go on** (no manifest, no README and no description, or a description of stop words and common words only): a usage error (exit 2) that asks for a description.
 - Output: one row per candidate, as for `search` (section 8), with a why line after the Verdict (`Why: dependency @playwright/test; matched coding, agent`), then the avoid group under its heading, on stdout; the count and the hint on stderr (`3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.`). No candidate: `No notes match: <keywords>.` on stderr, exit 0.
 
 `--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "why": {"keywords": [...], "dependencies": [...]}, "path": "..."}], "in_use_avoid": [<a match as in recall --json>]}`
@@ -183,10 +183,11 @@ Starts the local app: a server on `127.0.0.1` that serves the app and a JSON API
 
 Documents that the local app's API returns and no v0.1 command prints yet ([decision 0023](decisions/0023-api-is-the-json-contract.md)). Like the `--json` documents above, they are a public interface, and a future command that shows the same data prints the same document. Keys are snake_case; dates are `YYYY-MM-DD` strings; a failure adds `"error"` as in section 1.
 
-**Settings.** The journals in use, and whether a GitHub token is set. The token's value never appears.
+**Settings.** The home directory, the journals in use, and whether a GitHub token is set. The token's value never appears. The app uses `home` to show paths under it with `~`, as `magpie recall` prints them.
 
 ```json
 {"version": "0.1.0",
+ "home": "/home/ana",
  "journals": {"personal": {"path": "/home/ana/.magpie", "exists": true},
               "project": {"path": "/work/app/.magpie", "exists": false}},
  "github_token_set": true}
@@ -311,7 +312,7 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 - **Comparing names:** case-insensitive, and `_`, `.` and `-` count as the same character (PyPI's rule, applied to every type for name-only matches). An npm scope is part of the name: `@types/node` doesn't match `node`.
 
 **Suggest** narrows; the agent decides:
-1. Collect keywords: dependency names from the manifests (every dependency table: `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`; PEP 621 and PEP 735 lists and Poetry's tables; Cargo's dependency tables, also per target and for the workspace), `keywords` and `description` from `package.json`, `pyproject.toml` or `Cargo.toml`, and the README's first heading and paragraph. Or the words of the description. Words are lowercased, each kept once, without stop words and numbers; a package name splits into its words (`@types/node` → `types`, `node`).
+1. Collect keywords: dependency names from the manifests (every dependency table: `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`; PEP 621 and PEP 735 lists and Poetry's tables; Cargo's dependency tables, also per target and for the workspace), `keywords` and `description` from `package.json`, `pyproject.toml` or `Cargo.toml`, and the README's first heading and paragraph. Or the words of the description. Words are lowercased, each kept once, without stop words, common words and numbers; a package name splits into its words (`@types/node` → `node`). Common words are those almost any project's manifests and README contain, so they only bring coincidences: for example `about`, `before`, `code`, `install`, `js`, `plugin`, `types`, `checkout`, `end` (the list is in `src/core/suggest.ts`). They never show in the why line.
 2. Score notes by keyword search over the same index as `search`, with prefix matching but no fuzzy matching (fuzzy turns `test` into `rest` and `text`), plus one point per matching tag: a tag that is a keyword, or a hyphenated tag whose every word is one. A keyword of four letters or more loses one trailing "s" before the lookup, so `tests` finds `test` (and, by prefix, `tests` and `testing`). A completed skill line counts for its note.
 3. Leave out what the project already uses: every note recall would match for one of its dependencies (exact, else name-only). Those that are avoid notes go to `in_use_avoid`.
 4. **Relative cutoff:** leave out every candidate scoring under a fifth (0.2) of the best candidate's score. Picked with the quality tests (`src/core/suggest-quality.test.ts`, over the example vault): the notes they expect score 0.43 of the best or more; notes that share only a word or two with the project ("agent", "app") score 0.14 or less. Without it, suggest on RepoMagpie itself listed every note in the example vault, open-lakehouse included.
@@ -491,7 +492,7 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 | Typecheck (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
 | Node type definitions (dev only) | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) `^22.20.5` | MIT | 1 (`undici-types` 6.21.0, MIT, no dependencies) | ~2.3 MB | released 2026-10-01; stays on major 22 to match the Node floor | ~535M | approved |
 
-The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle, so the package's runtime dependencies stay the four above. Since [decision 0025](decisions/0025-bundle-the-cli.md), Vite also bundles the CLI, those four included.
+The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle. Since [decision 0025](decisions/0025-bundle-the-cli.md), Vite also bundles the CLI, the four libraries above included, so they are devDependencies too (since `feat/launch-prep`): the published package has no runtime dependencies.
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.

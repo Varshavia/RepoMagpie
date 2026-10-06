@@ -21,6 +21,7 @@ const SCOPES: readonly string[] = ["personal", "project"];
 
 export interface SettingsJson {
   version: string;
+  home: string; // the home directory, so the app can show paths under it with ~
   journals: { personal: { path: string; exists: boolean }; project: { path: string; exists: boolean } | null };
   github_token_set: boolean;
 }
@@ -30,6 +31,7 @@ export function settingsDocument(place: Place): SettingsJson {
   const project = locateJournal("project", place);
   return {
     version: packageVersion(),
+    home: place.home,
     journals: {
       personal: { path: personal.path, exists: existsSync(personal.path) },
       project: project.error ? null : { path: project.path, exists: existsSync(project.path) },

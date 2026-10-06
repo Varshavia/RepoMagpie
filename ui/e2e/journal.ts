@@ -92,6 +92,7 @@ export const BROKEN = "---\nid: [broken\n---\n\n## Verdict\nsomething\n";
 
 export interface Journal {
   root: string;
+  home: string; // the home directory magpie ui runs with (HOME, USERPROFILE): never the real one
   journal: string;
   project: string;
   note: (file: string, scope?: "personal" | "project") => string;
@@ -103,8 +104,11 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
   mkdirSync(SCRATCH, { recursive: true });
   const root = mkdtempSync(join(SCRATCH, "journal-"));
   mkdirSync(join(root, ".git")); // a fence: no walk for a git root or .magpie leaves the folder
-  const journal = join(root, "journal");
-  const project = join(root, "project");
+  // A fake home, so the app shows paths as ~/.magpie/notes/… and nothing of the machine it runs on
+  // (screenshots), and magpie never reads the real ~/.magpie/config.yaml.
+  const home = join(root, "home");
+  const journal = join(home, ".magpie");
+  const project = join(home, "code", "app");
   const notes = join(journal, "notes");
   mkdirSync(notes, { recursive: true });
   mkdirSync(join(project, ".git"), { recursive: true });
@@ -141,6 +145,7 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
   }
   return {
     root,
+    home,
     journal,
     project,
     note: (file, scope = "personal") => (scope === "personal" ? join(notes, file) : join(project, ".magpie", "notes", file)),
@@ -155,7 +160,7 @@ export interface Running {
 
 // magpie ui --no-open --json, from the source, on the journal; resolves once it prints its URL.
 export function startMagpie(j: Journal): Promise<Running> {
-  const env: Record<string, string | undefined> = { ...process.env, MAGPIE_HOME: j.journal };
+  const env: Record<string, string | undefined> = { ...process.env, HOME: j.home, USERPROFILE: j.home, MAGPIE_HOME: j.journal };
   delete env.GITHUB_TOKEN;
   const child: ChildProcess = spawn(process.execPath, [join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: j.project, env, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";

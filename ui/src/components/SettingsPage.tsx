@@ -1,6 +1,7 @@
 // Settings (docs/ui.md §7; read-only in v0.1): the journals, whether GITHUB_TOKEN is set (never its
 // value), the version, links to the docs. The theme is this browser's choice, not a journal setting.
 import type { SettingsJson } from "../api.ts";
+import { homePath } from "../logic/text.ts";
 import type { Theme } from "../platform.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
 
@@ -30,14 +31,14 @@ export function SettingsPage({ settings, error, theme, onTheme, onKeys }: Props)
           <dl className="facts">
             <dt>Personal</dt>
             <dd>
-              <span className="mono">{settings.journals.personal.path}</span>
+              <span className="mono">{homePath(settings.journals.personal.path, settings.home)}</span>
               {settings.journals.personal.exists ? null : <span className="field-help"> (created by the first note)</span>}
             </dd>
             <dt>Project</dt>
             <dd>
               {settings.journals.project ? (
                 <>
-                  <span className="mono">{settings.journals.project.path}</span>
+                  <span className="mono">{homePath(settings.journals.project.path, settings.home)}</span>
                   {settings.journals.project.exists ? null : <span className="field-help"> (created by the first note saved to it)</span>}
                 </>
               ) : (

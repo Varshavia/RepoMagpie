@@ -99,10 +99,11 @@ function setup(files: Record<string, string> = {}) {
 
 // --- Settings ---
 
-test("Settings: both journals with their paths, and whether a GitHub token is set", () => {
+test("Settings: the home directory, both journals with their paths, and whether a GitHub token is set", () => {
   const s = setup();
   assert.deepEqual(settingsDocument(s.context), {
     version: packageVersion(),
+    home: s.context.home,
     journals: { personal: { path: s.journal, exists: true }, project: { path: join(s.project, ".magpie"), exists: true } },
     github_token_set: false,
   });
