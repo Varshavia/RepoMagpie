@@ -87,6 +87,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `server/` (`magpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
 | `ui/` | The local app (React, Vite): `src/` (components, the API client, and `logic/` with unit tests), `e2e/` (Playwright), its `tsconfig.json`, `vite.config.ts` and `playwright.config.ts`. Built into `dist/ui/`, which `magpie ui` serves ([UI](docs/ui.md)). |
 | `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`), the link check (`npm run check:links`) and the app's size check (`npm run check:bundle`). Typechecked (the `.ts` files), not built or published. |
+| `skills/repomagpie/` | The agent skill: `SKILL.md` and `references/` (Agent Skills format; the folder name is the skill's name). No code; `src/cli/skill.test.ts` checks it ([standards](docs/standards.md)). |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
 | `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
