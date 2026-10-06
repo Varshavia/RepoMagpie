@@ -8,11 +8,12 @@ export interface Magpie extends Journal {
   open: (page: Page) => Promise<void>;
 }
 
-export const test = base.extend<{ magpie: Magpie; generated: number; empty: boolean }>({
+export const test = base.extend<{ magpie: Magpie; generated: number; empty: boolean; screens: boolean }>({
   generated: [0, { option: true }],
   empty: [false, { option: true }],
-  magpie: async ({ generated, empty }, use) => {
-    const journal = makeJournal({ generated, empty });
+  screens: [false, { option: true }],
+  magpie: async ({ generated, empty, screens }, use) => {
+    const journal = makeJournal({ generated, empty, screens });
     const server = await startMagpie(journal);
     await use({
       ...journal,
