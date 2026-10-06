@@ -63,12 +63,13 @@ skills/
   repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
                SKILL.md, and references/json.md (the --json fields it reads); src/cli/skill.test.ts
                checks it against magpie --help and the spec's --json shapes
-scripts/       the test runner with the ~/.magpie canary, benchmarks, the link check; not part of the package
+scripts/       the test runner with the ~/.magpie canary, the CLI's build (build-cli.ts: Vite bundles src/cli/main.ts
+               into dist/cli/, decision 0025) and its check, benchmarks, the link check; not part of the package
 ```
 
 Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's logic tests (`ui/src/logic/*.test.ts`) run in `npm test` too. Its end-to-end tests use `@playwright/test` against `magpie ui` on a journal in `.scratch/e2e/` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
 
-`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API. It imports only types from `core/` (the API's documents); what it needs at run time is mirrored, and tests keep each mirror equal to core's: the kinds, the draft marker, the avoid rule and the readable PURL in `ui/src/logic/schema.ts`, and the import item rule and its no-items hint in `ui/src/logic/importing.ts`.
+`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API. It imports only types from `core/` (the API's documents); what it needs at run time is mirrored, and tests keep each mirror equal to core's: the kinds, the draft marker, the avoid rule and the readable PURL in `ui/src/logic/schema.ts`, the import item rule and its no-items hint in `ui/src/logic/importing.ts`, and suggest's why line (as `magpie suggest` prints it) in `ui/src/logic/suggest.ts`.
 
 ### Future components
 

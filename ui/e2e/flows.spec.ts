@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
 import { runSuggest } from "../../src/core/suggest.ts";
+import { whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
 import { PDFKIT } from "./journal.ts";
@@ -331,7 +332,11 @@ test("suggest: what magpie suggest finds for this project, in its order; the in-
   await expect(page.getByRole("heading", { level: 1, name: "Suggest for this project" })).toBeVisible();
   const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
   await expect(rows).toHaveCount(expected.candidates.length + 1);
-  for (const [i, c] of expected.candidates.entries()) await expect(rows.nth(i)).toContainText(c.name);
+  for (const [i, c] of expected.candidates.entries()) {
+    await expect(rows.nth(i)).toContainText(c.name);
+    await expect(rows.nth(i)).toContainText(whyLine(c.why));
+  }
+  await expect(rows.last()).not.toContainText("Why:");
   await expect(rows.last()).toContainText("pdfkit");
   await expect(rows.last()).toContainText("In use, avoid");
   await expect(rows.last()).toContainText("avoid: async streams painful");

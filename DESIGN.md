@@ -100,6 +100,7 @@ spacing:
   section: 48px
   row-height: 32px
   list-row-height: 52px
+  list-row-tall-height: 72px
   sidebar-width: 232px
   list-width: 360px
 components:
@@ -136,6 +137,9 @@ components:
     textColor: "{colors.ink}"
   list-row-secondary:
     textColor: "{colors.ink-muted}"
+    typography: "{typography.body-sm}"
+  list-row-why:
+    textColor: "{colors.ink-subtle}"
     typography: "{typography.body-sm}"
   note-title:
     textColor: "{colors.ink}"
@@ -365,7 +369,7 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 ## Layout
 
 ### Spacing System
-A 4 px base: `xxs` 2, `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32, `section` 48. List rows are 52 px high, two lines (`list-row-height`); palette rows 32 px (`row-height`); sidebar items 28 px.
+A 4 px base: `xxs` 2, `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32, `section` 48. List rows are 52 px high, two lines (`list-row-height`); Suggest's rows 72 px, three lines (`list-row-tall-height`); palette rows 32 px (`row-height`); sidebar items 28 px.
 
 ### Three panes
 - **Sidebar** (`sidebar-width`, 232 px): journal switcher (Personal / Project), Inbox with a count, kinds, tags, settings.
@@ -397,7 +401,7 @@ No other radii, and no mixing within one component.
 Every interactive component has these states: default, hover, focus-visible (a 2 px `focus` ring, offset 2 px), active or selected, disabled (opacity 0.5, no pointer events), and, where it applies, loading and error.
 
 - **Sidebar item:** icon, label, count on the right. Active: `surface-3` and `ink`.
-- **List row:** two lines. Line 1: the name (cut with `…`, the full name on hover) and the PURL type on the right; in search, also the journal. Line 2: the Verdict in `ink-muted`, or "no verdict yet". The "Inbox" badge appears where a list mixes statuses, not in the Inbox itself. Selected: `accent-wash` and a 2 px `accent` edge on the left. Keyboard focus moves the selection (`j`/`k`); `Enter` opens.
+- **List row:** two lines. Line 1: the name (cut with `…`, the full name on hover) and the PURL type on the right; in search, also the journal. Line 2: the Verdict in `ink-muted`, or "no verdict yet". In Suggest, line 3: why the note is a candidate, in `ink-subtle` ("Why: dependency @playwright/test; matched coding, agent"). The "Inbox" badge appears where a list mixes statuses, not in the Inbox itself. Selected: `accent-wash` and a 2 px `accent` edge on the left. Keyboard focus moves the selection (`j`/`k`); `Enter` opens.
 - **Verdict hero:** the Verdict in `verdict` type on `surface-1`, with a 3 px `accent` edge on the left in both themes, so it stands out from the page in light too. Empty: "No verdict yet" in `ink-muted`, with a `hairline-strong` edge and a "Write the Verdict" action.
 - **Section label:** "Use when", "Avoid when", "What it does", and so on. "Avoid when" is `danger` only when the section has text; an empty one stays `ink-subtle`.
 - **Links:** `ink` with an underline in `hairline-strong`, `currentColor` on hover. The underline marks a link, not the colour.
