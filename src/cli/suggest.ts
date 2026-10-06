@@ -1,7 +1,7 @@
 // magpie suggest ["description"] (spec §2, §5, §8): the human output of core's runSuggest.
 import { exitCode } from "../core/outcome.ts";
 import type { JournalSource } from "../core/search.ts";
-import { runSuggest } from "../core/suggest.ts";
+import { runSuggest, type Candidate } from "../core/suggest.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 import { INBOX, purlType, renderRows } from "./results.ts";
@@ -12,6 +12,16 @@ export interface SuggestOptions extends GlobalOptions {
 }
 
 const verdictLine = (verdict: string | null) => (verdict === null ? `${INBOX} no verdict yet` : `Verdict: ${verdict}`);
+
+// Why a note is a candidate: the dependencies it matched, then the other keywords it matched.
+export function whyLine(why: Candidate["why"]): string {
+  const covered = new Set(why.dependencies.flatMap((name) => name.toLowerCase().split(/[^a-z0-9]+/)));
+  const words = why.keywords.filter((k) => !covered.has(k));
+  const parts = [];
+  if (why.dependencies.length) parts.push(`${why.dependencies.length === 1 ? "dependency" : "dependencies"} ${why.dependencies.join(", ")}`);
+  if (words.length) parts.push(`matched ${words.join(", ")}`);
+  return `Why: ${parts.join("; ")}`;
+}
 
 export async function suggestCommand(description: string | undefined, options: SuggestOptions, io: Io): Promise<number> {
   const run = runSuggest({ description, limit: options.limit, journal: options.journal }, contextOf(io, options));
@@ -26,7 +36,7 @@ export async function suggestCommand(description: string | undefined, options: S
   }
 
   const { candidates, in_use_avoid: avoid, keywords } = run.document;
-  const lines = renderRows(candidates.map((c, i) => [String(i + 1), c.name, purlType(c.id), c.journal, verdictLine(c.verdict)]), io);
+  const lines = renderRows(candidates.map((c, i) => [String(i + 1), c.name, purlType(c.id), c.journal, verdictLine(c.verdict)]), io, candidates.map((c) => [whyLine(c.why)]));
   if (avoid.length) {
     if (lines.length) lines.push("");
     lines.push("Already in use, you noted to avoid:");

@@ -48,7 +48,7 @@ magpie suggest --json
 magpie suggest "<what the project does>" --json
 ```
 
-Without a description, suggest reads the project's manifests and README. Its candidates are keyword matches, not answers: you make the semantic choice. Pick the candidates that fit what the project needs, and give one line per pick on why (from its `verdict`, its `tags` and the project). Leave out the ones that don't fit, and say so when none does. Mention every item of `in_use_avoid`: a package the project already uses that the user noted to avoid. Exit 2 means there was nothing to go on: ask the user for a one-line description. Install or adopt nothing from the list without asking.
+Without a description, suggest reads the project's manifests and README. Its candidates are keyword matches, not answers: you make the semantic choice. Pick the candidates that fit what the project needs, and give one line per pick on why (from its `verdict`, its `tags`, `why` and the project). Leave out the ones that don't fit, and say so when none does. Mention every item of `in_use_avoid`: a package the project already uses that the user noted to avoid. Exit 2 means there was nothing to go on: ask the user for a one-line description. Install or adopt nothing from the list without asking.
 
 ## Recording an opinion
 

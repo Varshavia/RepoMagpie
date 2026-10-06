@@ -103,11 +103,12 @@ Shows what the user already has that fits a project.
 - Flags: `--limit <n>` (default 20), `--journal personal|project` (one journal, for the candidates and the avoid group).
 - **The project's own dependencies are never candidates.** A dependency that has an avoid note (decision 0024's rule, as in section 6) is listed apart, in `in_use_avoid`, whatever the keywords: "Already in use, you noted to avoid".
 - **Nothing to go on** (no manifest, no README and no description, or a description of stop words only): a usage error (exit 2) that asks for a description.
-- Output: one row per candidate, as for `search` (section 8), then the avoid group under its heading, on stdout; the count and the hint on stderr (`3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.`). No candidate: `No notes match: <keywords>.` on stderr, exit 0.
+- Output: one row per candidate, as for `search` (section 8), with a why line after the Verdict (`Why: dependency @playwright/test; matched coding, agent`), then the avoid group under its heading, on stdout; the count and the hint on stderr (`3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.`). No candidate: `No notes match: <keywords>.` on stderr, exit 0.
 
-`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "path": "..."}], "in_use_avoid": [<a match as in recall --json>]}`
+`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "why": {"keywords": [...], "dependencies": [...]}, "path": "..."}], "in_use_avoid": [<a match as in recall --json>]}`
 
 - `keywords` are the words looked for, in order (section 5).
+- `why.keywords` are the keywords the note matched, in the same order. `why.dependencies` are the project's dependencies whose every word the note matched (`@playwright/test` for a note that matched `playwright` and `test`); `[]` for a description. The why line names the dependencies, then the other matched keywords.
 - `verdict` is `null` for a note without one, as in `search`. `in_use_avoid` items have the shape of `recall --json` matches, with `query` the dependency's name.
 
 ### `magpie adopt <name>`
@@ -311,9 +312,10 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 
 **Suggest** narrows; the agent decides:
 1. Collect keywords: dependency names from the manifests (every dependency table: `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`; PEP 621 and PEP 735 lists and Poetry's tables; Cargo's dependency tables, also per target and for the workspace), `keywords` and `description` from `package.json`, `pyproject.toml` or `Cargo.toml`, and the README's first heading and paragraph. Or the words of the description. Words are lowercased, each kept once, without stop words and numbers; a package name splits into its words (`@types/node` → `types`, `node`).
-2. Score notes by keyword search (as in `search`) plus one point per matching tag: a tag that is a keyword, or a hyphenated tag whose every word is one. A completed skill line counts for its note.
+2. Score notes by keyword search over the same index as `search`, with prefix matching but no fuzzy matching (fuzzy turns `test` into `rest` and `text`), plus one point per matching tag: a tag that is a keyword, or a hyphenated tag whose every word is one. A keyword of four letters or more loses one trailing "s" before the lookup, so `tests` finds `test` (and, by prefix, `tests` and `testing`). A completed skill line counts for its note.
 3. Leave out what the project already uses: every note recall would match for one of its dependencies (exact, else name-only). Those that are avoid notes go to `in_use_avoid`.
-4. Return the top candidates, Verdict first: `reviewed` before `inbox`, then by score; the same note in both journals, the project's first (section 3).
+4. **Relative cutoff:** leave out every candidate scoring under a fifth (0.2) of the best candidate's score. Picked with the quality tests (`src/core/suggest-quality.test.ts`, over the example vault): the notes they expect score 0.43 of the best or more; notes that share only a word or two with the project ("agent", "app") score 0.14 or less. Without it, suggest on RepoMagpie itself listed every note in the example vault, open-lakehouse included.
+5. Return the top candidates, Verdict first: `reviewed` before `inbox`, then by score; the same note in both journals, the project's first (section 3).
 
 **Search** indexes, per note: `name`, `id`, `tags`, Verdict, "Use when", "Avoid when", "What it does" and "My notes"; and each completed skill line as its own document. Prefix and fuzzy matching are on. Results rank `reviewed` (and completed skill lines) before `inbox`, then by relevance; a skill result's Verdict is its own text (section 2).
 
@@ -453,13 +455,13 @@ $ magpie search pdf | cat
 3  pdf-lib    npm  personal  [inbox] no verdict yet
 ```
 
-Suggest list (the hint goes to stderr):
+Suggest list, piped (the hint goes to stderr; in a terminal, the why line follows the Verdict on its own line):
 
 ```
-$ magpie suggest "a TypeScript CLI with tests"
-1  commander  npm  project   Verdict: our CLI parser
-2  commander  npm  personal  Verdict: fine for small CLIs
-3  tsx        npm  personal  [inbox] no verdict yet
+$ magpie suggest "a TypeScript CLI with tests" | cat
+1  commander  npm  project   Verdict: our CLI parser  Why: matched cli
+2  commander  npm  personal  Verdict: fine for small CLIs  Why: matched cli
+3  tsx        npm  personal  [inbox] no verdict yet  Why: matched typescript
 
 Already in use, you noted to avoid:
   pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer
@@ -473,7 +475,7 @@ Already in use, you noted to avoid:
 - **TypeScript on Node.js.** `engines.node` is `>=22.12.0`, the floor commander 15 requires; CI runs the tests on Node 22, 24 and 26, on Linux and Windows.
 - **ESM only:** `"type": "module"`. The published package contains compiled JavaScript and one `bin` entry, `magpie`.
 - **Source under type stripping:** contributors run the `.ts` source directly on Node 22.18.0 or later. `tsconfig.json` follows the [Node.js recommendation](https://nodejs.org/api/typescript.html): `module: nodenext`, `target: esnext`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`. In practice: no enums or namespaces, types imported with `import type`, and file extensions in every import.
-- **Build:** `tsc` compiles to `dist/` for publishing only; tests run on the source.
+- **Build:** for publishing only, Vite bundles the CLI and its libraries into `dist/cli/`: `main.js` and the chunks it loads on demand, with the libraries' licences in `THIRD-PARTY-LICENSES.md` ([decision 0025](decisions/0025-bundle-the-cli.md)). `tsc` only typechecks; tests run on the source. `npm run check:build` checks that the bundle answers as the source does.
 - **Tests:** `node:test`, with fixture journals and no network, as for git-guard.
 
 ### Libraries (dependency policy check)
@@ -486,10 +488,10 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 | Keyword search | [MiniSearch](https://github.com/lucaong/minisearch) 7.2.0 | MIT | 0 | 807 kB (several builds) | released and last pushed 2025-09-16; small, stable | ~3.9M | approved |
 | YAML frontmatter | [yaml](https://github.com/eemeli/yaml) 2.9.1 | ISC | 0 | 670 kB | released 2026-09-11; repo active (2026-09-23) | ~258M | approved |
 | PURL | [packageurl-js](https://github.com/package-url/packageurl-js) 2.0.1 | MIT | 0 | 56 kB | released 2024-09-04; repo active (2026-08-24) | ~2.6M | approved |
-| Build (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
+| Typecheck (dev only) | [typescript](https://github.com/microsoft/TypeScript) 7.0.2 | Apache-2.0 | 20 (optional per-platform compiler binaries; one installs) | 2 MB | released 2026-07-08 | ~355M | approved |
 | Node type definitions (dev only) | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) `^22.20.5` | MIT | 1 (`undici-types` 6.21.0, MIT, no dependencies) | ~2.3 MB | released 2026-10-01; stays on major 22 to match the Node floor | ~535M | approved |
 
-The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle, so the package's runtime dependencies stay the four above.
+The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle, so the package's runtime dependencies stay the four above. Since [decision 0025](decisions/0025-bundle-the-cli.md), Vite also bundles the CLI, those four included.
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.

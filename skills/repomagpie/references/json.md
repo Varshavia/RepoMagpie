@@ -33,10 +33,12 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 
 - `source`: `"manifests"` (read from the project) or `"description"`.
 - `keywords`: the words it looked for.
-- `candidates[]`: notes that match the keywords, reviewed first. Never a package the project already uses.
+- `candidates[]`: notes that match the keywords, reviewed first. Never a package the project already uses. Notes that score under a fifth of the best candidate are left out.
 - `candidates[].name`, `candidates[].id`, `candidates[].journal`: which note.
 - `candidates[].verdict`: the Verdict, or `null` for an inbox note.
 - `candidates[].tags`: the note's tags.
+- `candidates[].why.keywords`: the keywords the note matched. One or two common words ("agent", "app") is a weak reason.
+- `candidates[].why.dependencies`: the project's dependencies the note matched by name, such as `@playwright/test`; `[]` for a description.
 - `candidates[].status`: `"reviewed"` or `"inbox"`.
 - `candidates[].path`: the note's file; read it when the Verdict and tags aren't enough to judge the fit.
 - `in_use_avoid[]`: packages the project already uses that have an avoid note, each shaped like a recall match.
