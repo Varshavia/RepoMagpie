@@ -1,5 +1,6 @@
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
+import type { AdoptOptions } from "./adopt.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
@@ -9,6 +10,7 @@ import type { ImportOptions } from "./import.ts";
 import type { NoteOptions } from "./note.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
+import type { SuggestOptions } from "./suggest.ts";
 import type { UiOptions } from "./ui.ts";
 
 // Each command's module is loaded only when that command runs, so a quick command (recall) doesn't
@@ -34,8 +36,6 @@ export interface Io {
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
-  { usage: "suggest [description]", summary: "show the notes that fit this project" },
-  { usage: "adopt <name>", summary: "copy a note into the project journal" },
   { usage: "init", summary: "draft notes from this project's manifests" },
 ];
 
@@ -92,6 +92,25 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--full", "show every section of each note")
     .action(async (packages: string[], _options: unknown, command: Command) => {
       code = await (await import("./recall.ts")).recallCommand(packages, command.optsWithGlobals<RecallOptions>(), io);
+    });
+
+  program
+    .command("suggest")
+    .description("show the notes that fit this project")
+    .argument("[description]", "what the project does; default: its manifests and README")
+    .addOption(new Option("--journal <journal>", "read one journal only").choices(["personal", "project"]))
+    .option("--limit <n>", "show at most n candidates", positiveInteger, 20)
+    .action(async (description: string | undefined, _options: unknown, command: Command) => {
+      code = await (await import("./suggest.ts")).suggestCommand(description, command.optsWithGlobals<SuggestOptions>(), io);
+    });
+
+  program
+    .command("adopt")
+    .description("copy a note into the project journal")
+    .argument("<name-or-purl>", "a package name or PURL that has a note in your personal journal")
+    .addOption(new Option("--type <type>", "the package type of a bare name").choices(["npm", "pypi", "cargo"]))
+    .action(async (target: string, _options: unknown, command: Command) => {
+      code = await (await import("./adopt.ts")).adoptCommand(target, command.optsWithGlobals<AdoptOptions>(), io);
     });
 
   program
