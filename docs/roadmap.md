@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: suggest and adopt → agent skill and launch (recall, the UI server and the UI app are built).
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: agent skill and launch (recall, the UI server, the UI app, suggest and adopt are built).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -172,17 +172,21 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 **Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI. (On `feat/ui-app`, 2026-10-06, Windows dev machine: the inbox review end-to-end test reviews a note by keyboard in under a second of test time; first render with 2,000 notes 417 ms with a warm cache, 944 ms cold; the bundle 91.8 kB gzipped. CI runs the end-to-end flows in the "App build and end-to-end tests" job; not yet seen green in CI.)
 
 ### `magpie suggest`
-- [ ] Input: a project's manifests and README, or a free-text description.
-- [ ] Narrow candidates from both journals by keyword and tags; no embeddings.
-- [ ] Output: matching notes, verdict first. The coding agent makes the semantic choice, guided by `SKILL.md`.
+- [x] Input: a project's manifests and README, or a free-text description.
+- [x] Narrow candidates from both journals by keyword and tags; no embeddings.
+- [x] Output: matching notes, verdict first. The coding agent makes the semantic choice, guided by `SKILL.md`.
+- [x] The project's own dependencies are never suggested; those with an avoid note are listed apart ([spec](spec.md), section 2).
+- [x] In the local app: "Suggest for this project" ([UI](ui.md), section 7).
+- [x] Benchmark against the 500 ms budget (`scripts/bench-suggest.ts`; report only in CI).
 
-**Done when:** for three sample projects, the notes the maintainer expects are among the candidates.
+**Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. Open: the maintainer's real journal on RepoMagpie itself. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
 
 ### `magpie adopt <name>`
-- [ ] Copy a note from the personal journal into the project's `.magpie/`.
-- [ ] Print the install command. Never install anything.
+- [x] Copy a note from the personal journal into the project's `.magpie/`.
+- [x] Print the install command. Never install anything. A repository note with one package gets that package's command; with several, one command per package to choose from.
+- [x] In the local app: "Adopt to project" on a personal note ([UI](ui.md), section 7).
 
-**Done when:** after `adopt`, the project journal holds the note and nothing was installed.
+**Done when:** after `adopt`, the project journal holds the note and nothing was installed. (Met on `feat/suggest-adopt`: `src/core/adopt.test.ts` checks that only `.magpie/` appears in the project; the end-to-end test checks the same through the app.)
 
 ### Agent skill
 - [ ] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall.

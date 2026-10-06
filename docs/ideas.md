@@ -108,11 +108,11 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - **Input:** the project's manifests and README, or a free-text description ("a TypeScript CLI with tests").
   - **Output:** matching notes from both journals, verdict first.
   - **In v0.1, no embeddings:** magpie narrows the candidates by keyword and tags, and the coding agent makes the semantic choice, guided by `SKILL.md`.
-- **Surfaces:** CLI (`magpie suggest`); `SKILL.md`.
+- **Surfaces:** CLI (`magpie suggest`); `SKILL.md`; the local app ("Suggest for this project").
 - **Schema impact:** none planned.
 - **Target release:** v0.1.
 - **Open questions:**
-  - How many candidates does magpie hand to the agent?
+  - How many candidates does magpie hand to the agent? v0.1: 20 by default (`--limit`); the beta tests whether that fits.
   - Semantic matching (v0.3, with semantic search): does it replace the agent's choice or add to it?
 
 ## 5. Gap detection
@@ -195,9 +195,9 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Surfaces:** CLI (`magpie adopt`); the agent can run it through `SKILL.md`.
 - **Schema impact:** none; both journals use the same format ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - **Target release:** v0.1.
-- **Open questions:**
-  - If the project journal already has a note on the same package, does adopt merge, skip or ask?
-  - Adopting into a public repository makes the note public. Should adopt say so?
+- **Answered** ([spec](spec.md), section 2):
+  - If the project journal already has a note on the same package, adopt changes nothing and says where it is.
+  - Adopting into a public repository makes the note public, so adopt says who can read the project journal; the local app says it before it copies anything.
 
 ---
 

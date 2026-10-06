@@ -42,7 +42,9 @@ src/
                search: filters, ranking and results across journals
                install-detect: package installs in a shell command line
                recall: recall's matching rules, the journals it reads, its cache
-               match: suggest rules
+               manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
+               suggest: suggest's keywords, scoring and the project's dependencies left out
+               adopt: copying a personal note into the project journal; the install command
                github: repository metadata and SKILL.md detection
                capture: what note and import write for one item
                save: the journal to write to, saving one item; note and import runs with their --json documents
