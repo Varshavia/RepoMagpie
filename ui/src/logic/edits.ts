@@ -33,6 +33,12 @@ export function formOf(note: NoteJson): Form {
   };
 }
 
+// The line under a note's title: whether you ran it, and your rating; null when neither is set.
+export function triedLine({ tried, rating }: Pick<Form, "tried" | "rating">): string | null {
+  if (!tried && rating === null) return null;
+  return [tried ? "Tried" : "Not tried", ...(rating === null ? [] : [`rated ${rating} of 5`])].join(" · ");
+}
+
 // The PATCH body for the form's changes, or null when nothing changed or the note can't be edited.
 export function patchFor(note: NoteJson, form: Form): Patch | null {
   if (note.read_only || note.id === null || note.version === null) return null;

@@ -491,6 +491,8 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
   overflow-wrap: anywhere;
 }
 
+.note-tried { color: var(--ink-muted); }
+
 .note-purl {
   display: flex;
   align-items: center;

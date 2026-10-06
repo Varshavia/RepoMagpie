@@ -86,3 +86,11 @@ export function editableBody(body: string): string {
 export function obsidianUri(path: string): string {
   return `obsidian://open?path=${encodeURIComponent(path)}`;
 }
+
+// A path for people: under the home directory it starts with ~, as magpie recall and the hook print
+// it. The separator is the one the home directory uses (the app can't ask Node's path module).
+export function homePath(path: string, home: string | null): string {
+  if (!home) return path;
+  const sep = home.includes("\\") ? "\\" : "/";
+  return path.startsWith(home + sep) ? `~${path.slice(home.length)}` : path;
+}

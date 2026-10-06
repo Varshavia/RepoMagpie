@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { formOf, oneLine, parseTags, patchFor, tagProblems } from "./edits.ts";
+import { formOf, oneLine, parseTags, patchFor, tagProblems, triedLine } from "./edits.ts";
 
 // The edit the app sends (PATCH /api/note, spec "Editing a note"): only what the person changed,
 // with the version the note was read with.
@@ -39,4 +39,12 @@ test("oneLine: the Verdict is one line", () => {
 test("parseTags: commas or spaces, lowercase, no repeats; tagProblems names the ones core refuses", () => {
   assert.deepEqual(parseTags("PDF, testing  testing,agent-skills,"), ["pdf", "testing", "agent-skills"]);
   assert.deepEqual(tagProblems(["pdf", "agent_skills", "x-"]), ["agent_skills", "x-"]);
+});
+
+// The line under a note's title in the note view (docs/ui.md §7): whether you ran it, and your rating.
+test("triedLine: Tried and the rating; nothing for a note neither tried nor rated", () => {
+  assert.equal(triedLine({ tried: true, rating: 4 }), "Tried · rated 4 of 5");
+  assert.equal(triedLine({ tried: true, rating: null }), "Tried");
+  assert.equal(triedLine({ tried: false, rating: 2 }), "Not tried · rated 2 of 5");
+  assert.equal(triedLine({ tried: false, rating: null }), null);
 });

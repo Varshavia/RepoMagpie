@@ -5,13 +5,14 @@ import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { hookWouldAsk, packageLabel } from "../logic/schema.ts";
+import { homePath } from "../logic/text.ts";
 import { MOD } from "../platform.ts";
 import { FieldError } from "./common.tsx";
 import { TypeChoice } from "./fields.tsx";
 
 type Match = RecallJson["matches"][number];
 
-export function RecallPage() {
+export function RecallPage({ home }: { home: string | null }) { // paths under home are shown with ~
   const id = useId();
   const [text, setText] = useState("");
   const [type, setType] = useState<PackageType | "">("");
@@ -82,7 +83,7 @@ export function RecallPage() {
           {result.queries.map((q) => {
             const matches = result.matches.filter((m) => m.query === q);
             return matches.length ? (
-              matches.map((m) => <Card key={`${m.query} ${m.journal} ${m.id}`} match={m} />)
+              matches.map((m) => <Card key={`${m.query} ${m.journal} ${m.id}`} match={m} home={home} />)
             ) : (
               <p className="recall-card" key={q}>
                 <span>
@@ -99,7 +100,7 @@ export function RecallPage() {
   );
 }
 
-function Card({ match }: { match: Match }) {
+function Card({ match, home }: { match: Match; home: string | null }) {
   const ask = hookWouldAsk(match);
   const { type, name } = packageLabel(match.id);
   const draft = (list: "use_when" | "avoid_when") => (match.drafts as string[]).includes(list);
@@ -135,7 +136,7 @@ function Card({ match }: { match: Match }) {
           </span>
         </div>
       ) : null}
-      <p className="mono field-help">{match.path}</p>
+      <p className="mono field-help">{homePath(match.path, home)}</p>
     </article>
   );
 }

@@ -21,6 +21,7 @@ import type { Form } from "./logic/edits.ts";
 import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
+import { homePath } from "./logic/text.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
@@ -180,7 +181,8 @@ export function App() {
   const shown = search.status ? results.filter((r) => r.status === search.status) : results;
   const currentHit = shown.find((r) => resultKey(r) === hit) ?? null;
   const currentSuggestion = suggestions.find((s) => suggestKey(s) === hit) ?? null;
-  const projectRoot = settings?.journals.project ? settings.journals.project.path.replace(/[\\/]\.magpie$/, "") : null;
+  const home = settings?.home ?? null;
+  const projectRoot = settings?.journals.project ? homePath(settings.journals.project.path.replace(/[\\/]\.magpie$/, ""), home) : null;
   const allTags = useMemo(() => [...new Set([...tagLists.personal, ...tagLists.project])].sort(), [tagLists]);
 
   const select = useCallback((key: string | null, opts: { focus?: boolean; pane?: boolean } = {}) => {
@@ -354,6 +356,7 @@ export function App() {
       journal={scope}
       address={address}
       noteKey={key}
+      home={home}
       review={review}
       focusRequest={focus.key === key ? focus.n : 0}
       editRequest={editRequest}
@@ -493,7 +496,7 @@ export function App() {
         ) : view.page === "import" ? (
           <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />
         ) : view.page === "recall" ? (
-          <RecallPage />
+          <RecallPage home={home} />
         ) : (
           <SettingsPage settings={settings} error={settingsError} theme={theme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
         )}

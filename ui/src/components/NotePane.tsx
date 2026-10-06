@@ -4,9 +4,9 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { formOf, patchFor, type Form, type Patch } from "../logic/edits.ts";
+import { formOf, patchFor, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
-import { editableBody, firstEntries, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
+import { editableBody, firstEntries, homePath, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
@@ -16,6 +16,7 @@ export interface NotePaneProps {
   journal: Scope;
   address: Address;
   noteKey: string;
+  home: string | null; // paths under it are shown with ~
   review: boolean; // inbox review: an inbox note opens with the Verdict editor
   focusRequest: number; // > 0: take focus once the note has loaded
   editRequest: number; // grows with each press of e
@@ -44,7 +45,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote } = props;
+  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -157,6 +158,7 @@ export function NotePane(props: NotePaneProps) {
   const list = (key: string) => (Array.isArray(fm[key]) ? (fm[key] as unknown[]).filter((v): v is string => typeof v === "string") : []);
   const name = text("name") ?? note.file ?? "Note";
   const url = text("url");
+  const tried = triedLine(formOf(note));
   const patch = patchFor(note, form);
 
   async function submit(body: Patch, message: string): Promise<boolean> {
@@ -282,6 +284,7 @@ export function NotePane(props: NotePaneProps) {
             </h2>
             <StatusBadge status={note.status} readOnly={note.read_only} />
           </div>
+          {tried ? <p className="note-tried">{tried}</p> : null}
           {note.id ? (
             <p className="note-purl">
               <span className="mono" translate="no">
@@ -521,7 +524,7 @@ export function NotePane(props: NotePaneProps) {
         <footer className="note-foot">
           {note.path ? (
             <span className="mono" translate="no">
-              {note.path}
+              {homePath(note.path, home)}
             </span>
           ) : null}
           {text("explored") ? <span>Explored {text("explored")}</span> : null}
