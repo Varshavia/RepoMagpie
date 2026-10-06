@@ -1,6 +1,7 @@
 // The local app's API endpoints (docs/ui.md §6). Each one parses its request, calls src/core and
 // returns core's document with the status for its outcome; no logic of its own (decision 0023).
 // Security checks happen before a request gets here (server.ts).
+import { runAdopt } from "../core/adopt.ts";
 import {
   createTagList,
   emptyNote,
@@ -21,6 +22,7 @@ import type { Outcome } from "../core/outcome.ts";
 import { runRecall } from "../core/recall.ts";
 import { importFailure, runImport, runNote, type Context } from "../core/save.ts";
 import { runSearch } from "../core/search.ts";
+import { runSuggest } from "../core/suggest.ts";
 
 export interface ApiRequest {
   query: URLSearchParams;
@@ -157,6 +159,28 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
           return { status: 422, document: { opened: false, path, error: `Couldn't open the note: ${(error as Error).message}` } };
         }
         return { status: 200, document: { opened: true, path } };
+      },
+    },
+
+    "/api/suggest": {
+      GET: ({ query }) => {
+        const description = query.get("description") ?? undefined;
+        const empty = { source: description === undefined ? "manifests" : "description", keywords: [], candidates: [], in_use_avoid: [] };
+        const journal = query.has("journal") ? scope(query.get("journal")) : undefined;
+        if (journal === null) return bad(empty, JOURNAL);
+        const limit = query.has("limit") ? Number(query.get("limit")) : 20;
+        if (!Number.isInteger(limit) || limit < 1) return bad(empty, "limit must be a whole number of 1 or more.");
+        return reply(runSuggest({ description, journal, limit }, context));
+      },
+    },
+
+    "/api/adopt": {
+      POST: async ({ body }) => {
+        const empty = { id: null, from: null, to: null, install: null, install_choices: [] };
+        if (typeof body.target !== "string") return bad(empty, "target must be a package name or a PURL.");
+        const packageType = type(body.type);
+        if (packageType === null) return bad(empty, "type must be npm, pypi or cargo.");
+        return reply(await runAdopt({ target: body.target, type: packageType }, context));
       },
     },
 
