@@ -9,7 +9,7 @@ What we adopt, why, and how firmly. Researched October 2026.
 - Progressive disclosure: agents load only the short description until the skill is needed.
 
 **For RepoMagpie:**
-- We ship our own `SKILL.md` that teaches agents to call the `magpie` CLI (roadmap v0.1).
+- We ship our own `SKILL.md` that teaches agents to call the `magpie` CLI (roadmap v0.1): [`skills/repomagpie/`](../skills/repomagpie/SKILL.md), name `repomagpie`. Checked against the [specification](https://agentskills.io/specification) on 2026-10-06: `name` 1–64 characters, lowercase letters, digits and single hyphens, equal to the folder's name; `description` 1–1,024 characters; optional `license`, `compatibility` (up to 500), `metadata` and `allowed-tools`; `SKILL.md` under 500 lines, with longer material in `references/`, one level deep. `src/cli/skill.test.ts` checks these rules, and checks every command, flag and `--json` field the skill names against `magpie --help` and the [spec](spec.md).
 - The note schema treats skills as first-class: we detect `SKILL.md` files when adding a repo and list them under "Notable skills".
 
 ## skills.sh and the `skills` CLI — **distribute through**
@@ -17,7 +17,9 @@ What we adopt, why, and how firmly. Researched October 2026.
 - Vercel's directory and installer: `npx skills add <owner/repo>`. Ranking is based on anonymous install telemetry from the CLI.
 - README badge: `[![skills.sh](https://skills.sh/b/<owner>/<repo>)](https://skills.sh/<owner>/<repo>)`.
 
-**For RepoMagpie:** publish our skill there at launch; add the badge to the README.
+- Discovery (its README, checked 2026-10-06): the repository root, `skills/` and agent folders such as `.claude/skills/`, up to three levels deep; a recursive search only when none of these has a skill. A skill installs under its frontmatter `name`. `npx skills add ./ --list` in this repository finds one skill, `repomagpie`.
+
+**For RepoMagpie:** `npx skills add Varshavia/RepoMagpie` installs our skill. Publish it on skills.sh at launch; add the badge to the README.
 
 ## CLI vs. MCP — **CLI first, MCP later**
 
