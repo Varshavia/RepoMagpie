@@ -436,6 +436,15 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
   line-height: 1.4;
 }
 
+.row-why {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-subtle);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .row-meta {
   flex: none;
   margin-left: auto;

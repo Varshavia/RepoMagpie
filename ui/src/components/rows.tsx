@@ -39,6 +39,7 @@ export function SuggestRow({ item }: { item: SuggestItem }) {
         </span>
       </span>
       <span className="row-verdict">{item.verdict ?? "no verdict yet"}</span>
+      {item.why ? <span className="row-why" title={item.why}>{item.why}</span> : null}
     </>
   );
 }

@@ -7,7 +7,7 @@ import { Icon } from "../icons.tsx";
 import { keywordLine, suggestItems, suggestKey, type SuggestItem } from "../logic/suggest.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
 import { SuggestRow } from "./rows.tsx";
-import { VirtualList } from "./VirtualList.tsx";
+import { TALL_ROW, VirtualList } from "./VirtualList.tsx";
 
 interface Props {
   items: SuggestItem[];
@@ -159,6 +159,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
           onOpen={(key) => onSelect(key, true)}
           row={(item) => <SuggestRow item={item} />}
           listRef={listRef}
+          rowHeight={TALL_ROW}
         />
       ) : (
         <EmptyState>No notes match these words. Describe the project in other words, or add notes for the tools you use.</EmptyState>
