@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built).
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -179,7 +179,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] In the local app: "Suggest for this project" ([UI](ui.md), section 7).
 - [x] Benchmark against the 500 ms budget (`scripts/bench-suggest.ts`; report only in CI).
 
-**Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. The third, RepoMagpie itself, is a quality test over the example vault since `fix/pre-launch` (playwright-cli first, the agent tools it uses, not open-lakehouse); still open: the maintainer's check on the real journal, where 8 of 9 notes were suggested before the cutoff. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
+**Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. The third, RepoMagpie itself, is a quality test over the example vault since `fix/pre-launch` (playwright-cli first, vercel-labs/agent-skills and karpathy-skills, not open-lakehouse; since `feat/launch-prep` not mattpocock/skills, which matched only through words any project has); still open: the maintainer's check on the real journal, where 8 of 9 notes were suggested before the cutoff. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
 
 ### `magpie adopt <name>`
 - [x] Copy a note from the personal journal into the project's `.magpie/`.
@@ -211,17 +211,18 @@ Before the launch work (`fix/pre-launch`):
 
 ### Launch
 See [marketing.md](marketing.md).
-- [ ] Move `commander`, `minisearch`, `packageurl-js` and `yaml` to `devDependencies`: the CLI bundles them ([decision 0025](decisions/0025-bundle-the-cli.md)). On the launch-prep branch.
+- [x] Small fixes before the beta (`feat/launch-prep`): `magpie suggest` leaves out words common to any project (`code`, `install`, `js`) from its keywords and why line; the note view shows whether you tried a package and your rating under the title.
+- [x] Move `commander`, `minisearch`, `packageurl-js` and `yaml` to `devDependencies`: the CLI bundles them ([decision 0025](decisions/0025-bundle-the-cli.md)). Checked on `feat/launch-prep`: a clean install of the `npm pack` tarball adds one package, and every command runs from it.
 - [x] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand. (Written on `docs/ui`; the local app uses it too.)
-- [ ] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards.
+- [x] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards. (The README is the landing page, on `feat/launch-prep`: the logo, the one-liner, three bullets, a quick start and three dark screenshots of the app. No separate site.)
 - [ ] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`.
 - [ ] End-to-end check and screenshots of the landing page, and screenshots for the README, with `microsoft/playwright-cli`.
-- [ ] README rewrite for the accepted positioning, with one line about suggest; edit README and docs copy with `writing-guidelines` from `vercel-labs/agent-skills`.
-- [ ] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md))
+- [x] README rewrite for the accepted positioning, with one line about suggest; edit README and docs copy with `writing-guidelines` from `vercel-labs/agent-skills`.
+- [ ] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)). Prepared on `feat/launch-prep`: version `0.1.0-beta.1`, its CHANGELOG section, and the npm name `repomagpie` checked free on 2026-10-06. Open until the maintainer tags and publishes it.
 - [ ] Write the 30-second demo scenario (moved from step 1.5)
 - [ ] 30-second demo GIF: the "pdfkit moment", in the terminal theme from `DESIGN.md`
-- [ ] Social preview image, with `taste-skill`
-- [ ] Logo: a magpie, legible at 16 px; direction with `taste-skill`
+- [x] Social preview image, with `taste-skill` (`docs/assets/social-preview.png`, 1280×640; the maintainer sets it in the repository settings)
+- [x] Logo: a magpie, legible at 16 px; direction with `taste-skill` (`docs/assets/logo.svg`, also the app's favicon)
 - [ ] Five "good first issue" issues
 - [ ] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact.
 - [ ] Soft launch in niche communities
@@ -233,6 +234,7 @@ See [marketing.md](marketing.md).
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.
 - [ ] `magpie drift`: lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
 - [ ] `magpie gaps`: dependencies used in a project but missing from the journals.
+- [ ] `--project <dir>` also moves where `magpie suggest` reads the manifests and README, like `git -C`. In v0.1 they come from the working directory ([spec](spec.md), section 2), so `magpie --project ../app suggest` reads the current folder's manifests.
 
 ## v0.3 Share
 - [ ] `magpie publish`: a static "nest" site from notes marked public, following `DESIGN.md`. Review it with `web-design-guidelines` and check it with `playwright-cli`.
