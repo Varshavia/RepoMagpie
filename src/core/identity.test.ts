@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fileNameClash, fileNameFor, normalizePackage, resolveTarget, type Manifest, type PackageType } from "./identity.ts";
+import { fileNameClash, fileNameFor, normalizePackage, readablePurl, resolveTarget, type Manifest, type PackageType } from "./identity.ts";
 
 // Spec section 4: every input row, with the examples from the spec and the note schema.
 const RESOLVES: [string, { manifests?: Manifest[]; type?: PackageType }, string, string?][] = [
@@ -130,4 +130,12 @@ test("a case-only clash with the note already at that file is an error naming bo
 test("no clash when the file holds the same subject or nothing", () => {
   assert.equal(fileNameClash("pkg:npm/JSONStream", "pkg:npm/JSONStream"), null);
   assert.equal(fileNameClash("pkg:npm/JSONStream", undefined), null);
+});
+
+// For people only: the id stays encoded where it is stored, copied or sent.
+test("readablePurl decodes a PURL for display; anything it can't decode is shown as it is", () => {
+  assert.equal(readablePurl("pkg:npm/%40playwright/cli"), "pkg:npm/@playwright/cli");
+  assert.equal(readablePurl("pkg:npm/pdfkit"), "pkg:npm/pdfkit");
+  assert.equal(readablePurl("pkg:github/microsoft/playwright-cli"), "pkg:github/microsoft/playwright-cli");
+  assert.equal(readablePurl("pkg:npm/%E0%A4%A"), "pkg:npm/%E0%A4%A");
 });

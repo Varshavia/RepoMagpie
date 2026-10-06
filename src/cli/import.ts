@@ -2,6 +2,8 @@
 // stops the rest.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readablePurl } from "../core/identity.ts";
+import { noItemsHint } from "../core/import.ts";
 import { exitCode } from "../core/outcome.ts";
 import { importFailure, locateJournal, runImport, type Journal } from "../core/save.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
@@ -38,7 +40,7 @@ export async function importCommand(file: string, options: ImportOptions, io: Io
   if (run.document.error) return stop(run.document.error);
   const { results } = run;
   if (!results.length) {
-    io.err(`No items found in ${file}. Each item is a line that starts with "- ".\n`);
+    io.err(`No items found in ${file}. ${noItemsHint(text)}\n`);
     return 0;
   }
 
@@ -46,7 +48,7 @@ export async function importCommand(file: string, options: ImportOptions, io: Io
   for (const warning of run.journal.warnings) io.err(`warning: ${warning}\n`);
   for (const notice of run.notices) io.err(`${notice}\n`);
   for (const r of results) {
-    io.out(`line ${r.line}: ${r.result} ${r.id ?? r.target}\n`);
+    io.out(`line ${r.line}: ${r.result} ${r.id ? readablePurl(r.id) : r.target}\n`);
     for (const warning of r.warnings) io.err(`line ${r.line}: warning: ${warning}\n`);
     if (r.error) io.err(`line ${r.line}: ${r.error}\n`);
   }

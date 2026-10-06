@@ -52,6 +52,16 @@ export function normalizePackage(spec: string, type: PackageType): string {
   return at === -1 ? text : text.slice(0, at);
 }
 
+// A PURL as people read it, percent-encoding decoded: pkg:npm/%40playwright/cli → pkg:npm/@playwright/cli.
+// For display only; the id stays encoded wherever it is stored, copied or sent (--json, the API).
+export function readablePurl(purl: string): string {
+  try {
+    return decodeURIComponent(purl);
+  } catch {
+    return purl;
+  }
+}
+
 // The note's file name: type, namespace without a leading "@", and name, joined with "--" (note schema).
 export function fileNameFor(purl: string): string {
   const p = PackageURL.fromString(purl);

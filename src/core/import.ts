@@ -12,11 +12,19 @@ export interface ImportItem {
   error: string | null; // set when the line can't be parsed
 }
 
+// An item's marker at the left margin (lenient read): "- ", or "* " and "+ ", or "\- " as a list
+// copied out of a chat escapes it; a non-breaking space counts as the space.
+export const ITEM_MARKER = /^(?:\\?-|\*|\+)[  ]/;
+
+// The lines of an import text, without a UTF-8 BOM.
+const lines = (text: string) => text.replace(/^﻿/, "").split(/\r?\n/);
+
 export function parseImport(text: string): ImportItem[] {
   const items: ImportItem[] = [];
-  text.split(/\r?\n/).forEach((raw, index) => {
-    if (!raw.startsWith("- ")) return;
-    const rest = raw.slice(2);
+  lines(text).forEach((raw, index) => {
+    const marker = raw.match(ITEM_MARKER);
+    if (!marker) return;
+    const rest = raw.slice(marker[0].length);
     const split = rest.match(/^(.*?)(?:^|\s)(?:—|--)(?:\s|$)(.*)$/);
     const target = (split ? split[1] : rest).trim();
     const item: ImportItem = { line: index + 1, target, useWhen: [], avoidWhen: [], error: null };
@@ -44,4 +52,15 @@ export function parseImport(text: string): ImportItem[] {
     if (notes.length) item.myNotes = notes.join("\n");
   });
   return items;
+}
+
+// For a text without items: the rule, and what the first line with text starts with instead.
+export function noItemsHint(text: string): string {
+  const rule = 'Each item is a line that starts with "- ".';
+  const all = lines(text);
+  const index = all.findIndex((line) => line.trim());
+  if (index === -1) return `${rule} The text is empty.`;
+  const first = all[index].trim().split(/\s/)[0];
+  const start = first.length > 20 ? `${first.slice(0, 20)}…` : first;
+  return `${rule} Line ${index + 1} starts with ${/^\s/.test(all[index]) ? "spaces, then " : ""}"${start}".`;
 }

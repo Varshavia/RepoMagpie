@@ -71,6 +71,15 @@ test("human output: one result line per item on stdout; errors, warnings and the
   assert.match(r.err, /^2 created, 0 updated, 0 unchanged, 1 failed\.$/m);
 });
 
+test("human output shows a scoped package's PURL decoded; --json keeps it encoded", async () => {
+  const box = sandbox();
+  const file = importFile(box, ["- pkg:npm/%40babel/core — verdict: ok"]);
+  const r = await magpie(box, ["import", file, "--dry-run"]);
+  assert.equal(r.out, "line 1: created pkg:npm/@babel/core\n");
+  const json = await magpie(box, ["import", file, "--dry-run", "--json"]);
+  assert.equal(JSON.parse(json.out).items[0].id, "pkg:npm/%40babel/core");
+});
+
 test("one bad line never stops the rest: unparsable, unsupported, ambiguous and unknown repositories fail; others are saved", async () => {
   const box = sandbox(); // no manifest: a bare name is ambiguous
   const file = importFile(box, [
@@ -183,8 +192,8 @@ test("the personal-journal guard applies to import --to project", async () => {
 
 test("a file without items: a hint on stderr, exit 0", async () => {
   const box = sandbox();
-  const r = await magpie(box, ["import", importFile(box, ["# nothing here", "* not an item"])]);
+  const r = await magpie(box, ["import", importFile(box, ["", "\\* not an item", "1. nor this"])]);
   assert.equal(r.code, 0);
   assert.equal(r.out, "");
-  assert.match(r.err, /No items found/);
+  assert.match(r.err, /^No items found in .*\. Each item is a line that starts with "- "\. Line 2 starts with "\\\*"\.$/m);
 });
