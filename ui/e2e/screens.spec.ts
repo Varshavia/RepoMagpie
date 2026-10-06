@@ -1,14 +1,17 @@
 // Screenshots of every screen and state in dark and light, for pull requests (docs/ui.md §11). They
-// go to .scratch/screens/. Run with SCREENS=1; skipped otherwise, so CI stays fast.
+// go to .scratch/screens/. Run with SCREENS=1; skipped otherwise, so CI stays fast. The journal is
+// the screens one: the example notes and a few real-looking npm notes (journal.ts).
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
+import { BROKEN, BROKEN_FILE } from "./journal.ts";
 
 const OUT = fileURLToPath(new URL("../../.scratch/screens/", import.meta.url));
 
 test.skip(!process.env.SCREENS, "Set SCREENS=1 to take screenshots.");
+test.use({ screens: true });
 
 const shoot = async (page: Page, name: string) => {
   for (const scheme of ["dark", "light"] as const) {
@@ -92,6 +95,7 @@ test("check a package", async ({ page, magpie }) => {
 });
 
 test("read-only note", async ({ page, magpie }) => {
+  writeFileSync(magpie.note(BROKEN_FILE), BROKEN);
   await magpie.open(page);
   await allNotes(page);
   await page.getByRole("option", { name: /npm--broken\.md/ }).click();
@@ -146,7 +150,7 @@ test("no tag list", async ({ page, magpie }) => {
 });
 
 test("suggest for this project", async ({ page, magpie }) => {
-  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", keywords: ["agent-skills", "testing"], dependencies: { pdfkit: "*" } }));
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", keywords: ["agent-skills", "testing"], dependencies: { pdfkit: "*" }, devDependencies: { "@playwright/test": "*" } }));
   writeFileSync(join(magpie.project, "README.md"), "# Checkout tests\n\nEnd-to-end tests for the checkout, written and run by a coding agent.\n");
   await magpie.open(page);
   await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
