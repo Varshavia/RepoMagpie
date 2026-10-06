@@ -72,6 +72,7 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
         <Item icon="plus" label="Add" current={is("add")} onClick={() => onView({ page: "add" })} />
         <Item icon="import" label="Import" current={is("import")} onClick={() => onView({ page: "import" })} />
         <Item icon="package" label="Check a package" current={is("recall")} onClick={() => onView({ page: "recall" })} />
+        <Item icon="folder" label="Suggest" current={is("suggest")} onClick={() => onView({ page: "suggest" })} hint="for this project" />
       </div>
 
       {counts && counts.kinds.length ? (

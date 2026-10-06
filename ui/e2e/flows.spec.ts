@@ -1,13 +1,20 @@
 // End-to-end flows of the local app (docs/ui.md §11) against magpie ui on a temporary journal:
 // inbox review, search, add, import, conflicts, live updates, the palette and the keyboard map.
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
+import { runSuggest } from "../../src/core/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
+import { PDFKIT } from "./journal.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
+// Today in local time, as magpie writes it (adopted:).
+const today = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
 
 test("inbox review: Enter, write the Verdict, Ctrl+Enter; the note is reviewed and the next one opens", async ({ page, magpie }) => {
   await magpie.open(page);
@@ -311,6 +318,91 @@ test("the CSP holds: no violation while the app runs", async ({ page, magpie }) 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /All notes/ }).click();
   expect(violations).toEqual([]);
+});
+
+test("suggest: what magpie suggest finds for this project, in its order; the in-use avoid note apart; a description instead", async ({ page, magpie }) => {
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", dependencies: { pdfkit: "*" } }));
+  const place = { home: magpie.root, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project };
+  const expected = runSuggest({ limit: 20 }, place).document;
+  expect(expected.candidates.length).toBeGreaterThan(1);
+  expect(expected.in_use_avoid.map((m) => m.id)).toEqual(["pkg:npm/pdfkit"]);
+  await magpie.open(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Suggest for this project" })).toBeVisible();
+  const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
+  await expect(rows).toHaveCount(expected.candidates.length + 1);
+  for (const [i, c] of expected.candidates.entries()) await expect(rows.nth(i)).toContainText(c.name);
+  await expect(rows.last()).toContainText("pdfkit");
+  await expect(rows.last()).toContainText("In use, avoid");
+  await expect(rows.last()).toContainText("avoid: async streams painful");
+  // A candidate opens beside the list; the list stays.
+  await rows.first().click();
+  await expect(page.getByRole("heading", { level: 2, name: expected.candidates[0].name })).toBeVisible();
+  await expect(rows).toHaveCount(expected.candidates.length + 1);
+
+  const described = runSuggest({ description: "design system", limit: 20 }, place).document;
+  await page.getByLabel("Describe the project instead").fill("design system");
+  await page.getByRole("main").getByRole("button", { name: "Suggest", exact: true }).click();
+  await expect(page.getByText(`Looked for: ${described.keywords.join(", ")}`)).toBeVisible();
+  await expect(rows).toHaveCount(described.candidates.length + described.in_use_avoid.length);
+  await expect(rows.first()).toContainText(described.candidates[0].name);
+});
+
+test("suggest: a project with nothing to go on asks for a description", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  await expect(page.getByText("Nothing to go on here: no package.json, pyproject.toml, Cargo.toml or README.")).toBeVisible();
+  await expect(page.getByLabel("Describe the project instead")).toBeFocused();
+});
+
+test("adopt: the note reaches the project journal only after the confirm; the install command shows; nothing is installed", async ({ page, magpie }) => {
+  writeFileSync(join(magpie.project, "pnpm-lock.yaml"), "");
+  const before = readdirSync(magpie.project).sort();
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await expect(page.getByText("The project journal is committed with the code; anyone who can read this repository can read this note.")).toBeVisible();
+  expect(existsSync(magpie.note("npm--pdfkit.md", "project"))).toBe(false);
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByText("pnpm add pdfkit")).toBeVisible();
+  await expect(page.getByRole("status").getByText("Copied to the project journal")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8")).toBe(PDFKIT.replace(/\n---\n/, `\nadopted: ${today()}\n---\n`));
+  expect(readdirSync(magpie.project).sort()).toEqual(before);
+  await page.getByRole("button", { name: "Open the project's note" }).click();
+  await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Adopt to project" })).toHaveCount(0);
+});
+
+test("adopt: a repository note with one package gets its command; with several, one per package to choose from", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("github--acme--tool.md"), renderNote({ id: "pkg:github/acme/tool", name: "acme/tool", explored: "2026-10-01", kind: "cli", tags: [], verdict: "fine", packages: ["pkg:npm/acme-tool", "pkg:cargo/acme-tool"] }));
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  const notes = page.getByRole("listbox", { name: "All notes" });
+  await notes.getByRole("option", { name: /^microsoft\/playwright-cli / }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByText("npm install @playwright/cli")).toBeVisible();
+
+  await notes.getByRole("option", { name: /^acme\/tool / }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByText("This repository publishes 2 packages; install the one you need:")).toBeVisible();
+  await expect(page.getByText("npm install acme-tool")).toBeVisible();
+  await expect(page.getByText("cargo add acme-tool")).toBeVisible();
+});
+
+test("adopt: a note the project already has is refused and left as it is", async ({ page, magpie }) => {
+  const team = readFileSync(magpie.note("npm--puppeteer.md", "project"), "utf8");
+  writeFileSync(magpie.note("npm--puppeteer.md"), renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-01", kind: "library", tags: [], verdict: "my own take" }));
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^puppeteer / }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByRole("alert").getByText(/Already in this project: .*npm--puppeteer\.md/)).toBeVisible();
+  expect(readFileSync(magpie.note("npm--puppeteer.md", "project"), "utf8")).toBe(team);
 });
 
 test.describe("2,000 notes", () => {

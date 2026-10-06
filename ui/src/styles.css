@@ -105,6 +105,8 @@ ul, ol { padding: 0; }
    primary action). */
 a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; }
 a:hover { text-decoration-color: currentColor; }
+.link-button { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; cursor: pointer; }
+.link-button:hover { text-decoration-color: currentColor; }
 
 code, kbd, .mono { font-family: var(--mono); font-size: 12px; }
 
@@ -863,6 +865,14 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
 .recall-card.ask { border-left-color: var(--danger); }
 .recall-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--md); }
 .recall-line .section-label { padding-top: 3px; }
+
+.pane-action { margin-left: auto; }
+.suggest-form { display: flex; flex-direction: column; gap: var(--xs); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); }
+.suggest-form .field-help { overflow-wrap: anywhere; }
+
+.adopt-panel { display: flex; flex-direction: column; gap: var(--sm); padding: var(--md); border-radius: var(--r-md); background: var(--surface-1); font-size: 13px; }
+.install-line { display: flex; align-items: center; gap: var(--xs); }
+.install-line code { padding: 2px var(--sm); }
 
 /* ---------- Responsive ---------- */
 

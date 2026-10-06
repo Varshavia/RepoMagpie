@@ -14,11 +14,13 @@ import { NoteRow } from "./components/rows.tsx";
 import { NO_SEARCH, resultKey, SearchPane, type SearchState } from "./components/SearchPane.tsx";
 import { SettingsPage } from "./components/SettingsPage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { SuggestPane } from "./components/SuggestPane.tsx";
 import { VirtualList } from "./components/VirtualList.tsx";
 import { Icon } from "./icons.tsx";
 import type { Form } from "./logic/edits.ts";
 import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
+import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
@@ -50,6 +52,7 @@ export function App() {
   const [search, setSearch] = useState<SearchState>(NO_SEARCH);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hit, setHit] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestItem[]>([]);
   const drafts = useRef(new Map<string, Form>()).current;
   const listRef = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -176,6 +179,8 @@ export function App() {
   const currentKey = current ? keyOf(current) : null;
   const shown = search.status ? results.filter((r) => r.status === search.status) : results;
   const currentHit = shown.find((r) => resultKey(r) === hit) ?? null;
+  const currentSuggestion = suggestions.find((s) => suggestKey(s) === hit) ?? null;
+  const projectRoot = settings?.journals.project ? settings.journals.project.path.replace(/[\\/]\.magpie$/, "") : null;
   const allTags = useMemo(() => [...new Set([...tagLists.personal, ...tagLists.project])].sort(), [tagLists]);
 
   const select = useCallback((key: string | null, opts: { focus?: boolean; pane?: boolean } = {}) => {
@@ -243,6 +248,11 @@ export function App() {
     [toast, lists, view.page, journal, items, keyOf, select],
   );
 
+  const onAdopted = useCallback(() => {
+    toast("Copied to the project journal");
+    afterWrite("project");
+  }, [toast, afterWrite]);
+
   const commands: Command[] = [
     { id: "inbox", label: "Go to Inbox", keywords: "review", icon: "tray", hint: "g i", run: () => go({ page: "inbox" }) },
     { id: "all", label: "Show all notes", keywords: "list", icon: "notebook", run: () => go({ page: "all" }) },
@@ -250,6 +260,7 @@ export function App() {
     { id: "add", label: "Add a note", keywords: "new url repository package", icon: "plus", run: () => go({ page: "add" }) },
     { id: "import", label: "Import lines", keywords: "bulk", icon: "import", run: () => go({ page: "import" }) },
     { id: "recall", label: "Check a package", keywords: "recall hook install", icon: "package", run: () => go({ page: "recall" }) },
+    { id: "suggest", label: "Suggest for this project", keywords: "fit candidates dependencies manifest", icon: "folder", run: () => go({ page: "suggest" }) },
     { id: "settings", label: "Settings", keywords: "journal token version", icon: "gear", run: () => go({ page: "settings" }) },
     ...(journal === "personal" && hasProject
       ? [{ id: "project", label: "Switch to the project journal", keywords: "journal", icon: "users" as const, run: () => setJournal("project") }]
@@ -265,8 +276,9 @@ export function App() {
   // The keyboard map (docs/ui.md §7). One listener; it reads the latest state through a ref.
   const act = useRef<(action: Action) => void>(() => {});
   act.current = (action) => {
-    const searching = view.page === "search";
-    const keys = searching ? shown.map(resultKey) : items.map(keyOf);
+    // Search and Suggest: a list of results with the note beside it, selected by `hit`.
+    const searching = view.page === "search" || view.page === "suggest";
+    const keys = view.page === "search" ? shown.map(resultKey) : view.page === "suggest" ? suggestions.map(suggestKey) : items.map(keyOf);
     const at = searching ? hit : currentKey;
     switch (action) {
       case "next":
@@ -357,8 +369,17 @@ export function App() {
         setPane("list");
         listRef.current?.focus();
       }}
+      project={projectState}
+      onAdopted={onAdopted}
+      onOpenNote={openNote}
     />
   );
+
+  const openResult = (key: string, open: boolean) => {
+    setHit(key);
+    setPane("note");
+    if (open) setFocus((f) => ({ key, n: f.n + 1 }));
+  };
 
   let workspace;
   if (list) {
@@ -427,11 +448,7 @@ export function App() {
           results={results}
           onResults={setResults}
           selected={currentHit ? resultKey(currentHit) : null}
-          onSelect={(key, open) => {
-            setHit(key);
-            setPane("note");
-            if (open) setFocus((f) => ({ key, n: f.n + 1 }));
-          }}
+          onSelect={openResult}
           hasProject={hasProject}
           tags={allTags}
           inputRef={searchInput}
@@ -443,6 +460,27 @@ export function App() {
             notePane(currentHit.journal, { id: currentHit.id }, resultKey(currentHit))
           ) : (
             <EmptyState center>{shown.length ? "Select a result to read the note." : "Results open here."}</EmptyState>
+          )}
+        </section>
+      </>
+    );
+  } else if (view.page === "suggest") {
+    workspace = (
+      <>
+        <SuggestPane
+          items={suggestions}
+          onItems={setSuggestions}
+          selected={currentSuggestion ? suggestKey(currentSuggestion) : null}
+          onSelect={openResult}
+          projectRoot={projectRoot}
+          listRef={listRef}
+          refresh={live.personal.tick + live.project.tick}
+        />
+        <section className="pane" aria-label="Note">
+          {currentSuggestion?.id ? (
+            notePane(currentSuggestion.journal, { id: currentSuggestion.id }, suggestKey(currentSuggestion))
+          ) : (
+            <EmptyState center>{suggestions.length ? "Select a suggestion to read the note. Your coding agent picks the fit." : "Notes open here."}</EmptyState>
           )}
         </section>
       </>
@@ -492,7 +530,7 @@ export function App() {
         onView={go}
         inert={behind}
       />
-      <main id="main" tabIndex={-1} inert={behind} className={list || view.page === "search" ? "workspace" : "workspace single"} data-pane={pane} aria-label={viewTitle(view)}>
+      <main id="main" tabIndex={-1} inert={behind} className={list || view.page === "search" || view.page === "suggest" ? "workspace" : "workspace single"} data-pane={pane} aria-label={viewTitle(view)}>
         {workspace}
       </main>
       {palette ? <Palette actions={commands} onNote={(r) => r.id && openNote(r.journal, r.id)} onClose={() => setPalette(false)} /> : null}
