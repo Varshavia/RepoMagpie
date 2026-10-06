@@ -106,6 +106,8 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | POST | `/api/open` | `{"journal", "id"}`, or `{"journal", "file"}` for a read-only note, or `{"journal", "tag_list": true}` for the journal's `tags.md` | `{"opened": true, "path": "..."}`: opens the note, or `tags.md`, in the default editor |
 | GET | `/api/events` | | `text/event-stream`: `notes-changed` with `{"journal", "files": [...]}`; a comment every 30 s keeps the stream open |
 | GET | `/api/recall` | `?package=` (repeatable), `&type=` | Exactly `magpie recall --json` |
+| GET | `/api/suggest` | `?description=` (none: the project's manifests and README), `&journal=`, `&limit=` (default 20) | Exactly `magpie suggest --json`, for the project `magpie ui` was started in |
+| POST | `/api/adopt` | `{"target", "type"?}` | Exactly `magpie adopt --json`: copies a personal note into the project journal; never installs anything |
 
 - `journal` is required where it is listed for a `GET`. In a `POST` body, `to` may be left out and means `personal`, as `--to` does on the CLI.
 - `POST /api/open` that can't start the editor answers 422 with `{"opened": false, "path": "...", "error": "..."}`. With `tag_list`, a journal without `tags.md` answers 404; `tag_list` with `id` or `file`, or with any value but `true`, answers 400.
@@ -152,14 +154,16 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - "What it does", with a visible draft badge while it is a draft, and "Accept".
    - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
    - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
-   - Actions: open the repository, open in an editor, open in Obsidian, copy the PURL.
+   - Actions: open the repository, open in an editor, open in Obsidian, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).
    - PURLs are shown decoded (`pkg:npm/@playwright/cli`), everywhere in the app. The copied PURL and every request keep the encoded id.
 4. **Add.**
    - Paste a URL, PURL or name; see the fetched preview; write the Verdict; save. The same logic as `magpie note`.
    - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`, including its lenient read. Changing the lines needs a new check before importing. While the lines have no item, the help line says what the first line starts with, as the CLI's hint does.
 5. **Settings** (read-only in v0.1): journal paths, whether `GITHUB_TOKEN` is set, the version, links to the docs. Also the theme (the system's, dark or light), saved in the browser only.
 6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
-7. **Later, not v0.1:** suggest and adopt panels (they ship with those commands), export or nest (v0.3). A graph tab: open question (section 13).
+7. **Suggest for this project** ("Suggest" in the sidebar and the palette): what `magpie suggest` finds for the project `magpie ui` was started in, from its manifests and README, or from a description typed in the box. Two panes, like Search: the list, then the note. The list says which words it looked for; candidates come Verdict first, in `magpie suggest`'s order; the project's dependencies with an avoid note follow, labelled "In use, avoid" in words. "Show more" asks for 20 more. With nothing to go on (no manifest, no README), it asks for a description.
+   - **Adopt to project**, on a personal note when there is a project: a first click shows what happens and who can read it ("The project journal is committed with the code; anyone who can read this repository can read this note."); only "Copy to the project journal" writes, through `POST /api/adopt`. Then the install command, with a copy button and "Run it yourself" (for a repository with several packages, one command per package and a line that says to choose), and "Open the project's note". A note the project already has is refused, with its path.
+8. **Later, not v0.1:** export or nest (v0.3). A graph tab: open question (section 13).
 
 **Keyboard map**
 
@@ -209,7 +213,7 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | Long lists | Virtualised: only visible rows are in the DOM | A unit test of the windowing; the 2,000-note measurement |
 | Search from the app | The same as `magpie search`: under 500 ms with a warm cache ([spec](spec.md), section 7) | The search benchmark |
 
-Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (JavaScript 86.9 kB, CSS 4.6 kB, HTML 0.4 kB); first render with 2,000 notes 417 ms with a warm cache, 944 ms cold. `GET /api/notes` on 2,000 notes takes about 37 ms with the note-list cache and about 500 ms without it.
+Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (JavaScript 86.9 kB, CSS 4.6 kB, HTML 0.4 kB); first render with 2,000 notes 417 ms with a warm cache, 944 ms cold. `GET /api/notes` on 2,000 notes takes about 37 ms with the note-list cache and about 500 ms without it. With Suggest and Adopt (`feat/suggest-adopt`, 2026-10-06): 94.5 kB gzipped.
 
 ## 11. Design process and testing
 
@@ -228,7 +232,7 @@ Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (
 - **Server** (`node:test`, an in-process server on a random port): every endpoint; each response compared with the CLI's `--json` output for the same input; every security rule in section 3 (bad Host, missing token or header, cross-origin and Origin-less writes, traversal attempts, 409 on conflicts, 413, 415).
 - **Core:** round-trip tests for `setSection` and human-field edits, as for `setToolFields`.
 - **App logic** (`ui/src/logic/`: list windowing, the keyboard map, note text, the edit request, import labels, palette matching, and the values the app mirrors from core): unit tests with `node:test`, run by `npm test`.
-- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault. The flows: inbox review, search, add, import, a 409 conflict, live updates, read-only notes, the palette (the same results as `magpie search`, "Searching…" and errors) and keyboard map, decoded PURLs, a journal without `tags.md` or with an empty one, the skip link, no CSP violations, and the 2,000-note first render. `npm run build` first, then `npm run test:e2e`.
+- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault. The flows: inbox review, search, add, import, a 409 conflict, live updates, read-only notes, the palette (the same results as `magpie search`, "Searching…" and errors) and keyboard map, decoded PURLs, a journal without `tags.md` or with an empty one, suggest (the same candidates as `magpie suggest`, the in-use avoid row, a description, nothing to go on), adopt (nothing written before the confirm, the install command, a repository's one or several packages, nothing installed, a note the project already has), the skip link, no CSP violations, and the 2,000-note first render. `npm run build` first, then `npm run test:e2e`.
 - **Screenshots:** `SCREENS=1 npm run test:e2e` writes every screen and state in dark and light to `.scratch/screens/` (`ui/e2e/screens.spec.ts`); CI skips them.
 - **Before each UI pull request:** a `web-design-guidelines` pass, the bundle-size check, and a `writing-guidelines` pass on the copy.
 - **CI:** the existing matrix, plus one job ("App build and end-to-end tests") that builds the app, checks the bundle size and runs the end-to-end tests.

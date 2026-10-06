@@ -97,34 +97,41 @@ Keyword search across both journals.
 
 Shows what the user already has that fits a project.
 
-- Without a description, it reads the project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and README, from the project root (the git root, or the working directory).
-- With a description ("a TypeScript CLI with tests"), it uses that text instead.
+- Without a description, it reads the project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and README. The manifests are found as `note` finds them (section 4): the nearest folder with any, walking up to the git root. The README comes from that folder, or from the project root (the git root, or the working directory) when there is no manifest.
+- With a description ("a TypeScript CLI with tests"), its words are the keywords instead. The project's dependencies still come from its manifests, when there are any.
 - It narrows candidates by keyword and tags (section 5) and prints them Verdict first. The coding agent makes the semantic choice, guided by RepoMagpie's `SKILL.md`. No embeddings in v0.1.
-- Flags: `--limit <n>` (default 20), `--journal personal|project`.
-- Candidates that are already dependencies of the project are marked "already used".
+- Flags: `--limit <n>` (default 20), `--journal personal|project` (one journal, for the candidates and the avoid group).
+- **The project's own dependencies are never candidates.** A dependency that has an avoid note (decision 0024's rule, as in section 6) is listed apart, in `in_use_avoid`, whatever the keywords: "Already in use, you noted to avoid".
+- **Nothing to go on** (no manifest, no README and no description, or a description of stop words only): a usage error (exit 2) that asks for a description.
+- Output: one row per candidate, as for `search` (section 8), then the avoid group under its heading, on stdout; the count and the hint on stderr (`3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.`). No candidate: `No notes match: <keywords>.` on stderr, exit 0.
 
-`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "verdict": "...", "tags": [...], "already_used": false, "score": 2.1}]}`
+`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "path": "..."}], "in_use_avoid": [<a match as in recall --json>]}`
+
+- `keywords` are the words looked for, in order (section 5).
+- `verdict` is `null` for a note without one, as in `search`. `in_use_avoid` items have the shape of `recall --json` matches, with `query` the dependency's name.
 
 ### `magpie adopt <name>`
 
 Copies a note from the personal journal into the project journal and prints the install command. It never installs anything.
 
-1. Resolve `<name>` (a name or PURL) to a note in the personal journal. Not found: exit 1.
+1. Resolve `<name>` (a name, a PURL, or a URL) to a PURL as section 4 says (`--type npm|pypi|cargo` settles a bare name), then to the note in the personal journal whose `id` or `packages` has it (schema rule 6). Not found: exit 1, with a hint to write the note first.
 2. Find the project journal (section 3). If there is none, create `.magpie/` at the git root, or in the working directory when there is no git root, and say so.
-3. If the project journal already has a note for that PURL, change nothing and exit 1 ("Already in this project: <path>").
-4. Copy the file unchanged, except one tool-owned field, `adopted: YYYY-MM-DD`, which records that it came from the personal journal on that date.
-5. Print the install command, chosen from the PURL type and the project's lockfile:
+3. If the project journal already has a note for the note's `id` or any of its `packages`, change nothing and exit 1 ("Already in this project: <path>"). A file at the copy's name that holds another note, or none that can be read, is never overwritten either (exit 1).
+4. Copy the file unchanged, under the same file name, except one tool-owned field, `adopted: YYYY-MM-DD`, added at the end of the frontmatter, which records that it came from the personal journal on that date.
+5. Print the install command, chosen from the type of the PURL `<name>` resolved to and the lockfile in the project root (the folder that holds `.magpie/`):
 
 | PURL type | Lockfile | Command |
 |---|---|---|
 | npm | `pnpm-lock.yaml` / `yarn.lock` / `bun.lock` or `bun.lockb` / none | `pnpm add` / `yarn add` / `bun add` / `npm install` |
 | pypi | `uv.lock` / none | `uv add` / `pip install` |
 | cargo | — | `cargo add` |
-| github | — | no command; prints the repository URL |
+| github | — | the note's `packages` decide: exactly one, that package's command; several, one command per package, to choose from; none, no command, and the repository URL |
 
 6. On stderr: "The project journal is committed with the code; anyone who can read this repository can read this note."
 
-`--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander"}`
+Output: the copy's path and `Install with: <command>` on stdout; for several packages, `This repository publishes 2 packages; install the one you need:` and one command per line; for a repository without packages, `No install command for a GitHub repository: <url>`. Messages on stderr.
+
+`--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander", "install_choices": []}`. `id` is the note's own. `install` is the one command, or `null` when there is none or several; `install_choices` lists the commands when there are several, and is `[]` otherwise.
 
 ### `magpie recall <package>...`
 
@@ -303,9 +310,10 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 - **Comparing names:** case-insensitive, and `_`, `.` and `-` count as the same character (PyPI's rule, applied to every type for name-only matches). An npm scope is part of the name: `@types/node` doesn't match `node`.
 
 **Suggest** narrows; the agent decides:
-1. Collect keywords: dependency names from the manifests, `keywords` and `description` from `package.json` or `pyproject.toml`, and the README's first heading and paragraph. Or the words of the description.
-2. Score notes by keyword search (as in `search`) plus one point per matching tag.
-3. Return the top candidates, Verdict first, `reviewed` before `inbox`, with "already used" marked.
+1. Collect keywords: dependency names from the manifests (every dependency table: `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`; PEP 621 and PEP 735 lists and Poetry's tables; Cargo's dependency tables, also per target and for the workspace), `keywords` and `description` from `package.json`, `pyproject.toml` or `Cargo.toml`, and the README's first heading and paragraph. Or the words of the description. Words are lowercased, each kept once, without stop words and numbers; a package name splits into its words (`@types/node` → `types`, `node`).
+2. Score notes by keyword search (as in `search`) plus one point per matching tag: a tag that is a keyword, or a hyphenated tag whose every word is one. A completed skill line counts for its note.
+3. Leave out what the project already uses: every note recall would match for one of its dependencies (exact, else name-only). Those that are avoid notes go to `in_use_avoid`.
+4. Return the top candidates, Verdict first: `reviewed` before `inbox`, then by score; the same note in both journals, the project's first (section 3).
 
 **Search** indexes, per note: `name`, `id`, `tags`, Verdict, "Use when", "Avoid when", "What it does" and "My notes"; and each completed skill line as its own document. Prefix and fuzzy matching are on. Results rank `reviewed` (and completed skill lines) before `inbox`, then by relevance; a skill result's Verdict is its own text (section 2).
 
@@ -390,7 +398,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 | `recall`, and the hook | under 150 ms | 2,000 notes, warm cache |
 | `search`, `suggest` | under 500 ms | 2,000 notes, warm cache |
 
-**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-recall.ts`) and exits 1 over a budget. CI runs both with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
+**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `suggest`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-suggest.ts`, `scripts/bench-recall.ts`; suggest on a project with 25 dependencies and a README, and with a description) and exits 1 over a budget. CI runs all three with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
 
 **Caches:** three per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"), and `note-list.json` (each note's summary in the Note list document, for the local app). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed; the note list reads again only the notes that were added or changed. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
 
@@ -449,9 +457,12 @@ Suggest list (the hint goes to stderr):
 
 ```
 $ magpie suggest "a TypeScript CLI with tests"
-1  vitest     npm  project   Verdict: default test runner for new projects   already used
+1  commander  npm  project   Verdict: our CLI parser
 2  commander  npm  personal  Verdict: fine for small CLIs
 3  tsx        npm  personal  [inbox] no verdict yet
+
+Already in use, you noted to avoid:
+  pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer
 3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.
 ```
 
