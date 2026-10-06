@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api, type SearchResult } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
-import { rankActions, type PaletteAction } from "../logic/palette.ts";
+import { noteResults, rankActions, type NoteSearch, type PaletteAction } from "../logic/palette.ts";
 
 export interface Command extends PaletteAction {
   icon: IconName;
@@ -23,7 +23,7 @@ export function Palette({ actions, onNote, onClose }: Props) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [found, setFound] = useState<SearchResult[]>([]);
+  const [last, setLast] = useState<NoteSearch<SearchResult> | null>(null);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -34,10 +34,13 @@ export function Palette({ actions, onNote, onClose }: Props) {
 
   useEffect(() => {
     const q = query.trim();
-    if (!q) return setFound([]);
+    if (!q) return;
     let current = true;
     const timer = setTimeout(() => {
-      api.search({ q, limit: 6 }).then((doc) => current && setFound(doc.results), () => current && setFound([]));
+      api.search({ q, limit: 6 }).then(
+        (doc) => current && setLast({ query: q, results: doc.results }),
+        (error: Error) => current && setLast({ query: q, results: [], error: error.message }),
+      );
     }, 120);
     return () => {
       current = false;
@@ -45,7 +48,8 @@ export function Palette({ actions, onNote, onClose }: Props) {
     };
   }, [query]);
 
-  const notes: Item[] = found.map((r) => ({ kind: "note", key: `${r.journal} ${r.id} ${r.skill ?? ""}`, result: r }));
+  const found = noteResults(query, last);
+  const notes: Item[] = found.notes.map((r) => ({ kind: "note", key: `${r.journal} ${r.id} ${r.skill ?? ""}`, result: r }));
   const commands: Item[] = rankActions(actions, query).map((a) => ({ kind: "action", key: a.id, action: a }));
   const items = [...notes, ...commands];
   const at = Math.min(active, Math.max(0, items.length - 1));
@@ -104,6 +108,7 @@ export function Palette({ actions, onNote, onClose }: Props) {
           <kbd>Esc</kbd>
         </div>
         <div className="palette-list" id={`${id}-list`} role="listbox" aria-label="Results">
+          {found.error && items.length ? <p className="palette-empty" role="status">{found.error}</p> : null}
           {items.length ? (
             groups.map(([label, group]) =>
               group.length ? (
@@ -145,7 +150,9 @@ export function Palette({ actions, onNote, onClose }: Props) {
               ) : null,
             )
           ) : (
-            <p className="palette-empty">{`Nothing matches “${query.trim()}”.`}</p>
+            <p className="palette-empty" role="status">
+              {found.pending ? "Searching…" : found.error ?? `Nothing matches “${query.trim()}”.`}
+            </p>
           )}
         </div>
       </div>
