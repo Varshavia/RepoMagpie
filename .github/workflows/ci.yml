@@ -53,6 +53,8 @@ jobs:
       - run: npm run build
       - name: Search benchmark (report only)
         run: node scripts/bench-search.ts --report-only
+      - name: Suggest benchmark (report only)
+        run: node scripts/bench-suggest.ts --report-only
       - name: Recall and hook benchmark (report only)
         run: node scripts/bench-recall.ts --report-only
 
