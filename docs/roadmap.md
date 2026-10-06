@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: agent skill and launch (recall, the UI server, the UI app, suggest and adopt are built).
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: the pre-launch fixes, then the launch (recall, the UI server, the UI app, suggest, adopt and the agent skill are built).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -141,7 +141,7 @@ The first public release: capture what you learned, find it again, and see it be
 - [x] `magpie recall <package>` on the CLI, across both journals.
 - [x] Map package names to notes ([spec](spec.md), section 5): exact by PURL, then name-only, including GitHub repository names.
 - [x] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. It never denies: an avoid note asks the user to confirm; other notes inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
-- [ ] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing.
+- [x] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing, and to ask first on an avoid note (`skills/repomagpie/SKILL.md`).
 
 **Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`. Live check in a Claude Code session on 2026-10-04: an avoid note made Claude Code ask, in the default permission mode and in auto mode. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
 
@@ -189,10 +189,10 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 **Done when:** after `adopt`, the project journal holds the note and nothing was installed. (Met on `feat/suggest-adopt`: `src/core/adopt.test.ts` checks that only `.magpie/` appears in the project; the end-to-end test checks the same through the app.)
 
 ### Agent skill
-- [ ] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall.
+- [x] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall (`skills/repomagpie/`, installed with `npx skills add Varshavia/RepoMagpie`). Tests check its frontmatter against the Agent Skills format, and every command, flag and `--json` field it names against `magpie --help` and the spec.
 - [ ] Publish it to skills.sh and add the badge to the README.
 
-**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes.
+**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Open: needs the skill installed from `main` and `magpie` on `PATH`; not yet checked live.)
 
 ### `magpie init` (if time allows; otherwise v0.2)
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
@@ -202,6 +202,11 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] Scaffold: `package.json` with the approved libraries, TypeScript settings, the `src/` layout (`core/`, `cli/`, `hook/`), a minimal CLI (`magpie --version`, `magpie --help` listing the v0.1 commands as not implemented yet), and CI on Node 22, 24 and 26 × Linux and Windows.
 - [ ] Use `tdd` from `mattpocock/skills` while implementing v0.1, and its `code-review` before each pull request.
 - [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
+
+### Pre-launch
+For the next branch, before the launch work:
+- [ ] `magpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched).
+- [ ] Startup time of the hook and `magpie recall` on Windows; consider bundling `dist/` into one file.
 
 ### Launch
 See [marketing.md](marketing.md).
