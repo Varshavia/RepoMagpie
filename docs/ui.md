@@ -95,6 +95,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | GET | `/assets/<file>` | | A file of the bundle, from the startup list |
 | GET | `/api/settings` | | **Settings** document |
 | GET | `/api/tags` | `?journal=personal\|project` | **Tag list** document |
+| POST | `/api/tags` | `{"journal"}` | **Tag list** document after "Create tag list": writes the starter list to a journal without `tags.md`; an existing `tags.md` is left as it is |
 | GET | `/api/notes` | `?journal=`, `&status=inbox\|reviewed`, `&kind=`, `&tag=` (repeatable) | **Note list** document |
 | GET | `/api/note` | `?journal=&id=<PURL>`, or `?journal=&file=<file name>` for a read-only note | **Note** document |
 | PATCH | `/api/note` | `{"journal", "id", "version", "verdict"?, "sections"?: {"<name>": "<body>"}, "fields"?: {"kind", "tags", "tried", "rating"}, "accept_drafts"?: ["<section>"]}` | **Note** document after the edit |
@@ -136,11 +137,12 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 - **Left sidebar:** journal switcher (Personal / Project), Inbox with a count, kinds, tags, settings.
 - **Centre:** the list or the results. Rows have two lines: the name (the full name on hover) and the package type, then the Verdict, or "no verdict yet". The Inbox badge appears in All notes and search, not in the Inbox, where every row is an inbox note.
 - **Right:** the note.
-- **Command palette** on Ctrl/Cmd+K, for search and every action.
+- **Command palette** on Ctrl/Cmd+K, for search and every action. Its notes and skills are the first six results of `magpie search` for exactly what is typed, in the same order. Until that search answers, it says "Searching…"; a failed search shows its error. Never "Nothing matches" before the answer.
 
 1. **Inbox review.** The flow that fights note-taking friction (hypothesis H1, [validation](validation.md)).
    - Inbox notes in a list; `j`/`k` move, `Enter` opens.
    - The Verdict editor has focus; `Ctrl+Enter` saves. Kind, tags (from `tags.md`, with "Edit tag list", which opens `tags.md` in your editor), tried and rating are next to it.
+   - A journal with notes but no `tags.md`: the sidebar's Tags section says "No tag list yet." with "Create tag list", and the editor offers "Create tag list" instead of "Edit tag list". Only that click writes the starter list ([spec](spec.md), section 3). A `tags.md` without tags: the Tags section says "Your tag list is empty." with "Edit tag list".
    - Above the editor, short: "What it does" and "Use when", each cut to three bullets or lines with "Show all".
    - Saving a Verdict moves the note to reviewed and opens the next inbox note with its editor focused. An unsaved Verdict stays with its note while you move through the list.
    - **Goal:** review a note in under 15 seconds.
@@ -149,11 +151,12 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - The Verdict as the hero, marked with the accent; then Use when and Avoid when. The "Avoid when" label is red only when the section has text.
    - "What it does", with a visible draft badge while it is a draft, and "Accept".
    - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
-   - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, PURL packages, tags.
+   - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
    - Actions: open the repository, open in an editor, open in Obsidian, copy the PURL.
+   - PURLs are shown decoded (`pkg:npm/@playwright/cli`), everywhere in the app. The copied PURL and every request keep the encoded id.
 4. **Add.**
    - Paste a URL, PURL or name; see the fetched preview; write the Verdict; save. The same logic as `magpie note`.
-   - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`. Changing the lines needs a new check before importing.
+   - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`, including its lenient read. Changing the lines needs a new check before importing. While the lines have no item, the help line says what the first line starts with, as the CLI's hint does.
 5. **Settings** (read-only in v0.1): journal paths, whether `GITHUB_TOKEN` is set, the version, links to the docs. Also the theme (the system's, dark or light), saved in the browser only.
 6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
 7. **Later, not v0.1:** suggest and adopt panels (they ship with those commands), export or nest (v0.3). A graph tab: open question (section 13).
@@ -225,7 +228,7 @@ Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (
 - **Server** (`node:test`, an in-process server on a random port): every endpoint; each response compared with the CLI's `--json` output for the same input; every security rule in section 3 (bad Host, missing token or header, cross-origin and Origin-less writes, traversal attempts, 409 on conflicts, 413, 415).
 - **Core:** round-trip tests for `setSection` and human-field edits, as for `setToolFields`.
 - **App logic** (`ui/src/logic/`: list windowing, the keyboard map, note text, the edit request, import labels, palette matching, and the values the app mirrors from core): unit tests with `node:test`, run by `npm test`.
-- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault. The flows: inbox review, search, add, import, a 409 conflict, live updates, read-only notes, the palette and keyboard map, the skip link, no CSP violations, and the 2,000-note first render. `npm run build` first, then `npm run test:e2e`.
+- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault. The flows: inbox review, search, add, import, a 409 conflict, live updates, read-only notes, the palette (the same results as `magpie search`, "Searching…" and errors) and keyboard map, decoded PURLs, a journal without `tags.md` or with an empty one, the skip link, no CSP violations, and the 2,000-note first render. `npm run build` first, then `npm run test:e2e`.
 - **Screenshots:** `SCREENS=1 npm run test:e2e` writes every screen and state in dark and light to `.scratch/screens/` (`ui/e2e/screens.spec.ts`); CI skips them.
 - **Before each UI pull request:** a `web-design-guidelines` pass, the bundle-size check, and a `writing-guidelines` pass on the copy.
 - **CI:** the existing matrix, plus one job ("App build and end-to-end tests") that builds the app, checks the bundle size and runs the end-to-end tests.

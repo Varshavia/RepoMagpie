@@ -167,6 +167,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] Every state, the keyboard map and the accessibility rules ([UI](ui.md), "States", "Accessibility").
 - [x] End-to-end tests with `@playwright/test` in one CI job, Chromium only; screenshots in light and dark for the pull request.
 - [x] Before the pull request: `web-design-guidelines` and `writing-guidelines` passes, findings fixed or listed.
+- [x] Fixes from the maintainer's first use (`fix/ui-polish`): the palette shows what `magpie search` finds, PURLs shown decoded, "Create tag list" for a journal without `tags.md`, and a lenient read of import lists copied out of a chat.
 
 **Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI. (On `feat/ui-app`, 2026-10-06, Windows dev machine: the inbox review end-to-end test reviews a note by keyboard in under a second of test time; first render with 2,000 notes 417 ms with a warm cache, 944 ms cold; the bundle 91.8 kB gzipped. CI runs the end-to-end flows in the "App build and end-to-end tests" job; not yet seen green in CI.)
 
