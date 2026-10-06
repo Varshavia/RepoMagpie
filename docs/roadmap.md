@@ -10,7 +10,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Order of the remaining work: the pre-launch fixes, then the launch (recall, the UI server, the UI app, suggest, adopt and the agent skill are built).
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built).
 - **Next:** v0.2 Trust.
 - **Later:** v0.3 Share.
 
@@ -143,7 +143,7 @@ The first public release: capture what you learned, find it again, and see it be
 - [x] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. It never denies: an avoid note asks the user to confirm; other notes inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
 - [x] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing, and to ask first on an avoid note (`skills/repomagpie/SKILL.md`).
 
-**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`. Live check in a Claude Code session on 2026-10-04: an avoid note made Claude Code ask, in the default permission mode and in auto mode. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
+**Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`. Live check in a Claude Code session on 2026-10-04: an avoid note made Claude Code ask, in the default permission mode and in auto mode. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. With the bundled CLI ([decision 0025](decisions/0025-bundle-the-cli.md), 2026-10-06): recall 113–115 ms; the hook 108 ms with a note and 64–65 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
 
 ### Local app
 `magpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).
@@ -179,7 +179,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] In the local app: "Suggest for this project" ([UI](ui.md), section 7).
 - [x] Benchmark against the 500 ms budget (`scripts/bench-suggest.ts`; report only in CI).
 
-**Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. Open: the maintainer's real journal on RepoMagpie itself. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
+**Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. The third, RepoMagpie itself, is a quality test over the example vault since `fix/pre-launch` (playwright-cli first, the agent tools it uses, not open-lakehouse); still open: the maintainer's check on the real journal, where 8 of 9 notes were suggested before the cutoff. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
 
 ### `magpie adopt <name>`
 - [x] Copy a note from the personal journal into the project's `.magpie/`.
@@ -192,7 +192,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall (`skills/repomagpie/`, installed with `npx skills add Varshavia/RepoMagpie`). Tests check its frontmatter against the Agent Skills format, and every command, flag and `--json` field it names against `magpie --help` and the spec.
 - [ ] Publish it to skills.sh and add the badge to the README.
 
-**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Open: needs the skill installed from `main` and `magpie` on `PATH`; not yet checked live.)
+**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `magpie search` and returned the maintainer's playwright-cli note.)
 
 ### `magpie init` (if time allows; otherwise v0.2)
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
@@ -204,12 +204,14 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 - [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
 
 ### Pre-launch
-For the next branch, before the launch work:
-- [ ] `magpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched).
-- [ ] Startup time of the hook and `magpie recall` on Windows; consider bundling `dist/` into one file.
+Before the launch work (`fix/pre-launch`):
+- [x] `magpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched). Candidates under a fifth of the best score are left out; prefix matching only, no fuzzy ([spec](spec.md), section 5). On RepoMagpie itself, with the example vault: 5 candidates instead of 8, open-lakehouse out, playwright-cli first through `@playwright/test`.
+- [x] Startup time of the hook and `magpie recall` on Windows; consider bundling `dist/` into one file. Bundled with Vite into `dist/cli/`, an entry and chunks loaded on demand ([decision 0025](decisions/0025-bundle-the-cli.md)). Windows dev machine, 2,000 notes, median: recall 154 → 113 ms; the hook 152 → 108 ms with a note, 110 → 64 ms without an install.
+- [x] Fresh screenshots of every screen, dark and light, on a journal of real-looking notes, for the final design review (`SCREENS=1`, `ui/e2e/screens.spec.ts`).
 
 ### Launch
 See [marketing.md](marketing.md).
+- [ ] Move `commander`, `minisearch`, `packageurl-js` and `yaml` to `devDependencies`: the CLI bundles them ([decision 0025](decisions/0025-bundle-the-cli.md)). On the launch-prep branch.
 - [x] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand. (Written on `docs/ui`; the local app uses it too.)
 - [ ] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards.
 - [ ] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`.
