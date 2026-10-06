@@ -54,22 +54,25 @@ export function searchJournals(sources: JournalSource[], query: string, filters:
     }
   }
   hits.sort((a, b) => a.group - b.group || b.result.score - a.result.score);
+  return projectFirst(hits.map((hit) => hit.result), (r) => (r.id ? `${r.id}#${r.skill ?? ""}` : null)).slice(0, filters.limit);
+}
 
-  // The same subject in both journals: the project's result directly before the personal one.
-  const subject = (r: SearchResult) => (r.id ? `${r.id}#${r.skill ?? ""}` : null);
-  const placed = new Set<SearchResult>();
-  const ordered: SearchResult[] = [];
-  for (const { result } of hits) {
+// The same subject in both journals (the same `subject` key): the project's result directly before
+// the personal one, at the place of the first of the two (spec §3). Otherwise the order is kept.
+export function projectFirst<T extends { journal: string }>(results: T[], subject: (result: T) => string | null): T[] {
+  const placed = new Set<T>();
+  const ordered: T[] = [];
+  for (const result of results) {
     if (placed.has(result)) continue;
     const key = subject(result);
-    const partner = key ? hits.find(({ result: other }) => !placed.has(other) && other.journal !== result.journal && subject(other) === key)?.result : undefined;
+    const partner = key ? results.find((other) => !placed.has(other) && other.journal !== result.journal && subject(other) === key) : undefined;
     const pair = !partner ? [result] : result.journal === "project" ? [result, partner] : [partner, result];
     for (const r of pair) {
       placed.add(r);
       ordered.push(r);
     }
   }
-  return ordered.slice(0, filters.limit);
+  return ordered;
 }
 
 export interface SearchRequest {

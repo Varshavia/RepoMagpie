@@ -92,10 +92,15 @@ const MANIFESTS: readonly Manifest[] = ["package.json", "pyproject.toml", "Cargo
 
 // The manifests in the closest folder that has any, walking up to the git root (spec §4).
 export function findManifests(cwd: string): Manifest[] {
+  return findManifestFolder(cwd)?.manifests ?? [];
+}
+
+// The closest folder that has any manifest, walking up to the git root, and its manifests.
+export function findManifestFolder(cwd: string): { folder: string; manifests: Manifest[] } | null {
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
     const found = MANIFESTS.filter((manifest) => existsSync(join(dir, manifest)));
-    if (found.length) return found;
-    if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return [];
+    if (found.length) return { folder: dir, manifests: found };
+    if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return null;
   }
 }
 
