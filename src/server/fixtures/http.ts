@@ -1,6 +1,6 @@
 // Test helper: raw HTTP requests to the local app's server, with full control over Host, Origin,
 // Cookie and Content-Type (fetch would set some of them itself). Not part of the build
-// (tsconfig.build.json excludes fixtures/).
+// (it bundles only what src/cli/main.ts imports).
 import { request, type IncomingHttpHeaders } from "node:http";
 
 export interface Reply {

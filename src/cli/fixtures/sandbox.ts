@@ -1,6 +1,6 @@
 // Test helper: runs magpie in a temporary home, journal and project, with recorded responses
 // instead of the network. The real home directory is never used.
-// Not part of the build (tsconfig.build.json excludes fixtures/).
+// Not part of the build (it bundles only what src/cli/main.ts imports).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch } from "../../core/fixtures/fake-fetch.ts";

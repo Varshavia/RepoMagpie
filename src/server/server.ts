@@ -33,7 +33,7 @@ export interface UiServer {
 const HOST = "127.0.0.1";
 const MAX_BODY = 1024 * 1024;
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-// dist/ui/ from both src/server/ (run from source) and dist/server/ (the package).
+// dist/ui/ from both src/server/ (run from source) and dist/cli/ (the bundle, the package).
 const DEFAULT_ASSETS = fileURLToPath(new URL("../../dist/ui/", import.meta.url));
 const NOT_BUILT = "The app isn't built. Run npm run build, then start magpie ui again.";
 const TYPES: Record<string, string> = {

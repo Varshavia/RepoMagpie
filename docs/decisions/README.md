@@ -33,3 +33,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0022 | [Frontend stack](0022-frontend-stack.md) | accepted |
 | 0023 | [The API is the `--json` contract](0023-api-is-the-json-contract.md) | accepted |
 | 0024 | [Recall asks on avoid notes](0024-recall-asks-on-avoid-notes.md) | accepted (refines 0010) |
+| 0025 | [Bundle the CLI](0025-bundle-the-cli.md) | accepted |

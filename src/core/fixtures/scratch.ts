@@ -1,7 +1,7 @@
 // Test helper: a temporary folder under <repo>/.scratch/tests/, never the OS temp folder. Its base
 // holds a .git folder, so walking up to find a git root or a .magpie folder stops inside it and can
 // never reach the real home directory or its ~/.magpie. Removed when the test file ends.
-// Not part of the build (tsconfig.build.json excludes fixtures/).
+// Not part of the build (it bundles only what src/cli/main.ts imports).
 import { after } from "node:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";

@@ -86,11 +86,11 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `server/` (`magpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
 | `ui/` | The local app (React, Vite): `src/` (components, the API client, and `logic/` with unit tests), `e2e/` (Playwright), its `tsconfig.json`, `vite.config.ts` and `playwright.config.ts`. Built into `dist/ui/`, which `magpie ui` serves ([UI](docs/ui.md)). |
-| `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), benchmarks (`npm run bench`), the link check (`npm run check:links`) and the app's size check (`npm run check:bundle`). Typechecked (the `.ts` files), not built or published. |
+| `scripts/` | The test runner with its `~/.magpie` canary (`npm test`), the CLI's build and its check (`build-cli.ts`, `npm run check:build`), benchmarks (`npm run bench`), the link check (`npm run check:links`) and the app's size check (`npm run check:bundle`). Typechecked (the `.ts` files), not built or published. |
 | `skills/repomagpie/` | The agent skill: `SKILL.md` and `references/` (Agent Skills format; the folder name is the skill's name). No code; `src/cli/skill.test.ts` checks it ([standards](docs/standards.md)). |
 | `dist/` | Build output from `npm run build`. Git-ignored. |
 | `package.json`, `package-lock.json` | Package `repomagpie`, scripts, and the approved dependencies. |
-| `tsconfig.json`, `tsconfig.build.json` | TypeScript settings for typecheck and for the build. |
+| `tsconfig.json` | TypeScript settings for the typecheck. |
 | `.gitattributes` | Every text file is stored and checked out with LF line endings. |
 | `.gitignore` | Ignores secrets, build output, the personal vault, `.scratch/` and `.worklog/`. |
 | `AGENTS.md` | Points other coding agents to this file. |
@@ -194,7 +194,8 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | `npm ci` | Install exactly what `package-lock.json` lists. Use it instead of `npm install` unless a dependency was approved and is being added (section 9). |
 | `npm test` | Product tests (`node --test "src/**/*.test.ts" "ui/src/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
 | `npm run typecheck` | `tsc --noEmit` over `src/` and `scripts/`, then over `ui/` (its own `tsconfig.json`). |
-| `npm run build` | Compile `src/` to `dist/` (tests excluded), then build the local app from `ui/` into `dist/ui/` with Vite. `dist/` is git-ignored. |
+| `npm run build` | Bundle the CLI from `src/cli/main.ts` into `dist/cli/` with Vite ([decision 0025](docs/decisions/0025-bundle-the-cli.md)), then build the local app from `ui/` into `dist/ui/`. `dist/` is git-ignored. |
+| `npm run check:build` | The built CLI against the source: the same output for the same commands on a scratch journal (exit 1 if any differs). Run after `npm run build` when the build or the CLI's imports change. |
 | `npm run check:bundle` | The app's size in `dist/ui/`, gzipped, against its 200 kB budget (exit 1 over). Run after `npm run build` when `ui/` changes. |
 | `PLAYWRIGHT_BROWSERS_PATH="$PWD/.scratch/ms-playwright" npm run test:e2e` | The app's end-to-end tests (Chromium) against `magpie ui` on journals in `.scratch/e2e/`. Run `npm run build` first. Install the browser once with the same variable and `npx playwright install chromium`, so it stays inside the repo (section 10). `SCREENS=1` also writes screenshots of every screen to `.scratch/screens/`. |
 | `MAGPIE_UI_URL=<printed URL> npm run dev:ui` | Vite's dev server for `ui/`, forwarding `/api` to a running `magpie ui --no-open` (the row below). No CSP there; `magpie ui` always sends one. |
@@ -205,7 +206,7 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts note ...` | Try a command that writes notes. Without `MAGPIE_HOME` (or `--home`), `note` and `import` write to `~/.magpie`, the maintainer's real journal (section 10). Delete the scratch journal afterwards. Unauthenticated GitHub requests are limited to 60 an hour. |
 | `MAGPIE_HOME="$PWD/.scratch/journal" node src/cli/main.ts ui --no-open` | Start the local app's server on a scratch journal and print its URL; Ctrl+C stops it. It serves the app from `dist/ui/`, so run `npm run build` first. Without `MAGPIE_HOME`, the app reads and edits the real `~/.magpie`. Run it in the background and stop it when done. |
 
-CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck` and `npm run test:hooks` on Node 22, 24 and 26, on Linux and Windows; one job with `npm run check:links` and the benchmarks (report only); and one job that builds, runs `npm run check:bundle` and the end-to-end tests (Chromium).
+CI (`.github/workflows/ci.yml`) runs `npm test`, `npm run typecheck`, `npm run test:hooks`, `npm run build` and `npm run check:build` on Node 22, 24 and 26, on Linux and Windows; one job with `npm run check:links` and the benchmarks (report only); and one job that builds, runs `npm run check:bundle` and the end-to-end tests (Chromium).
 - **PowerShell live check:** passed on 2026-10-03, and again after the tokenizer learned redirections (same day). `git -C . commit --dry-run -m test` through the PowerShell tool was blocked by git-guard, not by the deny list (its prefix rules don't match the `-C .` form). Run it again if the hook's tokenizer changes.
 
 ## 14. Work log
