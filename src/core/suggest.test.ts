@@ -59,8 +59,43 @@ test("from the manifests: keywords from dependency names, keywords and descripti
     status: "reviewed",
     tags: ["cli"],
     score: "number",
+    why: { keywords: ["cli"], dependencies: [] },
     path: join(p.root, "journal", "notes", "npm--commander.md"),
   });
+});
+
+test("why: the keywords a note matched, in keyword order, and the dependencies whose every word it matched", () => {
+  const p = place({
+    "journal/notes/github--microsoft--playwright-cli.md": note({ id: "pkg:github/microsoft/playwright-cli", name: "microsoft/playwright-cli", verdict: "lets my agent test a web app in a browser" }),
+    "project/package.json": JSON.stringify({ description: "An agent tool", devDependencies: { "@playwright/test": "*", "@types/node": "*" } }),
+  });
+  const [candidate] = runSuggest({ limit: 20 }, p).document.candidates;
+  assert.deepEqual(candidate.why, { keywords: ["playwright", "test", "agent"], dependencies: ["@playwright/test"] });
+  const described = runSuggest({ description: "browser tests for an agent", limit: 20 }, p).document.candidates[0];
+  assert.deepEqual(described.why, { keywords: ["browser", "tests", "agent"], dependencies: [] }, "a description's words are no dependencies");
+});
+
+test("prefix matching only, no fuzzy: rest finds restful, not test or text; a plural finds its singular", () => {
+  const p = place({
+    "journal/notes/npm--fastify.md": note({ id: "pkg:npm/fastify", verdict: "restful APIs, fast" }),
+    "journal/notes/npm--vitest.md": note({ id: "pkg:npm/vitest", verdict: "test runner" }),
+    "journal/notes/npm--marked.md": note({ id: "pkg:npm/marked", verdict: "text to HTML" }),
+  });
+  assert.deepEqual(names(runSuggest({ description: "rest", limit: 20 }, p)), ["personal fastify"]);
+  const tests = runSuggest({ description: "tests", limit: 20 }, p).document.candidates;
+  assert.deepEqual(tests.map((c) => [c.name, c.why.keywords]), [["vitest", ["tests"]]]);
+});
+
+test("the relative cutoff: a candidate under a fifth of the best score is dropped, though it matches", () => {
+  const p = place({
+    "journal/notes/npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib", verdict: "render PDF invoices", tags: ["pdf"], useWhen: ["you render PDF invoices"] }),
+    "journal/notes/npm--lodash.md": note({ id: "pkg:npm/lodash", myNotes: "Many helpers for arrays, objects, strings and numbers; I once used one to render a table, among many other things in a long afternoon." }),
+  });
+  const run = runSuggest({ description: "render PDF invoices", limit: 20 }, p);
+  assert.deepEqual(names(run), ["personal pdf-lib"]);
+  assert.equal(run.total, 1, "the total counts what the cutoff keeps");
+  const alone = runSuggest({ description: "render", limit: 20 }, p);
+  assert.ok(names(alone).includes("personal lodash"), "lodash matches render");
 });
 
 test("Verdict first: reviewed candidates before inbox ones; the same note in both journals, project first", () => {

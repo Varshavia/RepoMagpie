@@ -21,8 +21,8 @@ test("candidates on stdout, Verdict first, then the in-use avoid group; the coun
   const r = await magpie(box, ["suggest"]);
   assert.equal(r.code, 0, r.err);
   assert.equal(r.out, [
-    "1  commander  npm  personal  Verdict: fine for small CLIs",
-    "2  tsx        npm  personal  [inbox] no verdict yet",
+    "1  commander  npm  personal  Verdict: fine for small CLIs  Why: matched cli",
+    "2  tsx        npm  personal  [inbox] no verdict yet  Why: matched typescript",
     "",
     "Already in use, you noted to avoid:",
     "  pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer",
@@ -34,7 +34,25 @@ test("candidates on stdout, Verdict first, then the in-use avoid group; the coun
 test("a description replaces the manifests' words", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["suggest", "run TypeScript directly"]);
-  assert.match(r.out, /^1  tsx\s+npm\s+personal\s+\[inbox\] no verdict yet\n/);
+  assert.match(r.out, /^1  tsx\s+npm\s+personal\s+\[inbox\] no verdict yet  Why: matched run, typescript, directly\n/);
+});
+
+test("the why line names the dependencies a note matched, then the other words", async () => {
+  const box = sandbox({
+    "journal/notes/github--microsoft--playwright-cli.md": note({ id: "pkg:github/microsoft/playwright-cli", name: "microsoft/playwright-cli", verdict: "lets my agent test a web app in a browser" }),
+    "journal/notes/npm--react.md": note({ id: "pkg:npm/react", verdict: "dashboards for an agent tool" }),
+    "project/package.json": JSON.stringify({ description: "An agent tool", devDependencies: { "@playwright/test": "*", "@types/node": "*" } }),
+  });
+  const r = await magpie(box, ["suggest"], { columns: 60, env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
+  assert.equal(r.out, [
+    "1  microsoft/playwright-cli  github  personal",
+    "   Verdict: lets my agent test a web app in a browser",
+    "   Why: dependency @playwright/test; matched agent",
+    "2  react                     npm     personal",
+    "   Verdict: dashboards for an agent tool",
+    "   Why: matched agent, tool",
+    "",
+  ].join("\n"));
 });
 
 test("--json prints exactly core's document, and nothing on stderr", async () => {
@@ -47,7 +65,7 @@ test("--json prints exactly core's document, and nothing on stderr", async () =>
   assert.deepEqual(json.keywords, ["pdfkit", "vitest", "typescript", "cli", "tests"]);
   assert.deepEqual({ ...json.candidates[0], score: typeof json.candidates[0].score }, {
     id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine for small CLIs", status: "reviewed", tags: ["cli"], score: "number",
-    path: box.note("npm--commander.md"),
+    why: { keywords: ["cli"], dependencies: [] }, path: box.note("npm--commander.md"),
   });
   assert.equal(json.in_use_avoid[0].id, "pkg:npm/pdfkit");
 });
@@ -55,7 +73,7 @@ test("--json prints exactly core's document, and nothing on stderr", async () =>
 test("--limit: the first candidates, with how many there are and the hint", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["suggest", "--limit", "1"]);
-  assert.equal(r.out.split("\n")[0], "1  commander  npm  personal  Verdict: fine for small CLIs");
+  assert.equal(r.out.split("\n")[0], "1  commander  npm  personal  Verdict: fine for small CLIs  Why: matched cli");
   assert.equal(r.err, "1 of 2 candidates. Your coding agent picks the fit; use --limit to see more.\n");
 });
 
@@ -89,5 +107,5 @@ test("no candidate: a short message on stderr, exit 0; the avoid group still sho
 test("in a terminal, the Verdict wraps under the name", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["suggest"], { columns: 40, env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
-  assert.match(r.out, /^1  commander  npm  personal\n   Verdict: fine for small CLIs\n/);
+  assert.match(r.out, /^1  commander  npm  personal\n   Verdict: fine for small CLIs\n   Why: matched cli\n/);
 });

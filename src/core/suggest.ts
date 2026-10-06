@@ -25,8 +25,17 @@ export interface Candidate {
   status: "inbox" | "reviewed";
   tags: string[];
   score: number;
+  why: {
+    keywords: string[]; // the keywords the note matched, in keyword order
+    dependencies: string[]; // the project's dependencies whose every word it matched; [] for a description
+  };
   path: string;
 }
+
+// A candidate scoring under this share of the best candidate's score is dropped (spec §5). Picked
+// with the quality tests (suggest-quality.test.ts): the notes they expect score 0.43 of the best or
+// more; open-lakehouse, which shares a word or two ("agent", "app"), 0.09 or less.
+export const MIN_SHARE = 0.2;
 
 export interface SuggestJson {
   source: "manifests" | "description";
@@ -72,20 +81,27 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   const sources: RecallSource[] = project.dependencies.length ? journals.map((j) => ({ ...j, entries: loadRecallEntries(j.path).entries })) : [];
   const inUse = project.dependencies.flatMap((d) => recall(sources, d.name, [d.type]));
   const usedIds = new Set(inUse.map((m) => m.id));
+  const dependencyNames = [...new Set(project.dependencies.map((d) => d.name))];
   const avoid = inUse.filter((m, i) => isAvoid(m) && inUse.findIndex((o) => o.id === m.id && o.journal === m.journal) === i);
   document.in_use_avoid = avoid.map(({ name: _name, ...match }) => match);
 
   const scored: { candidate: Candidate; group: number }[] = [];
   for (const journal of journals) {
     const index = loadIndex(journal.path).index;
-    const best = new Map<string, number>(); // note file → its best document's score
-    for (const hit of index.search(keywords.join(" "))) {
+    const best = new Map<string, { score: number; terms: Set<string> }>(); // note file → its best document's score, the keywords of all
+    // Prefix matching only: the keywords are real words from manifests and descriptions, and fuzzy
+    // matching turns test into rest and text. A plural is looked up as its singular instead.
+    for (const hit of index.search(keywords.map(singular).join(" "), { fuzzy: false })) {
       const file = (hit as unknown as SearchDoc).file;
-      best.set(file, Math.max(best.get(file) ?? 0, hit.score));
+      const note = best.get(file) ?? { score: 0, terms: new Set<string>() };
+      note.score = Math.max(note.score, hit.score);
+      for (const term of hit.queryTerms) note.terms.add(term);
+      best.set(file, note);
     }
-    for (const [file, score] of best) {
+    for (const [file, { score, terms }] of best) {
       const doc = index.getStoredFields(file) as unknown as SearchDoc | undefined;
       if (!doc || (doc.purl && usedIds.has(doc.purl))) continue;
+      const matched = keywords.filter((k) => terms.has(singular(k)));
       scored.push({
         group: doc.status === "reviewed" ? 0 : 1,
         candidate: {
@@ -96,13 +112,16 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
           status: doc.status,
           tags: doc.tags,
           score: Math.round((score + tagPoints(doc.tags, keywords)) * 100) / 100,
+          why: { keywords: matched, dependencies: source === "manifests" ? matchedDependencies(dependencyNames, matched) : [] },
           path: join(journal.path, "notes", file),
         },
       });
     }
   }
-  scored.sort((a, b) => a.group - b.group || b.candidate.score - a.candidate.score);
-  const candidates = projectFirst(scored.map((s) => s.candidate), (c) => c.id);
+  const floor = Math.max(0, ...scored.map((s) => s.candidate.score)) * MIN_SHARE;
+  const kept = scored.filter((s) => s.candidate.score >= floor);
+  kept.sort((a, b) => a.group - b.group || b.candidate.score - a.candidate.score);
+  const candidates = projectFirst(kept.map((s) => s.candidate), (c) => c.id);
   document.candidates = candidates.slice(0, request.limit);
   return run("ok", candidates.length, avoid.map((m) => m.name));
 }
@@ -117,6 +136,18 @@ const STOP_WORDS = new Set(("a all also an and any are as at be but by can do fo
 export function keywordsOf(texts: string[]): string[] {
   const words = texts.flatMap((text) => text.toLowerCase().split(/[^a-z0-9]+/));
   return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !/^\d+$/.test(word)))];
+}
+
+// A keyword as suggest looks it up: one trailing "s" dropped from words of four letters or more.
+// With prefix matching this only widens the match: test still finds tests and testing.
+const singular = (word: string) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word);
+
+// The dependencies a note matched: those with words, every one of them among the matched keywords.
+function matchedDependencies(names: string[], matched: string[]): string[] {
+  return names.filter((name) => {
+    const words = keywordsOf([name]);
+    return words.length > 0 && words.every((word) => matched.includes(word));
+  });
 }
 
 // One point per tag that matches the keywords: the tag itself, or each word of a hyphenated tag.
