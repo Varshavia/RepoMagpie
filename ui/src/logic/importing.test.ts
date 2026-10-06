@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countItems, lineTarget, resultWord, summary } from "./importing.ts";
+import { noItemsHint as coreNoItemsHint, parseImport } from "../../../src/core/import.ts";
+import { countItems, lineTarget, noItemsHint, resultWord, summary } from "./importing.ts";
 
 // Import (docs/ui.md §7): the dry-run table and the summary, from magpie import --json.
 
@@ -16,6 +17,30 @@ test("lineTarget: the target on that line, without the dash and the parts", () =
   assert.equal(lineTarget(TEXT, 3), "https://github.com/a/b");
   assert.equal(lineTarget(TEXT, 5), "left-pad");
   assert.equal(lineTarget(TEXT, 9), "");
+});
+
+// The app can't bundle core, so it mirrors core's item rule; these keep the two equal.
+const LENIENT = [
+  TEXT,
+  "﻿* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
+  "",
+  " \n\t\n",
+  "\n\n1. pdfkit — verdict: ok",
+  "  - indented\n• bullet",
+  "-pdfkit — verdict: ok",
+  "https://github.com/microsoft/playwright-cli",
+];
+
+test("countItems and lineTarget agree with core's parseImport (lenient read)", () => {
+  for (const text of LENIENT) {
+    const items = parseImport(text);
+    assert.equal(countItems(text), items.length, JSON.stringify(text));
+    for (const item of items) assert.equal(lineTarget(text, item.line), item.target, `${JSON.stringify(text)} line ${item.line}`);
+  }
+});
+
+test("noItemsHint equals core's", () => {
+  for (const text of LENIENT) assert.equal(noItemsHint(text), coreNoItemsHint(text), JSON.stringify(text));
 });
 
 test("resultWord: what will happen in a dry run, what happened otherwise", () => {

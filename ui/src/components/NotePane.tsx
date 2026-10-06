@@ -5,6 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode 
 import { api, ApiError, type Address, type NoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, type Form, type Patch } from "../logic/edits.ts";
+import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { editableBody, firstEntries, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
@@ -19,6 +20,8 @@ export interface NotePaneProps {
   editRequest: number; // grows with each press of e
   live: { tick: number; files: string[] }; // live updates for this journal
   tagList: string[];
+  noTagList: boolean; // the journal has no tags.md
+  onCreateTagList: () => void;
   drafts: Map<string, Form>; // unsaved forms, kept while you move between notes
   onSaved: (note: NoteJson, message: string) => void;
   onLeave: () => void; // Esc from an editor: back to the list
@@ -35,7 +38,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, review, focusRequest, editRequest, live, tagList, drafts, onSaved, onLeave, onToast, onBack } = props;
+  const { journal, address, noteKey, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -252,7 +255,7 @@ export function NotePane(props: NotePaneProps) {
           {note.id ? (
             <p className="note-purl">
               <span className="mono" translate="no">
-                {note.id}
+                {readablePurl(note.id)}
               </span>
               <button type="button" className="button ghost icon-button" onClick={copyPurl} aria-label="Copy PURL" title="Copy PURL">
                 <Icon name="copy" />
@@ -346,6 +349,8 @@ export function NotePane(props: NotePaneProps) {
               verdictRef={verdictRef}
               verdictChanged={patch?.verdict !== undefined}
               onEditTags={editTagList}
+              noTagList={noTagList}
+              onCreateTagList={onCreateTagList}
             />
             </>
           ) : (
@@ -470,11 +475,14 @@ function Chips({ kind, license, language, packages, tags }: { kind: string | nul
         </li>
       ) : null}
       {language ? <li className="chip meta" title="Language">{language}</li> : null}
-      {packages.map((p) => (
-        <li className="chip meta" key={p} title="Package">
-          {p}
-        </li>
-      ))}
+      {packages.map((p) => {
+        const { type, name } = packageLabel(p);
+        return (
+          <li className="chip meta" key={p} title={type ? `${type} package` : "Package"} translate="no">
+            {name}
+          </li>
+        );
+      })}
       {tags.map((t) => (
         <li key={t}>
           <span className="chip tag">{t}</span>

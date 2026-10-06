@@ -2,7 +2,8 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type ImportJson, type Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
-import { countItems, lineTarget, resultWord, summary } from "../logic/importing.ts";
+import { countItems, lineTarget, noItemsHint, resultWord, summary } from "../logic/importing.ts";
+import { readablePurl } from "../logic/schema.ts";
 import { Banner, FieldError } from "./common.tsx";
 import { JournalChoice, type ProjectState } from "./fields.tsx";
 
@@ -68,7 +69,7 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
           <p className="field-help" id={`${id}-help`}>
 
             One item per line: <code>{"- <url-or-name> — verdict: … | use: … | avoid: …"}</code>. The Verdict stays your own words; use and avoid become drafts.{" "}
-            {items ? `${items} ${items === 1 ? "item" : "items"}.` : "No items yet."}
+            {items ? `${items} ${items === 1 ? "item" : "items"}.` : text.trim() ? `No items yet. ${noItemsHint(text)}` : "No items yet."}
           </p>
         </div>
         <JournalChoice value={to} onChange={(j) => { setTo(j); setResult(null); }} project={project} />
@@ -104,7 +105,7 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
                 <tr key={item.line}>
                   <td className="tabular">{item.line}</td>
                   <td className="nowrap">
-                    <span className="mono">{item.id ?? lineTarget(result.text, item.line)}</span>
+                    <span className="mono">{item.id ? readablePurl(item.id) : lineTarget(result.text, item.line)}</span>
                   </td>
                   <td className="nowrap">
                     <span className={`result ${item.result}`}>

@@ -4,7 +4,7 @@
 import { memo } from "react";
 import type { Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
-import type { Counts } from "../logic/notes.ts";
+import type { Counts, TagListState } from "../logic/notes.ts";
 import type { View } from "../view.ts";
 
 interface Props {
@@ -12,6 +12,9 @@ interface Props {
   hasProject: boolean;
   onJournal: (journal: Scope) => void;
   counts: Counts | null;
+  tagList: TagListState; // no tags.md, or one without tags: an empty state
+  onCreateTagList: () => void;
+  onEditTagList: () => void;
   view: View;
   onView: (view: View) => void;
   inert: boolean; // behind an open dialog
@@ -34,7 +37,7 @@ function Item({ icon, label, count, current, onClick, hint }: { icon: IconName; 
   );
 }
 
-export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, counts, view, onView, inert }: Props) {
+export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, counts, tagList, onCreateTagList, onEditTagList, view, onView, inert }: Props) {
   const is = (page: View["page"], value?: string) => view.page === page && (value === undefined || ("value" in view && view.value === value));
   return (
     <nav className="sidebar" aria-label="Journals and screens" inert={inert}>
@@ -84,10 +87,21 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
         </div>
       ) : null}
 
-      {counts && counts.tags.length ? (
+      {(counts && counts.tags.length) || tagList !== "ready" ? (
         <div className="nav-group taxonomy">
           <h2 className="nav-label">Tags</h2>
-          {counts.tags.map((t) => (
+          {tagList === "missing" ? (
+            <div className="nav-empty">
+              <p className="label">No tag list yet.</p>
+              <Item icon="plus" label="Create tag list" current={false} onClick={onCreateTagList} hint="writes the starter tags.md" />
+            </div>
+          ) : tagList === "empty" ? (
+            <div className="nav-empty">
+              <p className="label">Your tag list is empty.</p>
+              <Item icon="pencil" label="Edit tag list" current={false} onClick={onEditTagList} hint="opens tags.md in your editor" />
+            </div>
+          ) : null}
+          {(counts?.tags ?? []).map((t) => (
             <button key={t.name} type="button" className="nav-item" aria-current={is("tag", t.name) ? "page" : undefined} onClick={() => onView({ page: "tag", value: t.name })}>
               <Icon name="tag" />
               <span className="label">{t.name}</span>

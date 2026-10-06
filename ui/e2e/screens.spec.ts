@@ -1,6 +1,7 @@
 // Screenshots of every screen and state in dark and light, for pull requests (docs/ui.md §11). They
 // go to .scratch/screens/. Run with SCREENS=1; skipped otherwise, so CI stays fast.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -50,7 +51,8 @@ test("command palette", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.keyboard.press("Control+k");
   await page.keyboard.type("design");
-  await expect(page.getByRole("option", { name: /awesome-design-md/ })).toBeVisible();
+  // Inside the palette: the inbox list behind it has the same note.
+  await expect(page.getByRole("dialog", { name: "Command palette" }).getByRole("option", { name: /awesome-design-md/ })).toBeVisible();
   await shoot(page, "04-palette");
 });
 
@@ -132,4 +134,12 @@ test("narrow window: one pane at a time", async ({ page, magpie }) => {
   await page.getByRole("option", { name: /pdfkit/ }).click();
   await expect(page.getByRole("button", { name: "Back to the list" })).toBeVisible();
   await shoot(page, "13-narrow");
+});
+
+test("no tag list", async ({ page, magpie }) => {
+  rmSync(join(magpie.journal, "tags.md"));
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("article").getByRole("button", { name: "Create tag list" })).toBeVisible();
+  await shoot(page, "14-no-tag-list");
 });

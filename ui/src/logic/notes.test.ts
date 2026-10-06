@@ -1,7 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteSummary } from "../../../src/core/documents.ts";
-import { filterNotes, nextAfter, noteKey, sidebarCounts } from "./notes.ts";
+import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState } from "./notes.ts";
+
+// The sidebar's Tags section from the Tag list document: an empty state for a journal with notes but
+// no tags.md ("Create tag list"), or with a tags.md that lists no tags ("Edit tag list").
+test("tagListState: missing, empty, or ready", () => {
+  assert.equal(tagListState({ tags: [], exists: false }), "missing");
+  assert.equal(tagListState({ tags: [], exists: true }), "empty");
+  assert.equal(tagListState({ tags: ["pdf"], exists: true }), "ready");
+  // A journal not created yet: no tags.md, but the starter list comes with its first note.
+  assert.equal(tagListState({ tags: ["pdf"], exists: false }), "ready");
+});
 
 // The sidebar's counts and the centre list come from one Note list document per journal.
 

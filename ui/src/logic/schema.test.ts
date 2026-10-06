@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DRAFT_MARKER as CORE_DRAFT_MARKER, KINDS as CORE_KINDS } from "../../../src/core/note.ts";
+import { readablePurl as coreReadablePurl } from "../../../src/core/identity.ts";
 import { isAvoid as coreIsAvoid } from "../../../src/core/recall.ts";
-import { DRAFT_MARKER, hookWouldAsk, isAvoid, KINDS, TAG_PATTERN } from "./schema.ts";
+import { DRAFT_MARKER, hookWouldAsk, isAvoid, KINDS, packageLabel, readablePurl, TAG_PATTERN } from "./schema.ts";
 
-// The app can't bundle core's modules (they read files), so it mirrors two of core's values. These
-// tests keep the mirror equal to core: core stays the single source.
+// The app can't bundle core's modules (they read files), so it mirrors some of core's values and
+// rules. These tests keep the mirror equal to core: core stays the single source.
 
 test("KINDS and the draft marker equal core's", () => {
   assert.deepEqual(KINDS, CORE_KINDS);
@@ -29,6 +30,16 @@ test("the hook asks only for an exact avoid match; a name-only match informs", (
   assert.equal(hookWouldAsk({ confidence: "exact", verdict: "avoid: slow", avoid_when: [] }), true);
   assert.equal(hookWouldAsk({ confidence: "name-only", verdict: "avoid: slow", avoid_when: [] }), false);
   assert.equal(hookWouldAsk({ confidence: "exact", verdict: "fine", avoid_when: [] }), false);
+});
+
+test("readablePurl equals core's; packageLabel gives the type and the package name as people write it", () => {
+  for (const purl of ["pkg:npm/%40playwright/cli", "pkg:npm/pdfkit", "pkg:github/microsoft/playwright-cli", "pkg:pypi/requests", "pkg:npm/%E0%A4%A"]) {
+    assert.equal(readablePurl(purl), coreReadablePurl(purl), purl);
+  }
+  assert.deepEqual(packageLabel("pkg:npm/%40playwright/cli"), { type: "npm", name: "@playwright/cli" });
+  assert.deepEqual(packageLabel("pkg:github/microsoft/playwright-cli"), { type: "github", name: "microsoft/playwright-cli" });
+  assert.deepEqual(packageLabel("pkg:cargo/serde"), { type: "cargo", name: "serde" });
+  assert.deepEqual(packageLabel("not a purl"), { type: "", name: "not a purl" });
 });
 
 test("tags are lowercase kebab-case, as core's tag list reads them", () => {

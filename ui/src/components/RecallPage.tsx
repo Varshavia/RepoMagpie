@@ -4,7 +4,7 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { hookWouldAsk } from "../logic/schema.ts";
+import { hookWouldAsk, packageLabel } from "../logic/schema.ts";
 import { MOD } from "../platform.ts";
 import { FieldError } from "./common.tsx";
 import { TypeChoice } from "./fields.tsx";
@@ -101,8 +101,7 @@ export function RecallPage() {
 
 function Card({ match }: { match: Match }) {
   const ask = hookWouldAsk(match);
-  const [, type = "", rest = ""] = match.id.match(/^pkg:([^/]+)\/(.+)$/) ?? [];
-  const name = decodeURIComponent(rest);
+  const { type, name } = packageLabel(match.id);
   const draft = (list: "use_when" | "avoid_when") => (match.drafts as string[]).includes(list);
   return (
     <article className={ask ? "recall-card ask" : "recall-card"} aria-label={name}>
