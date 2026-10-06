@@ -19,6 +19,22 @@ RepoMagpie keeps that knowledge as plain Markdown notes, and shows it to your co
 3. When your agent runs `npm install pdfkit`, a hook shows it your verdict first. It never denies an install: if your note says to avoid the package, Claude Code asks you to confirm, with your note on screen; otherwise it only informs. Claude Code comes first; other agents follow the same instruction through `SKILL.md`.
 4. When you start a project, `magpie suggest` shows what you already have that fits, and `magpie adopt` copies a note into the project.
 
+## Use with any coding agent
+
+RepoMagpie ships an [Agent Skill](skills/repomagpie/SKILL.md) that teaches your coding agent to use `magpie`. With it, the agent checks your notes before it adds a dependency, answers "what do I have for browser testing?" from your journals, picks what fits a project from `magpie suggest` and says why, and offers to save your opinion on a tool as a note. Install it with the [skills CLI](https://skills.sh):
+
+```bash
+npx skills add Varshavia/RepoMagpie
+```
+
+The skill needs the `magpie` command on your `PATH`. It never writes a Verdict you didn't say, and never writes to a project journal without your OK.
+
+Recall reaches the agent in one of two ways:
+- **Hook mode, in Claude Code:** the hook in [Recall in Claude Code](#recall-in-claude-code) checks every install, even when the agent forgets to. A note that says to avoid the package makes Claude Code ask you first.
+- **Skill mode, in every other agent that supports skills:** the skill tells the agent to run `magpie recall <package> --json` before it installs anything, and to ask you first when your note says to avoid the package. It works as well as the agent follows the skill; nothing enforces it.
+
+In Claude Code, use both: the hook for installs, the skill for search, suggest and notes.
+
 ## Setup
 
 ### More GitHub requests
