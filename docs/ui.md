@@ -98,6 +98,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | POST | `/api/tags` | `{"journal"}` | **Tag list** document after "Create tag list": writes the starter list to a journal without `tags.md`; an existing `tags.md` is left as it is |
 | POST | `/api/tags` | `{"journal", "add": ["<tag>", …]}` | **Tag list** document after appending the tags `tags.md` doesn't list ([spec](spec.md#shared-json-documents), "Adding tags to the list"); 404 without `tags.md`, 400 for a tag that isn't lowercase kebab-case |
 | GET | `/api/notes` | `?journal=`, `&status=inbox\|reviewed`, `&kind=`, `&tag=` (repeatable) | **Note list** document |
+| GET | `/api/graph` | `?journal=personal\|project`, `&ghosts=1` (missing notes as ghost nodes; `0` or none: without) | **Graph** document ([spec](spec.md#shared-json-documents)); 400 for any other `ghosts` |
 | GET | `/api/note` | `?journal=&id=<PURL>`, or `?journal=&file=<file name>` for a read-only note | **Note** document, with its `links` and `backlinks` ([spec](spec.md), section 2) |
 | PATCH | `/api/note` | `{"journal", "id", "version", "verdict"?, "sections"?: {"<name>": "<body>"}, "fields"?: {"kind", "tags", "tried", "rating", "alternatives"}, "accept_drafts"?: ["<section>"]}` | **Note** document after the edit |
 | GET | `/api/search` | `?q=`, `&tag=` (repeatable), `&kind=`, `&journal=`, `&limit=` | Exactly `magpie search --json` |

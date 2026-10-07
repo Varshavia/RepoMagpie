@@ -216,6 +216,35 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
             "verdict": "", "tried": false, "rating": null, "explored": null, "read_only": true}]}
 ```
 
+**Graph.** One journal's notes, the tags they carry and the connections between them, for the graph page ([decision 0028](decisions/0028-the-graph-page.md); the rules are in the [product](product.md#graph-model) graph model). Built from the notes on every read; nothing is written but the caches (section 7).
+
+```json
+{"journal": "personal",
+ "nodes": [{"type": "note", "key": "note:npm--pdfkit.md", "id": "pkg:npm/pdfkit", "file": "npm--pdfkit.md", "name": "pdfkit",
+            "kind": "library", "kind_group": "tool", "status": "reviewed", "tried": true, "rating": 2,
+            "tags": ["pdf"], "language": "JavaScript", "degree": 3},
+           {"type": "note", "key": "note:npm--puppeteer.md", "id": "pkg:npm/puppeteer", "file": "npm--puppeteer.md", "name": "puppeteer",
+            "kind": "library", "kind_group": "tool", "status": "inbox", "tried": false, "rating": null,
+            "tags": ["pdf"], "language": "TypeScript", "degree": 3},
+           {"type": "tag", "key": "tag:pdf", "tag": "pdf", "count": 2},
+           {"type": "ghost", "key": "ghost:wkhtmltopdf", "target": "wkhtmltopdf", "reason": "missing"}],
+ "edges": [{"type": "tagged", "source": "note:npm--pdfkit.md", "target": "tag:pdf"},
+           {"type": "tagged", "source": "note:npm--puppeteer.md", "target": "tag:pdf"},
+           {"type": "link", "source": "note:npm--pdfkit.md", "target": "note:npm--puppeteer.md", "count": 2},
+           {"type": "alternative", "source": "note:npm--pdfkit.md", "target": "note:npm--puppeteer.md"},
+           {"type": "alternative", "source": "note:npm--pdfkit.md", "target": "ghost:wkhtmltopdf"}],
+ "counts": {"notes": 2, "tags": 1, "edges_by_type": {"tagged": 2, "link": 1, "alternative": 2, "similar": 0}}}
+```
+
+- `nodes`: notes sorted by file name, then tags, then missing notes, each sorted by `key`. A key is `note:<file>`, `tag:<tag>` or `ghost:<target in lower case>`; edges name their ends by key.
+- Note nodes: the notes whose frontmatter can be read and has an `id`; read-only notes are left out, with their tags and links. `kind_group` is `skill-pack`, `tool` (cli, library, framework, plugin), `resource` (awesome-list, template, platform, app) or `other` (`other`, no kind, or one the schema doesn't know). `status` is derived from the Verdict, as in the Note list. `degree` counts the note's `tagged`, `link` and `alternative` edges to notes and tags; similarity and missing notes don't count.
+- Tag nodes: every tag a note carries, whether `tags.md` lists it or not. `count` is the number of notes with it.
+- Ghost nodes (missing notes): only with `ghosts=1`. One per unresolved link or `alternatives` target, ignoring case; `target` is the first spelling, `reason` is `missing` or `ambiguous`, as in the Note document's `links`.
+- `edges`: sorted by type (`tagged`, `link`, `alternative`, `similar`), then `source`, then `target`. `tagged` goes from a note to a tag. `link`, `alternative` and `similar` are one edge per pair of notes, whichever note holds the link, with `source` the smaller key; `link` has `count`, the body links between the two in both directions. A link and an alternative between the same pair are two edges. A note's link to itself is no edge. Edges to a missing note keep their type, with the note as `source`.
+- `similar` has `score`, rounded to 3 decimals: the Jaccard index of the two notes' `topics`, plus 0.1 for the same `language`, at least 0.25. Each note keeps its 3 best; a pair already joined by a link or an alternative gets none. The document always holds them; the page decides whether to show them.
+- `counts`: the note and tag nodes, and the edges of each type, in the document. Ghost nodes are not counted; their edges are.
+- A journal that can't be used (section 3) answers 422 with empty `nodes` and `edges`, and `error`.
+
 **Note.** One note, as read, with the version a write must send back ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
 
 ```json

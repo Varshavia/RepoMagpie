@@ -4,7 +4,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
-import { noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
+import { graphDocument, noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
 import { noteVersion } from "../core/edit.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
@@ -217,6 +217,36 @@ test("GET /api/settings, /api/tags, /api/notes and /api/note return core's share
     assert.equal((await http.get(path)).status, 400, path);
   }
   assert.equal((await http.get("/api/note?journal=personal&id=pkg%3Anpm%2Fnothing")).status, 404);
+});
+
+test("GET /api/graph returns the Graph document: core's graph of one journal, missing notes with ghosts=1", async (t) => {
+  const { http, box, context } = await start(t);
+  writeFileSync(box.note("npm--left-pad.md"), `${LEFT_PAD}\n## Related\n- [[pdfkit]]\n- [[puppeteer]]\n`);
+  for (const [path, journal, ghosts] of [
+    ["/api/graph?journal=personal", "personal", false],
+    ["/api/graph?journal=personal&ghosts=0", "personal", false],
+    ["/api/graph?journal=personal&ghosts=1", "personal", true],
+    ["/api/graph?journal=project", "project", false],
+  ] as const) {
+    assert.deepEqual(parsed(await http.get(path)), { status: 200, document: graphDocument(journal, { ghosts }, context).document }, path);
+  }
+  const graph = parsed(await http.get("/api/graph?journal=personal&ghosts=1")).document as { journal: string; nodes: { key: string }[]; edges: { type: string; source: string; target: string }[]; counts: unknown };
+  assert.equal(graph.journal, "personal");
+  assert.deepEqual(graph.nodes.map((n) => n.key), ["note:npm--left-pad.md", "note:npm--pdfkit.md", "tag:pdf", "ghost:puppeteer"]);
+  assert.deepEqual(graph.edges.filter((e) => e.type === "link").map((e) => `${e.source} ${e.target}`), ["note:npm--left-pad.md ghost:puppeteer", "note:npm--left-pad.md note:npm--pdfkit.md"]);
+  assert.deepEqual(graph.counts, { notes: 2, tags: 1, edges_by_type: { tagged: 1, link: 2, alternative: 0, similar: 0 } });
+
+  const empty = { journal: null, nodes: [], edges: [], counts: { notes: 0, tags: 0, edges_by_type: { tagged: 0, link: 0, alternative: 0, similar: 0 } } };
+  for (const [path, error] of [
+    ["/api/graph", "journal must be personal or project."],
+    ["/api/graph?journal=work", "journal must be personal or project."],
+    ["/api/graph?journal=personal&ghosts=yes", "ghosts must be 1 or 0."],
+    ["/api/graph?journal=personal&ghosts=", "ghosts must be 1 or 0."],
+  ]) {
+    const r = parsed(await http.get(path));
+    assert.equal(r.status, 400, path);
+    assert.deepEqual(r.document, { ...empty, journal: path.includes("personal") ? "personal" : null, error }, path);
+  }
 });
 
 test("PATCH /api/note edits through core and returns the Note document; an old version gets 409", async (t) => {

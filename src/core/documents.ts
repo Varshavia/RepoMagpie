@@ -1,10 +1,11 @@
 // The shared JSON documents (spec §2, "Shared JSON documents"; decision 0023): Settings, Tag list,
-// Note list, Note and Note preview, and the edit of one note. The local app's API returns them as
+// Note list, Graph, Note and Note preview, and the edit of one note. The local app's API returns them as
 // they are. Notes are found only by their id, or by a file name equal to one in the journal's
 // notes/ listing: no request text is ever joined to a path. Never prints.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
+import { graphData, type GraphData } from "./graph.ts";
 import { journalTagList, listNotes, parseTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkIndex, type Backlink, type Link } from "./links.ts";
 import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
@@ -163,6 +164,24 @@ function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {
     explored: typeof fm.explored === "string" ? fm.explored : null,
     read_only: id === null,
   };
+}
+
+// --- Graph ---
+
+export interface GraphJson extends GraphData {
+  journal: Scope;
+  error?: string;
+}
+
+export function emptyGraph(scope: Scope): GraphJson {
+  return { journal: scope, nodes: [], edges: [], counts: { notes: 0, tags: 0, edges_by_type: { tagged: 0, link: 0, alternative: 0, similar: 0 } } };
+}
+
+// One journal's graph (decision 0028); missing notes as ghost nodes only when asked.
+export function graphDocument(scope: Scope, options: { ghosts: boolean }, place: Place): Result<GraphJson> {
+  const journal = locateJournal(scope, place);
+  if (journal.error) return { outcome: "failed", document: { ...emptyGraph(scope), error: journal.error } };
+  return { outcome: "ok", document: { journal: scope, ...graphData(journal.path, options) } };
 }
 
 // --- Note ---
