@@ -1,6 +1,7 @@
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { graphData, type GraphEdge, type GraphNode } from "./graph.ts";
@@ -204,4 +205,56 @@ test("graph cache: .cache/graph.json; unchanged notes come from it, changed note
 
   writeFileSync(join(root, "notes", "npm--a.md"), note({ id: "pkg:npm/a", tags: ["yaml"] }, "## Verdict\nfine\n"));
   assert.deepEqual(graphData(root).nodes.filter((n) => n.type === "tag").map((n) => n.key), ["tag:pdf", "tag:yaml"]);
+});
+
+const CACHE_NOTES = {
+  "npm--a.md": note({ id: "pkg:npm/a", tags: ["pdf"], topics: ["pdf"] }, "## Related\n[[npm--b]] [[gone]]\n"),
+  "npm--b.md": note({ id: "pkg:npm/b", tags: ["pdf"], topics: ["pdf"] }),
+  "npm--c.md": note({ id: "pkg:npm/c", topics: ["pdf"] }),
+};
+
+test("graph cache: written whole to a temporary file, then renamed into place; nothing is left behind", (t) => {
+  const root = journal(CACHE_NOTES);
+  const cacheFile = join(root, ".cache", "graph.json");
+  // writeCache imports writeFileSync and renameSync by name; syncing the built-in's exports makes the spies reach it.
+  const writes = mock.method(fs, "writeFileSync");
+  const renames = mock.method(fs, "renameSync");
+  syncBuiltinESMExports();
+  t.after(() => {
+    mock.restoreAll();
+    syncBuiltinESMExports();
+  });
+  graphData(root);
+  const written = writes.mock.calls.map((call) => String(call.arguments[0])).filter((path) => path.includes("graph.json"));
+  assert.equal(written.length, 1);
+  assert.match(written[0], /graph\.json\.\d+\.tmp$/);
+  assert.deepEqual(renames.mock.calls.filter((call) => String(call.arguments[1]) === cacheFile).map((call) => String(call.arguments[0])), written);
+  assert.ok(readdirSync(join(root, ".cache")).every((name) => !name.endsWith(".tmp")));
+  assert.equal((JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number }).version, 1);
+});
+
+test("graph cache: a corrupt, truncated or mismatched graph.json is ignored and rebuilt, without an error", () => {
+  const root = journal(CACHE_NOTES);
+  const cacheFile = join(root, ".cache", "graph.json");
+  const expected = graphData(root, { ghosts: true });
+  const good = readFileSync(cacheFile, "utf8");
+  const cache = JSON.parse(good) as { version: number; files: unknown; data: Record<string, unknown> };
+  const garbage = [
+    good.slice(0, Math.floor(good.length / 2)), // truncated, as by a crash mid-write
+    "",
+    "\u0000\u0001 not json",
+    "null",
+    "[]",
+    JSON.stringify({ ...cache, version: 999 }),
+    JSON.stringify({ ...cache, data: "nonsense" }),
+    // Valid JSON for the right files, but entries of the wrong shape.
+    JSON.stringify({ ...cache, data: { ...cache.data, "npm--a.md": "nonsense" } }),
+    JSON.stringify({ ...cache, data: { ...cache.data, "npm--a.md": { id: "pkg:npm/a", tags: "pdf" } } }),
+    JSON.stringify({ ...cache, data: { ...cache.data, "npm--b.md": null } }),
+  ];
+  for (const text of garbage) {
+    writeFileSync(cacheFile, text);
+    assert.deepEqual(graphData(root, { ghosts: true }), expected, `with graph.json: ${JSON.stringify(text.slice(0, 60))}`);
+    assert.deepEqual(JSON.parse(readFileSync(cacheFile, "utf8")), JSON.parse(good), "the cache is rewritten whole");
+  }
 });

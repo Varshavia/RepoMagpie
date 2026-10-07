@@ -94,7 +94,7 @@ interface Entry {
 }
 
 export function graphData(journal: string, options: { ghosts?: boolean } = {}): GraphData {
-  const { files, data } = noteEntries(journal, GRAPH_CACHE, GRAPH_VERSION, (_file, path) => entry(path));
+  const { files, data } = noteEntries(journal, GRAPH_CACHE, GRAPH_VERSION, (_file, path) => entry(path), isEntry);
   const notes = files.filter((file) => data[file].id !== null);
   const noteKey = (file: string) => `note:${file}`;
   const edges: GraphEdge[] = [];
@@ -198,6 +198,17 @@ function similarPairs(notes: Entry[], isJoined: (a: number, b: number) => boolea
     }
   });
   return [...kept.values()];
+}
+
+// Whether a cached value has an entry's shape (a damaged cache is read again from the note).
+function isEntry(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const e = value as Record<string, unknown>;
+  if (e.id === null) return true;
+  const textOrNull = (v: unknown) => v === null || typeof v === "string";
+  const texts = (v: unknown) => Array.isArray(v) && v.every((item) => typeof item === "string");
+  return typeof e.id === "string" && textOrNull(e.name) && textOrNull(e.kind) && (e.status === "inbox" || e.status === "reviewed") &&
+    typeof e.tried === "boolean" && (e.rating === null || Number.isInteger(e.rating)) && texts(e.tags) && textOrNull(e.language) && texts(e.topics);
 }
 
 // One note's graph fields; no id for a note that can't be read (skipped, as in the link index).
