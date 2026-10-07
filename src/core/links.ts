@@ -1,7 +1,7 @@
 // Links between notes (decisions 0026 and 0027): [[wikilinks]] in every body section and in the
 // alternatives field, resolved within one journal. The link index lists each note's outgoing and
 // incoming links; it is built from per-file entries cached like the note list (spec §7), so a warm
-// read doesn't parse every file again. Used by the Note document and, later, the graph. Never prints.
+// read doesn't parse every file again. Used by the Note document and the graph. Never prints.
 import { readFileSync } from "node:fs";
 import { readableId, readNote } from "./note.ts";
 import { noteEntries } from "./note-cache.ts";
@@ -74,6 +74,13 @@ interface Entry {
 }
 
 export function linkIndex(journal: string): LinkIndex {
+  const { outgoing, incoming } = resolvedLinkIndex(journal);
+  return { outgoing, incoming };
+}
+
+// The link index, plus the file each outgoing link resolves to (null when unresolved), in the same
+// order as `outgoing`. The graph joins notes by file, since two files may carry the same id.
+export function resolvedLinkIndex(journal: string): LinkIndex & { targets: Record<string, (string | null)[]> } {
   const { files, data } = noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path));
   const notes = files.filter((file) => data[file].id !== null);
   const byStem = new Map<string, string[]>();
@@ -86,14 +93,17 @@ export function linkIndex(journal: string): LinkIndex {
   }
 
   const outgoing: Record<string, Link[]> = {};
+  const targets: Record<string, (string | null)[]> = {};
   const sources: Record<string, { file: string; from: string }[]> = {};
   for (const file of notes) sources[file] = [];
   for (const file of notes) {
+    targets[file] = [];
     outgoing[file] = data[file].links.map(({ target, label, from }) => {
       // 1. the file stem; 2. exactly one note's name; otherwise unresolved (case-insensitive).
       const stems = byStem.get(target.toLowerCase()) ?? [];
       const named = byName.get(target.toLowerCase()) ?? [];
       const to = stems.length === 1 ? stems[0] : !stems.length && named.length === 1 ? named[0] : null;
+      targets[file].push(to);
       if (!to) return { target, label, id: null, name: null, reason: stems.length > 1 || named.length > 1 ? "ambiguous" : "missing", from };
       if (to !== file && !sources[to].some((s) => s.file === file && s.from === from)) sources[to].push({ file, from });
       return { target, label, id: data[to].id, name: data[to].name, from };
@@ -107,7 +117,7 @@ export function linkIndex(journal: string): LinkIndex {
       .sort((a, b) => compare(sortKey(a.file), sortKey(b.file)) || compare(a.file, b.file))
       .map(({ file: source, from }) => ({ id: data[source].id as string, name: data[source].name, from }));
   }
-  return { outgoing, incoming };
+  return { outgoing, incoming, targets };
 }
 
 // One note's id, name and links, as written. A note that can't be read has no id and no links.

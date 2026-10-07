@@ -18,11 +18,22 @@ const WORDS = ("pdf render stream async browser agent skill test design frontend
 const TAGS = ["agent-skills", "browser-automation", "code-understanding", "coding-guidelines", "data-engineering", "design", "frontend", "react", "testing", "workflow"];
 const words = (seed: number, count: number) => Array.from({ length: count }, (_, k) => WORDS[(seed * 7 + k * 13) % WORDS.length]).join(" ");
 
+// GitHub-like topics for note i: 3 to 7 of 200, drawn so that a few are on hundreds of notes (like
+// "javascript") and most on a few; and one of six languages. Deterministic.
+const LANGUAGES = ["TypeScript", "JavaScript", "Python", "Rust", "Go", "Java"];
+function topicsFor(i: number): string[] {
+  let x = (i * 2654435761) % 2 ** 32;
+  const next = () => (x = (x * 1664525 + 1013904223) % 2 ** 32) / 2 ** 32;
+  const count = 3 + Math.floor(next() * 5);
+  return [...new Set(Array.from({ length: count }, () => `topic-${Math.floor(200 * next() ** 2)}`))];
+}
+
 // Runs `body` with a fresh scratch folder (with a .git fence, so no walk leaves it) holding
 // <root>/journal with NOTES generated notes (pkg:npm/package-<i>), then deletes the folder. Each
 // note links to two others (by file stem and by name) and to one subject without a note.
 // `needsBuild: false` for a benchmark that calls core in-process instead of the built CLI.
-export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true): void {
+// `topics: true` also gives each note topics and a language (the graph's similarity reads them).
+export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true, topics = false): void {
   if (needsBuild && !existsSync(cli)) {
     console.error("No build found. Run npm run build first (npm run bench does).");
     process.exit(1);
@@ -41,6 +52,7 @@ export function withJournal(name: string, body: (root: string, journal: string) 
         explored: "2026-10-04",
         kind: "library",
         tags: [TAGS[i % TAGS.length], TAGS[(i * 3) % TAGS.length]].filter((tag, k, all) => all.indexOf(tag) === k),
+        ...(topics ? { topics: topicsFor(i), language: LANGUAGES[i % LANGUAGES.length] } : {}),
         verdict: i % 3 ? words(i, 12) : undefined, // two in three reviewed
         useWhen: [words(i + 1, 15)],
         avoidWhen: [words(i + 2, 10)],

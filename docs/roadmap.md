@@ -251,7 +251,7 @@ Follow-up, small, after `feat/linked-notes` (the maintainer, 2026-10-07):
 ### Part 2: the graph page (`feat/graph`)
 A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification); library, layout and encoding: [decision 0028](decisions/0028-the-graph-page.md).
 - [x] Decision 0028 and the rendering library: sigma 3, graphology and graphology-layout-forceatlas2, approved 2026-10-07; their licence notices ship in `dist/ui/`.
-- [ ] Core: `graphData` (`src/core/graph.ts`): note, tag and ghost nodes; tagged, link, alternative and similar edges; warm in under 300 ms for 2,000 notes.
+- [x] Core: `graphData` (`src/core/graph.ts`): note, tag and ghost nodes; tagged, link, alternative and similar edges; warm in under 300 ms for 2,000 notes. (2026-10-08: 146 ms median, p95 162 ms, missing notes included, on a Windows dev machine, `scripts/bench-graph.ts`.)
 - [ ] API: `GET /api/graph`, with security tests.
 - [ ] Page skeleton: a lazy-loaded route, the sidebar item, the palette entry and `g g`; rendering with the `DESIGN.md` tokens; the layout worker; the status line; the empty and WebGL states.
 - [ ] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.

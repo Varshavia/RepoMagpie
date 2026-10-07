@@ -39,6 +39,7 @@ src/
                identity: PURL resolution and file names (decision 0017)
                note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links)
                links: [[wikilinks]] and alternatives, resolved within a journal; the link index (decision 0026)
+               graph: the graph's nodes and edges (tags, links, alternatives, similarity, missing notes) (decision 0028)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
                install-detect: package installs in a shell command line
