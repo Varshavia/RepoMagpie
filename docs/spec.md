@@ -151,7 +151,7 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 - `avoid_when` and `use_when` hold one item per bullet, without the draft marker and comments.
 - `drafts` names which of `avoid_when` and `use_when` are still drafts (schema rule 3); `[]` when none.
 
-### `magpie init` (if time allows in v0.1; otherwise v0.2)
+### `magpie init` (if time allows in v0.1; otherwise v0.3)
 
 Reads the project's manifests and creates a draft note, without a Verdict (`status: inbox`), for each direct dependency that has no note yet ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)). It writes to the project journal by default (`--to personal` to change that).
 
@@ -498,7 +498,7 @@ The maintainer approved the local app's frontend libraries on 2026-10-04 ([decis
 
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.
-- **Search:** [Orama](https://github.com/oramasearch/orama) 3.1.18 (Apache-2.0, 0 deps) is the upgrade path if semantic or hybrid search arrives (roadmap v0.3). FlexSearch (Apache-2.0) is fastest at very large scale but more complex than needed for a few thousand notes.
+- **Search:** [Orama](https://github.com/oramasearch/orama) 3.1.18 (Apache-2.0, 0 deps) is the upgrade path if semantic or hybrid search arrives (roadmap v0.4). FlexSearch (Apache-2.0) is fastest at very large scale but more complex than needed for a few thousand notes.
 - **YAML:** gray-matter 4.0.3 (MIT, 4 deps, last release 2021-04-24) and js-yaml 5.4.2 (MIT, 1 dep) were not chosen: keeping comments and formatting when a file is rewritten is a hard requirement, and `yaml` documents a Document API that does it.
 - **PURL:** a small own parser for the four types in use (github, npm, pypi, cargo) was the fallback; not needed now that packageurl-js is approved.
 

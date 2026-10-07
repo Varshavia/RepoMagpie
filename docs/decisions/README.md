@@ -15,10 +15,10 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0004 | [English everywhere](0004-english-everywhere.md) | accepted |
 | 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | superseded by 0018 |
 | 0006 | [One note per repository; skills are searchable lines](0006-skills-as-searchable-lines.md) | accepted |
-| 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | proposed |
+| 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | accepted in part by 0027 (`alternatives`); `works_with` stays proposed |
 | 0008 | [Machine-readable output for every command](0008-machine-readable-output.md) | accepted |
 | 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted |
-| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024) |
+| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024; the graph's status changed by 0026) |
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
@@ -34,3 +34,5 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0023 | [The API is the `--json` contract](0023-api-is-the-json-contract.md) | accepted |
 | 0024 | [Recall asks on avoid notes](0024-recall-asks-on-avoid-notes.md) | accepted (refines 0010) |
 | 0025 | [Bundle the CLI](0025-bundle-the-cli.md) | accepted |
+| 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
+| 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |

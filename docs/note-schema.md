@@ -103,10 +103,10 @@ These fields are planned for later releases ([ideas](ideas.md)). They are **not*
 
 | Field | Owner | Type | For | Target |
 |---|---|---|---|---|
-| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | [decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed |
+| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.2 part 1 ([decision 0027](decisions/0027-alternatives-active.md), accepted; joins the active schema on `feat/linked-notes`) |
 | `works_with` | human | list of wikilinks | typed edges | [decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed |
-| `reviewed_commit` | tool | commit SHA | drift | v0.2 |
-| `public` | human | bool, default `false` | nests | v0.3 |
+| `reviewed_commit` | tool | commit SHA | drift | v0.3 |
+| `public` | human | bool, default `false` | nests | v0.4 |
 | `last_resurfaced` | tool | date | digest | later |
 
 `packages` moved from this table into the active schema in v1, as a list of PURLs.

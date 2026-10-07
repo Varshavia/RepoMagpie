@@ -77,17 +77,18 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 
 | Component | Layer | Job | Release |
 |---|---|---|---|
-| **graph generator** | core | Builds nodes and edges from the notes (repos, completed skill lines, tags, typed relations), with status, drift and `tried` for each node. Nothing is stored that can't be rebuilt (decision 0001). | not scheduled (marketing only) |
-| `magpie graph` | cli | Writes the graph as one self-contained HTML file with the data embedded as JSON. | not scheduled (marketing only) |
-| **publish pipeline** | core | Selects notes with `public: true` only, and builds the nest data: note list, graph and `/uses` view. | v0.3 |
-| `magpie publish` | cli | Writes the nest as a static site. | v0.3 |
+| **link index** | core | Resolves `[[links]]` and `alternatives` within a journal and lists each note's outgoing and incoming links, from the note cache. | v0.2 part 1 ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
+| **graph generator** | core | Builds nodes and edges from the notes (repos, completed skill lines, tags, links, `alternatives`), with status, drift and `tried` for each node. Nothing is stored that can't be rebuilt (decision 0001). The app's graph page reads it through the API. | v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
+| `magpie graph` | cli | Writes the graph as one self-contained HTML file with the data embedded as JSON. | later, as an export ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
+| **publish pipeline** | core | Selects notes with `public: true` only, and builds the nest data: note list, graph and `/uses` view. | v0.4 |
+| `magpie publish` | cli | Writes the nest as a static site. | v0.4 |
 
 ## Storage
 
 - **Notes** are the only source of truth: plain Markdown with YAML frontmatter ([decision 0001](decisions/0001-plain-markdown-storage.md)).
 - **Journals:** a personal journal outside any repository, and a project journal in `.magpie/` inside a project repository, with the same format ([decision 0013](decisions/0013-two-journal-scopes.md)). Layout: `<journal>/notes/<file>.md` for notes, with the file name derived from the note's PURL (`npm--pdfkit.md`, `github--owner--repo.md`), and `<journal>/tags.md` for the tag list ([note schema](note-schema.md), [decision 0017](decisions/0017-package-identity-purl.md)).
 - **Search index:** a derived cache in `<journal>/.cache/`, one per journal, git-ignored (the project journal gets a `.magpie/.gitignore` with `.cache/`). It is rebuilt when a note file is newer than the index, and can be deleted at any time (decision 0001).
-- **Embeddings:** not in v0.1 ([spec](spec.md), section 10). Semantic search is planned for v0.3; the default must work offline.
+- **Embeddings:** not in v0.1 ([spec](spec.md), section 10). Semantic search is planned for v0.4; the default must work offline.
 
 ## Data flow: recall before an install
 
@@ -115,7 +116,7 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 1. **Get the index:** reuse the cached index of each journal if it is newer than every note; otherwise rebuild it.
 2. **Match**, across both journals:
    - keyword search over frontmatter and text (roadmap v0.1);
-   - semantic search over the note text (roadmap v0.3).
+   - semantic search over the note text (roadmap v0.4).
 3. **Results** are notes and completed skill lines (decision 0006). Empty skill lines are ignored (note schema, rule 4). Notes in `inbox` rank below `reviewed` notes ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)).
 4. **Output:** short and parseable, like every `magpie` command (decision 0002), with a machine-readable mode (decision 0008).
 

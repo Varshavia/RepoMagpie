@@ -2,7 +2,7 @@
 
 This file is the single source of truth for project status. It has two parts:
 - **Foundation** (steps 0, 1, 1.5, 2): what must exist before any product code.
-- **Release milestones** (v0.1 to v0.3, then Later): what each release ships. Scope follows the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md); the v0.1 beta may still change it.
+- **Release milestones** (v0.1 to v0.4, then Later): what each release ships. Scope follows the accepted [strategy](strategy.md), [decision 0010](decisions/0010-v0-1-scope.md) and, for v0.2, [decision 0026](decisions/0026-the-app-is-the-workspace.md); the v0.1 beta may still change it.
 
 Each task is a checkbox. Tick it when the work is done. A step or milestone is done only when its **Done when** criteria are met. Work is committed in small pieces.
 
@@ -11,8 +11,9 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-- **Next:** v0.2 Trust.
-- **Later:** v0.3 Share.
+  Also now: v0.2 Connect, part 1 (linked notes, `feat/linked-notes`).
+- **Next:** v0.2 Connect, parts 2 (the graph page) and 3 (agent output).
+- **Later:** v0.3 Trust, v0.4 Share.
 
 | Part | Status |
 |---|---|
@@ -21,8 +22,9 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 | 1.5. Validation | ✅ done (desk research) |
 | 2. Spec and tech-stack decision | ✅ done |
 | v0.1 Remember | ⬜ |
-| v0.2 Trust | ⬜ |
-| v0.3 Share | ⬜ |
+| v0.2 Connect | ⬜ |
+| v0.3 Trust | ⬜ |
+| v0.4 Share | ⬜ |
 | Later | ⬜ |
 
 ---
@@ -94,7 +96,7 @@ Answer each open question and record the answer as a decision record. The v0.1 c
 - [x] Write [`docs/spec.md`](spec.md): commands, journals, identity, matching, hook contract, performance budgets, output design, stack.
 
 Moved out of this step:
-- Embeddings for semantic search (local model or API; the default must work offline): to v0.3, with semantic search. v0.1 has no embeddings.
+- Embeddings for semantic search (local model or API; the default must work offline): to v0.4 (v0.3 before [decision 0026](decisions/0026-the-app-is-the-workspace.md)), with semantic search. v0.1 has no embeddings.
 
 **Done when:** `docs/spec.md` exists and every open question has a decision record.
 
@@ -102,7 +104,7 @@ Moved out of this step:
 
 # Release milestones
 
-Scope follows [decision 0010](decisions/0010-v0-1-scope.md) (extended by [0021](decisions/0021-local-ui-server.md) with the local app) and [strategy](strategy.md) §7 and §15; the v0.1 beta may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
+Scope follows [decision 0010](decisions/0010-v0-1-scope.md) (extended by [0021](decisions/0021-local-ui-server.md) with the local app) and [strategy](strategy.md) §7 and §15; v0.2 follows [decision 0026](decisions/0026-the-app-is-the-workspace.md); the v0.1 beta may still change it. Each feature is described in [ideas](ideas.md). Each release is also a marketing moment: one headline feature, one GIF, one short post.
 
 ## v0.1 Remember
 The first public release: capture what you learned, find it again, and see it before your agent installs a dependency. The sections below are in build order from recall on: recall → local app (server, then app) → suggest and adopt → agent skill and launch ([decision 0021](decisions/0021-local-ui-server.md)).
@@ -194,7 +196,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 
 **Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `magpie search` and returned the maintainer's playwright-cli note.)
 
-### `magpie init` (if time allows; otherwise v0.2)
+### `magpie init` (if time allows; otherwise v0.3)
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
 
 ### Development practice
@@ -229,14 +231,36 @@ See [marketing.md](marketing.md).
 - [ ] Show HN
 - [ ] Product Hunt
 
-## v0.2 Trust
+## v0.2 Connect
+The app becomes the place where you write and connect notes: links, backlinks, the `alternatives` relation and a graph, built into `magpie ui` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). Three parts, each on its own branch.
+
+### Part 1: linked notes (`feat/linked-notes`)
+- [x] Decisions: the app is the workspace ([0026](decisions/0026-the-app-is-the-workspace.md)); `alternatives` becomes active, one side is enough ([0027](decisions/0027-alternatives-active.md)).
+- [x] Remove "Open in Obsidian" from the app. "Open in editor" stays.
+- [ ] "My notes" and "Related" are always shown in the note view, so you can start them from the app. Saving a section the file doesn't have inserts it at its canonical position.
+- [ ] Links in core: `[[target]]`, `[[target|label]]`, `[[target#heading]]`, resolved within the journal by file stem, then by a unique name; otherwise unresolved (missing or ambiguous). A link index with outgoing and incoming links, warm in under 150 ms for 2,000 notes.
+- [ ] Links in the API and the app: `links` and `backlinks` in the Note document, in-app links, unresolved links that open Add, `[[` autocomplete, "Linked from", and live refresh.
+- [ ] `alternatives`: in the schema, core, `PATCH /api/note`, and the note view (chips, "+ Add", "Alternative to: …" on the other note).
+- [ ] Tags from GitHub topics: "From GitHub topics" chips in Add, the inbox review and the note view; a chip adds the tag and appends it to `tags.md` (`POST /api/tags` with `add`).
+
+**Done when:** every item works in the app and has tests; every new write keeps the rest of the file byte for byte; the link index meets its budget and the existing budgets still hold; all checks and end-to-end tests pass.
+
+### Part 2: the graph page
+- [ ] A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification).
+- [ ] Choose the rendering library (dependency policy, the app's 200 kB budget).
+- [ ] Review with `web-design-guidelines`; check and screenshot with `playwright-cli`.
+
+### Part 3: agent output
+- [ ] `magpie recall` and `magpie suggest` show alternatives and neighbours; the skill explains them.
+
+## v0.3 Trust
 - [ ] `magpie init`, if it missed v0.1.
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.
 - [ ] `magpie drift`: lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
 - [ ] `magpie gaps`: dependencies used in a project but missing from the journals.
 - [ ] `--project <dir>` also moves where `magpie suggest` reads the manifests and README, like `git -C`. In v0.1 they come from the working directory ([spec](spec.md), section 2), so `magpie --project ../app suggest` reads the current folder's manifests.
 
-## v0.3 Share
+## v0.4 Share
 - [ ] `magpie publish`: a static "nest" site from notes marked public, following `DESIGN.md`. Review it with `web-design-guidelines` and check it with `playwright-cli`.
 - [ ] `magpie follow <nest-url>`: another user's public notes in your search results, attributed.
 - [ ] `/uses` page generator.
@@ -249,6 +273,7 @@ See [marketing.md](marketing.md).
 - [ ] Recall for installs without package names (`npm install`, `pip install -r requirements.txt`): check the whole manifest. Ignored in v0.1 ([spec](spec.md), section 6).
 - [ ] Hook mode for clients other than Claude Code, as their hooks allow passing context on an allowed command ([ideas](ideas.md#hook-support-in-major-clients)). v0.1 uses skill mode there.
 - [ ] *Obsidian extra (optional):* ready-made Dataview queries in `examples/vault/`.
+- [ ] The graph as an export: a standalone HTML file, and the graph in nest pages ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 
 ## Not scheduled
-- Graph views: marketing only ([ideas](ideas.md), idea 10). The Obsidian graph preset and `magpie graph` are built only as a shareable visual, if at all. If built: review with `web-design-guidelines`, check and screenshot with `playwright-cli`.
+- *Obsidian extra (optional):* the Obsidian graph preset for the example vault (level 1 in the [product](product.md#graph-specification) history). The in-app graph is the working view ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
