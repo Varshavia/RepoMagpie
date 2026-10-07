@@ -6,11 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Changed
-
-- `magpie adopt` names no install command for a note whose Verdict says to avoid the package. It still copies the note, and says `Your note says to avoid pdfkit; no install command.` instead; `install` is `null` in `--json`. The app shows the same line. "Avoid when" text alone doesn't stop the command.
-
-## [0.1.0-beta.1] - 2026-10-06
+## [0.1.0-beta.1] - 2026-10-07
 
 The first pre-release, for early testers.
 
@@ -31,7 +27,7 @@ The first pre-release, for early testers.
 - A third cache, `<journal>/.cache/note-list.json`, keeps the app's note list fast: 2,000 notes load in about 40 ms instead of 500 ms.
 
 - `magpie suggest ["description"]` shows the notes from both journals that fit this project, Verdict first, from its manifests and README or from a description. Packages the project already uses are never suggested; those you noted to avoid are listed apart, under "Already in use, you noted to avoid". It narrows by keyword and tags, skips words almost every project has (`code`, `install`, `js`), leaves out notes that score under a fifth of the best one, and says why each note is a candidate: `Why: dependency @playwright/test; matched coding, agent` (`why` in `--json`, a third line in the app). Your coding agent picks the fit. Flags: `--limit`, `--journal`, `--json`.
-- `magpie adopt <name-or-purl>` copies a note from your personal journal into the project journal, with the date as `adopted`, and prints the install command for the project's package manager (`npm`, `pnpm`, `yarn`, `bun`, `pip`, `uv`, `cargo`). For a repository that publishes several packages, it prints one command per package for you to choose from. It never installs anything, and never overwrites a note the project already has. Flags: `--type`, `--json`.
+- `magpie adopt <name-or-purl>` copies a note from your personal journal into the project journal, with the date as `adopted`, and prints the install command for the project's package manager (`npm`, `pnpm`, `yarn`, `bun`, `pip`, `uv`, `cargo`). For a repository that publishes several packages, it prints one command per package for you to choose from. It never installs anything, and never overwrites a note the project already has. For a note whose Verdict says to avoid the package, it still copies the note but names no install command, and says `Your note says to avoid pdfkit; no install command.` instead; `install` is `null` in `--json`. The app shows the same line. "Avoid when" text alone doesn't stop the command. Flags: `--type`, `--json`.
 - In the local app: **Suggest for this project**, with the same candidates as `magpie suggest` and a box for a description; and **Adopt to project** on a personal note, which says who can read the project journal before it copies anything.
 - An agent skill for any coding agent that supports Agent Skills, installed with `npx skills add Varshavia/RepoMagpie`. It teaches the agent to run `magpie recall` before it adds a dependency and to ask you first when your note says to avoid it (skill mode, for agents without the Claude Code hook); to answer "what do I have for X?" with `magpie search`; to pick what fits a project from `magpie suggest` and say why; and to offer `magpie note` when you form an opinion on a tool. It never writes a Verdict you didn't say, and runs `magpie adopt` or writes to a project journal only with your OK.
 - `magpie --version` and `magpie --help`. Help lists the v0.1 commands (`note`, `import`, `search`, `recall`, `ui`, `suggest`, `adopt`, `init`); `init` is not implemented yet.
