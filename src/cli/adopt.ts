@@ -1,4 +1,5 @@
 // magpie adopt <name-or-purl> (spec §2): the human output of core's runAdopt. Never installs.
+// A note whose Verdict says to avoid the package is copied with no install command.
 import { runAdopt } from "../core/adopt.ts";
 import type { PackageType } from "../core/identity.ts";
 import { exitCode } from "../core/outcome.ts";
@@ -26,7 +27,8 @@ export async function adoptCommand(target: string, options: AdoptOptions, io: Io
   io.err(`✔ Copied to the project journal: ${run.name}\n`);
   io.out(`${run.document.to}\n`);
   const { install, install_choices: choices } = run.document;
-  if (install) io.out(`Install with: ${install}\n`);
+  if (run.avoid) io.out(`Your note says to avoid ${run.name}; no install command.\n`);
+  else if (install) io.out(`Install with: ${install}\n`);
   else if (choices.length) io.out(`This repository publishes ${choices.length} packages; install the one you need:\n${choices.map((c) => `  ${c}\n`).join("")}`);
   else io.out(`No install command for a GitHub repository: ${run.url}\n`);
   io.err("The project journal is committed with the code; anyone who can read this repository can read this note.\n");

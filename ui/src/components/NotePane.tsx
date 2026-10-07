@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode 
 import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, triedLine, type Form, type Patch } from "../logic/edits.ts";
-import { packageLabel, readablePurl } from "../logic/schema.ts";
+import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
 import { editableBody, firstEntries, homePath, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
@@ -342,7 +342,9 @@ export function NotePane(props: NotePaneProps) {
           ) : adopting?.step === "done" ? (
             <div className="adopt-panel" role="group" aria-label="Adopted">
               <p>Copied to the project journal.</p>
-              {adopting.doc.install || adopting.doc.install_choices.length ? (
+              {verdictSaysAvoid(note.verdict) ? (
+                <p className="field-help">{`Your note says to avoid ${name}; no install command.`}</p>
+              ) : adopting.doc.install || adopting.doc.install_choices.length ? (
                 <>
                   {adopting.doc.install_choices.length ? <p>{`This repository publishes ${adopting.doc.install_choices.length} packages; install the one you need:`}</p> : null}
                   {(adopting.doc.install ? [adopting.doc.install] : adopting.doc.install_choices).map((command) => (

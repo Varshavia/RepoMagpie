@@ -165,11 +165,11 @@ test("adopt to project", async ({ page, magpie }) => {
   writeFileSync(join(magpie.project, "package.json"), "{}");
   await magpie.open(page);
   await allNotes(page);
-  await page.getByRole("option", { name: /^pdfkit / }).click();
+  await page.getByRole("option", { name: /^zod / }).click();
   await page.getByRole("button", { name: "Adopt to project" }).click();
   await expect(page.getByText("anyone who can read this repository can read this note.")).toBeVisible();
   await shoot(page, "16-adopt-confirm");
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
-  await expect(page.getByText("npm install pdfkit")).toBeVisible();
+  await expect(page.getByText("npm install zod")).toBeVisible();
   await shoot(page, "17-adopt-done");
 });
