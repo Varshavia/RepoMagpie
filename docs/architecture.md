@@ -37,7 +37,8 @@ src/
   core/        journals: discovery and config (decision 0016)
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
-               note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list)
+               note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links)
+               links: [[wikilinks]] and alternatives, resolved within a journal; the link index (decision 0026)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
                install-detect: package installs in a shell command line
@@ -77,7 +78,6 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 
 | Component | Layer | Job | Release |
 |---|---|---|---|
-| **link index** | core | Resolves `[[links]]` and `alternatives` within a journal and lists each note's outgoing and incoming links, from the note cache. | v0.2 part 1 ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
 | **graph generator** | core | Builds nodes and edges from the notes (repos, completed skill lines, tags, links, `alternatives`), with status, drift and `tried` for each node. Nothing is stored that can't be rebuilt (decision 0001). The app's graph page reads it through the API. | v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
 | `magpie graph` | cli | Writes the graph as one self-contained HTML file with the data embedded as JSON. | later, as an export ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
 | **publish pipeline** | core | Selects notes with `public: true` only, and builds the nest data: note list, graph and `/uses` view. | v0.4 |

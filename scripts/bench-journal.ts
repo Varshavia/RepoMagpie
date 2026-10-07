@@ -19,9 +19,11 @@ const TAGS = ["agent-skills", "browser-automation", "code-understanding", "codin
 const words = (seed: number, count: number) => Array.from({ length: count }, (_, k) => WORDS[(seed * 7 + k * 13) % WORDS.length]).join(" ");
 
 // Runs `body` with a fresh scratch folder (with a .git fence, so no walk leaves it) holding
-// <root>/journal with NOTES generated notes (pkg:npm/package-<i>), then deletes the folder.
-export function withJournal(name: string, body: (root: string, journal: string) => void): void {
-  if (!existsSync(cli)) {
+// <root>/journal with NOTES generated notes (pkg:npm/package-<i>), then deletes the folder. Each
+// note links to two others (by file stem and by name) and to one subject without a note.
+// `needsBuild: false` for a benchmark that calls core in-process instead of the built CLI.
+export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true): void {
+  if (needsBuild && !existsSync(cli)) {
     console.error("No build found. Run npm run build first (npm run bench does).");
     process.exit(1);
   }
@@ -45,6 +47,7 @@ export function withJournal(name: string, body: (root: string, journal: string) 
         whatItDoes: words(i + 3, 25),
         myNotes: words(i + 4, 30),
         skills: i % 5 ? [] : ["skill-a", "skill-b"],
+        related: `- [[npm--package-${(i + 1) % NOTES}]]\n- [[package-${(i * 7) % NOTES}|a neighbour]]\n- [[subject-${i % 50}]]`,
       });
       text = text.replace("- `skill-a` —", `- \`skill-a\` — ${words(i + 5, 8)}`); // one completed skill line
       writeFileSync(join(journal, "notes", `npm--package-${i}.md`), text);
@@ -64,6 +67,20 @@ export function measure(label: string, root: string, args: string[], budgetMs: n
     if (child.status !== 0) throw new Error(`${label} failed: ${child.stderr}`);
     return performance.now() - started;
   };
+  report(label, once, budgetMs);
+}
+
+// Calls `run` in this process once as a warm-up (it builds the cache), then RUNS times, and reports
+// as `measure` does. For core functions with no command of their own (the link index).
+export function measureInProcess(label: string, run: () => void, budgetMs: number): void {
+  report(label, () => {
+    const started = performance.now();
+    run();
+    return performance.now() - started;
+  }, budgetMs);
+}
+
+function report(label: string, once: () => number, budgetMs: number): void {
   const cold = once();
   const times = Array.from({ length: RUNS }, once).sort((a, b) => a - b);
   const median = (times[RUNS / 2 - 1] + times[RUNS / 2]) / 2;

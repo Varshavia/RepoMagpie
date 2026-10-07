@@ -48,6 +48,27 @@ export function readCacheEntries(journal: string, name: string, version: number)
   return undefined;
 }
 
+// Data derived from each note file, cached per file with its modification time and size (the note
+// list, the link index): only new and changed files are derived again, so a saved note doesn't cost
+// a full re-read. `derive` gets the file's name and path; the result is stored as JSON.
+export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, path: string) => T): { files: string[]; data: Record<string, T> } {
+  const { files, signature } = noteSignature(journal);
+  const cached = readCacheEntries(journal, name, version);
+  const data: Record<string, T> = {};
+  let changed = !cached || Object.keys(cached.files).length !== files.length;
+  for (const file of files) {
+    const before = cached?.files[file];
+    const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
+    if (hit) data[file] = hit as T;
+    else {
+      data[file] = derive(file, join(journal, "notes", file));
+      changed = true;
+    }
+  }
+  if (changed && files.length) writeCache(journal, name, version, signature, data);
+  return { files, data };
+}
+
 // Writes the cache whole, then renames it into place, so a reader never sees half a file.
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
   try {
