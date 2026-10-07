@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SOURCES, drawable, edgeStyle, graphState, LAYOUT, layoutSettings, mixRgb, nodeSize, seedPosition, statusLine, type GraphJson } from "./graph.ts";
+import Graph from "graphology";
+import forceAtlas2 from "graphology-layout-forceatlas2";
+import { allLabels, DEFAULT_SOURCES, drawable, edgeStyle, graphState, LAYOUT, layoutSettings, mixRgb, nodeSize, seedPosition, statusLine, type GraphJson } from "./graph.ts";
 
 // The graph page's pure parts (decision 0028): what is drawn, where it starts, how big, and the
 // status line.
@@ -32,13 +34,21 @@ test("seedPosition: the same key always starts at the same place; different keys
   for (const p of points) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && Math.hypot(p.x, p.y) <= 100);
 });
 
-test("nodeSize: notes grow with the log of their connections; tag nodes are small and fixed", () => {
-  assert.equal(nodeSize("note", 0), 4);
+test("nodeSize: a note without connections is clearly visible; notes grow with the log of their connections; tags slightly smaller", () => {
+  assert.equal(nodeSize("note", 0), 8); // about 14 px across at the default zoom
   assert.ok(nodeSize("note", 1) > nodeSize("note", 0));
   assert.ok(nodeSize("note", 1000) < 40);
   assert.ok(nodeSize("note", 7) - nodeSize("note", 3) > nodeSize("note", 15) - nodeSize("note", 11)); // log scale
   assert.equal(nodeSize("tag", 0), nodeSize("tag", 500));
-  assert.ok(nodeSize("tag", 0) < nodeSize("note", 2));
+  assert.ok(nodeSize("tag", 0) < nodeSize("note", 0));
+  assert.ok(nodeSize("tag", 0) >= nodeSize("note", 0) - 2);
+});
+
+test("allLabels: every label below 150 drawn nodes; above, only the larger ones", () => {
+  assert.equal(allLabels(9), true);
+  assert.equal(allLabels(149), true);
+  assert.equal(allLabels(150), false);
+  assert.equal(allLabels(830), false);
 });
 
 test("drawable: the default sources are tags, links and alternatives; similarity and missing notes are off", () => {
@@ -88,4 +98,28 @@ test("layout: a fixed number of iterations; Barnes-Hut only for large graphs", (
   assert.equal(layoutSettings(100).barnesHutOptimize, false);
   assert.equal(layoutSettings(2000).barnesHutOptimize, true);
   assert.deepEqual(layoutSettings(300), layoutSettings(300));
+});
+
+test("layout: notes without connections stay near the rest instead of drifting to a ring far out", () => {
+  // The real layout on two journals like the maintainer's: few connections, many notes without.
+  // The farthest unconnected note may be at most 1.2 times as far from the centre as the farthest
+  // connected node (with the old gravity of 0.05 it was 1.34 and 1.36).
+  for (const [connected, isolated, tags] of [[2, 7, 3], [60, 40, 10]]) {
+    const graph = new Graph({ type: "undirected", multi: true });
+    const add = (key: string, size: number) => graph.addNode(key, { ...seedPosition(key), size });
+    for (let t = 0; t < tags; t++) add(`tag:t${t}`, nodeSize("tag", 0));
+    for (let i = 0; i < connected + isolated; i++) add(`note:n${i}.md`, nodeSize("note", i < connected ? 2 : 0));
+    for (let i = 0; i < connected; i++) {
+      graph.addEdge(`note:n${i}.md`, `tag:t${i % tags}`);
+      graph.addEdge(`note:n${i}.md`, `tag:t${(i * 7 + 3) % tags}`);
+    }
+    forceAtlas2.assign(graph, { iterations: LAYOUT.iterations, settings: layoutSettings(graph.order) });
+    const keys = graph.nodes();
+    const [cx, cy] = ["x", "y"].map((axis) => keys.reduce((sum, key) => sum + (graph.getNodeAttribute(key, axis) as number), 0) / keys.length);
+    const distance = (key: string) => Math.hypot(graph.getNodeAttribute(key, "x") - cx, graph.getNodeAttribute(key, "y") - cy);
+    const alone = (key: string) => key.startsWith("note:") && Number(key.slice("note:n".length, -".md".length)) >= connected;
+    const ratio = Math.max(...keys.filter(alone).map(distance)) / Math.max(...keys.filter((key) => !alone(key)).map(distance));
+    assert.ok(ratio <= 1.2, `${connected} connected, ${isolated} alone: ${ratio.toFixed(2)}`);
+  }
+  assert.equal(layoutSettings(9).strongGravityMode, true);
 });

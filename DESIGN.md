@@ -26,7 +26,7 @@ colors:
   graph-resource: "#E890C4"
   graph-other: "#8F9AA5"
   graph-tag: "#D2D6DB"
-  graph-edge-tagged: "#5C6670"
+  graph-edge-tagged: "#727C87"
   graph-edge-link: "#8A949E"
   graph-edge-alternative: "#3CC8B4"
   graph-edge-similar: "#69737E"
@@ -54,8 +54,8 @@ colors:
   light-graph-resource: "#B13F7E"
   light-graph-other: "#66717C"
   light-graph-tag: "#353C43"
-  light-graph-edge-tagged: "#848D97"
-  light-graph-edge-link: "#6B7581"
+  light-graph-edge-tagged: "#6F7882"
+  light-graph-edge-link: "#565F6A"
   light-graph-edge-alternative: "#0B7A6E"
   light-graph-edge-similar: "#7F8994"
 typography:
@@ -349,7 +349,7 @@ The palette is two neutral ramps (dark and light) with one accent and three sema
 The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on `canvas` with its own tokens. Each is checked at 3:1 against `canvas` (non-text); the legend, always shown, says each in words.
 - **Kind groups (`graph-skill-pack`, `graph-tool`, `graph-resource`, `graph-other`):** a note's fill. Violet, blue, pink and grey: hues apart from the semantic colours, so a kind never reads as inbox, reviewed or avoid.
 - **Tag (`graph-tag`):** tag nodes. Neutral, near `ink`; they are small and always labelled `#tag`.
-- **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a brighter grey; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation.
+- **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a stronger grey, drawn thicker; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation. A thin line is antialiased, so it shows lighter than its token: `graph-edge-tagged` is set at about 4.4:1, so that a tag edge, 1.5 px wide, still shows at 3:1 or more at the default zoom (measured on screenshots, 2026-10-08: 3.52 dark, 3.22 light).
 - **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
 
 ### Contrast
@@ -372,8 +372,8 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 | `graph-resource` on `canvas` (3:1) | 8.37 | 5.18 |
 | `graph-other` on `canvas` (3:1) | 6.66 | 4.77 |
 | `graph-tag` on `canvas` (3:1) | 13.06 | 10.70 |
-| `graph-edge-tagged` on `canvas` (3:1) | 3.26 | 3.22 |
-| `graph-edge-link` on `canvas` (3:1) | 6.18 | 4.48 |
+| `graph-edge-tagged` on `canvas` (3:1) | 4.49 | 4.29 |
+| `graph-edge-link` on `canvas` (3:1) | 6.18 | 6.20 |
 | `graph-edge-alternative` on `canvas` (3:1) | 9.18 | 5.00 |
 | `graph-edge-similar` on `canvas` (3:1) | 3.95 | 3.40 |
 

@@ -7,11 +7,11 @@ import Graph from "graphology";
 import { assignLayoutChanges, graphToByteArrays } from "graphology-layout-forceatlas2/helpers.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Sigma from "sigma";
-import type { NodeHoverDrawingFunction } from "sigma/rendering";
+import type { NodeHoverDrawingFunction, NodeLabelDrawingFunction } from "sigma/rendering";
 import type { Settings } from "sigma/settings";
 import { api, type ApiError, type GraphJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { DEFAULT_SOURCES, drawable, edgeStyle, graphState, KIND_COLOR, LAYOUT, layoutSettings, mixRgb, nodeSize, seedPosition, statusLine, type Shown } from "../logic/graph.ts";
+import { allLabels, DEFAULT_SOURCES, drawable, edgeStyle, graphState, KIND_COLOR, LAYOUT, layoutSettings, mixRgb, nodeSize, seedPosition, statusLine, type Shown } from "../logic/graph.ts";
 import type { LayoutReply, LayoutRequest } from "../layout.worker.ts";
 import { MOD, type Theme } from "../platform.ts";
 import { EmptyState } from "./common.tsx";
@@ -59,7 +59,7 @@ export default function GraphPage({ journal, theme, onAdd }: Props) {
   const [scheme, setScheme] = useState(0); // the system's colour scheme changed
   const container = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLSpanElement>(null);
-  const drawn = useRef<{ sigma: Sigma; graph: Graph } | null>(null);
+  const drawn = useRef<{ sigma: Sigma; graph: Graph; fitted: boolean } | null>(null);
   const worker = useRef<Worker | null>(null);
   const reduced = useMemo(() => matchMedia(REDUCED_MOTION).matches, []);
   const sources = DEFAULT_SOURCES;
@@ -87,7 +87,8 @@ export default function GraphPage({ journal, theme, onAdd }: Props) {
   const state = load.status === "ready" ? graphState(load.doc, sources) : null;
 
   // ForceAtlas2 for a fixed number of iterations, from the positions the nodes have now. Under
-  // reduced motion only the settled layout is drawn.
+  // reduced motion only the settled layout is drawn. While it runs, the view follows the graph's
+  // bounds; once it settles, the bounds are kept, and the first time the camera fits them.
   const runLayout = useCallback(() => {
     const view = drawn.current;
     if (!view) return;
@@ -95,12 +96,18 @@ export default function GraphPage({ journal, theme, onAdd }: Props) {
     const layout = new Worker(new URL("../layout.worker.ts", import.meta.url), { type: "module" });
     worker.current = layout;
     setSettled(false);
+    view.sigma.setCustomBBox(null);
     layout.onmessage = (event: MessageEvent<LayoutReply>) => {
       if (worker.current !== layout) return;
       assignLayoutChanges(view.graph, event.data.nodes, null);
       if (!event.data.done) return;
       layout.terminate();
       worker.current = null;
+      keepBounds(view.sigma);
+      if (!view.fitted) {
+        view.sigma.getCamera().setState(FITTED);
+        view.fitted = true;
+      }
       setSettled(true);
     };
     const { nodes, edges } = graphToByteArrays(view.graph, () => 1);
@@ -114,12 +121,12 @@ export default function GraphPage({ journal, theme, onAdd }: Props) {
     const graph = buildGraph(shown, colors);
     let sigma: Sigma;
     try {
-      sigma = new Sigma(graph, container.current, sigmaSettings(colors, getComputedStyle(container.current).fontFamily, reduced));
+      sigma = new Sigma(graph, container.current, sigmaSettings(colors, getComputedStyle(container.current).fontFamily, reduced, allLabels(graph.order)));
     } catch {
       setWebgl(false);
       return;
     }
-    drawn.current = { sigma, graph };
+    drawn.current = { sigma, graph, fitted: false };
     runLayout();
     return () => {
       worker.current?.terminate();
@@ -135,14 +142,16 @@ export default function GraphPage({ journal, theme, onAdd }: Props) {
     if (!view || !probe.current) return;
     const colors = palette(probe.current);
     paint(view.graph, colors);
-    view.sigma.setSettings(sigmaSettings(colors, view.sigma.getSettings().labelFont, reduced));
+    view.sigma.setSettings(sigmaSettings(colors, view.sigma.getSettings().labelFont, reduced, allLabels(view.graph.order)));
   }, [theme, scheme, reduced]);
 
+  // Fit to screen: the graph's bounds as they are now, with the stage padding around them.
   const fit = () => {
-    const camera = drawn.current?.sigma.getCamera();
-    if (!camera) return;
-    if (reduced) camera.setState({ x: 0.5, y: 0.5, ratio: 1, angle: 0 });
-    else void camera.animatedReset({ duration: 300 });
+    const view = drawn.current;
+    if (!view) return;
+    keepBounds(view.sigma);
+    if (reduced) view.sigma.getCamera().setState(FITTED);
+    else void view.sigma.getCamera().animate(FITTED, { duration: 300 });
   };
 
   const drawing = shown && state !== "empty" && webgl;
@@ -261,16 +270,26 @@ function palette(probe: HTMLElement): Colors {
   return colors;
 }
 
+// Bounds that stay put once the layout has settled, so a later change doesn't rescale the view.
+function keepBounds(sigma: Sigma): void {
+  sigma.setCustomBBox(null);
+  sigma.refresh();
+  sigma.setCustomBBox(sigma.getBBox());
+}
+
+const FITTED = { x: 0.5, y: 0.5, ratio: 1, angle: 0 };
+
 function buildGraph(shown: Shown, colors: Colors): Graph {
   const graph = new Graph({ type: "undirected", multi: true });
+  const every = allLabels(shown.nodes.length); // a small graph names every node
   for (const node of shown.nodes) {
     const { x, y } = seedPosition(node.key);
     if (node.type === "note") {
-      graph.addNode(node.key, { x, y, size: nodeSize("note", node.degree), label: node.name ?? node.file.replace(/\.md$/, ""), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1 });
+      graph.addNode(node.key, { x, y, size: nodeSize("note", node.degree), label: node.name ?? node.file.replace(/\.md$/, ""), forceLabel: every, kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1 });
     } else if (node.type === "tag") {
       graph.addNode(node.key, { x, y, size: nodeSize("tag", node.count), label: `#${node.tag}`, forceLabel: true, tag: true, zIndex: 2 });
     } else {
-      graph.addNode(node.key, { x, y, size: nodeSize("ghost", 0), label: node.target, ghost: true, zIndex: 0 });
+      graph.addNode(node.key, { x, y, size: nodeSize("ghost", 0), label: node.target, forceLabel: every, ghost: true, zIndex: 0 });
     }
   }
   for (const edge of shown.edges) {
@@ -288,24 +307,44 @@ function paint(graph: Graph, colors: Colors): void {
   graph.updateEachEdgeAttributes((_key, attr) => ({ ...attr, color: colors[edgeStyle(attr.edgeType).color as keyof Colors] }));
 }
 
-function sigmaSettings(colors: Colors, font: string, reduced: boolean): Partial<Settings> {
+function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabel: boolean): Partial<Settings> {
   return {
     labelFont: font,
     labelSize: 12,
     labelWeight: "500",
     labelColor: { color: colors["--ink"] },
-    // Labels for tag nodes always (forceLabel); for notes from 8 px on screen, which a note reaches
-    // with two connections at the default zoom, so the largest are named first and all once you zoom in.
-    labelRenderedSizeThreshold: 8,
+    // Tag nodes are always labelled (forceLabel), and so is every node of a small graph. In a larger
+    // one, notes from 14 on screen (three connections at the default zoom), so the largest are named
+    // first, and the rest as you zoom in; sigma's label grid keeps them from overlapping.
+    labelRenderedSizeThreshold: everyLabel ? 0 : 14,
     labelDensity: 0.6,
-    minEdgeThickness: 0.8,
+    minEdgeThickness: 1,
     zIndex: true,
-    stagePadding: 32,
+    stagePadding: 64, // room for the labels of the outermost nodes
     renderEdgeLabels: false,
     zoomDuration: reduced ? 0 : 250,
     inertiaDuration: reduced ? 0 : 150,
     doubleClickZoomingDuration: reduced ? 0 : 200,
+    defaultDrawNodeLabel: drawLabel(colors),
     defaultDrawNodeHover: drawHover(colors),
+  };
+}
+
+// A label in the theme's ink with a halo in the canvas colour, so it stays readable where it
+// crosses nodes and edges.
+function drawLabel(colors: Colors): NodeLabelDrawingFunction {
+  return (context, data, settings) => {
+    if (!data.label) return;
+    const size = settings.labelSize;
+    context.font = `${settings.labelWeight} ${size}px ${settings.labelFont}`;
+    const x = data.x + data.size + 3;
+    const y = data.y + size / 3;
+    context.lineJoin = "round";
+    context.lineWidth = 3;
+    context.strokeStyle = colors["--canvas"];
+    context.strokeText(data.label, x, y);
+    context.fillStyle = colors["--ink"];
+    context.fillText(data.label, x, y);
   };
 }
 
