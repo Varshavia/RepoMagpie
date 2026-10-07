@@ -11,7 +11,7 @@ export type View =
   | { page: "import" }
   | { page: "recall" }
   | { page: "suggest" }
-  | { page: "graph" }
+  | { page: "graph"; focus?: string } // focus: "Show in graph", the note's node key
   | { page: "settings" };
 
 // The journal list a view shows, or null for the other screens.

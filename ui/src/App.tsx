@@ -7,7 +7,7 @@ import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/c
 import type { ProjectState } from "./components/fields.tsx";
 import { ImportPage } from "./components/ImportPage.tsx";
 import { KeyMapDialog } from "./components/KeyMapDialog.tsx";
-import { NotePane } from "./components/NotePane.tsx";
+import { NotePane, type NotePaneProps } from "./components/NotePane.tsx";
 import { Palette, type Command } from "./components/Palette.tsx";
 import { RecallPage } from "./components/RecallPage.tsx";
 import { NoteRow } from "./components/rows.tsx";
@@ -378,7 +378,14 @@ export function App() {
 
   const review = view.page === "inbox";
 
-  const notePane = (scope: Scope, address: { id: string } | { file: string }, key: string) => (
+  // "Show in graph" in the note view: the graph, centred on that note, in local mode.
+  const showInGraph = (scope: Scope, file: string) => {
+    setJournal(scope);
+    go({ page: "graph", focus: `note:${file}` });
+  };
+
+  // `over`: the graph's note pane, where a [[link]] selects the note in the graph.
+  const notePane = (scope: Scope, address: { id: string } | { file: string }, key: string, over: Partial<NotePaneProps> = {}) => (
     <NotePane
       key={key}
       journal={scope}
@@ -407,6 +414,8 @@ export function App() {
       onFollowLink={followLink}
       onAddNote={(target) => go({ page: "add", target })}
       onTagList={showTags}
+      onShowInGraph={(file) => showInGraph(scope, file)}
+      {...over}
     />
   );
 
@@ -531,7 +540,16 @@ export function App() {
           </section>
         }
       >
-        <GraphPage key={journal} journal={journal} theme={theme} onAdd={() => go({ page: "add" })} />
+        <GraphPage
+          key={journal}
+          journal={journal}
+          theme={theme}
+          focus={view.focus ?? null}
+          onAdd={() => go({ page: "add" })}
+          renderNote={(note, open) =>
+            notePane(journal, { id: note.id }, `${journal} id ${note.id}`, { onOpenNote: (_scope, id) => open(id), onFollowLink: (_scope, _from, to) => open(to), onShowInGraph: undefined })
+          }
+        />
       </Suspense>
     );
   } else {
