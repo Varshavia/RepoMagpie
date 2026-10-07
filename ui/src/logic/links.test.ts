@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alternativeOptions, alternativesOf, alternativeTo, backlinkGroups, insertLink, linkCandidates, linkFor, linkQuery, linkText, noteHash, parseNoteHash, unresolvedTitle, withAlternative } from "./links.ts";
+import { alternativeEntry, alternativeOptions, alternativesOf, alternativeTo, backlinkGroups, insertLink, linkCandidates, linkFor, linkQuery, linkText, noteHash, parseNoteHash, unresolvedTitle, withAlternative } from "./links.ts";
 
 // Links in the note view (docs/ui.md §7): how a link shows, "Linked from", the [[ autocomplete, and
 // the address a followed link leaves in the browser's history.
@@ -82,6 +82,17 @@ test("alternativesOf and alternativeTo: links and backlinks from the alternative
   assert.deepEqual(alternativesOf([PDFKIT, alt, GHOST]), [alt]);
   const back = { id: "pkg:npm/pdfkit", name: "pdfkit", from: "alternatives" };
   assert.deepEqual(alternativeTo([{ id: "pkg:npm/zod", name: "zod", from: "Related" }, back]), [back]);
+});
+
+test("alternativeEntry: the entry as the note has it, for Undo, so a label or heading comes back too", () => {
+  const raw = ["[[zod#Verdict|Zod]]", " wkhtmltopdf ", "[[npm--pdf-lib]]"];
+  const link = (target: string, label: string | null) => ({ target, label, id: null, name: null, reason: "missing" as const, from: "alternatives" });
+  assert.equal(alternativeEntry(raw, link("zod", "Zod")), "[[zod#Verdict|Zod]]");
+  assert.equal(alternativeEntry(raw, link("wkhtmltopdf", null)), "wkhtmltopdf");
+  assert.equal(alternativeEntry(raw, link("npm--pdf-lib", null)), "[[npm--pdf-lib]]");
+  // Not found, or a field that isn't a list: rebuilt from the link.
+  assert.equal(alternativeEntry(raw, link("joi", "Joi")), "[[joi|Joi]]");
+  assert.equal(alternativeEntry("oops", link("joi", null)), "joi");
 });
 
 test("withAlternative: added at the end, trimmed; a target already there (ignoring case) is not added twice", () => {

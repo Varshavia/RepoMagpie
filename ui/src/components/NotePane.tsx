@@ -530,6 +530,7 @@ export function NotePane(props: NotePaneProps) {
 
         <Alternatives
           alternatives={alternativesOf(note.links)}
+          raw={note.frontmatter.alternatives}
           alternativeTo={alternativeTo(note.backlinks)}
           notes={linkNotes}
           self={note.id}

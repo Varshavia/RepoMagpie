@@ -5,12 +5,13 @@
 import { useId, useRef, useState, type ReactNode } from "react";
 import type { Backlink, Link } from "../../../src/core/links.ts";
 import { Icon } from "../icons.tsx";
-import { alternativeOptions, linkText, withAlternative, type LinkNote } from "../logic/links.ts";
+import { alternativeEntry, alternativeOptions, linkText, withAlternative, type LinkNote } from "../logic/links.ts";
 import { readablePurl } from "../logic/schema.ts";
 import { FieldError } from "./common.tsx";
 
 interface Props {
   alternatives: Link[]; // the note's links from the field
+  raw: unknown; // the field as written (the Note document's frontmatter), for Undo
   alternativeTo: Backlink[];
   notes: LinkNote[]; // the journal's notes
   self: string | null;
@@ -21,15 +22,15 @@ interface Props {
   noteLink: (id: string, text: string) => ReactNode; // a link to a note of this journal
 }
 
-export function Alternatives({ alternatives, alternativeTo, notes, self, editable, saving, onSave, link, noteLink }: Props) {
+export function Alternatives({ alternatives, raw, alternativeTo, notes, self, editable, saving, onSave, link, noteLink }: Props) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  // The last one removed, until the next change: Undo puts it back where it was.
-  const [removed, setRemoved] = useState<{ target: string; at: number; name: string } | null>(null);
+  // The last one removed, until the next change: Undo puts it back where it was, as it was written.
+  const [removed, setRemoved] = useState<{ entry: string; at: number; name: string } | null>(null);
   const targets = alternatives.map((l) => l.target);
   const options = adding ? alternativeOptions(notes, query, targets, self) : [];
   const at = Math.min(active, options.length - 1);
@@ -50,13 +51,15 @@ export function Alternatives({ alternatives, alternativeTo, notes, self, editabl
     }
   }
 
+  // Core keeps the other entries as written; only this one goes.
   async function remove(at: number, name: string) {
-    if (await save(targets.filter((_, j) => j !== at), `${name} removed from alternatives`)) setRemoved({ target: targets[at], at, name });
+    const entry = alternativeEntry(raw, alternatives[at]);
+    if (await save(targets.filter((_, j) => j !== at), `${name} removed from alternatives`)) setRemoved({ entry, at, name });
   }
 
   async function undo() {
     if (!removed) return;
-    const next = [...targets.slice(0, removed.at), removed.target, ...targets.slice(removed.at)];
+    const next = [...targets.slice(0, removed.at), removed.entry, ...targets.slice(removed.at)];
     if (await save(next, `${removed.name} is an alternative again`)) setRemoved(null);
   }
 

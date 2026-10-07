@@ -2,7 +2,8 @@
 // Edits splice text at the positions the yaml Document API reports, so every byte outside
 // the intended change stays as the person wrote it (note schema, rules 2 and 8).
 // Pure functions on text; no file system, no printing.
-import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair } from "yaml";
+import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
+import { alternativeLinks, findLinks } from "./links.ts";
 import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, type SectionName } from "./note.ts";
 
 export type ToolField = "id" | "name" | "url" | "language" | "license" | "topics" | "packages" | "explored" | "adopted";
@@ -123,24 +124,109 @@ export interface HumanFields {
   tags?: string[];
   tried?: boolean;
   rating?: number | null;
-  alternatives?: string[]; // link targets; written as "[[<target>]]" (decision 0027)
+  // The whole list, in order: link targets ("zod"), or whole wikilinks ("[[zod|Zod]]") written as
+  // given (decision 0027). Entries already in the note are matched by target and stay as written.
+  alternatives?: string[];
 }
 
 // Removes a key and its lines from the frontmatter.
 const REMOVE = Symbol("remove");
 
 // A person's edit of kind, tags, tried, rating or alternatives. Values are checked against the schema
-// first; one bad value, or any other key, leaves the note untouched with a warning. alternatives
-// takes targets and writes each as a quoted wikilink; an empty list removes the key.
+// first; one bad value, or any other key, leaves the note untouched with a warning.
 export function setHumanFields(text: string, values: HumanFields): EditResult {
   for (const [key, value] of Object.entries(values)) {
     const problem = value === undefined ? null : humanFieldProblem(key, value);
     if (problem) return untouched(text, problem);
   }
   const { alternatives, ...rest } = values;
-  const fields: Record<string, unknown> = { ...rest };
-  if (alternatives !== undefined) fields.alternatives = alternatives.length ? alternatives.map((target) => `[[${target.trim()}]]`) : REMOVE;
-  return editFrontmatter(text, fields, false);
+  const fields = editFrontmatter(text, rest as Record<string, unknown>, false);
+  if (alternatives === undefined || fields.warnings.length) return fields;
+  const edited = editAlternatives(fields.text, alternatives);
+  if (edited.warnings.length) return untouched(text, edited.warnings[0]);
+  return { text: edited.text, changed: edited.text !== text, warnings: [] };
+}
+
+const WIKILINK = /^\[\[[^[\]\r\n]+\]\]$/;
+const isWikilink = (entry: string) => WIKILINK.test(entry.trim()) && findLinks(entry.trim()).length === 1;
+// A requested entry's target, and what is written for it when it is new.
+const entryTarget = (entry: string) => (isWikilink(entry) ? findLinks(entry.trim())[0].target : entry.trim());
+const entryText = (entry: string) => (isWikilink(entry) ? entry.trim() : `[[${entry.trim()}]]`);
+
+// alternatives, edited as text: every entry that stays keeps its exact text (quotes, label, comment
+// on its line), a removed one goes with its line (a block list) or its comma (a flow list), and a new
+// one is written as a quoted wikilink at its place. An entry with no target can't be named, so it
+// stays. The key goes when nothing is left. Reordering is refused. A missing key, an empty value or
+// one that isn't a list of strings is written whole.
+function editAlternatives(text: string, entries: string[]): EditResult {
+  const bounds = frontmatterBounds(text);
+  if (!bounds) return untouched(text, "The note has no frontmatter; it was left unchanged.");
+  const frontmatter = text.slice(bounds.start, bounds.end);
+  const doc = parseDocument(frontmatter);
+  const pair = isMap(doc.contents) ? (doc.contents.items as Pair[]).find((p) => isScalar(p.key) && p.key.value === "alternatives") : undefined;
+  const seq = pair && isSeq(pair.value) ? pair.value : null;
+  const items = seq && seq.items.length && seq.items.every((item) => isScalar(item) && typeof item.value === "string") ? (seq.items as Scalar<string>[]) : null;
+  if (!seq || !items) return editFrontmatter(text, { alternatives: entries.length ? entries.map(entryText) : REMOVE }, false);
+
+  // Match each requested entry to the first unused entry with its target (ignoring case).
+  const targetOf = (item: Scalar<string>) => alternativeLinks([item.value])[0]?.target.toLowerCase() ?? null;
+  const used = new Set<number>();
+  const newBefore = new Map<number, string[]>();
+  let pending: string[] = [];
+  let last = -1;
+  for (const entry of entries) {
+    const target = entryTarget(entry).toLowerCase();
+    const at = items.findIndex((item, k) => !used.has(k) && targetOf(item) === target);
+    if (at === -1) {
+      pending.push(entryText(entry));
+      continue;
+    }
+    if (at < last) return untouched(text, "Alternatives can only be added or removed here; change their order in the note's file.");
+    used.add(at);
+    last = at;
+    if (pending.length) newBefore.set(at, pending);
+    pending = [];
+  }
+  const kept = items.map((item, k) => used.has(k) || targetOf(item) === null);
+  if (!kept.some(Boolean) && !newBefore.size && !pending.length) return editFrontmatter(text, { alternatives: REMOVE }, false);
+
+  const range = (item: Scalar<string>) => item.range as [number, number, number];
+  let start: number;
+  let end: number;
+  let out = "";
+  if (seq.flow) {
+    // Between the first and the last entry: the kept entries' own text, with the list's separator.
+    start = range(items[0])[0];
+    end = range(items[items.length - 1])[1];
+    const separator = items.length > 1 ? frontmatter.slice(range(items[0])[1], range(items[1])[0]) : ", ";
+    const parts: string[] = [];
+    items.forEach((item, k) => {
+      parts.push(...(newBefore.get(k) ?? []).map(valueText));
+      if (kept[k]) parts.push(frontmatter.slice(range(item)[0], range(item)[1]));
+    });
+    parts.push(...pending.map(valueText));
+    out = parts.join(separator);
+  } else {
+    // Each entry's lines: from its line to the next entry's (comment lines after it go with it).
+    const lineStart = (at: number) => frontmatter.lastIndexOf("\n", at - 1) + 1;
+    const lineEnd = (at: number) => {
+      if (frontmatter[at - 1] === "\n") return at;
+      const newline = frontmatter.indexOf("\n", at);
+      return newline === -1 ? frontmatter.length : newline + 1;
+    };
+    const starts = items.map((item) => lineStart(range(item)[0]));
+    start = starts[0];
+    end = lineEnd(range(items[items.length - 1])[1]);
+    const prefix = frontmatter.slice(starts[0], range(items[0])[0]); // "  - "
+    const line = (entry: string) => `${prefix}${valueText(entry)}${bounds.eol}`;
+    items.forEach((_, k) => {
+      out += (newBefore.get(k) ?? []).map(line).join("");
+      if (kept[k]) out += frontmatter.slice(starts[k], k + 1 < items.length ? starts[k + 1] : end);
+    });
+    out += pending.map(line).join("");
+  }
+  const result = text.slice(0, bounds.start) + frontmatter.slice(0, start) + out + frontmatter.slice(end) + text.slice(bounds.end);
+  return { text: result, changed: result !== text, warnings: [] };
 }
 
 function humanFieldProblem(key: string, value: unknown): string | null {
@@ -158,9 +244,9 @@ function humanFieldProblem(key: string, value: unknown): string | null {
         ? null
         : "rating must be a whole number from 1 to 5, or empty.";
     case "alternatives":
-      return Array.isArray(value) && value.every((target) => typeof target === "string" && /^[^[\]|#\r\n]+$/.test(target) && target.trim() !== "")
+      return Array.isArray(value) && value.every((entry) => typeof entry === "string" && ((/^[^[\]|#\r\n]+$/.test(entry) && entry.trim() !== "") || isWikilink(entry)))
         ? null
-        : "alternatives must be a list of note names or file stems, without [[ ]], | or #.";
+        : "alternatives must be a list of note names or file stems (without [[ ]], | or #), or of single wikilinks such as [[zod|Zod]].";
     default:
       return `${key} can't be edited by hand; only kind, tags, tried, rating and alternatives can.`;
   }
