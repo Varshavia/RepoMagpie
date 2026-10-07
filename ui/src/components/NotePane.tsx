@@ -6,7 +6,7 @@ import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope 
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
-import { editableBody, firstEntries, homePath, isBlank, obsidianUri, parseBody, type Block, type Inline } from "../logic/text.ts";
+import { editableBody, firstEntries, homePath, isBlank, parseBody, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
@@ -307,12 +307,6 @@ export function NotePane(props: NotePaneProps) {
               <Icon name="pencil" />
               Open in editor
             </button>
-            {note.path ? (
-              <a className="button secondary" href={obsidianUri(note.path)}>
-                <Icon name="external" />
-                Open in Obsidian
-              </a>
-            ) : null}
             {journal === "personal" && project !== "none" && note.id && !note.read_only ? (
               <button type="button" className="button secondary" onClick={() => setAdopting({ step: "confirm", busy: false, error: null })} aria-expanded={adopting !== null}>
                 <Icon name="users" />

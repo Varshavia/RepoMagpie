@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { editableBody, firstEntries, homePath, isBlank, obsidianUri, parseBody, parseInline } from "./text.ts";
+import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline } from "./text.ts";
 
 // How the app shows a section's Markdown body: bullets, lines, code spans and links. No HTML is
 // ever built from note text; these are plain data for React to render.
@@ -51,11 +51,6 @@ test("isBlank: only comments and whitespace", () => {
 test("editableBody: the body without the draft marker and the blank lines around it; other comments stay", () => {
   assert.equal(editableBody("<!-- magpie:draft -->\n- quick PDFs\n<!-- keep -->\n\n"), "- quick PDFs\n<!-- keep -->");
   assert.equal(editableBody("\nA PDF library.\n"), "A PDF library.");
-});
-
-test("obsidianUri: open?path= with the URI-encoded absolute path", () => {
-  assert.equal(obsidianUri("/home/ana/.magpie/notes/npm--pdfkit.md"), "obsidian://open?path=%2Fhome%2Fana%2F.magpie%2Fnotes%2Fnpm--pdfkit.md");
-  assert.equal(obsidianUri("C:\\Users\\Ana Lee\\.magpie\\notes\\a.md"), "obsidian://open?path=C%3A%5CUsers%5CAna%20Lee%5C.magpie%5Cnotes%5Ca.md");
 });
 
 // Paths for people, as magpie recall and the hook print them: under the home directory with ~.
