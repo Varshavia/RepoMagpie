@@ -21,6 +21,15 @@ colors:
   danger: "#F0857A"
   warning: "#E2B54A"
   success: "#5CC98A"
+  graph-skill-pack: "#B49CF5"
+  graph-tool: "#6FA8F2"
+  graph-resource: "#E890C4"
+  graph-other: "#8F9AA5"
+  graph-tag: "#D2D6DB"
+  graph-edge-tagged: "#5C6670"
+  graph-edge-link: "#8A949E"
+  graph-edge-alternative: "#3CC8B4"
+  graph-edge-similar: "#69737E"
   # Light theme
   light-canvas: "#FAFAF9"
   light-surface-1: "#F2F3F4"
@@ -40,6 +49,15 @@ colors:
   light-danger: "#B03A2E"
   light-warning: "#875700"
   light-success: "#1B6B3C"
+  light-graph-skill-pack: "#6A4BC7"
+  light-graph-tool: "#2D6AB5"
+  light-graph-resource: "#B13F7E"
+  light-graph-other: "#66717C"
+  light-graph-tag: "#353C43"
+  light-graph-edge-tagged: "#848D97"
+  light-graph-edge-link: "#6B7581"
+  light-graph-edge-alternative: "#0B7A6E"
+  light-graph-edge-similar: "#7F8994"
 typography:
   headline-md:
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -327,6 +345,13 @@ The palette is two neutral ramps (dark and light) with one accent and three sema
 - **Success (green):** `reviewed`.
 - **Danger (coral red):** the "Avoid when" label and errors. The same colour role the CLI gives "Avoid when" ([spec](docs/spec.md), section 8).
 
+### Graph
+The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on `canvas` with its own tokens. Each is checked at 3:1 against `canvas` (non-text); the legend, always shown, says each in words.
+- **Kind groups (`graph-skill-pack`, `graph-tool`, `graph-resource`, `graph-other`):** a note's fill. Violet, blue, pink and grey: hues apart from the semantic colours, so a kind never reads as inbox, reviewed or avoid.
+- **Tag (`graph-tag`):** tag nodes. Neutral, near `ink`; they are small and always labelled `#tag`.
+- **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a brighter grey; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation.
+- **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
+
 ### Contrast
 Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5:1 (AA), inputs and the focus ring 3:1.
 
@@ -342,6 +367,17 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 | `success` on `surface-2` | 7.94 | 5.47 |
 | `border-input` on `canvas` (3:1) | 3.41 | 3.54 |
 | `focus` on `canvas` (3:1) | 10.81 | 5.87 |
+| `graph-skill-pack` on `canvas` (3:1) | 8.18 | 5.84 |
+| `graph-tool` on `canvas` (3:1) | 7.77 | 5.24 |
+| `graph-resource` on `canvas` (3:1) | 8.37 | 5.18 |
+| `graph-other` on `canvas` (3:1) | 6.66 | 4.77 |
+| `graph-tag` on `canvas` (3:1) | 13.06 | 10.70 |
+| `graph-edge-tagged` on `canvas` (3:1) | 3.26 | 3.22 |
+| `graph-edge-link` on `canvas` (3:1) | 6.18 | 4.48 |
+| `graph-edge-alternative` on `canvas` (3:1) | 9.18 | 5.00 |
+| `graph-edge-similar` on `canvas` (3:1) | 3.95 | 3.40 |
+
+The graph rows were checked on 2026-10-08, with the same formula.
 
 ## Typography
 

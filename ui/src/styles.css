@@ -23,6 +23,15 @@
   --danger: light-dark(#B03A2E, #F0857A);
   --warning: light-dark(#875700, #E2B54A);
   --success: light-dark(#1B6B3C, #5CC98A);
+  --graph-skill-pack: light-dark(#6A4BC7, #B49CF5);
+  --graph-tool: light-dark(#2D6AB5, #6FA8F2);
+  --graph-resource: light-dark(#B13F7E, #E890C4);
+  --graph-other: light-dark(#66717C, #8F9AA5);
+  --graph-tag: light-dark(#353C43, #D2D6DB);
+  --graph-edge-tagged: light-dark(#848D97, #5C6670);
+  --graph-edge-link: light-dark(#6B7581, #8A949E);
+  --graph-edge-alternative: light-dark(#0B7A6E, #3CC8B4);
+  --graph-edge-similar: light-dark(#7F8994, #69737E);
   --shadow: light-dark(rgb(21 24 27 / 0.16), rgb(0 0 0 / 0.5));
   --scrim: light-dark(rgb(21 24 27 / 0.32), rgb(0 0 0 / 0.55));
 
@@ -961,6 +970,11 @@ button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
 .adopt-panel { display: flex; flex-direction: column; gap: var(--sm); padding: var(--md); border-radius: var(--r-md); background: var(--surface-1); font-size: 13px; }
 .install-line { display: flex; align-items: center; gap: var(--xs); }
 .install-line code { padding: 2px var(--sm); }
+
+/* ---------- The graph page ---------- */
+
+/* The rest of the page's styles load with its chunk (components/GraphPage.css). */
+.graph-status { padding: var(--sm) var(--md); color: var(--ink-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* ---------- Responsive ---------- */
 

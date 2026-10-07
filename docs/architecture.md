@@ -59,7 +59,9 @@ src/
                core), live (fs.watch + signature check), open (the platform's open command)
 ui/            the local app (decision 0022): React and Vite, built into dist/ui/ (npm run build)
   src/         App.tsx, components/ (one per pane and screen), api.ts (the only way to the journals),
-               logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette)
+               logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette, graph);
+               the graph page (components/GraphPage.tsx) is its own lazy chunk, and layout.worker.ts
+               runs its ForceAtlas2 layout (decision 0028)
   e2e/         @playwright/test against magpie ui on a temporary journal; screenshots with SCREENS=1
 skills/
   repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
