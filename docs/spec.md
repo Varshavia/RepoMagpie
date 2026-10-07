@@ -505,6 +505,8 @@ Every library needs the maintainer's approval before it is added (CLAUDE.md, sec
 
 The maintainer approved the local app's frontend libraries on 2026-10-04 ([decision 0022](decisions/0022-frontend-stack.md), with licences, dependencies and sizes): `react` and `react-dom` 19.3.0, `vite` 8.3.2, `@vitejs/plugin-react` 6.1.1, `@types/react` and `@types/react-dom` 19.3.0 (all MIT), and `@playwright/test` 1.63.0 (Apache-2.0). All are devDependencies, added on `feat/ui-app`: the app ships as a built bundle. Since [decision 0025](decisions/0025-bundle-the-cli.md), Vite also bundles the CLI, the four libraries above included, so they are devDependencies too (since `feat/launch-prep`): the published package has no runtime dependencies.
 
+The maintainer approved the graph page's libraries on 2026-10-07 ([decision 0028](decisions/0028-the-graph-page.md), with licences, dependencies and sizes): `sigma` 3.0.3, `graphology` 0.26.0, `graphology-layout-forceatlas2` 0.10.1 and `graphology-types` 0.24.8 (all MIT). They are devDependencies, bundled into the app, added on `feat/graph`. The app's build writes the notices of every bundled library to `dist/ui/THIRD-PARTY-LICENSES.md`.
+
 Alternatives considered:
 - **CLI:** [citty](https://github.com/unjs/citty) 0.2.2 (MIT, 0 deps, 34 kB, ~40M weekly) is the modern, TypeScript-first alternative, still before 1.0. yargs and clipanion were not checked in detail.
 - **Search:** [Orama](https://github.com/oramasearch/orama) 3.1.18 (Apache-2.0, 0 deps) is the upgrade path if semantic or hybrid search arrives (roadmap v0.4). FlexSearch (Apache-2.0) is fastest at very large scale but more complex than needed for a few thousand notes.

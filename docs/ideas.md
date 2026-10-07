@@ -179,9 +179,9 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Schema impact:** the human-owned `alternatives` field: a list of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]` ([decision 0027](decisions/0027-alternatives-active.md)). `works_with` stays proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)).
 - **Target release:** v0.2. Part 1 (linked notes) stores the links and `alternatives` the graph draws; part 2 builds the graph page.
 - **History:** until 2026-10-07 the status was "marketing only, not scheduled": graph views would be built only as a shareable visual, if at all, in three levels (an Obsidian preset, a `magpie graph` HTML file, nest pages). That rested on secondhand desk research ([validation](validation.md), Q7). The first user then asked for the graph as a working view, and [decision 0026](decisions/0026-the-app-is-the-workspace.md) moved it into the app.
-- **Open questions:**
-  - Does node size encode connections or rating?
-  - Rendering library for the graph page (part 2).
+- **Answered** ([decision 0028](decisions/0028-the-graph-page.md)):
+  - Node size encodes the number of connections, on a log scale, not rating.
+  - The graph page renders with sigma 3 and graphology.
 
 ## 11. Adopt
 

@@ -99,9 +99,9 @@ A page in the local app, v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-
 
 ## Graph specification
 
-**Status:** a page in the local app, v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md); [ideas](ideas.md), idea 10). Part 1 (linked notes) stores the links and `alternatives` it draws. The rendering library and the details below are settled on the part 2 branch.
+**Status:** a page in the local app, v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md); [ideas](ideas.md), idea 10). Part 1 (linked notes) stores the links and `alternatives` it draws. The library, the layout and the visual encoding are settled by [decision 0028](decisions/0028-the-graph-page.md).
 
-The graph is a working view: it shows what you have, how it groups by tag, and what connects to what. It also shows status at a glance (inbox now; drift and gaps once they exist).
+The graph is a working view: it shows what you have, how it groups by tag, and what connects to what. It also shows status at a glance (inbox now; drift and gaps once they exist). It answers questions such as "What do I have for PDF?", "What did I say to use instead of X?" and "What's still in my inbox around this topic?"
 
 ### Levels (superseded)
 
@@ -119,26 +119,27 @@ The status was "marketing only": graph views are often admired but rarely used, 
 
 **Node types**
 
-| Node | Source | Notes |
-|---|---|---|
-| repo | each note in `notes/` | main node |
-| skill | each completed skill line | attached to its repo |
-| tag | each tag in use | hub node |
-| magpie (v0.4) | each followed nest | other people |
+| Node | Source | Notes | In the app (v0.2) |
+|---|---|---|---|
+| repo | each note in `notes/` | main node; unreadable notes are left out | yes |
+| tag | each tag in use, listed in `tags.md` or not | hub node, labelled `#tag` | yes |
+| missing note | an unresolved link or `alternatives` target | a ghost node | yes, off by default |
+| skill | each completed skill line | attached to its repo | later |
+| magpie (v0.4) | each followed nest | other people | later |
 
 **Edge types**
 
-| Edge | Direction | Source | Style |
-|---|---|---|---|
-| part-of | skill → repo | skill lines | short solid |
-| tagged | repo → tag | `tags` | thin dotted |
-| alternative-to | repo ↔ repo | human-owned `alternatives`; one side is enough, drawn once | dashed, accent colour |
-| works-with | repo ↔ repo | human-owned `works_with` (proposed, not scheduled) | solid |
-| related | repo ↔ repo | untyped `[[links]]` in any body section | thin solid |
-| similar-to | repo ↔ repo | computed from `topics` and `language`, at most 3 per note | faint, dashed, off by default |
-| recommended-by (v0.4) | magpie → repo | followed nests | thin |
+| Edge | Direction | Source | Style | In the app (v0.2) |
+|---|---|---|---|---|
+| tagged | repo → tag | `tags` | thin, faint | on |
+| related | repo ↔ repo | untyped `[[links]]` in any body section; one edge per pair, either direction | solid | on |
+| alternative-to | repo ↔ repo | human-owned `alternatives`; one side is enough, drawn once | its own colour, thicker | on |
+| similar-to | repo ↔ repo | computed from `topics` and `language`, at most 3 per note; none between notes already linked | faint | off |
+| part-of | skill → repo | skill lines | short solid | later |
+| works-with | repo ↔ repo | human-owned `works_with` (proposed, not scheduled) | solid | later |
+| recommended-by (v0.4) | magpie → repo | followed nests | thin | later |
 
-Edge sources on by default: tags, `[[links]]` and `alternatives`. Similar-to is off by default ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
+A link and an alternative between the same two notes are two edges of different types. Edge sources on by default: tags, `[[links]]` and `alternatives` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 
 ### Typed relations
 
@@ -146,33 +147,44 @@ Edge sources on by default: tags, `[[links]]` and `alternatives`. Similar-to is 
 
 ### Visual encoding
 
-| Property | Encodes |
-|---|---|
-| fill colour | `kind`, in at most 4 groups: skill pack; tool (cli, library, framework, plugin); resource (awesome-list, template, platform, app); other |
-| size | number of connections, or rating (decided when the graph is built) |
-| opacity | `status`: inbox notes are faded |
-| ring | drift: a red ring when upstream changed since review |
-| hollow vs. solid | `tried: false` vs. `tried: true` |
+Settled by [decision 0028](decisions/0028-the-graph-page.md):
 
-A legend is always visible. Colour is never the only carrier of meaning: shapes and labels must work in greyscale.
+| Property | Encodes | In the app (v0.2) |
+|---|---|---|
+| fill colour | `kind`, in 4 groups: skill pack; tool (cli, library, framework, plugin); resource (awesome-list, template, platform, app); other | yes |
+| size | number of connections, on a log scale (not rating: most notes have none) | yes |
+| faded | `status: inbox` | yes |
+| tag nodes | smaller, neutral, labelled `#tag` | yes |
+| edges | tag edges thin and faint; links solid; alternatives in their own colour and thicker; similarity faint | yes |
+| hollow vs. solid | `tried: false` vs. `tried: true` | later: needs a node program we don't have |
+| ring | drift: a red ring when upstream changed since review | later: drift doesn't exist yet, and it needs a node program |
+
+The colours are tokens in [`DESIGN.md`](../DESIGN.md), dark and light, checked for 3:1 against the canvas. A legend is always visible. Colour is never the only carrier of meaning: every fact the graph shows by colour is also in words, in the side panel and the legend.
+
+### Layout
+
+- ForceAtlas2, in a web worker built with the app, so the page never freezes. The package's own worker starts from a `blob:` URL, which the app's CSP blocks ([decision 0028](decisions/0028-the-graph-page.md)).
+- Deterministic: starting positions are seeded from each node's id, and the layout runs a fixed number of iterations, then stops. The same journal gives the same picture every time. "Re-run layout" runs it again.
+- No positions are stored.
+- Under `prefers-reduced-motion`, the layout is shown only once it has settled, and zoom and centre jump instead of gliding.
 
 ### Interactions
 
-Written for level 2; they carry over to the graph page and are settled on the part 2 branch.
-
-- Search box: focus and highlight matching nodes.
-- Filters: kind, tag, status (inbox or reviewed), drift only, tried only.
-- Click a node to open a side panel: Verdict, "Use when", "Avoid when", "What it does", notable skills, rating, and links to the note file and the repository.
-- Local graph: depth 1 or 2 around the selected node.
-- Toggle similar-to edges.
-- Export the current view as PNG and SVG, for sharing.
-- Keyboard accessible; respects `prefers-color-scheme` and `prefers-reduced-motion`.
+- Search box: type a name, pick from up to 8 matches, and the graph centres on that node and selects it.
+- Click a note node to open the note in a pane beside the graph, where you can read and edit it. Click a tag node to highlight its notes. Click a missing note to add it.
+- Hover: the node and its neighbours stand out; everything else is dimmed.
+- Local graph: depth 1 or 2 around the selected node, with a toggle to show everything again.
+- Filters: kind group, tags, status (inbox or reviewed), tried only. Drift only waits for drift.
+- Edge toggles: tags, links, alternatives, similarity, missing notes.
+- "Show in graph" in the note view opens the graph centred on that note, in local mode.
+- Keyboard and screen readers: the canvas is hidden from assistive technology. The search box, the filters, a status line ("Showing 214 notes, 31 tags and 486 connections") and a list of the selected node's neighbours are how you use the page without a mouse or a screen.
+- Later: export the current view as PNG and SVG, for sharing.
 
 ### Technical constraints
 
-- The graph page gets its nodes and edges from the API; core builds them from the notes and the link index.
-- The rendering library is chosen on the part 2 branch, under the dependency policy. Candidates: d3-force, Cytoscape.js, sigma.js with graphology. Criteria: size against the app's 200 kB budget, performance at 2,000 nodes, MIT-compatible license.
-- Performance target: smooth interaction with 2,000 nodes on a mid-range laptop.
+- The graph page gets its nodes and edges from the API (`GET /api/graph`); core builds them from the notes and the link index (`src/core/graph.ts`).
+- Rendering: sigma 3 with graphology (WebGL), chosen in [decision 0028](decisions/0028-the-graph-page.md) under the dependency policy, against the app's 200 kB budget, performance at 2,000 nodes, and an MIT-compatible licence. The graph is its own lazy-loaded chunk; other screens don't load it.
+- Performance target: smooth interaction with 2,000 nodes on a mid-range laptop; data fetched, layout settled and first frame drawn in under 2 s.
 - The graph is generated from notes only ([decision 0001](decisions/0001-plain-markdown-storage.md)). Nothing is stored that can't be rebuilt.
 - Superseded (level 2): one self-contained `.html` file with the data embedded as JSON, opened offline without a server. Possible later as an export.
 
@@ -191,6 +203,6 @@ Written for level 2; they carry over to the graph page and are settled on the pa
 ## Open questions
 
 - **Links in properties:** moot ([decision 0027](decisions/0027-alternatives-active.md)). The in-app graph reads `alternatives` itself, so it doesn't matter whether Obsidian's graph view and backlinks count wikilinks inside frontmatter properties. (Obsidian's [Properties help](https://obsidian.md/help/properties) and the [1.4.0 changelog](https://obsidian.md/changelog/2023-07-26-desktop-v1.4.0) don't say; checked 2026-10-03.)
-- **Node size:** connections or rating? Decided on the part 2 branch.
-- **Rendering library** for the graph page. Decided on the part 2 branch.
+- **Node size:** answered by [decision 0028](decisions/0028-the-graph-page.md): the number of connections, on a log scale.
+- **Rendering library** for the graph page: answered by [decision 0028](decisions/0028-the-graph-page.md): sigma 3 with graphology.
 - Recall, vet, nest and other feature questions: see [ideas](ideas.md).
