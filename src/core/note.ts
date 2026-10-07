@@ -95,6 +95,12 @@ export function readNote(text: string): Note {
   };
 }
 
+// The note's id when its frontmatter can be read; null for a note that is read-only in the app and
+// skipped by the link index.
+export function readableId(note: Note): string | null {
+  return note.hasFrontmatter && !note.warnings.length && typeof note.frontmatter.id === "string" ? note.frontmatter.id : null;
+}
+
 // Reports every schema problem it finds; never throws.
 export function validate(note: Note, options: { fileName?: string } = {}): Problem[] {
   const problems: Problem[] = [];
@@ -140,6 +146,8 @@ function checkFields(note: Note, add: (where: string, message: string) => void):
     }
   }
   if (!empty(fm.topics) && !isTextList(fm.topics)) add("frontmatter.topics", "topics must be a list.");
+  // Lenient read: a malformed value makes only this field unreadable (decision 0027).
+  if (!empty(fm.alternatives) && !isTextList(fm.alternatives)) add("frontmatter.alternatives", 'alternatives must be a list of wikilinks, such as ["[[npm--puppeteer]]"].');
   if (!empty(fm.packages)) {
     if (!isTextList(fm.packages)) add("frontmatter.packages", "packages must be a list of PURLs.");
     else {

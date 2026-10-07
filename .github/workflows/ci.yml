@@ -57,6 +57,8 @@ jobs:
         run: node scripts/bench-suggest.ts --report-only
       - name: Recall and hook benchmark (report only)
         run: node scripts/bench-recall.ts --report-only
+      - name: Link index benchmark (report only)
+        run: node scripts/bench-links.ts --report-only
 
   # The local app (docs/ui.md §10, §11): the built bundle against its size budget, then the
   # end-to-end tests against magpie ui on a temporary journal. Chromium only.
