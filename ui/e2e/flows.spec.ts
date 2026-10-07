@@ -259,6 +259,24 @@ test("topics: in the Add preview a chip appends the topic to tags.md and shows i
   expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toMatch(/- `charts`\n$/);
 });
 
+test("alternatives: entries written by hand stay as written; Undo brings back a removed one with its label", async ({ page, magpie }) => {
+  const file = magpie.note("npm--pdfkit.md");
+  const handWritten = PDFKIT.replace("status: reviewed\n", "status: reviewed\nalternatives:\n  - '[[github--microsoft--playwright-cli|Playwright]]'  # mine\n  - \"[[yup]]\"\n");
+  writeFileSync(file, handWritten);
+  await magpie.open(page);
+  await openByName(page, "pdfkit", "pdfkit");
+  const row = page.getByRole("region", { name: "Alternatives" });
+  await expect(row.getByRole("link", { name: "Playwright" })).toBeVisible();
+  await row.getByRole("button", { name: "Remove yup from alternatives" }).click();
+  await expect(page.getByRole("status").getByText("yup removed from alternatives")).toBeVisible();
+  expect(readFileSync(file, "utf8")).toBe(handWritten.replace('  - "[[yup]]"\n', ""));
+  await row.getByRole("button", { name: "Remove Playwright from alternatives" }).click();
+  await expect(page.getByRole("status").getByText("Playwright removed from alternatives")).toBeVisible();
+  await row.getByRole("button", { name: "Undo" }).click();
+  await expect(row.getByRole("link", { name: "Playwright" })).toBeVisible();
+  expect(readFileSync(file, "utf8")).toBe(PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli|Playwright]]"]\n'));
+});
+
 test("search: / focuses the box, Verdicts first, Enter opens the note; the status filter applies", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.keyboard.press("/");

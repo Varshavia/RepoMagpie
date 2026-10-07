@@ -528,6 +528,44 @@ test("alternatives: replaced in place; a block list stays a block list, its comm
   assert.equal(setHumanFields(block, { alternatives: ["npm--puppeteer", "zod"] }).text, block.replace('  - "[[npm--puppeteer]]"\n', '  - "[[npm--puppeteer]]"\n  - "[[zod]]"\n'));
 });
 
+// Editing alternatives keeps every existing entry as written, labels and quotes included; only the
+// entry added or removed changes (the maintainer, 2026-10-07).
+const ZOD_YUP = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives:\n  - '[[zod|Zod]]'   # the one I use\n  - \"[[yup]]\"\n");
+
+test("alternatives: removing yup leaves the zod line exactly as written", () => {
+  const r = setHumanFields(ZOD_YUP, { alternatives: ["zod"] });
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.text, ZOD_YUP.replace('  - "[[yup]]"\n', ""));
+});
+
+test("alternatives: adding one keeps both lines exactly as written", () => {
+  const r = setHumanFields(ZOD_YUP, { alternatives: ["zod", "yup", "joi"] });
+  assert.equal(r.text, ZOD_YUP.replace('  - "[[yup]]"\n', '  - "[[yup]]"\n  - "[[joi]]"\n'));
+});
+
+test("alternatives in a flow list: the other entries' text and the comment stay; a removed entry takes its comma", () => {
+  const flow = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives: ['[[zod|Zod]]',  \"[[yup]]\"] # mine\n");
+  assert.equal(setHumanFields(flow, { alternatives: ["zod"] }).text, flow.replace(",  \"[[yup]]\"]", "]"));
+  assert.equal(setHumanFields(flow, { alternatives: ["yup"] }).text, flow.replace("'[[zod|Zod]]',  ", ""));
+  assert.equal(setHumanFields(flow, { alternatives: ["zod", "yup", "joi"] }).text, flow.replace('"[[yup]]"]', '"[[yup]]",  "[[joi]]"]'));
+});
+
+test("alternatives: an entry with no target can't be named, so it stays; the key goes only when nothing is left", () => {
+  const text = HAND_WRITTEN.replace("rating:\n", 'rating:\nalternatives: ["[[]]", "[[zod]]"]\n');
+  assert.equal(setHumanFields(text, { alternatives: [] }).text, text.replace(', "[[zod]]"', ""));
+});
+
+test("alternatives: a whole wikilink is written as given, at its place (the app's Undo); targets match ignoring case", () => {
+  const text = HAND_WRITTEN.replace("rating:\n", 'rating:\nalternatives: ["[[yup]]"]\n');
+  assert.equal(setHumanFields(text, { alternatives: ["[[zod|Zod]]", "YUP"] }).text, text.replace('["[[yup]]"]', '["[[zod|Zod]]", "[[yup]]"]'));
+});
+
+test("alternatives: reordering is refused (only adding and removing); nothing changes", () => {
+  const r = setHumanFields(ZOD_YUP, { alternatives: ["yup", "zod"] });
+  assert.equal(r.text, ZOD_YUP);
+  assert.equal(r.warnings.length, 1);
+});
+
 test("alternatives: an empty list removes the key and its line; nothing else changes", () => {
   const before = HAND_WRITTEN.replace("rating:\n", "rating:\n");
   for (const written of ['alternatives: ["[[npm--puppeteer]]"]\n', 'alternatives: ["[[npm--puppeteer]]"]   # a comment\n', 'alternatives:\n  - "[[a]]"\n  - "[[b]]"\n', "alternatives: []\n", "alternatives:\n"]) {
@@ -550,7 +588,8 @@ test("alternatives: an empty list removes the key and its line; nothing else cha
 test("invalid values, tool-owned keys and status are refused; nothing changes", () => {
   const cases = [
     { kind: "gadget" }, { tags: ["Not Kebab"] }, { tags: "pdf" }, { tried: "yes" }, { rating: 6 }, { rating: 2.5 }, { name: "PDFKit" }, { status: "inbox" },
-    { alternatives: "npm--zod" }, { alternatives: [1] }, { alternatives: [""] }, { alternatives: ["  "] }, { alternatives: ["[[zod]]"] }, { alternatives: ["zod|Zod"] }, { alternatives: ["zod#Verdict"] }, { alternatives: ["two\nlines"] },
+    { alternatives: "npm--zod" }, { alternatives: [1] }, { alternatives: [""] }, { alternatives: ["  "] }, { alternatives: ["zod|Zod"] }, { alternatives: ["zod#Verdict"] }, { alternatives: ["two\nlines"] },
+    { alternatives: ["[[zod"] }, { alternatives: ["[[a]] [[b]]"] }, { alternatives: ["[[]]"] }, { alternatives: ["see [[zod]]"] },
   ];
   for (const values of cases) {
     const r = setHumanFields(HAND_WRITTEN, values as never);

@@ -2,6 +2,7 @@
 // and the address a followed link leaves in the browser's history. Resolving is core's (the Note
 // document's links and backlinks); nothing here decides where a link goes.
 import type { Backlink, Link } from "../../../src/core/links.ts";
+import { parseInline } from "./text.ts";
 
 export type Scope = "personal" | "project";
 export interface LinkNote {
@@ -86,6 +87,21 @@ export function alternativesOf(links: Link[]): Link[] {
 // "Alternative to: …": notes that list this one. One side is enough, so this comes from backlinks.
 export function alternativeTo(backlinks: Backlink[]): Backlink[] {
   return backlinks.filter((link) => link.from === "alternatives");
+}
+
+// The entry of the alternatives field (its raw value, from the Note document's frontmatter) that a
+// link came from, so Undo writes it back as it was: core keeps a whole wikilink as given. Not
+// found: rebuilt from the link.
+export function alternativeEntry(raw: unknown, link: Link): string {
+  const entries = Array.isArray(raw) ? raw.filter((r): r is string => typeof r === "string") : [];
+  const found = entries.find((entry) => {
+    if (!entry.includes("[[")) return entry.trim().toLowerCase() === link.target.toLowerCase();
+    const parts = parseInline(entry.trim());
+    const only = parts.length === 1 && parts[0].kind === "wikilink" ? parts[0] : null;
+    return only !== null && only.target.toLowerCase() === link.target.toLowerCase() && only.label === link.label;
+  });
+  if (found !== undefined) return found.includes("[[") ? found.trim() : link.target;
+  return link.label ? `[[${link.target}|${link.label}]]` : link.target;
 }
 
 // The targets with one more at the end; nothing changes for an empty one or one already there.
