@@ -26,7 +26,12 @@ export const TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
 export function isAvoid(match: { verdict: string | null; avoid_when: string[] }): boolean {
-  return /^avoid\b/i.test(match.verdict ?? "") || match.avoid_when.length > 0;
+  return verdictSaysAvoid(match.verdict) || match.avoid_when.length > 0;
+}
+
+// A Verdict that says to avoid the package: adopt names no install command for one (spec §2).
+export function verdictSaysAvoid(verdict: string | null): boolean {
+  return /^avoid\b/i.test(verdict ?? "");
 }
 
 // The Claude Code hook asks the user first only for an exact match on an avoid note (spec §6).
