@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import { allLabels, DEFAULT_SOURCES, drawable, edgeStyle, graphState, LAYOUT, layoutSettings, mixRgb, nodeSize, seedPosition, statusLine, type GraphJson } from "./graph.ts";
+import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, graphState, LAYOUT, layoutSettings, mixRgb, neighbours, nodeLabel, nodeSize, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
 
 // The graph page's pure parts (decision 0028): what is drawn, where it starts, how big, and the
 // status line.
@@ -91,6 +91,59 @@ test("mixRgb: a colour moved toward another, as the browser writes computed colo
   assert.equal(mixRgb("rgb(180, 156, 245)", "rgb(14, 16, 18)", 0), "rgb(180, 156, 245)");
   assert.equal(mixRgb("rgb(180, 156, 245)", "rgb(14, 16, 18)", 1), "rgb(14, 16, 18)");
   assert.equal(mixRgb("not a colour", "rgb(0, 0, 0)", 0.5), "not a colour");
+});
+
+// A chain d - e - f - g, and h alone, for local mode.
+const CHAIN: Shown = drawable(
+  {
+    journal: "personal",
+    nodes: ["d", "e", "f", "g", "h"].map((k) => note(k)),
+    edges: [
+      { type: "link", source: "note:d", target: "note:e", count: 1 },
+      { type: "alternative", source: "note:e", target: "note:f" },
+      { type: "link", source: "note:f", target: "note:g", count: 1 },
+    ],
+    counts: counts(0, 2, 1),
+  },
+  DEFAULT_SOURCES,
+);
+
+test("neighbours: the node itself and every node within one or two steps, through drawn edges only", () => {
+  assert.deepEqual([...neighbours(CHAIN.edges, "note:e", 1)].sort(), ["note:d", "note:e", "note:f"]);
+  assert.deepEqual([...neighbours(CHAIN.edges, "note:e", 2)].sort(), ["note:d", "note:e", "note:f", "note:g"]);
+  assert.deepEqual([...neighbours(CHAIN.edges, "note:h", 2)], ["note:h"]);
+  assert.deepEqual([...neighbours(drawable(DOC, DEFAULT_SOURCES).edges, "note:b", 1)].sort(), ["note:a", "note:b"]); // similarity is off
+});
+
+test("around: local mode keeps the nodes within the depth and the edges between them, and counts them", () => {
+  const one = around(CHAIN, "note:e", 1);
+  assert.deepEqual(one.nodes.map((n) => n.key), ["note:d", "note:e", "note:f"]);
+  assert.deepEqual(one.edges.map((e) => `${e.source} ${e.target}`), ["note:d note:e", "note:e note:f"]);
+  assert.deepEqual(one.counts, { notes: 3, tags: 0, connections: 2 });
+  assert.deepEqual(around(CHAIN, "note:e", 2).counts, { notes: 4, tags: 0, connections: 3 });
+  assert.deepEqual(statusLine(around(drawable(DOC, DEFAULT_SOURCES), "tag:pdf", 1).counts), "Showing 1 note, 1 tag and 1 connection");
+});
+
+test("searchNodes: up to 8 nodes whose name, file stem or tag contains the text; starts-with first, then by name", () => {
+  const nodes: GraphJson["nodes"] = [
+    note("npm--pdf-lib", { name: "pdf-lib" }),
+    note("npm--pdfkit", { name: "pdfkit" }),
+    note("npm--react-pdf", { name: "react-pdf" }),
+    note("npm--zod", { name: "zod" }),
+    { type: "tag", key: "tag:pdf", tag: "pdf", count: 3 },
+    ...Array.from({ length: 10 }, (_, i) => note(`npm--more-pdf-${i}`, { name: `more-pdf-${i}` })),
+  ];
+  assert.deepEqual(searchNodes(nodes, "PDF").map(nodeLabel), ["#pdf", "pdf-lib", "pdfkit", "more-pdf-0", "more-pdf-1", "more-pdf-2", "more-pdf-3", "more-pdf-4"]);
+  assert.deepEqual(searchNodes(nodes, "#pd").map(nodeLabel), ["#pdf"]);
+  assert.deepEqual(searchNodes(nodes, "npm--zo").map(nodeLabel), ["zod"]); // by file stem
+  assert.deepEqual(searchNodes(nodes, "  "), []);
+});
+
+test("nodeLabel: a note's name, or its file stem; #tag; a missing note's target", () => {
+  assert.equal(nodeLabel(note("npm--zod", { name: "zod" })), "zod");
+  assert.equal(nodeLabel(note("npm--zod", { name: null })), "npm--zod");
+  assert.equal(nodeLabel({ type: "tag", key: "tag:pdf", tag: "pdf", count: 1 }), "#pdf");
+  assert.equal(nodeLabel({ type: "ghost", key: "ghost:x", target: "X", reason: "missing" }), "X");
 });
 
 test("layout: a fixed number of iterations; Barnes-Hut only for large graphs", () => {

@@ -254,7 +254,7 @@ A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alt
 - [x] Core: `graphData` (`src/core/graph.ts`): note, tag and ghost nodes; tagged, link, alternative and similar edges; warm in under 300 ms for 2,000 notes. (2026-10-08: 146 ms median, p95 162 ms, missing notes included, on a Windows dev machine, `scripts/bench-graph.ts`.)
 - [x] API: `GET /api/graph` (the Graph document), with security tests.
 - [x] Page skeleton: a lazy-loaded route, the sidebar item, the palette entry and `g g`; rendering with the `DESIGN.md` tokens; the layout worker; the status line; the empty and WebGL states. (2026-10-08: the app 142.8 kB of 200 kB gzipped; the graph's chunk 39.9 kB and its worker 1.8 kB load only on the graph page; the other screens' first files 101.1 kB, 1.7 kB more than before.)
-- [ ] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.
+- [x] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.
 - [ ] Filters, edge toggles and the neighbours list, with ghost nodes behind their toggle.
 - [ ] Live updates; performance at 2,000 notes (data, layout and first frame in under 2 s).
 - [ ] Docs, end-to-end flows, screenshots in dark and light at 800 notes; review with `web-design-guidelines`; check and screenshot with `playwright-cli`.

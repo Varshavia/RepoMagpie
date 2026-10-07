@@ -1,6 +1,7 @@
 // End-to-end flows of the graph page (decision 0028, docs/ui.md §7): how you get there, the status
-// line, drawing with WebGL and the layout worker under the app's CSP, and the empty and no-WebGL
-// states.
+// line, drawing with WebGL and the layout worker under the app's CSP, the empty and no-WebGL
+// states; hover, click, the note pane, the search box, local mode, Esc and "Show in graph".
+import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import type { GraphJson } from "../../src/core/documents.ts";
 import { expect, test } from "./fixtures.ts";
@@ -15,13 +16,132 @@ async function expectedStatus(page: Page): Promise<string> {
   return `Showing ${plural(doc.counts.notes, "note")}, ${plural(doc.counts.tags, "tag")} and ${plural(connections, "connection")}`;
 }
 
+const status = (page: Page) => page.getByRole("status").filter({ hasText: /^Showing/ });
+const canvas = (page: Page) => page.locator(".graph-canvas");
+
+async function openGraph(page: Page, magpie: { open: (page: Page) => Promise<void> }) {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+}
+
+// Where a node is on the page, from the graph's own positions (the canvas has no DOM per node).
+async function nodeAt(page: Page, key: string): Promise<{ x: number; y: number; width: number; height: number; left: number; top: number }> {
+  const box = await canvas(page).boundingBox();
+  const at = await canvas(page).evaluate((el, k) => (el as unknown as { nodePosition: (k: string) => { x: number; y: number } }).nodePosition(k), key);
+  return { x: (box?.x ?? 0) + at.x, y: (box?.y ?? 0) + at.y, width: box?.width ?? 0, height: box?.height ?? 0, left: box?.x ?? 0, top: box?.y ?? 0 };
+}
+
+// The same, once the node has stopped moving (after the note pane resized the graph).
+async function nodeAtRest(page: Page, key: string) {
+  let last = "";
+  let at = await nodeAt(page, key);
+  await expect
+    .poll(async () => {
+      at = await nodeAt(page, key);
+      const now = `${Math.round(at.x)} ${Math.round(at.y)}`;
+      const same = now === last;
+      last = now;
+      return same;
+    }, { intervals: [100] })
+    .toBe(true);
+  return at;
+}
+
+test("graph: hover lights a node; a click on a note opens it beside the graph, on a tag selects it; Esc clears the selection", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const tag = await nodeAt(page, "tag:agent-skills");
+  await page.mouse.move(tag.x, tag.y);
+  await expect(canvas(page)).toHaveAttribute("data-hovered", "tag:agent-skills");
+
+  const note = await nodeAt(page, "note:github--vercel-labs--agent-skills.md");
+  await page.mouse.click(note.x, note.y);
+  await expect(canvas(page)).toHaveAttribute("data-selected", "note:github--vercel-labs--agent-skills.md");
+  const pane = page.getByRole("complementary", { name: "Note" });
+  await expect(pane.getByRole("heading", { level: 2, name: "vercel-labs/agent-skills" })).toBeVisible();
+  await expect(page.getByText("Selected: vercel-labs/agent-skills")).toBeVisible();
+
+  const again = await nodeAtRest(page, "tag:agent-skills"); // the pane narrowed the graph: positions moved
+  await page.waitForTimeout(350); // sigma reads two clicks within 300 ms as a double click (a zoom), as a person wouldn't click
+  await page.mouse.click(again.x, again.y);
+  await expect(canvas(page)).toHaveAttribute("data-selected", "tag:agent-skills");
+  await expect(pane).toHaveCount(0);
+  await expect(page.getByText("Selected: #agent-skills")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "");
+  await expect(page.getByText(/^Selected:/)).toHaveCount(0);
+});
+
+test("graph: the search box finds a note, selects it and centres it; Esc clears the selection, then the search", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const search = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  await search.fill("taste");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option")).toHaveText([/Leonxlnx\/taste-skill/]);
+  await page.keyboard.press("Enter");
+  const key = "note:github--leonxlnx--taste-skill.md";
+  await expect(canvas(page)).toHaveAttribute("data-selected", key);
+  await expect(search).toHaveValue("Leonxlnx/taste-skill");
+  await expect
+    .poll(async () => {
+      const at = await nodeAt(page, key);
+      return Math.abs(at.x - (at.left + at.width / 2)) < at.width * 0.05 && Math.abs(at.y - (at.top + at.height / 2)) < at.height * 0.05;
+    })
+    .toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "");
+  await expect(search).toHaveValue("Leonxlnx/taste-skill");
+  await page.keyboard.press("Escape");
+  await expect(search).toHaveValue("");
+});
+
+test("graph: local mode shows the selected node and its neighbours, counted in the status line; Everything shows all again", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const everything = await status(page).textContent();
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const tagged = doc.edges.filter((e) => e.type === "tagged" && e.target === "tag:agent-skills").length;
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#agent");
+  await page.keyboard.press("Enter");
+  await page.getByRole("radio", { name: "1 step" }).click();
+  await expect(status(page)).toHaveText(`Showing ${tagged} notes, 1 tag and ${tagged} connections`);
+  await page.getByRole("radio", { name: "Everything" }).click();
+  await expect(status(page)).toHaveText(everything ?? "");
+});
+
+test("graph: a [[link]] in the note pane selects that note in the graph", async ({ page, magpie }) => {
+  const file = magpie.note("github--leonxlnx--taste-skill.md");
+  writeFileSync(file, `${readFileSync(file, "utf8").replace(/\n*$/, "\n")}\nSee also [[github--vercel-labs--agent-skills]].\n`);
+  await openGraph(page, magpie);
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("taste");
+  await page.keyboard.press("Enter");
+  const pane = page.getByRole("complementary", { name: "Note" });
+  await pane.getByRole("link", { name: "vercel-labs/agent-skills" }).click();
+  await expect(canvas(page)).toHaveAttribute("data-selected", "note:github--vercel-labs--agent-skills.md");
+  await expect(pane.getByRole("heading", { level: 2, name: "vercel-labs/agent-skills" })).toBeVisible();
+});
+
+test("Show in graph: from the note view, the graph opens on that note, in local mode", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByText("vercel-labs/agent-skills").click();
+  await page.getByRole("button", { name: "Show in graph" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Graph" })).toBeVisible();
+  await expect(canvas(page)).toHaveAttribute("data-selected", "note:github--vercel-labs--agent-skills.md", { timeout: 10_000 });
+  await expect(page.getByRole("radio", { name: "1 step" })).toHaveAttribute("aria-checked", "true");
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const tags = doc.edges.filter((e) => e.type === "tagged" && e.source === "note:github--vercel-labs--agent-skills.md").length;
+  await expect(status(page)).toHaveText(`Showing 1 note, ${tags} tags and ${tags} connections`);
+  await expect(page.getByRole("complementary", { name: "Note" }).getByRole("button", { name: "Show in graph" })).toHaveCount(0);
+});
+
 test("graph: the sidebar, g g and the palette open it; the status line counts in words; it draws, and the layout settles under the CSP", async ({ page, magpie }) => {
   const violations: string[] = [];
   page.on("console", (message) => {
     if (/Content Security Policy|Refused to/.test(message.text())) violations.push(message.text());
   });
   await magpie.open(page);
-  await page.getByRole("button", { name: "Graph" }).click();
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Graph" })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: /^Showing/ })).toHaveText(await expectedStatus(page));
   const canvas = page.locator(".graph-canvas");
@@ -53,7 +173,7 @@ test("graph: other screens don't load its chunk", async ({ page, magpie }) => {
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("button", { name: "Search" }).click();
   expect(scripts.filter((path) => /GraphPage|layout\.worker/.test(path))).toEqual([]);
-  await page.getByRole("button", { name: "Graph" }).click();
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(page.locator(".graph-canvas")).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
   expect(scripts.some((path) => /GraphPage/.test(path))).toBe(true);
 });
@@ -71,7 +191,7 @@ test.describe("reduced motion", () => {
       }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-settled", "data-waiting"] });
     });
     await magpie.open(page);
-    await page.getByRole("button", { name: "Graph" }).click();
+    await page.getByRole("button", { name: "Graph", exact: true }).click();
     const canvas = page.locator(".graph-canvas");
     await expect(canvas).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
     await expect(canvas).toHaveAttribute("data-waiting", "false");
@@ -87,7 +207,7 @@ test.describe("an empty journal", () => {
 
   test("graph: nothing to draw yet, with Add", async ({ page, magpie }) => {
     await magpie.open(page);
-    await page.getByRole("button", { name: "Graph" }).click();
+    await page.getByRole("button", { name: "Graph", exact: true }).click();
     await expect(page.getByText("Nothing to draw yet. Add a repository here, or from the palette")).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /^Showing/ })).toHaveText("Showing 0 notes, 0 tags and 0 connections");
     await page.getByRole("button", { name: "Add a note" }).click();
@@ -103,7 +223,7 @@ test("graph: without WebGL it says so, and the status line still counts", async 
     } as typeof original;
   });
   await magpie.open(page);
-  await page.getByRole("button", { name: "Graph" }).click();
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(page.getByText("This browser can't draw the graph: WebGL is off or not available.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: /^Showing/ })).toHaveText(await expectedStatus(page));
   await expect(page.locator(".graph-canvas")).toHaveCount(0);

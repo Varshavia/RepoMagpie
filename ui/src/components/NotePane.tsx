@@ -47,6 +47,7 @@ export interface NotePaneProps {
   onFollowLink: (journal: Scope, from: string | null, to: string) => void; // a [[link]] or "Linked from"
   onAddNote: (target: string) => void; // an unresolved link: Add, with the target filled in
   onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
+  onShowInGraph?: (file: string) => void; // not in the graph's own note pane
 }
 
 type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
@@ -61,7 +62,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onTagList } = props;
+  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onTagList, onShowInGraph } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -365,6 +366,12 @@ export function NotePane(props: NotePaneProps) {
               <Icon name="pencil" />
               Open in editor
             </button>
+            {onShowInGraph && !note.read_only && note.file ? (
+              <button type="button" className="button secondary" onClick={() => onShowInGraph(note.file as string)}>
+                <Icon name="graph" />
+                Show in graph
+              </button>
+            ) : null}
             {journal === "personal" && project !== "none" && note.id && !note.read_only ? (
               <button type="button" className="button secondary" onClick={() => setAdopting({ step: "confirm", busy: false, error: null })} aria-expanded={adopting !== null}>
                 <Icon name="users" />

@@ -35,6 +35,55 @@ export function drawable(doc: GraphJson, sources: Sources): Shown {
   return { nodes, edges, counts: { notes, tags, connections: edges.length } };
 }
 
+// The node itself and every node within `depth` steps along the drawn edges.
+export function neighbours(edges: GraphEdge[], key: string, depth: 1 | 2): Set<string> {
+  const near = new Set([key]);
+  let frontier = new Set([key]);
+  for (let step = 0; step < depth; step++) {
+    const next = new Set<string>();
+    for (const e of edges) {
+      for (const [from, to] of [[e.source, e.target], [e.target, e.source]]) {
+        if (frontier.has(from) && !near.has(to)) {
+          near.add(to);
+          next.add(to);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return near;
+}
+
+// Local mode: the part of what is drawn within `depth` steps of a node, with its counts.
+export function around(shown: Shown, key: string, depth: 1 | 2): Shown {
+  const near = neighbours(shown.edges, key, depth);
+  const nodes = shown.nodes.filter((n) => near.has(n.key));
+  const edges = shown.edges.filter((e) => near.has(e.source) && near.has(e.target));
+  return { nodes, edges, counts: { notes: nodes.filter((n) => n.type === "note").length, tags: nodes.filter((n) => n.type === "tag").length, connections: edges.length } };
+}
+
+// The name a node goes by: a note's name or file stem, #tag, a missing note's target.
+export function nodeLabel(node: GraphNode): string {
+  return node.type === "note" ? (node.name ?? node.file.replace(/\.md$/, "")) : node.type === "tag" ? `#${node.tag}` : node.target;
+}
+
+const MAX_MATCHES = 8;
+
+// The search box: up to 8 nodes whose name, file stem or tag contains the text, ignoring case;
+// those that start with it first, then by name (as the [[ autocomplete ranks notes).
+export function searchNodes(nodes: GraphNode[], query: string): GraphNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const texts = (n: GraphNode) => (n.type === "note" ? [nodeLabel(n), n.file.replace(/\.md$/, "")] : n.type === "tag" ? [`#${n.tag}`, n.tag] : [n.target]).map((t) => t.toLowerCase());
+  return nodes
+    .map((n) => ({ n, label: nodeLabel(n).toLowerCase(), texts: texts(n) }))
+    .filter((c) => c.texts.some((t) => t.includes(q)))
+    .map((c) => ({ ...c, first: c.texts.some((t) => t.startsWith(q)) ? 0 : 1 }))
+    .sort((a, b) => a.first - b.first || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0))
+    .slice(0, MAX_MATCHES)
+    .map((c) => c.n);
+}
+
 export type GraphState = "empty" | "unconnected" | "ready";
 
 export function graphState(doc: GraphJson, sources: Sources): GraphState {
