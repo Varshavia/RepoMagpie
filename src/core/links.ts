@@ -4,7 +4,7 @@
 // read doesn't parse every file again. Used by the Note document and the graph. Never prints.
 import { readFileSync } from "node:fs";
 import { readableId, readNote } from "./note.ts";
-import { noteEntries } from "./note-cache.ts";
+import { isRecord, isTextOrNull, noteEntries } from "./note-cache.ts";
 
 export interface FoundLink {
   target: string; // as written, without the #heading
@@ -81,7 +81,7 @@ export function linkIndex(journal: string): LinkIndex {
 // The link index, plus the file each outgoing link resolves to (null when unresolved), in the same
 // order as `outgoing`. The graph joins notes by file, since two files may carry the same id.
 export function resolvedLinkIndex(journal: string): LinkIndex & { targets: Record<string, (string | null)[]> } {
-  const { files, data } = noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path));
+  const { files, data } = noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path), isEntry);
   const notes = files.filter((file) => data[file].id !== null);
   const byStem = new Map<string, string[]>();
   const byName = new Map<string, string[]>();
@@ -118,6 +118,12 @@ export function resolvedLinkIndex(journal: string): LinkIndex & { targets: Recor
       .map(({ file: source, from }) => ({ id: data[source].id as string, name: data[source].name, from }));
   }
   return { outgoing, incoming, targets };
+}
+
+// Whether a cached value has an entry's shape (a damaged cache is read again from the note).
+function isEntry(e: unknown): boolean {
+  return isRecord(e) && isTextOrNull(e.id) && isTextOrNull(e.name) && Array.isArray(e.links) &&
+    e.links.every((link) => isRecord(link) && typeof link.target === "string" && isTextOrNull(link.label) && typeof link.from === "string");
 }
 
 // One note's id, name and links, as written. A note that can't be read has no id and no links.

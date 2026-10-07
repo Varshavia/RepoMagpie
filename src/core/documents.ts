@@ -9,7 +9,7 @@ import { graphData, type GraphData } from "./graph.ts";
 import { journalTagList, listNotes, parseTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkIndex, type Backlink, type Link } from "./links.ts";
 import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
-import { noteEntries } from "./note-cache.ts";
+import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
 import { packageVersion } from "./version.ts";
@@ -144,8 +144,15 @@ const NOTE_LIST_CACHE = "note-list.json";
 const NOTE_LIST_VERSION = 1;
 
 function summaries(journal: string): NoteSummary[] {
-  const { files, data } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))));
+  const { files, data } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
   return files.map((file) => data[file]);
+}
+
+// Whether a cached value has a summary's shape (a damaged cache is read again from the note).
+function isSummary(s: unknown): boolean {
+  return isRecord(s) && isTextOrNull(s.id) && typeof s.file === "string" && isTextOrNull(s.name) && isTextOrNull(s.kind) && isTexts(s.tags) &&
+    (s.status === "inbox" || s.status === "reviewed") && typeof s.verdict === "string" && typeof s.tried === "boolean" &&
+    (s.rating === null || Number.isInteger(s.rating)) && isTextOrNull(s.explored) && typeof s.read_only === "boolean";
 }
 
 function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {

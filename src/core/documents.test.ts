@@ -247,6 +247,19 @@ test("Note list cache: .cache/note-list.json; unchanged notes come from it, chan
   assert.deepEqual(noteListDocument("personal", {}, s.context).document, next);
 });
 
+test("Note list cache: a cached summary of the wrong shape is read again from its note, and the cache rewritten", () => {
+  const s = setup();
+  const expected = noteListDocument("personal", {}, s.context).document;
+  const cacheFile = join(s.journal, ".cache", "note-list.json");
+  const good = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, Record<string, unknown>> };
+  const summary = good.data["npm--pdfkit.md"];
+  for (const wrong of ["nonsense", 42, [], { ...summary, tags: "pdf" }, { ...summary, status: "done" }, { ...summary, tried: "yes" }, { ...summary, rating: "2" }, { ...summary, read_only: undefined }]) {
+    writeFileSync(cacheFile, JSON.stringify({ ...good, data: { ...good.data, "npm--pdfkit.md": wrong } }));
+    assert.deepEqual(noteListDocument("personal", {}, s.context).document, expected, JSON.stringify(wrong));
+    assert.deepEqual(JSON.parse(readFileSync(cacheFile, "utf8")), good, `rewritten after ${JSON.stringify(wrong)}`);
+  }
+});
+
 // --- Note ---
 
 test("Note: the note as read, with its version", () => {
