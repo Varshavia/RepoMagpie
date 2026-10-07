@@ -114,7 +114,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 - `GET /api/events` starts with the comment `: connected`.
 - A 405 names the allowed methods in an `Allow` header. `HEAD` and `OPTIONS` are not supported.
 
-"Open the repository", "Open in Obsidian" and "Copy PURL" happen in the browser, from the note's fields; they need no endpoint. Obsidian is opened with `obsidian://open?path=<URI-encoded absolute path>` (section 12).
+"Open the repository" and "Copy PURL" happen in the browser, from the note's fields; they need no endpoint.
 
 **Statuses**
 
@@ -155,9 +155,9 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - "What it does", with a visible draft badge while it is a draft, and "Accept".
    - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
    - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
-   - Actions: open the repository, open in an editor, open in Obsidian, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).
+   - Actions: open the repository, open in an editor, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).
    - PURLs are shown decoded (`pkg:npm/@playwright/cli`), everywhere in the app. The copied PURL and every request keep the encoded id.
-   - Paths under the home directory are shown with `~` (`~/.magpie/notes/npm--pdfkit.md`), as `magpie recall` prints them, everywhere in the app: the note view, Check a package, Settings and Suggest. "Open in Obsidian" and the API keep the absolute path.
+   - Paths under the home directory are shown with `~` (`~/.magpie/notes/npm--pdfkit.md`), as `magpie recall` prints them, everywhere in the app: the note view, Check a package, Settings and Suggest. The API keeps the absolute path.
 4. **Add.**
    - Paste a URL, PURL or name; see the fetched preview; write the Verdict; save. The same logic as `magpie note`.
    - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`, including its lenient read. Changing the lines needs a new check before importing. While the lines have no item, the help line says what the first line starts with, as the CLI's hint does.
@@ -165,7 +165,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
 7. **Suggest for this project** ("Suggest" in the sidebar and the palette): what `magpie suggest` finds for the project `magpie ui` was started in, from its manifests and README, or from a description typed in the box. Two panes, like Search: the list, then the note. The list says which words it looked for; candidates come Verdict first, in `magpie suggest`'s order, each with a third line that says why ("Why: dependency @playwright/test; matched coding, agent", as `magpie suggest` prints it); the project's dependencies with an avoid note follow, labelled "In use, avoid" in words. "Show more" asks for 20 more. With nothing to go on (no manifest, no README), it asks for a description.
    - **Adopt to project**, on a personal note when there is a project: a first click shows what happens and who can read it ("The project journal is committed with the code; anyone who can read this repository can read this note."); only "Copy to the project journal" writes, through `POST /api/adopt`. Then the install command, with a copy button and "Run it yourself" (for a repository with several packages, one command per package and a line that says to choose; for a note whose Verdict says to avoid, no command but "Your note says to avoid <name>; no install command."), and "Open the project's note". A note the project already has is refused, with its path.
-8. **Later, not v0.1:** export or nest (v0.3). A graph tab: open question (section 13).
+8. **Later, not v0.1:** a graph page (v0.2 part 2, [decision 0026](decisions/0026-the-app-is-the-workspace.md)); export or nest (v0.4).
 
 **Keyboard map**
 
@@ -247,12 +247,11 @@ Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (
 | What `taste-skill` assumes | Tailwind v4, Motion, Next.js Server Components, an icon library, self-hosted fonts; scope excludes dashboards. Adopt and skip list in [0022](decisions/0022-frontend-stack.md) | [`skills/taste-skill/SKILL.md`](https://github.com/Leonxlnx/taste-skill/blob/main/skills/taste-skill/SKILL.md) |
 | Does `playwright-cli` fit end-to-end tests in CI? | No: it drives a browser for coding agents and has no test runner, assertions or reports. Used for development checks and screenshots; `@playwright/test` proposed for CI ([0022](decisions/0022-frontend-stack.md)) | [`playwright-cli` README](https://github.com/microsoft/playwright-cli#readme) |
 | The DESIGN.md format version | `alpha`; the components part is "actively evolving". `DESIGN.md` uses only the token groups and section order | [DESIGN.md spec](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) |
-| `obsidian://` to open a note | `obsidian://open?path=<URI-encoded absolute path>` opens the file in "the most specific vault which contains the specified file path"; values must be URI-encoded; the scheme registers itself on Windows and macOS, and needs manual setup on Linux | [Obsidian URI help](https://obsidian.md/help/Extending+Obsidian/Obsidian+URI) |
 | React's size against the 200 kB budget | Production builds, gzipped: `react` 4.5 kB, `react-dom` client 107.9 kB (unminified as published), `scheduler` 2.4 kB | The published files of `react`/`react-dom` 19.3.0, measured ([0022](decisions/0022-frontend-stack.md)) |
 
-**Still open:** what Obsidian does when a journal is not inside any vault it knows (the path open then has nothing to open). Not tried on `feat/ui-app` (no Obsidian on the agent's machine). "Open in Obsidian" is a secondary button, styled like "Open in editor" (the maintainer's design review, 2026-10-06).
+The `obsidian://` row and its "Still open" question were removed with the "Open in Obsidian" button ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 
 ## 13. Open questions
 
-- **Graph tab.** The UI brief lists a graph tab for v0.2. [Ideas](ideas.md) (idea 10) and [product](product.md) keep graph views "marketing only, not scheduled", based on the desk research. Which holds?
+- **Graph tab.** Answered on 2026-10-07 by [decision 0026](decisions/0026-the-app-is-the-workspace.md): the graph is a page in the app, v0.2 part 2. The "marketing only" status in [ideas](ideas.md) (idea 10) and [product](product.md#graph-specification) is superseded.
 - **Read-only notes by file name.** A note whose frontmatter can't be read has no `id`, so "Open in editor" addresses it by its `file` name, matched against core's listing of `notes/` (section 3). This goes one step beyond "notes are addressed by PURL". The alternative: such notes only show their path, with no open action. Built as in section 3 on `feat/ui-server`, with a traversal test for every parameter; waiting for the maintainer's confirmation.

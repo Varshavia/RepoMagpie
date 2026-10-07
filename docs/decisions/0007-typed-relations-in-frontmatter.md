@@ -1,6 +1,6 @@
 # 0007 — Typed relations in frontmatter
 
-**Status:** proposed (2026-10-03). Finalised in roadmap v0.1, together with the [note schema](../note-schema.md).
+**Status:** accepted in part by [0027](0027-alternatives-active.md) (`alternatives`); `works_with` stays proposed. Proposed 2026-10-03.
 
 ## Context
 Notes link to each other only through untyped `[[wikilinks]]` in the "Related" section. The graph needs to tell kinds of links apart ([product](../product.md#graph-model)): "alternative to" and "works with" are different from "related". Proactive recall also wants to show better-rated alternatives ([ideas](../ideas.md), idea 1).

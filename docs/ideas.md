@@ -32,13 +32,13 @@ The product's category moved:
 | 8 | Team journal | **Core**, as the project journal | v0.1 | Git gives sharing for free |
 | 4 | Context-aware suggest | **Core** | v0.1 | Shows what you already have when a project starts |
 | 11 | Adopt | **Core** | v0.1 | Moves a note from your personal journal into a project |
-| 5 | Gap detection | `magpie init`; `magpie gaps` | `init`: v0.1 if time allows, else v0.2; `gaps`: v0.2 | Fills an empty journal from real manifests |
-| 2 | Vet and drift | **Reduced** | v0.2 | Record your review; integrate existing scanners and lockfiles; no own scanner |
-| 3 | Nests and follow | Planned | v0.3 | Needs users first |
-| 7 | `/uses` page generator | Planned | v0.3 | Marketing feature |
+| 10 | Graph views | **In the app** | v0.2 (part 2) | The first user asks for it to work in ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
+| 5 | Gap detection | `magpie init`; `magpie gaps` | `init`: v0.1 if time allows, else v0.3; `gaps`: v0.3 | Fills an empty journal from real manifests |
+| 2 | Vet and drift | **Reduced** | v0.3 | Record your review; integrate existing scanners and lockfiles; no own scanner |
+| 3 | Nests and follow | Planned | v0.4 | Needs users first |
+| 7 | `/uses` page generator | Planned | v0.4 | Marketing feature |
 | 6 | Resurfacing digest | Later | — | Nice to have |
 | 9 | Daily find | Later | — | Distraction from the core |
-| 10 | Graph views | Marketing only | not scheduled | Desk research (Q7, secondhand): widely reported as not useful for real work |
 
 ---
 
@@ -81,8 +81,8 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - **Vet:** the user records their own review and the commit they reviewed in the note, and can link the output of existing scanners ([competitors](competitors.md), C).
   - **Drift:** `magpie drift` lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
 - **Surfaces:** CLI (`magpie drift`, and a way to record a review).
-- **Schema impact:** a tool-owned `reviewed_commit` field (commit SHA). It joins the schema only when v0.2 work starts.
-- **Target release:** v0.2.
+- **Schema impact:** a tool-owned `reviewed_commit` field (commit SHA). It joins the schema only when v0.3 work starts.
+- **Target release:** v0.3.
 - **Open questions:**
   - Which scanners and lockfile formats to integrate first?
   - How far back can drift look when no commit was recorded?
@@ -95,7 +95,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - `magpie follow <nest-url>` imports another user's public verdicts and "Use when" lines into your search results. They are clearly attributed and never mixed into your own notes.
 - **Surfaces:** CLI (`magpie publish`, `magpie follow`); the nest site; search results.
 - **Schema impact:** a human-owned `public` field, `true` or `false`, default `false`. Private by default.
-- **Target release:** v0.3.
+- **Target release:** v0.4.
 - **Open questions:**
   - Nest data format (a JSON export next to the HTML?).
   - Attribution format.
@@ -113,7 +113,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Target release:** v0.1.
 - **Open questions:**
   - How many candidates does magpie hand to the agent? v0.1: 20 by default (`--limit`); the beta tests whether that fits.
-  - Semantic matching (v0.3, with semantic search): does it replace the agent's choice or add to it?
+  - Semantic matching (v0.4, with semantic search): does it replace the agent's choice or add to it?
 
 ## 5. Gap detection
 
@@ -123,7 +123,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - `magpie gaps` reports dependencies used in a project but missing from the journals, and tags or kinds with no reviewed notes.
 - **Surfaces:** CLI (`magpie init`, `magpie gaps`).
 - **Schema impact:** none planned; it reads the `packages` field (idea 1).
-- **Target release:** `init` in v0.1 if time allows, otherwise v0.2; `gaps` in v0.2.
+- **Target release:** `init` in v0.1 if time allows, otherwise v0.3; `gaps` in v0.3.
 - **Open questions:**
   - Does `init` write drafts into the project journal, the personal journal, or ask?
   - Which projects does `gaps` scan, and how does the user point to them?
@@ -145,7 +145,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Behaviour:** Generates a "Tools I trust" page or README section from public, reviewed notes, grouped by tag or kind.
 - **Surfaces:** CLI; the nest site (idea 3).
 - **Schema impact:** none of its own; it uses `public` (idea 3).
-- **Target release:** v0.3, together with nests.
+- **Target release:** v0.4, together with nests.
 - **Open questions:**
   - Output formats: Markdown section, HTML page, or both?
 
@@ -173,20 +173,15 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 ## 10. Graph views
 
-- **Problem:** You can't see the state of your journal at a glance (drift, inbox, gaps), and you can't easily show it to others.
-- **Behaviour:** Three levels:
-  - **Level 1:** a preconfigured Obsidian graph for the example vault, with zero code.
-  - **Level 2:** `magpie graph`, a self-contained interactive HTML file with typed edges and status encoding.
-  - **Level 3:** the graph embedded in nest pages (idea 3).
-
-  Graph views are often admired but rarely used. Ours must earn its place by showing status at a glance (drift, inbox, gaps) and by being a visual people can share. It is not decoration. Full specification: [product](product.md#graph-specification).
-- **Surfaces:** Obsidian graph view (level 1); an HTML file (level 2); nest pages (level 3).
-- **Schema impact:** two human-owned fields for typed relations, `alternatives` and `works_with`: lists of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. Proposed in [decision 0007](decisions/0007-typed-relations-in-frontmatter.md).
-- **Target release:** marketing only, not scheduled. Graph views are built only as a shareable visual, if at all. Desk research ([validation](validation.md), Q7) found graph views widely reported as not useful for real work; that is secondhand evidence.
+- **Problem:** With hundreds of notes, you can't see what you have, how it groups, and what connects to what. You also can't see the state of your journal at a glance (inbox, drift, gaps).
+- **Behaviour:** A graph page in the local app ([decision 0026](decisions/0026-the-app-is-the-workspace.md)): every note is a node, tags are hub nodes, and `[[links]]` and `alternatives` are edges. Similarity computed from topics and language is an optional edge source, off by default, with at most 3 neighbours per note. Full specification: [product](product.md#graph-specification).
+- **Surfaces:** the local app (`magpie ui`). Later, as exports: a standalone HTML file and the graph in nest pages (idea 3).
+- **Schema impact:** the human-owned `alternatives` field: a list of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]` ([decision 0027](decisions/0027-alternatives-active.md)). `works_with` stays proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)).
+- **Target release:** v0.2. Part 1 (linked notes) stores the links and `alternatives` the graph draws; part 2 builds the graph page.
+- **History:** until 2026-10-07 the status was "marketing only, not scheduled": graph views would be built only as a shareable visual, if at all, in three levels (an Obsidian preset, a `magpie graph` HTML file, nest pages). That rested on secondhand desk research ([validation](validation.md), Q7). The first user then asked for the graph as a working view, and [decision 0026](decisions/0026-the-app-is-the-workspace.md) moved it into the app.
 - **Open questions:**
-  - Does Obsidian's graph view count wikilinks inside frontmatter properties? If not, level 1 shows only body links.
   - Does node size encode connections or rating?
-  - Rendering library for level 2.
+  - Rendering library for the graph page (part 2).
 
 ## 11. Adopt
 
@@ -207,8 +202,8 @@ None of these are in the active schema or the template yet. Each joins the [note
 
 | Field | Owner | Type | For | Target |
 |---|---|---|---|---|
-| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
-| `works_with` | human | list of wikilinks | typed edges | v0.1 ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
-| `reviewed_commit` | tool | commit SHA | drift | v0.2 |
-| `public` | human | bool, default `false` | nests | v0.3 |
+| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.2, part 1 ([decision 0027](decisions/0027-alternatives-active.md), accepted) |
+| `works_with` | human | list of wikilinks | typed edges | not scheduled ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
+| `reviewed_commit` | tool | commit SHA | drift | v0.3 |
+| `public` | human | bool, default `false` | nests | v0.4 |
 | `last_resurfaced` | tool | date | digest | later |

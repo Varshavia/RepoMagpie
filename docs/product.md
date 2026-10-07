@@ -12,8 +12,8 @@ There is no desktop app and no remote server. RepoMagpie has six surfaces:
 | Local app | `magpie ui`: an Obsidian-inspired app in the browser, served from your machine on `127.0.0.1` ([UI](ui.md), [decision 0021](decisions/0021-local-ui-server.md)) | v0.1 |
 | Agent layer | RepoMagpie's `SKILL.md`, plus a hook for proactive recall (Claude Code first) | v0.1 |
 | Journals | A personal journal and project journals: Markdown files, used in Obsidian or any editor | v0.1 |
-| Nest | A static site of public notes, built by `magpie publish` | v0.3 |
-| `magpie graph` | One self-contained HTML file | not scheduled (marketing only) |
+| Nest | A static site of public notes, built by `magpie publish` | v0.4 |
+| Graph | A page in the local app: notes, tags and the links between them ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) | v0.2 |
 
 ### CLI
 
@@ -87,9 +87,9 @@ Journals are fully usable without Obsidian. Obsidian extras only add comfort. No
 
 A static site built by `magpie publish`. It contains public notes only (`public: true`, default `false`): a searchable list and a `/uses` view. It can be hosted on GitHub Pages. See [ideas, idea 3](ideas.md#3-nests-and-follow).
 
-### `magpie graph`
+### Graph
 
-A single self-contained HTML file. Marketing only, not scheduled. See [Graph specification](#graph-specification).
+A page in the local app, v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). A standalone HTML file is possible later, as an export. See [Graph specification](#graph-specification).
 
 ## Visual identity
 
@@ -99,9 +99,13 @@ A single self-contained HTML file. Marketing only, not scheduled. See [Graph spe
 
 ## Graph specification
 
-**Status:** marketing only, not scheduled ([ideas](ideas.md), idea 10). The specification is kept so a graph can be built as a shareable visual if it earns a place.
+**Status:** a page in the local app, v0.2 part 2 ([decision 0026](decisions/0026-the-app-is-the-workspace.md); [ideas](ideas.md), idea 10). Part 1 (linked notes) stores the links and `alternatives` it draws. The rendering library and the details below are settled on the part 2 branch.
 
-### Levels
+The graph is a working view: it shows what you have, how it groups by tag, and what connects to what. It also shows status at a glance (inbox now; drift and gaps once they exist).
+
+### Levels (superseded)
+
+*History. Superseded by [decision 0026](decisions/0026-the-app-is-the-workspace.md) on 2026-10-07: the in-app page replaces level 2; levels 2 and 3 remain possible later as exports.*
 
 | Level | What | Release |
 |---|---|---|
@@ -109,7 +113,7 @@ A single self-contained HTML file. Marketing only, not scheduled. See [Graph spe
 | 2 | `magpie graph`: a self-contained, interactive HTML file with typed edges and status encoding. | not scheduled |
 | 3 | The graph embedded in nest pages. | not scheduled |
 
-Graph views are often admired but rarely used. Ours must earn its place by (a) showing status at a glance (drift, inbox, gaps) and (b) being a visual people can share. It is not decoration.
+The status was "marketing only": graph views are often admired but rarely used, so ours had to earn its place by (a) showing status at a glance (drift, inbox, gaps) and (b) being a visual people can share.
 
 ### Graph model
 
@@ -120,7 +124,7 @@ Graph views are often admired but rarely used. Ours must earn its place by (a) s
 | repo | each note in `notes/` | main node |
 | skill | each completed skill line | attached to its repo |
 | tag | each tag in use | hub node |
-| magpie (v0.3) | each followed nest | other people |
+| magpie (v0.4) | each followed nest | other people |
 
 **Edge types**
 
@@ -128,15 +132,17 @@ Graph views are often admired but rarely used. Ours must earn its place by (a) s
 |---|---|---|---|
 | part-of | skill → repo | skill lines | short solid |
 | tagged | repo → tag | `tags` | thin dotted |
-| alternative-to | repo ↔ repo | human-owned `alternatives` | dashed, accent colour |
-| works-with | repo ↔ repo | human-owned `works_with` | solid |
-| related | repo ↔ repo | untyped `[[links]]` in "Related" | thin solid |
-| similar-to | repo ↔ repo | computed from semantic search, above a threshold | faint, dashed, toggleable |
-| recommended-by (v0.3) | magpie → repo | followed nests | thin |
+| alternative-to | repo ↔ repo | human-owned `alternatives`; one side is enough, drawn once | dashed, accent colour |
+| works-with | repo ↔ repo | human-owned `works_with` (proposed, not scheduled) | solid |
+| related | repo ↔ repo | untyped `[[links]]` in any body section | thin solid |
+| similar-to | repo ↔ repo | computed from `topics` and `language`, at most 3 per note | faint, dashed, off by default |
+| recommended-by (v0.4) | magpie → repo | followed nests | thin |
+
+Edge sources on by default: tags, `[[links]]` and `alternatives`. Similar-to is off by default ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 
 ### Typed relations
 
-Typed edges need two human-owned frontmatter fields, `alternatives` and `works_with`: lists of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. Proposed in [decision 0007](decisions/0007-typed-relations-in-frontmatter.md); finalised with the note schema in v0.1.
+`alternatives` is active ([decision 0027](decisions/0027-alternatives-active.md)): a human-owned list of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. `works_with` stays proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)).
 
 ### Visual encoding
 
@@ -150,7 +156,9 @@ Typed edges need two human-owned frontmatter fields, `alternatives` and `works_w
 
 A legend is always visible. Colour is never the only carrier of meaning: shapes and labels must work in greyscale.
 
-### Interactions (level 2)
+### Interactions
+
+Written for level 2; they carry over to the graph page and are settled on the part 2 branch.
 
 - Search box: focus and highlight matching nodes.
 - Filters: kind, tag, status (inbox or reviewed), drift only, tried only.
@@ -160,14 +168,15 @@ A legend is always visible. Colour is never the only carrier of meaning: shapes 
 - Export the current view as PNG and SVG, for sharing.
 - Keyboard accessible; respects `prefers-color-scheme` and `prefers-reduced-motion`.
 
-### Technical constraints (level 2)
+### Technical constraints
 
-- One self-contained `.html` file with the data embedded as JSON. It opens offline by double-clicking and needs no server.
-- The rendering library is chosen when level 2 is scheduled. Candidates: d3-force, Cytoscape.js, sigma.js with graphology. Criteria: offline bundle size, performance at 2,000 nodes, MIT-compatible license.
+- The graph page gets its nodes and edges from the API; core builds them from the notes and the link index.
+- The rendering library is chosen on the part 2 branch, under the dependency policy. Candidates: d3-force, Cytoscape.js, sigma.js with graphology. Criteria: size against the app's 200 kB budget, performance at 2,000 nodes, MIT-compatible license.
 - Performance target: smooth interaction with 2,000 nodes on a mid-range laptop.
 - The graph is generated from notes only ([decision 0001](decisions/0001-plain-markdown-storage.md)). Nothing is stored that can't be rebuilt.
+- Superseded (level 2): one self-contained `.html` file with the data embedded as JSON, opened offline without a server. Possible later as an export.
 
-### Obsidian preset (level 1)
+### Obsidian preset (level 1, not scheduled)
 
 - Ship `examples/vault/.obsidian/graph.json` with one colour group per `kind` group.
 - Colour groups take an Obsidian search query ([Graph view help](https://obsidian.md/help/plugins/graph)), and search matches a property value with `[property:value]`, with `OR` between values ([Search help](https://obsidian.md/help/plugins/search)). So the four groups would be:
@@ -181,7 +190,7 @@ A legend is always visible. Colour is never the only carrier of meaning: shapes 
 
 ## Open questions
 
-- **Links in properties:** do Obsidian's graph view and backlinks count wikilinks inside frontmatter properties, and since which version? Obsidian's [Properties help](https://obsidian.md/help/properties) and the [1.4.0 changelog](https://obsidian.md/changelog/2023-07-26-desktop-v1.4.0) say properties can hold internal links (quoted: `"[[Link]]"`), but not whether the graph or backlinks use them (checked 2026-10-03). Test it in the current Obsidian version. If they don't, the level 1 graph shows only body links, and typed edges appear only in level 2.
-- **Node size:** connections or rating? Decided when the graph is built.
-- **Rendering library** for level 2. Decided when level 2 is scheduled.
+- **Links in properties:** moot ([decision 0027](decisions/0027-alternatives-active.md)). The in-app graph reads `alternatives` itself, so it doesn't matter whether Obsidian's graph view and backlinks count wikilinks inside frontmatter properties. (Obsidian's [Properties help](https://obsidian.md/help/properties) and the [1.4.0 changelog](https://obsidian.md/changelog/2023-07-26-desktop-v1.4.0) don't say; checked 2026-10-03.)
+- **Node size:** connections or rating? Decided on the part 2 branch.
+- **Rendering library** for the graph page. Decided on the part 2 branch.
 - Recall, vet, nest and other feature questions: see [ideas](ideas.md).
