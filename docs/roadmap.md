@@ -11,8 +11,8 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, part 1 (linked notes, `feat/linked-notes`), built and waiting for its pull request.
-- **Next:** v0.2 Connect, parts 2 (the graph page) and 3 (agent output).
+  Also now: v0.2 Connect, part 2 (the graph page, `feat/graph`). Part 1 (linked notes) is merged.
+- **Next:** v0.2 Connect, part 3 (agent output).
 - **Later:** v0.3 Trust, v0.4 Share.
 
 | Part | Status |
@@ -248,10 +248,18 @@ The app becomes the place where you write and connect notes: links, backlinks, t
 Follow-up, small, after `feat/linked-notes` (the maintainer, 2026-10-07):
 - [ ] Unresolved links: an ambiguous link opens Search with its name; a missing link whose target is a file stem (`npm--pdfkit`, `github--owner--repo`) opens Add with the PURL it stands for. npm scopes can't be recovered from a stem; those stay as written.
 
-### Part 2: the graph page
-- [ ] A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification).
-- [ ] Choose the rendering library (dependency policy, the app's 200 kB budget).
-- [ ] Review with `web-design-guidelines`; check and screenshot with `playwright-cli`.
+### Part 2: the graph page (`feat/graph`)
+A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification); library, layout and encoding: [decision 0028](decisions/0028-the-graph-page.md).
+- [x] Decision 0028 and the rendering library: sigma 3, graphology and graphology-layout-forceatlas2, approved 2026-10-07; their licence notices ship in `dist/ui/`.
+- [ ] Core: `graphData` (`src/core/graph.ts`): note, tag and ghost nodes; tagged, link, alternative and similar edges; warm in under 300 ms for 2,000 notes.
+- [ ] API: `GET /api/graph`, with security tests.
+- [ ] Page skeleton: a lazy-loaded route, the sidebar item, the palette entry and `g g`; rendering with the `DESIGN.md` tokens; the layout worker; the status line; the empty and WebGL states.
+- [ ] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.
+- [ ] Filters, edge toggles and the neighbours list, with ghost nodes behind their toggle.
+- [ ] Live updates; performance at 2,000 notes (data, layout and first frame in under 2 s).
+- [ ] Docs, end-to-end flows, screenshots in dark and light at 800 notes; review with `web-design-guidelines`; check and screenshot with `playwright-cli`.
+
+**Done when:** every item works and has tests; the budgets hold (`graphData` under 300 ms, the page under 2 s at 2,000 notes, the bundle under 200 kB with other screens' initial chunk within ±2 kB, the existing budgets unchanged); all checks, end-to-end tests and benchmarks pass.
 
 ### Part 3: agent output
 - [ ] `magpie recall` and `magpie suggest` show alternatives and neighbours; the skill explains them.

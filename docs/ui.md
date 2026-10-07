@@ -19,7 +19,7 @@ Browser (the app)  ⇄  local API (node:http, 127.0.0.1)  ⇄  src/core  ⇄  Ma
 - **One contract.** Every API response is a document the [spec](spec.md) defines: a command's `--json` output (section 2), or a shared document ("Shared JSON documents"). The app, the CLI and agents read the same data in the same form.
 - **No logic in the server.** `src/server` parses requests, calls `src/core`, and serialises results. Business rules live in `src/core` only.
 - **No new runtime dependencies:** `node:http`, `node:fs`, `node:crypto`.
-- **The app is a static bundle** built at publish time into `dist/ui/` and served by `magpie ui`. Frontend libraries are devDependencies ([0022](decisions/0022-frontend-stack.md)).
+- **The app is a static bundle** built at publish time into `dist/ui/` and served by `magpie ui`. Frontend libraries are devDependencies ([0022](decisions/0022-frontend-stack.md), [0028](decisions/0028-the-graph-page.md)). Their licence notices ship beside the bundle, in `dist/ui/THIRD-PARTY-LICENSES.md`, and the icons' notice in `dist/ui/icons-LICENSE.txt`.
 - **Markdown stays the only source of truth.** The server holds only the session token and the search cache.
 
 Code layout: `src/server/` (the HTTP layer) and `ui/` (the app's source); see [architecture](architecture.md).
