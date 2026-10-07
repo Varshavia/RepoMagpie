@@ -71,6 +71,11 @@ export function noteEntries<T>(journal: string, name: string, version: number, d
   return { files, data };
 }
 
+// Shape checks for the `valid` argument of noteEntries.
+export const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+export const isTextOrNull = (v: unknown): boolean => v === null || typeof v === "string";
+export const isTexts = (v: unknown): boolean => Array.isArray(v) && v.every((item) => typeof item === "string");
+
 // Writes the cache whole, then renames it into place, so a reader never sees half a file.
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
   try {

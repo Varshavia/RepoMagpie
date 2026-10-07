@@ -183,3 +183,17 @@ test("link cache: .cache/links.json; unchanged notes come from it, changed and n
   rmSync(cacheFile);
   assert.deepEqual(linkIndex(j.root), next);
 });
+
+test("link cache: a cached entry of the wrong shape is read again from its note, and the cache rewritten", () => {
+  const j = journal();
+  const expected = linkIndex(j.root);
+  const cacheFile = join(j.root, ".cache", "links.json");
+  const good = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, Record<string, unknown>> };
+  const entry = good.data["npm--pdfkit.md"];
+  const link = (entry.links as Record<string, unknown>[])[0];
+  for (const wrong of ["nonsense", 42, [], { ...entry, links: "[[puppeteer]]" }, { ...entry, links: [{ ...link, target: 5 }] }, { ...entry, links: [{ ...link, from: null }] }, { ...entry, links: [null] }, { ...entry, name: 7 }, { ...entry, id: ["pkg:npm/pdfkit"] }]) {
+    writeFileSync(cacheFile, JSON.stringify({ ...good, data: { ...good.data, "npm--pdfkit.md": wrong } }));
+    assert.deepEqual(linkIndex(j.root), expected, JSON.stringify(wrong));
+    assert.deepEqual(JSON.parse(readFileSync(cacheFile, "utf8")), good, `rewritten after ${JSON.stringify(wrong)}`);
+  }
+});

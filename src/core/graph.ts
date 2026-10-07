@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { resolvedLinkIndex } from "./links.ts";
 import { readableId, readNote } from "./note.ts";
-import { noteEntries } from "./note-cache.ts";
+import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
 
 export type KindGroup = "skill-pack" | "tool" | "resource" | "other";
 export type EdgeType = "tagged" | "link" | "alternative" | "similar";
@@ -201,14 +201,11 @@ function similarPairs(notes: Entry[], isJoined: (a: number, b: number) => boolea
 }
 
 // Whether a cached value has an entry's shape (a damaged cache is read again from the note).
-function isEntry(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const e = value as Record<string, unknown>;
+function isEntry(e: unknown): boolean {
+  if (!isRecord(e)) return false;
   if (e.id === null) return true;
-  const textOrNull = (v: unknown) => v === null || typeof v === "string";
-  const texts = (v: unknown) => Array.isArray(v) && v.every((item) => typeof item === "string");
-  return typeof e.id === "string" && textOrNull(e.name) && textOrNull(e.kind) && (e.status === "inbox" || e.status === "reviewed") &&
-    typeof e.tried === "boolean" && (e.rating === null || Number.isInteger(e.rating)) && texts(e.tags) && textOrNull(e.language) && texts(e.topics);
+  return typeof e.id === "string" && isTextOrNull(e.name) && isTextOrNull(e.kind) && (e.status === "inbox" || e.status === "reviewed") &&
+    typeof e.tried === "boolean" && (e.rating === null || Number.isInteger(e.rating)) && isTexts(e.tags) && isTextOrNull(e.language) && isTexts(e.topics);
 }
 
 // One note's graph fields; no id for a note that can't be read (skipped, as in the link index).
