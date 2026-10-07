@@ -59,5 +59,5 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `id`: the note's PURL.
 - `from`: the note's file in the personal journal.
 - `to`: the copy in the project journal.
-- `install`: the install command for this project's package manager, or `null` when there is none or several.
+- `install`: the install command for this project's package manager, or `null` when there is none or several, or when the note's Verdict says to avoid the package.
 - `install_choices`: the commands to choose from when the repository publishes several packages; `[]` otherwise.

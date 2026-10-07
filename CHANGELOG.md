@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `magpie adopt` names no install command for a note whose Verdict says to avoid the package. It still copies the note, and says `Your note says to avoid pdfkit; no install command.` instead; `install` is `null` in `--json`. The app shows the same line. "Avoid when" text alone doesn't stop the command.
+
 ## [0.1.0-beta.1] - 2026-10-06
 
 The first pre-release, for early testers.

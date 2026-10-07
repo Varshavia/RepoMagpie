@@ -113,7 +113,7 @@ Shows what the user already has that fits a project.
 
 ### `magpie adopt <name>`
 
-Copies a note from the personal journal into the project journal and prints the install command. It never installs anything.
+Copies a note from the personal journal into the project journal and prints the install command, unless the note's Verdict says to avoid the package (step 5). It never installs anything.
 
 1. Resolve `<name>` (a name, a PURL, or a URL) to a PURL as section 4 says (`--type npm|pypi|cargo` settles a bare name), then to the note in the personal journal whose `id` or `packages` has it (schema rule 6). Not found: exit 1, with a hint to write the note first.
 2. Find the project journal (section 3). If there is none, create `.magpie/` at the git root, or in the working directory when there is no git root, and say so.
@@ -128,11 +128,13 @@ Copies a note from the personal journal into the project journal and prints the 
 | cargo | — | `cargo add` |
 | github | — | the note's `packages` decide: exactly one, that package's command; several, one command per package, to choose from; none, no command, and the repository URL |
 
+   If the note's Verdict says to avoid the package (it starts with the word "avoid", in any case), the note is still copied, but no install command is named: `Your note says to avoid <name>; no install command.` Only the Verdict counts here; "Avoid when" text lists situations, not the package, so it doesn't stop the command (unlike the avoid note of section 6, which also counts "Avoid when").
+
 6. On stderr: "The project journal is committed with the code; anyone who can read this repository can read this note."
 
-Output: the copy's path and `Install with: <command>` on stdout; for several packages, `This repository publishes 2 packages; install the one you need:` and one command per line; for a repository without packages, `No install command for a GitHub repository: <url>`. Messages on stderr.
+Output: the copy's path and `Install with: <command>` on stdout; for several packages, `This repository publishes 2 packages; install the one you need:` and one command per line; for a repository without packages, `No install command for a GitHub repository: <url>`; for a Verdict that says to avoid, `Your note says to avoid <name>; no install command.` Messages on stderr.
 
-`--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander", "install_choices": []}`. `id` is the note's own. `install` is the one command, or `null` when there is none or several; `install_choices` lists the commands when there are several, and is `[]` otherwise.
+`--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander", "install_choices": []}`. `id` is the note's own. `install` is the one command, or `null` when there is none, several, or the Verdict says to avoid; `install_choices` lists the commands when there are several, and is `[]` otherwise.
 
 ### `magpie recall <package>...`
 
