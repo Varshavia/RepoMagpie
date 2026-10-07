@@ -82,11 +82,6 @@ export function editableBody(body: string): string {
   return body.replace(DRAFT_MARKER, "").replace(/^(?:[ \t]*\r?\n)+/, "").trimEnd();
 }
 
-// Obsidian's URI for a file (docs/ui.md §12): the absolute path, URI-encoded.
-export function obsidianUri(path: string): string {
-  return `obsidian://open?path=${encodeURIComponent(path)}`;
-}
-
 // A path for people: under the home directory it starts with ~, as magpie recall and the hook print
 // it. The separator is the one the home directory uses (the app can't ask Node's path module).
 export function homePath(path: string, home: string | null): string {
