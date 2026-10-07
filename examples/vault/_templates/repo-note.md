@@ -12,6 +12,7 @@ tags: []
 tried: false
 rating: 
 status: inbox
+alternatives: []
 ---
 
 ## Verdict

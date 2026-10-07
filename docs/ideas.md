@@ -198,11 +198,10 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 ## Planned fields
 
-None of these are in the active schema or the template yet. Each joins the [note schema](note-schema.md) when its release starts. `packages` joined the active schema in v1, as a list of PURLs.
+None of these are in the active schema or the template yet. Each joins the [note schema](note-schema.md) when its release starts. `packages` joined the active schema in v1, as a list of PURLs; `alternatives` in v0.2 ([decision 0027](decisions/0027-alternatives-active.md)).
 
 | Field | Owner | Type | For | Target |
 |---|---|---|---|---|
-| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.2, part 1 ([decision 0027](decisions/0027-alternatives-active.md), accepted) |
 | `works_with` | human | list of wikilinks | typed edges | not scheduled ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed) |
 | `reviewed_commit` | tool | commit SHA | drift | v0.3 |
 | `public` | human | bool, default `false` | nests | v0.4 |

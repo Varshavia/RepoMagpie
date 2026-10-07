@@ -1,16 +1,27 @@
 // The right pane: one note (docs/ui.md §7, "Note view"), and the inbox review's Verdict editor.
-// The Verdict leads; then Use when and Avoid when, the other sections, skill lines, metadata and
-// actions. Every write sends the version the note was read with; a 409 shows the conflict banner.
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope } from "../api.ts";
+// The Verdict leads; then Use when and Avoid when, the other sections, skill lines, "Linked from",
+// metadata and actions. Every write sends the version the note was read with; a 409 shows the
+// conflict banner. [[Links]] open the note they resolve to, as core resolved them.
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { formOf, patchFor, triedLine, type Form, type Patch } from "../logic/edits.ts";
+import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
+import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
-import { editableBody, firstEntries, homePath, isBlank, parseBody, type Block, type Inline } from "../logic/text.ts";
+import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
+import { Alternatives } from "./Alternatives.tsx";
+import { LinkTextarea } from "./LinkTextarea.tsx";
 import { ReviewForm } from "./ReviewForm.tsx";
+
+// What a [[link]] in the note needs: the note's resolved links, and where a click goes.
+const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void } | null>(null);
+
+// A plain click opens the note in the app; a click with a modifier, or the middle button, is left to
+// the browser (a new tab opens the same note from its address).
+const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 export interface NotePaneProps {
   journal: Scope;
@@ -32,6 +43,10 @@ export interface NotePaneProps {
   project: ProjectState; // "none": no project to adopt into
   onAdopted: () => void;
   onOpenNote: (journal: Scope, id: string) => void;
+  linkNotes: LinkNote[]; // the journal's notes, for the [[ autocomplete
+  onFollowLink: (journal: Scope, from: string | null, to: string) => void; // a [[link]] or "Linked from"
+  onAddNote: (target: string) => void; // an unresolved link: Add, with the target filled in
+  onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
 }
 
 type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
@@ -46,7 +61,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote } = props;
+  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onTagList } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -93,14 +108,19 @@ export function NotePane(props: NotePaneProps) {
   }, [drafts, noteKey]);
 
   // Live updates: a change on disk reloads the note, unless you are editing it; then the conflict
-  // banner says so before you save.
+  // banner says so before you save. A change to any other note in the journal can change this
+  // note's links and backlinks; those refresh, and nothing else.
   useEffect(() => {
     const n = latest.current.note;
-    if (!live.tick || !n?.file || (live.files.length && !live.files.includes(n.file))) return;
+    if (!live.tick || !n?.file) return;
     let current = true;
     api.note(journal, address).then(
       (doc) => {
-        if (!current || doc.version === n.version) return;
+        if (!current) return;
+        if (doc.version === n.version) {
+          setNote((shown) => (shown && shown.version === doc.version ? { ...shown, links: doc.links, backlinks: doc.backlinks } : shown));
+          return;
+        }
         const { form: f, section: s } = latest.current;
         if ((f && patchFor(n, f)) || s) setConflict(doc);
         else {
@@ -198,6 +218,40 @@ export function NotePane(props: NotePaneProps) {
     if (await submit({ journal, id: note.id, version: note.version, sections: { [section.name]: section.text.trimEnd() } }, `${section.name} saved`)) setSection(null);
   }
 
+  // "From GitHub topics": the tag goes into the form, saved with it; a tag tags.md doesn't list is
+  // appended there now, on this click (schema rule 5).
+  async function addTopic(tag: string) {
+    setSaveError(null);
+    if (!tagList.includes(tag)) {
+      try {
+        onTagList(await api.addTags(journal, [tag]));
+      } catch (error) {
+        setSaveError((error as ApiError).message);
+        return;
+      }
+    }
+    setForm((f) => (f && !f.tags.includes(tag) ? { ...f, tags: [...f.tags, tag] } : f));
+  }
+
+  // The alternatives row saves on its own; an unsaved Verdict edit stays in the form.
+  async function saveAlternatives(targets: string[], message: string): Promise<string | null> {
+    if (!note?.id || !note.version) return "This note can't be edited here.";
+    setSaving(true);
+    try {
+      const doc = await api.patch({ journal, id: note.id, version: note.version, fields: { alternatives: targets } });
+      setNote(doc);
+      setConflict(null);
+      onSaved(doc, message);
+      return null;
+    } catch (error) {
+      const e = error as ApiError;
+      if (e.status === 409 && e.document) setConflict(e.document as NoteJson);
+      return e.message;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function accept(sectionName: string) {
     if (!note?.id || !note.version) return;
     await submit({ journal, id: note.id, version: note.version, accept_drafts: [sectionName] }, `${sectionName} accepted`);
@@ -274,9 +328,12 @@ export function NotePane(props: NotePaneProps) {
   const shown = [...missing, ...sections]
     .filter((s) => (ALWAYS.includes(s.name ?? "") || !isBlank(s.body)) && !context.includes(s))
     .sort((a, b) => rank(a.name) - rank(b.name));
+  const linking = { journal, links: note.links, open: (to: string) => onFollowLink(journal, note.id, to), add: onAddNote };
+  const linkedFrom = backlinkGroups(note.backlinks);
 
   return (
     <Shell onBack={onBack}>
+      <Links.Provider value={linking}>
       <article className="note" ref={articleRef} tabIndex={-1} aria-labelledby="note-title">
         <header className="note-head">
           <div className="note-title-row">
@@ -427,6 +484,10 @@ export function NotePane(props: NotePaneProps) {
               saving={saving}
               dirty={patch !== null}
               error={saveError}
+              linkNotes={linkNotes}
+              self={note.id}
+              topics={topicSuggestions(note.frontmatter.topics, form.tags, note.id)}
+              onAddTopic={(tag) => void addTopic(tag)}
               verdictRef={verdictRef}
               verdictChanged={patch?.verdict !== undefined}
               onEditTags={editTagList}
@@ -456,10 +517,28 @@ export function NotePane(props: NotePaneProps) {
                   </div>
                 )}
               </div>
-              {note.verdict ? <p className="verdict-hero">{note.verdict}</p> : <p className="verdict-hero empty">No verdict yet.</p>}
+              {note.verdict ? (
+                <p className="verdict-hero">
+                  <Inlines parts={parseInline(note.verdict)} />
+                </p>
+              ) : (
+                <p className="verdict-hero empty">No verdict yet.</p>
+              )}
             </>
           )}
         </section>
+
+        <Alternatives
+          alternatives={alternativesOf(note.links)}
+          alternativeTo={alternativeTo(note.backlinks)}
+          notes={linkNotes}
+          self={note.id}
+          editable={!note.read_only && note.id !== null}
+          saving={saving}
+          onSave={saveAlternatives}
+          link={(target, text) => <WikiLink target={target} text={text} />}
+          noteLink={(id, text) => <NoteLink id={id}>{text}</NoteLink>}
+        />
 
         {shown.map((s) => {
           const label = s.name ?? s.heading;
@@ -490,6 +569,8 @@ export function NotePane(props: NotePaneProps) {
               {isEditing ? (
                 <SectionEditor
                   label={label}
+                  notes={linkNotes}
+                  self={note.id}
                   text={section.text}
                   onChange={(t) => setSection({ name: label, text: t })}
                   onSave={saveSection}
@@ -518,6 +599,28 @@ export function NotePane(props: NotePaneProps) {
           </section>
         ) : null}
 
+        {note.read_only ? null : (
+          <section className="section" aria-labelledby="section-linked-from">
+            <div className="section-head">
+              <h3 className="section-label" id="section-linked-from">
+                Linked from
+              </h3>
+            </div>
+            {linkedFrom.length ? (
+              <ul className="backlinks">
+                {linkedFrom.map((g) => (
+                  <li key={g.id}>
+                    <NoteLink id={g.id}>{g.name ?? readablePurl(g.id)}</NoteLink>
+                    <span className="backlink-places">{g.places.join(", ")}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="prose muted">No other note links here.</p>
+            )}
+          </section>
+        )}
+
         <footer className="note-foot">
           {note.path ? (
             <span className="mono" translate="no">
@@ -527,6 +630,7 @@ export function NotePane(props: NotePaneProps) {
           {text("explored") ? <span>Explored {text("explored")}</span> : null}
         </footer>
       </article>
+      </Links.Provider>
     </Shell>
   );
 }
@@ -573,7 +677,7 @@ function Chips({ kind, license, language, packages, tags }: { kind: string | nul
   );
 }
 
-function SectionEditor(props: { label: string; text: string; onChange: (text: string) => void; onSave: () => void; onCancel: () => void; saving: boolean; error: string | null; draft: boolean }) {
+function SectionEditor(props: { label: string; notes: LinkNote[]; self: string | null; text: string; onChange: (text: string) => void; onSave: () => void; onCancel: () => void; saving: boolean; error: string | null; draft: boolean }) {
   return (
     <div
       className="review"
@@ -589,11 +693,15 @@ function SectionEditor(props: { label: string; text: string; onChange: (text: st
         }
       }}
     >
-      <textarea
+      <LinkTextarea
         className="textarea"
         rows={Math.min(12, Math.max(3, props.text.split("\n").length + 1))}
         value={props.text}
-        onChange={(e) => props.onChange(e.target.value)}
+        onValueChange={props.onChange}
+        notes={props.notes}
+        self={props.self}
+        name={slug(props.label)}
+        autoComplete="off"
         aria-label={props.label}
         autoFocus
       />
@@ -722,6 +830,8 @@ function Inlines({ parts }: { parts: Inline[] }) {
       {parts.map((p, i) =>
         p.kind === "code" ? (
           <code key={i}>{p.text}</code>
+        ) : p.kind === "wikilink" ? (
+          <WikiLink key={i} target={p.target} text={p.text} />
         ) : p.kind === "link" ? (
           <a key={i} href={p.href} target="_blank" rel="noreferrer">
             {p.text}
@@ -731,6 +841,65 @@ function Inlines({ parts }: { parts: Inline[] }) {
         ),
       )}
     </>
+  );
+}
+
+// A [[link]], as core resolved it: an in-app link to the note; or, unresolved, muted with a dashed
+// underline and its reason in the title and in words for screen readers. A missing one opens Add.
+// A link core doesn't know (it can't happen while the app and core find the same links) stays text.
+function WikiLink({ target, text }: { target: string; text: string }) {
+  const context = useContext(Links);
+  const link = context ? linkFor(context.links, target) : null;
+  if (!context || !link) return <>{text}</>;
+  const { id } = link;
+  if (id) {
+    return (
+      <a
+        className="wikilink"
+        href={noteHash(context.journal, id)}
+        onClick={(e) => {
+          if (!plainClick(e)) return;
+          e.preventDefault();
+          context.open(id);
+        }}
+      >
+        <span translate="no">{linkText(link)}</span>
+      </a>
+    );
+  }
+  const why = unresolvedTitle(link);
+  if (link.reason === "missing") {
+    return (
+      <button type="button" className="wikilink unresolved" title={why} onClick={() => context.add(link.target)}>
+        <span translate="no">{linkText(link)}</span>
+        <span className="visually-hidden">{` (${why}. Add it.)`}</span>
+      </button>
+    );
+  }
+  return (
+    <span className="wikilink unresolved" title={why}>
+      <span translate="no">{linkText(link)}</span>
+      <span className="visually-hidden">{` (${why})`}</span>
+    </span>
+  );
+}
+
+// A link to another note of this journal ("Linked from", "Alternative to").
+function NoteLink({ id, children }: { id: string; children: ReactNode }) {
+  const context = useContext(Links);
+  if (!context) return <>{children}</>;
+  return (
+    <a
+      href={noteHash(context.journal, id)}
+      onClick={(e) => {
+        if (!plainClick(e)) return;
+        e.preventDefault();
+        context.open(id);
+      }}
+      translate="no"
+    >
+      {children}
+    </a>
   );
 }
 

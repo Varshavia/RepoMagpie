@@ -513,8 +513,45 @@ test("setHumanFields keeps CRLF line endings", () => {
   assert.equal(r.text, crlf.replace("tags:\r\n  - pdf\r\n", "tags:\r\n  - pdf\r\n  - testing\r\n").replace("rating:\r\n", "rating: 2\r\n"));
 });
 
+// alternatives (decision 0027): targets in, quoted wikilinks written; an empty list removes the key.
+test("alternatives: a new key at the end of the frontmatter, each target written as a quoted wikilink", () => {
+  const r = setHumanFields(HAND_WRITTEN, { alternatives: ["npm--puppeteer", " pdf-lib "] });
+  assert.equal(r.text, HAND_WRITTEN.replace("status: reviewed\n---", 'status: reviewed\nalternatives: ["[[npm--puppeteer]]", "[[pdf-lib]]"]\n---'));
+  assert.deepEqual(r.warnings, []);
+  assert.deepEqual(readNote(r.text).frontmatter.alternatives, ["[[npm--puppeteer]]", "[[pdf-lib]]"]);
+});
+
+test("alternatives: replaced in place; a block list stays a block list, its comments and the rest byte for byte", () => {
+  const flow = HAND_WRITTEN.replace("rating:\n", 'rating:\nalternatives: ["[[npm--puppeteer]]"] # mine\n');
+  assert.equal(setHumanFields(flow, { alternatives: ["npm--puppeteer", "zod"] }).text, flow.replace('["[[npm--puppeteer]]"]', '["[[npm--puppeteer]]", "[[zod]]"]'));
+  const block = HAND_WRITTEN.replace("rating:\n", 'rating:\nalternatives:\n  - "[[npm--puppeteer]]"\n');
+  assert.equal(setHumanFields(block, { alternatives: ["npm--puppeteer", "zod"] }).text, block.replace('  - "[[npm--puppeteer]]"\n', '  - "[[npm--puppeteer]]"\n  - "[[zod]]"\n'));
+});
+
+test("alternatives: an empty list removes the key and its line; nothing else changes", () => {
+  const before = HAND_WRITTEN.replace("rating:\n", "rating:\n");
+  for (const written of ['alternatives: ["[[npm--puppeteer]]"]\n', 'alternatives: ["[[npm--puppeteer]]"]   # a comment\n', 'alternatives:\n  - "[[a]]"\n  - "[[b]]"\n', "alternatives: []\n", "alternatives:\n"]) {
+    const text = before.replace("rating:\n", `rating:\n${written}`);
+    const r = setHumanFields(text, { alternatives: [] });
+    assert.equal(r.text, before, JSON.stringify(written));
+    assert.equal(r.changed, true);
+  }
+  // As the last key, and with CRLF.
+  const last = HAND_WRITTEN.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[zod]]"]\n');
+  assert.equal(setHumanFields(last, { alternatives: [] }).text, HAND_WRITTEN);
+  const crlf = HAND_WRITTEN.replace("rating:\n", 'rating:\nalternatives: ["[[zod]]"]\n').replace(/\n/g, "\r\n");
+  assert.equal(setHumanFields(crlf, { alternatives: [] }).text, HAND_WRITTEN.replace(/\n/g, "\r\n"));
+  // No key and an empty list: nothing to do.
+  const none = setHumanFields(HAND_WRITTEN, { alternatives: [] });
+  assert.equal(none.text, HAND_WRITTEN);
+  assert.equal(none.changed, false);
+});
+
 test("invalid values, tool-owned keys and status are refused; nothing changes", () => {
-  const cases = [{ kind: "gadget" }, { tags: ["Not Kebab"] }, { tags: "pdf" }, { tried: "yes" }, { rating: 6 }, { rating: 2.5 }, { name: "PDFKit" }, { status: "inbox" }];
+  const cases = [
+    { kind: "gadget" }, { tags: ["Not Kebab"] }, { tags: "pdf" }, { tried: "yes" }, { rating: 6 }, { rating: 2.5 }, { name: "PDFKit" }, { status: "inbox" },
+    { alternatives: "npm--zod" }, { alternatives: [1] }, { alternatives: [""] }, { alternatives: ["  "] }, { alternatives: ["[[zod]]"] }, { alternatives: ["zod|Zod"] }, { alternatives: ["zod#Verdict"] }, { alternatives: ["two\nlines"] },
+  ];
   for (const values of cases) {
     const r = setHumanFields(HAND_WRITTEN, values as never);
     assert.equal(r.text, HAND_WRITTEN, JSON.stringify(values));

@@ -1,29 +1,33 @@
 // Add (docs/ui.md §7): paste a URL, PURL or name; see the preview; write the Verdict; save. The same
 // logic as magpie note, through POST /api/note/preview and POST /api/note.
-import { useId, useState } from "react";
-import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope } from "../api.ts";
+import { useId, useState, type ReactNode } from "react";
+import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { oneLine } from "../logic/edits.ts";
+import { oneLine, topicSuggestions } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, FieldError } from "./common.tsx";
-import { JournalChoice, TypeChoice, type ProjectState } from "./fields.tsx";
+import { JournalChoice, TopicChips, TypeChoice, type ProjectState } from "./fields.tsx";
 
 interface Props {
   project: ProjectState;
   defaultJournal: Scope;
+  initialTarget?: string; // from an unresolved [[link]]
   onOpenNote: (journal: Scope, id: string) => void;
   onSaved: (journal: Scope) => void;
+  noTagList: (journal: Scope) => boolean; // the journal has no tags.md
+  onCreateTagList: (journal: Scope) => void;
+  onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
 }
 
-export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props) {
+export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, onSaved, noTagList, onCreateTagList, onTagList }: Props) {
   const id = useId();
-  const [target, setTarget] = useState("");
+  const [target, setTarget] = useState(initialTarget ?? "");
   const [to, setTo] = useState<Scope>(defaultJournal);
   const [type, setType] = useState<PackageType | "">("");
   const [verdict, setVerdict] = useState("");
   const [preview, setPreview] = useState<NotePreviewJson | null>(null);
-  const [busy, setBusy] = useState<"" | "preview" | "save">("");
+  const [busy, setBusy] = useState<"" | "preview" | "save" | "topic">("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedNoteJson | null>(null);
 
@@ -46,6 +50,21 @@ export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props)
       setPreview(await api.preview(request));
     } catch (e) {
       setPreview(null);
+      setError((e as ApiError).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // "From GitHub topics": a picked topic joins tags.md now, so the save drafts it as a tag, as
+  // magpie note drafts the topics the list has (spec §2).
+  async function addTopic(tag: string) {
+    setBusy("topic");
+    setError(null);
+    try {
+      onTagList(await api.addTags(to, [tag]));
+      setPreview((p) => (p && !p.tags.includes(tag) ? { ...p, tags: [...p.tags, tag].sort() } : p));
+    } catch (e) {
       setError((e as ApiError).message);
     } finally {
       setBusy("");
@@ -126,7 +145,13 @@ export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props)
         </div>
       </form>
 
-      {preview ? <Preview preview={preview} onOpen={() => preview.id && onOpenNote(to, preview.id)} /> : null}
+      {preview ? (
+        <Preview preview={preview} onOpen={() => preview.id && onOpenNote(to, preview.id)}>
+          {preview.exists ? null : (
+            <TopicChips topics={topicSuggestions(preview.topics, preview.tags, preview.id)} noTagList={noTagList(to)} busy={busy !== ""} onAdd={(tag) => void addTopic(tag)} onCreateTagList={() => onCreateTagList(to)} />
+          )}
+        </Preview>
+      ) : null}
 
       <div className="page-section">
         <div className="field">
@@ -176,7 +201,7 @@ export function AddPage({ project, defaultJournal, onOpenNote, onSaved }: Props)
   );
 }
 
-function Preview({ preview, onOpen }: { preview: NotePreviewJson; onOpen: () => void }) {
+function Preview({ preview, onOpen, children }: { preview: NotePreviewJson; onOpen: () => void; children?: ReactNode }) {
   const packages = preview.packages.map((p) => packageLabel(p).name);
   const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...packages].filter((c): c is string => Boolean(c));
   const id = preview.id && readablePurl(preview.id);
@@ -222,6 +247,7 @@ function Preview({ preview, onOpen }: { preview: NotePreviewJson; onOpen: () => 
           ))}
         </ul>
       ) : null}
+      {children}
       {preview.skills.length ? <p className="field-help">{`${preview.skills.length} ${preview.skills.length === 1 ? "skill" : "skills"}: ${preview.skills.join(", ")}`}</p> : null}
       {preview.warnings.map((w) => (
         <Banner tone="warning" key={w}>

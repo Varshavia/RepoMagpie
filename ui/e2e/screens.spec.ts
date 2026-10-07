@@ -41,6 +41,26 @@ test("note view", async ({ page, magpie }) => {
   await shoot(page, "02-note-view");
 });
 
+test("links: a resolved link, an unresolved one, the [[ autocomplete and Linked from", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await allNotes(page);
+  await page.getByRole("option", { name: /^zod/ }).click();
+  await expect(page.getByRole("region", { name: "Related" }).getByRole("link", { name: "commander" })).toBeVisible();
+  await page.getByRole("region", { name: "Related" }).scrollIntoViewIfNeeded();
+  await shoot(page, "18-links-resolved");
+  await page.getByRole("option", { name: /^pdfkit/ }).click();
+  await expect(page.getByRole("region", { name: "My notes" }).getByRole("button", { name: /^puppeteer/ })).toBeVisible();
+  await page.getByRole("button", { name: "Edit Related" }).click();
+  await page.getByRole("textbox", { name: "Related" }).pressSequentially("- [[v");
+  await expect(page.getByRole("listbox", { name: "Notes to link" })).toBeVisible();
+  await shoot(page, "19-links-unresolved-and-autocomplete");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.getByRole("option", { name: /^commander/ }).click();
+  await page.getByRole("region", { name: "Linked from" }).scrollIntoViewIfNeeded();
+  await shoot(page, "20-linked-from");
+});
+
 test("search", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.keyboard.press("/");

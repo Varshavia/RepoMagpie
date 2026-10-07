@@ -91,6 +91,174 @@ test("note view: My notes and Related are there when empty; My notes keeps multi
   await expect(page.getByRole("region", { name: "Related" }).getByText("Nothing yet.")).toBeVisible();
 });
 
+test("note view: no Open in Obsidian; Open in editor stays (decision 0026)", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("option", { name: /microsoft\/playwright-cli/ }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
+  const actions = page.locator(".note-head .actions");
+  await expect(actions.getByRole("button", { name: "Open in editor" })).toBeVisible();
+  await expect(page.getByText(/Obsidian/)).toHaveCount(0);
+  await expect(page.locator('a[href^="obsidian:"]')).toHaveCount(0);
+});
+
+// Opens a personal note through search, as a person would.
+async function openByName(page: import("@playwright/test").Page, query: string, name: string) {
+  await page.keyboard.press("/");
+  await page.keyboard.type(query);
+  await page.getByRole("listbox", { name: "Search results" }).getByRole("option").filter({ hasText: name }).first().click();
+  await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+}
+
+test("links: [[ autocomplete writes the link; it opens the note, which lists the link under Linked from; Back returns", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openByName(page, "pdfkit", "pdfkit");
+  await page.getByRole("button", { name: "Edit My notes" }).click();
+  const editor = page.getByRole("textbox", { name: "My notes" });
+  await editor.pressSequentially("Compare with [[playw");
+  const options = page.getByRole("listbox", { name: "Notes to link" }).getByRole("option");
+  await expect(options.first()).toContainText("microsoft/playwright-cli");
+  await expect(editor).toHaveAttribute("aria-activedescendant", (await options.first().getAttribute("id")) ?? "");
+  await expect(page.getByRole("status").filter({ hasText: "to link. Up and down to choose" })).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(editor).toHaveValue("Compare with [[github--microsoft--playwright-cli|microsoft/playwright-cli]]");
+  await expect(page.getByRole("listbox", { name: "Notes to link" })).toHaveCount(0);
+  await page.keyboard.type(" and [[tast");
+  await expect(options.first()).toContainText("taste-skill");
+  await page.keyboard.press("Escape"); // closes the list, leaves the text, keeps the editor open
+  await expect(page.getByRole("listbox", { name: "Notes to link" })).toHaveCount(0);
+  await expect(editor).toHaveValue("Compare with [[github--microsoft--playwright-cli|microsoft/playwright-cli]] and [[tast");
+  await editor.fill("Compare with [[github--microsoft--playwright-cli|microsoft/playwright-cli]].");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("My notes saved")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md"), "utf8")).toContain("## My notes\nCompare with [[github--microsoft--playwright-cli|microsoft/playwright-cli]].\n");
+
+  await page.getByRole("region", { name: "My notes" }).getByRole("link", { name: "microsoft/playwright-cli" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
+  const linkedFrom = page.getByRole("region", { name: "Linked from" });
+  await expect(linkedFrom.getByRole("listitem")).toHaveText(["pdfkitin My notes"]);
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Linked from" }).getByText("No other note links here.")).toBeVisible();
+});
+
+test("links: an unresolved link is marked in words, not by colour alone; a missing one opens Add with the target", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("## Related\n", "## Related\n- [[puppeteer|Puppeteer]] instead\n"));
+  await magpie.open(page);
+  await openByName(page, "pdfkit", "pdfkit");
+  const link = page.getByRole("region", { name: "Related" }).getByRole("button", { name: /^Puppeteer/ });
+  await expect(link).toHaveAttribute("title", "No note named “puppeteer” in this journal");
+  await expect(link).toHaveAccessibleName("Puppeteer (No note named “puppeteer” in this journal. Add it.)");
+  await expect(link).toHaveCSS("text-decoration-style", "dashed");
+  await link.click();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a note" })).toBeVisible();
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("puppeteer");
+});
+
+test("links: Linked from refreshes when another note links here on disk", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openByName(page, "playwright", "microsoft/playwright-cli");
+  await expect(page.getByRole("region", { name: "Linked from" }).getByText("No other note links here.")).toBeVisible();
+  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("## Related\n", "## Related\n- [[github--microsoft--playwright-cli]]\n"));
+  await expect(page.getByRole("region", { name: "Linked from" }).getByRole("link", { name: "pdfkit" })).toBeVisible({ timeout: 10_000 });
+});
+
+test("alternatives: add a note and a name without one, see the relation on both notes, remove them; the file is as before", async ({ page, magpie }) => {
+  const file = magpie.note("npm--pdfkit.md");
+  await magpie.open(page);
+  await openByName(page, "pdfkit", "pdfkit");
+  const row = page.getByRole("region", { name: "Alternatives" });
+  await row.getByRole("button", { name: "Add an alternative" }).click();
+  const box = page.getByRole("combobox", { name: /^Add an alternative/ });
+  await expect(box).toBeFocused();
+  await box.pressSequentially("playw");
+  await expect(page.getByRole("listbox", { name: "Alternatives to add" }).getByRole("option").first()).toContainText("microsoft/playwright-cli");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").getByText("microsoft/playwright-cli added as an alternative")).toBeVisible();
+  expect(readFileSync(file, "utf8")).toBe(PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli]]"]\n'));
+
+  await row.getByRole("button", { name: "Add an alternative" }).click();
+  await box.fill("wkhtmltopdf");
+  await expect(page.getByRole("option", { name: "Add “wkhtmltopdf”, no note yet" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(row.getByRole("button", { name: /^wkhtmltopdf/ })).toHaveAttribute("title", "No note named “wkhtmltopdf” in this journal");
+
+  await row.getByRole("link", { name: "microsoft/playwright-cli" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Alternatives" }).getByText("Alternative to:")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Alternatives" }).getByRole("link", { name: "pdfkit" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Linked from" }).getByRole("listitem")).toHaveText(["pdfkitas an alternative"]);
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  const both = readFileSync(file, "utf8");
+  await row.getByRole("button", { name: "Remove microsoft/playwright-cli from alternatives" }).click();
+  await expect(page.getByRole("status").getByText("microsoft/playwright-cli removed from alternatives")).toBeVisible();
+  // Undo puts it back where it was.
+  await row.getByRole("button", { name: "Undo" }).click();
+  await expect(row.getByRole("listitem").first()).toContainText("microsoft/playwright-cli");
+  expect(readFileSync(file, "utf8")).toBe(both);
+  await row.getByRole("button", { name: "Remove microsoft/playwright-cli from alternatives" }).click();
+  await expect(row.getByRole("button", { name: "Undo" })).toBeVisible();
+  await row.getByRole("button", { name: "Remove wkhtmltopdf from alternatives" }).click();
+  await expect(row.getByRole("listitem")).toHaveCount(0);
+  expect(readFileSync(file, "utf8")).toBe(PDFKIT);
+});
+
+test("topics: a chip in the review adds the tag and appends it to tags.md; the rest of tags.md stays", async ({ page, magpie }) => {
+  const tagsFile = join(magpie.journal, "tags.md");
+  const before = readFileSync(tagsFile, "utf8");
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 2, name: "Egonex-AI/Understand-Anything" })).toBeVisible();
+  const topics = page.getByRole("group", { name: "From GitHub topics" });
+  // GitHub's order, at most 8, none the note has as a tag.
+  await expect(topics.getByRole("button")).toHaveText(["antigravity-skills", "business-knowledge", "claude-code", "claude-skills", "codebase-analysis", "codex", "codex-skills", "developer-tools-ai-agent"]);
+  await topics.getByRole("button", { name: "Add tag claude-code" }).click();
+  await expect(page.getByRole("group", { name: "Tags" }).getByRole("button", { name: "claude-code" })).toHaveAttribute("aria-pressed", "true");
+  await expect(topics.getByRole("button", { name: "Add tag claude-code" })).toHaveCount(0);
+  expect(readFileSync(tagsFile, "utf8")).toBe(`${before}- \`claude-code\`\n`);
+  await page.getByRole("textbox", { name: "Verdict" }).fill("fine for a first look at a codebase");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("Verdict saved")).toBeVisible();
+  expect(readFileSync(magpie.note("github--egonex-ai--understand-anything.md"), "utf8")).toMatch(/^tags: \[agent-skills, code-understanding, claude-code\]$/m);
+});
+
+test("topics: without tags.md the chips wait for Create tag list", async ({ page, magpie }) => {
+  rmSync(join(magpie.journal, "tags.md"));
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  const chip = page.getByRole("group", { name: "From GitHub topics" }).getByRole("button", { name: "Add tag codex", exact: true });
+  await expect(chip).toBeDisabled();
+  await expect(page.getByText("This journal has no tag list yet. Create it first")).toBeVisible();
+  await page.getByRole("button", { name: "Create tag list" }).first().click();
+  await expect(chip).toBeEnabled();
+  await chip.click();
+  expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toBe(`${STARTER_TAGS}- \`codex\`\n`);
+});
+
+test("topics: in the Add preview a chip appends the topic to tags.md and shows it among the preview's tags", async ({ page, magpie }) => {
+  // No network in these tests: the preview of a GitHub URL is served here.
+  await page.route("**/api/note/preview", (route) =>
+    route.fulfill({
+      json: {
+        id: "pkg:github/acme/widget", journal: "personal", path: null, exists: false, verdict: null, name: "acme/widget", url: "https://github.com/acme/widget",
+        what_it_does: "Widgets.", language: "TypeScript", license: "MIT", topics: ["widget", "testing", "charts"], kind: "library", tags: ["testing"], packages: [], skills: [], warnings: [],
+      },
+    }),
+  );
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel("Package, PURL or GitHub URL").fill("https://github.com/acme/widget");
+  await page.getByRole("button", { name: "Preview" }).click();
+  const topics = page.getByRole("group", { name: "From GitHub topics" });
+  await expect(topics.getByRole("button")).toHaveText(["charts"]); // not the repository's name, not a tag it has
+  await topics.getByRole("button", { name: "Add tag charts" }).click();
+  await expect(page.getByRole("region", { name: "Preview" }).getByText("charts", { exact: true })).toBeVisible();
+  await expect(topics).toHaveCount(0);
+  expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toMatch(/- `charts`\n$/);
+});
+
 test("search: / focuses the box, Verdicts first, Enter opens the note; the status filter applies", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.keyboard.press("/");
@@ -506,6 +674,8 @@ test.describe("2,000 notes", () => {
     await expect(firstRow).toBeVisible();
     const cold = Date.now() - started;
     await expect(page.getByRole("button", { name: "All notes, 2000 notes" })).toBeVisible();
+    // The first note open too: its links come from the link cache, which this run builds.
+    await expect(page.locator("#note-title")).toBeVisible();
 
     await page.context().clearCookies();
     started = Date.now();

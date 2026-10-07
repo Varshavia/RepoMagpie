@@ -46,5 +46,5 @@ test("browser shortcuts pass through: Ctrl or Alt with any other key does nothin
 });
 
 test("the map shown with ? lists every key of docs/ui.md §7", () => {
-  assert.deepEqual(KEY_MAP.map((row) => row.keys), ["Ctrl/Cmd+K", "/", "j / k", "Enter", "e", "Ctrl+Enter", "Esc", "g i / g s", "?"]);
+  assert.deepEqual(KEY_MAP.map((row) => row.keys), ["Ctrl/Cmd+K", "/", "j / k", "Enter", "e", "Ctrl+Enter", "[[", "Esc", "g i / g s", "?"]);
 });

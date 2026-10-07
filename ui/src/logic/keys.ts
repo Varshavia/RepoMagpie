@@ -37,6 +37,7 @@ export const KEY_MAP: { keys: string; does: string }[] = [
   { keys: "Enter", does: "Open the selected note" },
   { keys: "e", does: "Edit the Verdict" },
   { keys: "Ctrl+Enter", does: "Save" },
+  { keys: "[[", does: "In an editor: link a note (↑ / ↓ choose, Enter or Tab inserts, Esc closes the list)" },
   { keys: "Esc", does: "Close the palette or editor; back to the list" },
   { keys: "g i / g s", does: "Go to Inbox / Search" },
   { keys: "?", does: "Show the keyboard map" },

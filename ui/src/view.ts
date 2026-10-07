@@ -7,7 +7,7 @@ export type View =
   | { page: "kind"; value: string }
   | { page: "tag"; value: string }
   | { page: "search" }
-  | { page: "add" }
+  | { page: "add"; target?: string } // target: from an unresolved [[link]]
   | { page: "import" }
   | { page: "recall" }
   | { page: "suggest" }

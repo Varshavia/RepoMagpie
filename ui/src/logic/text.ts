@@ -1,31 +1,45 @@
-// A section's Markdown body as plain data for React: bullet lists, lines, code spans and links. HTML
-// comments (the draft marker among them) are not shown. No HTML is built from note text.
+// A section's Markdown body as plain data for React: bullet lists, lines, code spans, links and
+// [[wikilinks]]. HTML comments (the draft marker among them) are not shown. No HTML is built from
+// note text. Wikilinks are found by core's rules (src/core/links.ts; text.test.ts keeps them equal):
+// none in fenced code blocks or code spans.
 import { DRAFT_MARKER } from "./schema.ts";
 
-export type Inline = { kind: "text"; text: string } | { kind: "code"; text: string } | { kind: "link"; text: string; href: string };
+export type Inline =
+  | { kind: "text"; text: string }
+  | { kind: "code"; text: string }
+  | { kind: "link"; text: string; href: string }
+  | { kind: "wikilink"; target: string; label: string | null; text: string };
 export type Block = { kind: "list"; items: Inline[][] } | { kind: "lines"; lines: Inline[][] };
 
 const COMMENT = /<!--[\s\S]*?-->/g;
 const BULLET = /^\s*[-*+]\s+(.*)$/;
-const INLINE = /`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)/g;
+const FENCE = /^(```|~~~)/;
+// A code span (a run of backticks, up to a run of the same length), a wikilink, a Markdown link, a
+// bare link.
+const INLINE = /(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)|\[\[([^[\]\n]*)\]\]|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)/g;
 
 export function parseBody(body: string): Block[] {
   const blocks: Block[] = [];
   let current = null as Block | null;
+  let fence: string | null = null;
   for (const raw of body.replace(COMMENT, "").split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) {
       current = null;
       continue;
     }
-    const bullet = line.match(BULLET);
+    // A fenced code block's lines, its fences too, are shown as plain lines.
+    const mark = line.match(FENCE)?.[1];
+    if (mark) fence = fence === null ? mark : fence === mark ? null : fence;
+    const plain = Boolean(mark || fence);
+    const bullet = plain ? null : line.match(BULLET);
     const kind = bullet ? "list" : "lines";
     if (current?.kind !== kind) {
       current = kind === "list" ? { kind: "list", items: [] } : { kind: "lines", lines: [] };
       blocks.push(current);
     }
     if (current.kind === "list") current.items.push(parseInline(bullet ? bullet[1] : line));
-    else current.lines.push(parseInline(line));
+    else current.lines.push(plain ? [{ kind: "text", text: line }] : parseInline(line));
   }
   return blocks;
 }
@@ -42,13 +56,19 @@ export function parseInline(text: string): Inline[] {
   for (const m of text.matchAll(INLINE)) {
     pushText(text.slice(at, m.index));
     at = m.index + m[0].length;
-    if (m[1] !== undefined) out.push({ kind: "code", text: m[1] });
-    else if (m[2] !== undefined) out.push({ kind: "link", text: m[2], href: m[3] });
+    if (m[1] !== undefined) out.push({ kind: "code", text: m[2] });
+    else if (m[3] !== undefined) {
+      const bar = m[3].indexOf("|");
+      const target = (bar === -1 ? m[3] : m[3].slice(0, bar)).split("#")[0].trim();
+      const label = bar === -1 ? "" : m[3].slice(bar + 1).trim();
+      if (target) out.push({ kind: "wikilink", target, label: label || null, text: m[0] });
+      else pushText(m[0]);
+    } else if (m[4] !== undefined) out.push({ kind: "link", text: m[4], href: m[5] });
     else {
       // A bare link doesn't take the sentence's closing punctuation.
-      const href = m[4].replace(/[.,;:!?]+$/, "");
+      const href = m[6].replace(/[.,;:!?]+$/, "");
       out.push({ kind: "link", text: href, href });
-      pushText(m[4].slice(href.length));
+      pushText(m[6].slice(href.length));
     }
   }
   pushText(text.slice(at));

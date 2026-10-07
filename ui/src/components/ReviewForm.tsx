@@ -3,9 +3,12 @@
 import { useId, type KeyboardEvent, type Ref } from "react";
 import { IS_MAC, MOD } from "../platform.ts";
 import type { Form } from "../logic/edits.ts";
+import type { LinkNote } from "../logic/links.ts";
 import { KINDS } from "../logic/schema.ts";
 import { Icon } from "../icons.tsx";
 import { FieldError } from "./common.tsx";
+import { TopicChips } from "./fields.tsx";
+import { LinkTextarea } from "./LinkTextarea.tsx";
 
 interface Props {
   form: Form;
@@ -21,9 +24,13 @@ interface Props {
   error: string | null;
   verdictRef: Ref<HTMLTextAreaElement>;
   verdictChanged: boolean;
+  linkNotes: LinkNote[]; // for the [[ autocomplete
+  self: string | null; // the note itself, left out of it
+  topics: string[]; // "From GitHub topics": topics that aren't tags of the note
+  onAddTopic: (tag: string) => void;
 }
 
-export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged }: Props) {
+export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged, linkNotes, self, topics, onAddTopic }: Props) {
   const id = useId();
   const keys = (e: KeyboardEvent) => {
     if ((IS_MAC ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
@@ -46,14 +53,16 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
         <label className="field-label" htmlFor={`${id}-verdict`}>
           Verdict
         </label>
-        <textarea
-          ref={verdictRef}
+        <LinkTextarea
+          textareaRef={verdictRef}
           id={`${id}-verdict`}
           name="verdict"
           className="textarea verdict-editor"
           rows={2}
           value={form.verdict}
-          onChange={(e) => set("verdict", e.target.value)}
+          onValueChange={(value) => set("verdict", value)}
+          notes={linkNotes}
+          self={self}
           placeholder="Your own words: what you decided, and why…"
           autoComplete="off"
           aria-describedby={`${id}-verdict-help`}
@@ -136,6 +145,7 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
           ) : (
             <p className="field-help">{noTagList ? "This journal has no tag list yet. Create it to pick tags." : "No tags yet. Edit the tag list to add one."}</p>
           )}
+          <TopicChips topics={topics} noTagList={noTagList} busy={saving} onAdd={onAddTopic} />
         </div>
       </div>
 

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Links between notes in `magpie ui`. Write `[[pdfkit]]`, `[[npm--pdfkit|a label]]` or `[[pdfkit#Verdict]]` in any section, and the note view shows it as a link that opens that note; the browser's Back returns. Typing `[[` in an editor lists the journal's notes to link. A link to a subject without a note looks muted, with a dashed underline, and opens Add. "Linked from" at the end of a note lists the notes that link to it, and refreshes when another note changes.
+- The Note document (`GET /api/note`) has `links` and `backlinks`.
+- `alternatives` in the note schema: a human-owned list of wikilinks, such as `alternatives: ["[[npm--puppeteer]]"]`. In `magpie ui`, a note's alternatives show under the Verdict as chips you can open or remove, and "+ Add" picks a note or takes a name without one. One side is enough: the other note shows "Alternative to: …". `PATCH /api/note` takes `fields.alternatives`.
+- "From GitHub topics" in `magpie ui`: in the inbox review, the note's tag editor and Add's preview, a repository's topics that aren't tags yet show as chips. A click adds the tag, and appends it to the journal's `tags.md` if the list doesn't have it; the rest of the file stays as it was. `POST /api/tags` takes `{"journal", "add": [...]}`.
+
 ### Changed
 
 - The note view in `magpie ui` always shows "My notes" and "Related", like "Use when" and "Avoid when", so you can start them from the app. An empty one says "Nothing yet." and offers Edit. Saving a section the file doesn't have adds it at its place in the note and leaves the rest of the file as it was, including blank lines at the end.

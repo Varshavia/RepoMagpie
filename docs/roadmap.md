@@ -11,7 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, part 1 (linked notes, `feat/linked-notes`).
+  Also now: v0.2 Connect, part 1 (linked notes, `feat/linked-notes`), built and waiting for its pull request.
 - **Next:** v0.2 Connect, parts 2 (the graph page) and 3 (agent output).
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -238,12 +238,12 @@ The app becomes the place where you write and connect notes: links, backlinks, t
 - [x] Decisions: the app is the workspace ([0026](decisions/0026-the-app-is-the-workspace.md)); `alternatives` becomes active, one side is enough ([0027](decisions/0027-alternatives-active.md)).
 - [x] Remove "Open in Obsidian" from the app. "Open in editor" stays.
 - [x] "My notes" and "Related" are always shown in the note view, so you can start them from the app. Saving a section the file doesn't have inserts it at its canonical position.
-- [ ] Links in core: `[[target]]`, `[[target|label]]`, `[[target#heading]]`, resolved within the journal by file stem, then by a unique name; otherwise unresolved (missing or ambiguous). A link index with outgoing and incoming links, warm in under 150 ms for 2,000 notes.
-- [ ] Links in the API and the app: `links` and `backlinks` in the Note document, in-app links, unresolved links that open Add, `[[` autocomplete, "Linked from", and live refresh.
-- [ ] `alternatives`: in the schema, core, `PATCH /api/note`, and the note view (chips, "+ Add", "Alternative to: …" on the other note).
-- [ ] Tags from GitHub topics: "From GitHub topics" chips in Add, the inbox review and the note view; a chip adds the tag and appends it to `tags.md` (`POST /api/tags` with `add`).
+- [x] Links in core: `[[target]]`, `[[target|label]]`, `[[target#heading]]`, resolved within the journal by file stem, then by a unique name; otherwise unresolved (missing or ambiguous). A link index with outgoing and incoming links, warm in under 150 ms for 2,000 notes. (`src/core/links.ts`, 2026-10-07: 41–44 ms median, p95 47–55 ms, on a Windows dev machine, `scripts/bench-links.ts`.)
+- [x] Links in the API and the app: `links` and `backlinks` in the Note document, in-app links, unresolved links that open Add, `[[` autocomplete, "Linked from", and live refresh.
+- [x] `alternatives`: in the schema, core, `PATCH /api/note`, and the note view (chips, "+ Add", "Alternative to: …" on the other note).
+- [x] Tags from GitHub topics: "From GitHub topics" chips in Add, the inbox review and the note view; a chip adds the tag and appends it to `tags.md` (`POST /api/tags` with `add`).
 
-**Done when:** every item works in the app and has tests; every new write keeps the rest of the file byte for byte; the link index meets its budget and the existing budgets still hold; all checks and end-to-end tests pass.
+**Done when:** every item works in the app and has tests; every new write keeps the rest of the file byte for byte; the link index meets its budget and the existing budgets still hold; all checks and end-to-end tests pass. (Met on `feat/linked-notes`, 2026-10-07, Windows dev machine, Node 24.13: 742 tests and 39 end-to-end flows pass; byte-for-byte tests for a new section, `alternatives` and appending to `tags.md`. Link index warm 46 ms median for 2,000 notes. The other budgets hold: search 267 ms, suggest 387 / 300 ms, recall 139 ms, the hook 136 / 79 ms; recall and the hook are close to their 150 ms on this machine today, with or without this branch's changes. Not yet seen green in CI.)
 
 ### Part 2: the graph page
 - [ ] A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification).

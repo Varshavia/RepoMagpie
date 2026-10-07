@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
@@ -275,6 +275,18 @@ test("POST /api/tags writes the starter list to a journal without tags.md; never
   assert.deepEqual(kept.document, { journal: "personal", tags: ["pdf", "testing"], exists: true });
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
   assert.equal((await http.write("POST", "/api/tags", { journal: "elsewhere" })).status, 400);
+});
+
+test("POST /api/tags with add appends missing tags to tags.md and returns the Tag list; 404 without tags.md; 400 for a bad tag", async (t) => {
+  const { http, box } = await start(t);
+  const added = parsed(await http.write("POST", "/api/tags", { journal: "personal", add: ["cli", "pdf"] }));
+  assert.deepEqual(added, { status: 200, document: { journal: "personal", tags: ["pdf", "testing", "cli"], exists: true } });
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `cli`\n");
+  const missing = await http.write("POST", "/api/tags", { journal: "project", add: ["cli"] });
+  assert.equal(missing.status, 404);
+  assert.equal(existsSync(join(box.project, ".magpie", "tags.md")), false);
+  for (const add of [["Not Kebab"], "cli", [3]]) assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add })).status, 400, JSON.stringify(add));
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `cli`\n");
 });
 
 test("POST /api/open says so when the editor can't be started", async (t) => {

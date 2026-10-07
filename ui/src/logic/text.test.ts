@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { findLinks } from "../../../src/core/links.ts";
 import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline } from "./text.ts";
 
 // How the app shows a section's Markdown body: bullets, lines, code spans and links. No HTML is
@@ -28,6 +29,46 @@ test("code spans, Markdown links and bare links; only http and https become link
     { kind: "text", text: "." },
   ]);
   assert.deepEqual(parseInline("[x](javascript:alert(1))"), [{ kind: "text", text: "[x](javascript:alert(1))" }]);
+});
+
+test("wikilinks: target, label and the text as written; the #heading is dropped; an empty target is text", () => {
+  assert.deepEqual(parseInline("use [[puppeteer]] or [[npm--pdfkit#Verdict| pdfkit ]], not [[#x]] or [[]]"), [
+    { kind: "text", text: "use " },
+    { kind: "wikilink", target: "puppeteer", label: null, text: "[[puppeteer]]" },
+    { kind: "text", text: " or " },
+    { kind: "wikilink", target: "npm--pdfkit", label: "pdfkit", text: "[[npm--pdfkit#Verdict| pdfkit ]]" },
+    { kind: "text", text: ", not [[#x]] or [[]]" },
+  ]);
+});
+
+test("code spans of any number of backticks; links inside them stay code", () => {
+  assert.deepEqual(parseInline("``a ` [[b]]`` and `[[c]]`"), [
+    { kind: "code", text: "a ` [[b]]" },
+    { kind: "text", text: " and " },
+    { kind: "code", text: "[[c]]" },
+  ]);
+});
+
+test("lines in a fenced code block are plain text: no links, no code spans", () => {
+  assert.deepEqual(parseBody("```\n[[a]] `b`\n```\n[[c]]"), [
+    { kind: "lines", lines: [[{ kind: "text", text: "```" }], [{ kind: "text", text: "[[a]] `b`" }], [{ kind: "text", text: "```" }], [{ kind: "wikilink", target: "c", label: null, text: "[[c]]" }]] },
+  ]);
+});
+
+// The app finds the links core counts (src/core/links.ts), so each one it shows has core's resolution.
+test("the wikilinks the app shows are the ones core finds", () => {
+  const samples = [
+    "use [[puppeteer]], [[npm--pdfkit|pdfkit]], [[zod#Verdict]] or [[a#b|the label]]",
+    "[[ pdfkit | the lib ]] [[]] [[ ]] [[|x]] [[#Verdict]] [[zod|]] [[a|b|c]]",
+    "[[a[[b]] [x] [[c]",
+    "`[[a]]` and ``x [[b]] ` y`` and ```[[c]]``` but `[[d]]",
+    "[`x`[e]] [[f]]",
+    "- [[one]]\n- [[two]]\n\n```js\n[[in-code]]\n~~~\n```\n[[after]]\n  ~~~\n[[tilde]]\n  ~~~\n```\n[[unclosed]]",
+  ];
+  for (const sample of samples) {
+    const shown = parseBody(sample).flatMap((b) => (b.kind === "list" ? b.items : b.lines)).flat().flatMap((p) => (p.kind === "wikilink" ? [{ target: p.target, label: p.label }] : []));
+    assert.deepEqual(shown, findLinks(sample), sample);
+  }
 });
 
 test("firstEntries: the first n bullets or lines across blocks, and how many are left out", () => {

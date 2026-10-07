@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { fakeFetch, recorded } from "./fixtures/fake-fetch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import {
+  addTags,
   createTagList,
   locateNote,
   noteDocument,
@@ -158,6 +159,39 @@ test("createTagList without a project journal fails, as the Tag list does, and w
   assert.deepEqual(readdirSync(s.context.home), []);
 });
 
+// Tags from GitHub topics (docs/ui.md §7): a click appends a tag the list doesn't have. An explicit
+// human action (schema rule 5); the rest of tags.md stays byte for byte.
+test("addTags appends the missing tags as list lines, in order, once; the rest of tags.md stays", () => {
+  const s = setup();
+  const result = addTags("personal", ["browser-automation", "pdf", "cli", "cli"], s.context);
+  assert.deepEqual(result, { outcome: "ok", document: { journal: "personal", tags: ["pdf", "testing", "browser-automation", "cli"], exists: true } });
+  assert.equal(readFileSync(join(s.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `browser-automation`\n- `cli`\n");
+});
+
+test("addTags keeps the file's line endings and closes an unfinished last line; tags already there write nothing", () => {
+  const s = setup({ "journal/tags.md": "# Tags\r\n\r\n- `pdf` — documents\r\n- testing" });
+  addTags("personal", ["cli"], s.context);
+  assert.equal(readFileSync(join(s.journal, "tags.md"), "utf8"), "# Tags\r\n\r\n- `pdf` — documents\r\n- testing\r\n- `cli`\r\n");
+  const before = readFileSync(join(s.journal, "tags.md"), "utf8");
+  assert.equal(addTags("personal", ["pdf", "testing", "cli"], s.context).outcome, "ok");
+  assert.deepEqual(addTags("personal", [], s.context).document.tags, ["pdf", "testing", "cli"]);
+  assert.equal(readFileSync(join(s.journal, "tags.md"), "utf8"), before);
+});
+
+test("addTags: a journal without tags.md is not found; bad tags are refused; nothing is written", () => {
+  const s = setup();
+  const missing = addTags("project", ["cli"], s.context);
+  assert.equal(missing.outcome, "not-found");
+  assert.match(missing.document.error ?? "", /no tags\.md/);
+  assert.equal(existsSync(join(s.project, ".magpie", "tags.md")), false);
+  for (const bad of [["Not Kebab"], ["a--b"], [""], [1], "cli", null, ["ok", "BAD"]]) {
+    const r = addTags("personal", bad as never, s.context);
+    assert.equal(r.outcome, "usage", JSON.stringify(bad));
+    assert.ok(r.document.error);
+  }
+  assert.equal(readFileSync(join(s.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
+});
+
 // --- Note list ---
 
 test("Note list: every note, sorted by name, read-only ones included", () => {
@@ -236,8 +270,26 @@ test("Note: the note as read, with its version", () => {
       { name: null, heading: "Benchmarks", body: "Slow.\n", draft: false },
     ],
     skills: [{ name: "pdf-forms", text: "fill PDF forms from a script" }, { name: "pdf-merge", text: "" }],
+    links: [],
+    backlinks: [],
     warnings: [],
   });
+});
+
+test("Note: links and backlinks from the journal's link index", () => {
+  const s = setup({
+    "journal/notes/github--microsoft--playwright-cli.md": `${PLAYWRIGHT}\n## Related\n- [[pdfkit|the PDF one]]\n- [[puppeteer]]\n`,
+  });
+  const playwright = noteDocument("personal", { id: "pkg:github/microsoft/playwright-cli" }, s.context).document;
+  assert.deepEqual(playwright.links, [
+    { target: "pdfkit", label: "the PDF one", id: "pkg:npm/pdfkit", name: "pdfkit", from: "Related" },
+    // puppeteer has a note only in the project journal: no links across journals.
+    { target: "puppeteer", label: null, id: null, name: null, reason: "missing", from: "Related" },
+  ]);
+  assert.deepEqual(playwright.backlinks, []);
+  assert.deepEqual(noteDocument("personal", { id: "pkg:npm/pdfkit" }, s.context).document.backlinks, [
+    { id: "pkg:github/microsoft/playwright-cli", name: "microsoft/playwright-cli", from: "Related" },
+  ]);
 });
 
 test("Note: a note whose frontmatter can't be read is read-only, addressed by its file name", () => {
@@ -247,6 +299,7 @@ test("Note: a note whose frontmatter can't be read is read-only, addressed by it
   assert.equal(document.id, null);
   assert.equal(document.read_only, true);
   assert.equal(document.warnings.length, 1);
+  assert.deepEqual([document.links, document.backlinks], [[], []]);
 });
 
 test("Note: an unknown id or file, a package of another note, and paths are not found", () => {
@@ -287,6 +340,38 @@ test("PATCH: edits go through editNote, byte for byte, and the new version comes
   assert.equal(readFileSync(s.note("npm--pdfkit.md"), "utf8"), expected.text);
   assert.equal(r.document.version, noteVersion(expected.text));
   assert.equal(r.document.frontmatter.rating, 3);
+});
+
+test("PATCH: the answer's links follow the edit", () => {
+  const s = setup();
+  const version = noteVersion(readFileSync(s.note("npm--pdfkit.md")));
+  const r = patchNote({ journal: "personal", id: "pkg:npm/pdfkit", version, sections: { Related: "- [[github--microsoft--playwright-cli]]" } }, s.context);
+  assert.equal(r.outcome, "ok");
+  assert.deepEqual(r.document.links, [
+    { target: "github--microsoft--playwright-cli", label: null, id: "pkg:github/microsoft/playwright-cli", name: "microsoft/playwright-cli", from: "Related" },
+  ]);
+  assert.deepEqual(noteDocument("personal", { id: "pkg:github/microsoft/playwright-cli" }, s.context).document.backlinks, [
+    { id: "pkg:npm/pdfkit", name: "pdfkit", from: "Related" },
+  ]);
+});
+
+test("PATCH alternatives: written as quoted wikilinks; the relation shows on both notes; [] removes the key", () => {
+  const s = setup();
+  const before = readFileSync(s.note("npm--pdfkit.md"), "utf8");
+  const set = patchNote({ journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(before), fields: { alternatives: ["github--microsoft--playwright-cli", "wkhtmltopdf"] } }, s.context);
+  assert.equal(set.outcome, "ok");
+  const written = readFileSync(s.note("npm--pdfkit.md"), "utf8");
+  assert.equal(written, before.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli]]", "[[wkhtmltopdf]]"]\n'));
+  assert.deepEqual(set.document.links.map((l) => [l.target, l.id, l.from]), [
+    ["github--microsoft--playwright-cli", "pkg:github/microsoft/playwright-cli", "alternatives"],
+    ["wkhtmltopdf", null, "alternatives"],
+  ]);
+  assert.deepEqual(noteDocument("personal", { id: "pkg:github/microsoft/playwright-cli" }, s.context).document.backlinks, [{ id: "pkg:npm/pdfkit", name: "pdfkit", from: "alternatives" }]);
+
+  const cleared = patchNote({ journal: "personal", id: "pkg:npm/pdfkit", version: set.document.version, fields: { alternatives: [] } }, s.context);
+  assert.equal(cleared.outcome, "ok");
+  assert.equal(readFileSync(s.note("npm--pdfkit.md"), "utf8"), before);
+  assert.deepEqual(noteDocument("personal", { id: "pkg:github/microsoft/playwright-cli" }, s.context).document.backlinks, []);
 });
 
 test("PATCH with an old version: conflict, the current version, nothing written", () => {

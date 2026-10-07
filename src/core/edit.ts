@@ -8,7 +8,7 @@ import { acceptDraft, setHumanFields, setSection, setVerdict, type EditResult, t
 export interface NoteEdits {
   verdict?: unknown; // one line; "" clears it
   sections?: unknown; // {"<section name>": "<body>"}
-  fields?: unknown; // {"kind", "tags", "tried", "rating"}
+  fields?: unknown; // {"kind", "tags", "tried", "rating", "alternatives"}
   accept_drafts?: unknown; // ["<section name>"]
 }
 

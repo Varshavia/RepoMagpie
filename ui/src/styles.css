@@ -574,6 +574,83 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
 .prose p + p, .prose ul + p, .prose p + ul { margin-top: var(--sm); }
 .prose.muted { color: var(--ink-muted); }
 
+/* [[Links]]: a resolved one is an ordinary link. An unresolved one is muted with a dashed underline,
+   so it differs by more than colour; its reason is in the title and, for screen readers, in words. */
+.wikilink.unresolved {
+  color: var(--ink-muted);
+  text-decoration: underline dashed var(--ink-subtle);
+  text-underline-offset: 2px;
+}
+button.wikilink { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+button.wikilink:hover { color: var(--ink); text-decoration-color: currentColor; }
+span.wikilink { cursor: help; }
+
+.backlinks { display: flex; flex-direction: column; gap: var(--xs); list-style: none; }
+.backlinks li { display: flex; flex-wrap: wrap; gap: var(--sm); align-items: baseline; overflow-wrap: anywhere; }
+.backlink-places { color: var(--ink-subtle); font-size: 12px; }
+
+/* Alternatives, under the Verdict: chips that are links, each with a remove button. */
+.alternatives { display: flex; flex-direction: column; gap: var(--sm); margin-bottom: var(--xl); }
+.alternatives-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sm); min-height: 28px; }
+.chip.alternative { max-width: 100%; height: 24px; padding-right: var(--xxs); color: var(--ink); font-size: 13px; }
+/* Truncated, with room inside the clip for the (dashed) underline. */
+.chip.alternative > .wikilink { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 3px; line-height: 1.2; }
+.chip.alternative:not(:has(.chip-remove)) { padding-right: var(--sm); }
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-subtle);
+  cursor: pointer;
+}
+.chip-remove:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.alternatives-add { max-width: 360px; }
+.alternative-to { font-size: 13px; }
+.alternatives .muted { color: var(--ink-subtle); }
+
+/* "From GitHub topics": suggestion chips, dashed, so they read as "not a tag yet" without colour. */
+.topic-chips { display: flex; flex-direction: column; gap: var(--xs); margin-top: var(--sm); }
+button.chip.suggestion { border: 1px dashed var(--hairline-strong); background: transparent; }
+button.chip.suggestion:hover:not(:disabled) { border-style: solid; color: var(--ink); }
+button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
+
+/* The [[ autocomplete under a section editor (LinkTextarea). */
+.link-input { position: relative; display: flex; flex-direction: column; }
+.link-options {
+  position: absolute;
+  top: calc(100% + var(--xs));
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: calc(8 * 32px + 2 * var(--xs));
+  overflow-y: auto;
+  padding: var(--xs) 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  box-shadow: 0 8px 24px var(--shadow);
+  list-style: none;
+}
+.link-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  min-height: 32px;
+  margin: 0 var(--xs);
+  padding: 0 var(--md);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.link-option[aria-selected="true"] { background: var(--accent-wash); }
+.link-option .label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-option .detail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); text-align: right; }
+
 .skills { display: flex; flex-direction: column; gap: var(--xs); list-style: none; }
 .skills li { display: flex; gap: var(--sm); align-items: baseline; }
 .skills .mono { flex: none; color: var(--ink-muted); }
