@@ -141,6 +141,10 @@ The status was "marketing only": graph views are often admired but rarely used, 
 
 A link and an alternative between the same two notes are two edges of different types. Edge sources on by default: tags, `[[links]]` and `alternatives` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 
+**Similarity** (`graphData` in `src/core/graph.ts`): only notes that share at least one topic are compared, through an index from topic to notes. The score is the Jaccard index of the two topic sets (topics compared in lower case), plus 0.1 when both notes have the same `language`. A pair needs at least 0.25: one shared topic of four is enough (a note with two topics and one with three), one of five is not unless the language matches. Pairs already joined by a link or an alternative are skipped. Each note keeps its 3 best, ties broken by file name; an edge exists if either note keeps it, so a note can have more than 3.
+
+**Connections** (node size): a note's edges to other notes and to tags (tagged, links, alternatives). Similarity and missing notes don't count, so a toggle doesn't resize the graph.
+
 ### Typed relations
 
 `alternatives` is active ([decision 0027](decisions/0027-alternatives-active.md)): a human-owned list of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]`. `works_with` stays proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)).
