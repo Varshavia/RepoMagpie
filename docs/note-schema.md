@@ -39,6 +39,7 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 | `tried` | yes | bool | human (default `false`) | Have you actually run it? |
 | `rating` | no | 1–5 | human | Leave empty until tried |
 | `status` | yes | enum | human (tool sets it at creation) | `inbox` or `reviewed`; see rule 1 |
+| `alternatives` | no | list of wikilinks | human | Subjects to use instead, as quoted strings: `alternatives: ["[[npm--puppeteer]]"]`. One side is enough: the other note shows the relation too ([decision 0027](decisions/0027-alternatives-active.md)). A target may have no note yet. A value that isn't a list of strings makes only this field unreadable |
 
 ### `kind` values
 
@@ -77,12 +78,21 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 
 Notes may be written in any language ([decision 0004](decisions/0004-english-everywhere.md)).
 
+## Links
+
+A note links to another with a wikilink: `[[target]]`, `[[target|label]]` or `[[target#heading]]` (the heading is ignored for resolving). Links count in every body section and in `alternatives`; links inside code spans and fenced code blocks don't. A link resolves within the same journal, ignoring case:
+1. to the note whose file name, without `.md`, is the target: `[[npm--pdfkit]]`;
+2. otherwise, to the one note whose `name` is the target: `[[pdfkit]]`;
+3. otherwise it is unresolved: no such note (`missing`), or several notes with that name (`ambiguous`). That is allowed: `[[puppeteer]]` can name a subject you have no note on yet.
+
+There are no links across journals. Obsidian resolves a wikilink by file name, so a link by file stem (rule 1, what the app's `[[` autocomplete writes) works there too; a link by `name` (rule 2) resolves in magpie only.
+
 ## Rules
 
 1. **Status.** A note is `inbox` until its Verdict has human-written text ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)); then it is `reviewed`. The tool sets `status` when it writes a note. When reading, a note with an empty Verdict counts as `inbox`, whatever its `status` field says.
 2. **Ownership.**
    - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
-   - **Human-owned:** `kind`, `tags`, `tried`, `rating`, `status`, and all body sections.
+   - **Human-owned:** `kind`, `tags`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one.
    - **At creation only**, the tool may write drafts of `kind`, `tags` (from topics), "What it does" and "Use when". It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
    - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines.
 3. **Drafts.** A drafted section starts with the line `<!-- magpie:draft -->`. AI may draft only "What it does" and "Use when". "Avoid when" may also be a draft when it comes from the user's own `avoid:` text in `magpie import` (rule 7). The Verdict is never a draft. Deleting the marker accepts the draft. Search, suggest and recall label draft text as a draft.
@@ -103,13 +113,12 @@ These fields are planned for later releases ([ideas](ideas.md)). They are **not*
 
 | Field | Owner | Type | For | Target |
 |---|---|---|---|---|
-| `alternatives` | human | list of wikilinks | typed edges, recall alternatives | v0.2 part 1 ([decision 0027](decisions/0027-alternatives-active.md), accepted; joins the active schema on `feat/linked-notes`) |
 | `works_with` | human | list of wikilinks | typed edges | [decision 0007](decisions/0007-typed-relations-in-frontmatter.md), proposed |
 | `reviewed_commit` | tool | commit SHA | drift | v0.3 |
 | `public` | human | bool, default `false` | nests | v0.4 |
 | `last_resurfaced` | tool | date | digest | later |
 
-`packages` moved from this table into the active schema in v1, as a list of PURLs.
+`packages` moved from this table into the active schema in v1, as a list of PURLs; `alternatives` in v0.2 ([decision 0027](decisions/0027-alternatives-active.md)).
 
 ## Example
 

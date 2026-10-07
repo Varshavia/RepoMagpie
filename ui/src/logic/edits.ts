@@ -16,7 +16,7 @@ export interface Patch {
   id: string;
   version: string;
   verdict?: string;
-  fields?: Partial<Pick<Form, "kind" | "tags" | "tried" | "rating">>;
+  fields?: Partial<Pick<Form, "kind" | "tags" | "tried" | "rating">> & { alternatives?: string[] }; // alternatives: link targets
   sections?: Record<string, string>;
   accept_drafts?: string[];
 }
@@ -62,6 +62,15 @@ export function oneLine(text: string): string {
 
 export function parseTags(text: string): string[] {
   return [...new Set(text.toLowerCase().split(/[\s,]+/).filter(Boolean))];
+}
+
+// "From GitHub topics": the note's topics that could become tags, in GitHub's order, at most 8. Not
+// one the note has, not the repository's own name, and only ones that are valid tags.
+export function topicSuggestions(topics: unknown, tags: string[], id: string | null): string[] {
+  if (!Array.isArray(topics)) return [];
+  const repo = id?.match(/^pkg:github\/[^/]+\/([^/?#@]+)/)?.[1]?.toLowerCase();
+  const valid = topics.filter((t): t is string => typeof t === "string" && TAG_PATTERN.test(t) && !tags.includes(t) && t !== repo);
+  return [...new Set(valid)].slice(0, 8);
 }
 
 // The tags core would refuse.

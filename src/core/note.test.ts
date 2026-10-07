@@ -159,7 +159,17 @@ const VALUE_PROBLEMS: [string, string, string, string][] = [
   ["packages entry with a version", "packages: []", "packages: [pkg:npm/pdfkit@1.0]", "frontmatter.packages"],
   ["topics not a list", "topics: []", "topics: pdf", "frontmatter.topics"],
   ["license not a string", "license: MIT", "license: 42", "frontmatter.license"],
+  ["alternatives not a list", "status: reviewed", 'status: reviewed\nalternatives: "[[npm--puppeteer]]"', "frontmatter.alternatives"],
+  ["alternatives with an item that is not text", "status: reviewed", 'status: reviewed\nalternatives: ["[[npm--puppeteer]]", 3]', "frontmatter.alternatives"],
 ];
+
+test("validate: alternatives as quoted wikilinks are fine; a malformed one leaves the note readable", () => {
+  assert.deepEqual(validate(readNote(CANONICAL.replace("status: reviewed", 'status: reviewed\nalternatives: ["[[npm--puppeteer]]", "[[zod|Zod]]"]'))), []);
+  const broken = readNote(CANONICAL.replace("status: reviewed", "status: reviewed\nalternatives: {a: b}"));
+  assert.deepEqual(broken.warnings, []);
+  assert.equal(broken.frontmatter.id, "pkg:npm/pdfkit");
+  assert.deepEqual(validate(broken).map((p) => p.where), ["frontmatter.alternatives"]);
+});
 
 for (const [label, from, to, where] of VALUE_PROBLEMS) {
   test(`validate: ${label}`, () => {

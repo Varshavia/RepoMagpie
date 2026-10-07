@@ -40,8 +40,8 @@ const SCREEN_NOTES: Record<string, string> = {
     useWhen: ["a small, synchronous PDF with a few lines of text"],
     avoidWhen: ["you need streamed output for large PDFs", "the layout comes from HTML and CSS"],
     whatItDoes: "A PDF generation library for Node and the browser, with a drawing API for text, vectors and images.",
-    myNotes: "Tried it for the invoice export in September. Piping the document into a stream and awaiting the end took a day of debugging; puppeteer printed the existing HTML template in an hour.",
-  }),
+    myNotes: "Tried it for the invoice export in September. Piping the document into a stream and awaiting the end took a day of debugging; [[puppeteer]] printed the existing HTML template in an hour.",
+  }).replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[puppeteer]]", "[[pdf-lib]]"]\n'),
   "npm--zod.md": renderNote({
     id: "pkg:npm/zod",
     name: "zod",
@@ -57,6 +57,7 @@ const SCREEN_NOTES: Record<string, string> = {
     avoidWhen: ["a hot path parses millions of small objects; a hand-written check is faster"],
     whatItDoes: "Schema declaration and validation, with static types inferred from the schema.",
     myNotes: "Error messages need a formatter before they reach users; z.prettifyError is enough for CLIs.",
+    related: "- [[npm--commander|commander]] for the CLI that reads the config",
   }),
   "npm--commander.md": renderNote({
     id: "pkg:npm/commander",
@@ -113,7 +114,7 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
   mkdirSync(notes, { recursive: true });
   mkdirSync(join(project, ".git"), { recursive: true });
   mkdirSync(join(project, ".magpie", "notes"), { recursive: true });
-  writeFileSync(join(journal, "tags.md"), readFileSync(join(VAULT, "tags.md")));
+  writeFileSync(join(journal, "tags.md"), readFileSync(join(VAULT, "tags.md"), "utf8").replace(/\r\n/g, "\n")); // LF, like the notes below
 
   if (options.empty) {
     // tags.md only

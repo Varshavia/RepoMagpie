@@ -3,11 +3,12 @@
 // they are. Notes are found only by their id, or by a file name equal to one in the journal's
 // notes/ listing: no request text is ever joined to a path. Never prints.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
-import { journalTagList, listNotes, STARTER_TAGS, type Place } from "./journals.ts";
-import { DRAFT_MARKER, readNote } from "./note.ts";
-import { noteSignature, readCacheEntries, writeCache } from "./note-cache.ts";
+import { journalTagList, listNotes, parseTagList, STARTER_TAGS, type Place } from "./journals.ts";
+import { linkIndex, type Backlink, type Link } from "./links.ts";
+import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
+import { noteEntries } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
 import { packageVersion } from "./version.ts";
@@ -71,6 +72,33 @@ export function createTagList(scope: Scope, place: Place): Result<TagListJson> {
   return tagListDocument(scope, place);
 }
 
+// "From GitHub topics" in the app: a clicked topic becomes a tag, and a tag the journal's tags.md
+// doesn't list is appended to it as ``- `<tag>` ``. An explicit human action (schema rule 5); the rest
+// of the file stays byte for byte. A journal without tags.md gets "Create tag list" first.
+export function addTags(scope: Scope, tags: unknown, place: Place): Result<TagListJson> {
+  const journal = locateJournal(scope, place);
+  if (journal.error) return tagListDocument(scope, place);
+  const usage = (error: string): Result<TagListJson> => ({ outcome: "usage", document: { ...tagListDocument(scope, place).document, error } });
+  if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(tag))) {
+    return usage("add must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
+  }
+  const file = join(journal.path, "tags.md");
+  if (!existsSync(file)) return { outcome: "not-found", document: { journal: scope, tags: [], exists: false, error: "This journal has no tags.md yet. Create the tag list first." } };
+  const text = readFileSync(file, "utf8");
+  const listed = parseTagList(text);
+  const added = [...new Set(tags as string[])].filter((tag) => !listed.includes(tag));
+  if (added.length) {
+    const eol = text.includes("\r\n") ? "\r\n" : "\n";
+    const close = text === "" || text.endsWith("\n") ? "" : eol;
+    try {
+      writeFileSync(file, text + close + added.map((tag) => `- \`${tag}\`${eol}`).join(""));
+    } catch (error) {
+      return { outcome: "failed", document: { journal: scope, tags: listed, exists: true, error: `Couldn't write tags.md: ${(error as Error).message}` } };
+    }
+  }
+  return tagListDocument(scope, place);
+}
+
 // --- Note list ---
 
 export interface NoteSummary {
@@ -115,20 +143,7 @@ const NOTE_LIST_CACHE = "note-list.json";
 const NOTE_LIST_VERSION = 1;
 
 function summaries(journal: string): NoteSummary[] {
-  const { files, signature } = noteSignature(journal);
-  const cached = readCacheEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION);
-  const data: Record<string, NoteSummary> = {};
-  let changed = !cached || Object.keys(cached.files).length !== files.length;
-  for (const file of files) {
-    const before = cached?.files[file];
-    const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
-    if (hit) data[file] = hit as NoteSummary;
-    else {
-      data[file] = summary(file, readNote(readFileSync(join(journal, "notes", file), "utf8")));
-      changed = true;
-    }
-  }
-  if (changed && files.length) writeCache(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, signature, data);
+  const { files, data } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))));
   return files.map((file) => data[file]);
 }
 
@@ -164,6 +179,8 @@ export interface NoteJson {
   frontmatter: Record<string, unknown>;
   sections: { name: string | null; heading: string; body: string; draft: boolean }[];
   skills: { name: string; text: string }[];
+  links: Link[]; // the note's own links, resolved within its journal
+  backlinks: Backlink[]; // the other notes in its journal that link to it
   warnings: string[];
   error?: string;
 }
@@ -196,7 +213,7 @@ export function noteDocument(scope: Scope, address: NoteAddress, place: Place): 
 }
 
 export function emptyNote(scope: Scope): NoteJson {
-  return { id: null, journal: scope, file: null, path: null, version: null, read_only: false, status: null, verdict: null, frontmatter: {}, sections: [], skills: [], warnings: [] };
+  return { id: null, journal: scope, file: null, path: null, version: null, read_only: false, status: null, verdict: null, frontmatter: {}, sections: [], skills: [], links: [], backlinks: [], warnings: [] };
 }
 
 function noteJson(scope: Scope, path: string, bytes: Buffer): NoteJson {
@@ -210,10 +227,13 @@ function noteJson(scope: Scope, path: string, bytes: Buffer): NoteJson {
     const match = line.match(/^\s*[-*]\s+`([^`]+)`\s*(?:—|--?)\s*(.*)$/);
     return match ? [{ name: match[1], text: match[2].trim() }] : [];
   });
+  // The path is <journal>/notes/<file>; a note that can't be read is not in the index.
+  const index = linkIndex(dirname(dirname(path)));
+  const file = basename(path);
   return {
     id,
     journal: scope,
-    file: basename(path),
+    file,
     path,
     version: noteVersion(bytes),
     read_only: id === null,
@@ -222,6 +242,8 @@ function noteJson(scope: Scope, path: string, bytes: Buffer): NoteJson {
     frontmatter: note.frontmatter,
     sections: note.sections.map(({ name, heading, body, draft }) => ({ name, heading, body, draft })),
     skills,
+    links: index.outgoing[file] ?? [],
+    backlinks: index.incoming[file] ?? [],
     warnings,
   };
 }
@@ -336,10 +358,6 @@ function noteFiles(journal: string): string[] {
 }
 
 // A note is editable only with readable frontmatter that has an id (decision 0023).
-function readableId(note: ReturnType<typeof readNote>): string | null {
-  return note.hasFrontmatter && !note.warnings.length && typeof note.frontmatter.id === "string" ? note.frontmatter.id : null;
-}
-
 function textList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }

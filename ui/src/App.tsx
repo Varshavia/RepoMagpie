@@ -21,6 +21,7 @@ import type { Form } from "./logic/edits.ts";
 import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
+import { noteHash, parseNoteHash } from "./logic/links.ts";
 import { homePath } from "./logic/text.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
@@ -207,6 +208,27 @@ export function App() {
     [select],
   );
 
+  // A followed [[link]] is a step in the browser's history: the note you left gets its address
+  // first, so Back returns to it. A note's address also opens it on load (a link opened in a new tab).
+  const followLink = useCallback(
+    (scope: Scope, from: string | null, to: string) => {
+      if (from) history.replaceState(null, "", noteHash(scope, from));
+      history.pushState(null, "", noteHash(scope, to));
+      openNote(scope, to);
+    },
+    [openNote],
+  );
+
+  useEffect(() => {
+    const show = () => {
+      const target = parseNoteHash(location.hash);
+      if (target) openNote(target.journal, target.id);
+    };
+    show();
+    window.addEventListener("popstate", show);
+    return () => window.removeEventListener("popstate", show);
+  }, [openNote]);
+
   const pickTheme = useCallback((t: Theme) => {
     setTheme(t);
     applyTheme(t);
@@ -375,6 +397,10 @@ export function App() {
       project={projectState}
       onAdopted={onAdopted}
       onOpenNote={openNote}
+      linkNotes={lists[scope].status === "ready" ? (lists[scope] as { notes: NoteSummary[] }).notes : []}
+      onFollowLink={followLink}
+      onAddNote={(target) => go({ page: "add", target })}
+      onTagList={showTags}
     />
   );
 
@@ -492,7 +518,17 @@ export function App() {
     workspace = (
       <section className="pane page-pane">
         {view.page === "add" ? (
-          <AddPage project={projectState} defaultJournal={journal} onOpenNote={openNote} onSaved={afterWrite} />
+          <AddPage
+            key={view.target ?? ""}
+            project={projectState}
+            defaultJournal={journal}
+            initialTarget={view.target}
+            onOpenNote={openNote}
+            onSaved={afterWrite}
+            noTagList={(scope) => tagState[scope] === "missing"}
+            onCreateTagList={createTagList}
+            onTagList={showTags}
+          />
         ) : view.page === "import" ? (
           <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />
         ) : view.page === "recall" ? (

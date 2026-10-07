@@ -1,6 +1,44 @@
-// Form fields shared by Add, Import and Check a package.
+// Form fields shared by Add, Import, Check a package and the tag editor.
 import { useId } from "react";
 import type { PackageType, Scope } from "../api.ts";
+import { Icon } from "../icons.tsx";
+
+// "From GitHub topics" (docs/ui.md §7): topics that aren't tags yet. A click adds the tag; a tag the
+// journal's tags.md doesn't list is appended to it. Without tags.md: "Create tag list" first.
+export function TopicChips({ topics, noTagList, busy, onAdd, onCreateTagList }: { topics: string[]; noTagList: boolean; busy: boolean; onAdd: (tag: string) => void; onCreateTagList?: () => void }) {
+  const id = useId();
+  if (!topics.length) return null;
+  return (
+    <div className="topic-chips">
+      <span className="field-label" id={id}>
+        From GitHub topics
+      </span>
+      <div className="chips" role="group" aria-labelledby={id}>
+        {topics.map((t) => (
+          <button key={t} type="button" className="chip tag suggestion" onClick={() => onAdd(t)} disabled={noTagList || busy} aria-label={`Add tag ${t}`}>
+            <Icon name="plus" size={12} />
+            <span translate="no">{t}</span>
+          </button>
+        ))}
+      </div>
+      {noTagList ? (
+        <p className="field-help">
+          This journal has no tag list yet. Create it first; a topic you pick is then added to it.
+          {onCreateTagList ? (
+            <>
+              {" "}
+              <button type="button" className="link-button" onClick={onCreateTagList}>
+                Create tag list
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : (
+        <p className="field-help">A topic you pick becomes a tag, and is added to tags.md if the list doesn't have it.</p>
+      )}
+    </div>
+  );
+}
 
 // The project journal: none (no project root to make one in), new (not created yet) or there.
 export type ProjectState = "none" | "new" | "exists";

@@ -3,6 +3,7 @@
 // Security checks happen before a request gets here (server.ts).
 import { runAdopt } from "../core/adopt.ts";
 import {
+  addTags,
   createTagList,
   emptyNote,
   emptyPreview,
@@ -63,9 +64,11 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         return journal ? reply(tagListDocument(journal, context)) : bad({ journal: null, tags: [], exists: false }, JOURNAL);
       },
       // "Create tag list": the starter list, for a journal without tags.md; never overwrites one.
+      // With "add": appends the tags tags.md doesn't list yet ("From GitHub topics").
       POST: ({ body }) => {
         const journal = scope(body.journal);
-        return journal ? reply(createTagList(journal, context)) : bad({ journal: null, tags: [], exists: false }, JOURNAL);
+        if (!journal) return bad({ journal: null, tags: [], exists: false }, JOURNAL);
+        return reply(body.add === undefined ? createTagList(journal, context) : addTags(journal, body.add, context));
       },
     },
 

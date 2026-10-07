@@ -58,7 +58,7 @@ The page gets the token for the `X-Magpie-Token` header from a `<meta>` tag in t
 
 ## 4. Live updates
 
-The server watches both journals' `notes/` folders. When a note changes on disk (edited in Obsidian, another editor, or the CLI), it tells the app over Server-Sent Events (`GET /api/events`), and the app refreshes what it shows.
+The server watches both journals' `notes/` folders. When a note changes on disk (edited in Obsidian, another editor, or the CLI), it tells the app over Server-Sent Events (`GET /api/events`), and the app refreshes what it shows. A change to any note in a journal also re-reads the open note of that journal, so its links and "Linked from" follow; if the note's own file is unchanged, nothing else in the view changes.
 
 Verified against the [Node.js `fs.watch` caveats](https://nodejs.org/api/fs.html#caveats) (2026-10-04):
 - It uses inotify on Linux, FSEvents and kqueue on macOS, and `ReadDirectoryChangesW` on Windows, and "is not 100% consistent across platforms".
@@ -76,7 +76,7 @@ So:
 ## 5. Editing
 
 The rules are [decision 0023](decisions/0023-api-is-the-json-contract.md)'s:
-- Edits a person makes in the app are human edits, written only through round-trip-safe core functions: `setSection`, `setVerdict`, and edits of the human-owned frontmatter keys `kind`, `tags`, `tried` and `rating`. `status` follows the Verdict.
+- Edits a person makes in the app are human edits, written only through round-trip-safe core functions: `setSection`, `setVerdict`, and edits of the human-owned frontmatter keys `kind`, `tags`, `tried`, `rating` and `alternatives`. `status` follows the Verdict.
 - Everything outside the edited part stays byte for byte. A section the file doesn't have is inserted before the next section in the schema's body order, or after the file's last line; an empty body for it writes nothing.
 - Tool-owned fields are never edited by hand.
 - Saving an edited draft section removes its draft marker; "Accept draft" removes it without changing the text.
@@ -96,9 +96,10 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | GET | `/api/settings` | | **Settings** document |
 | GET | `/api/tags` | `?journal=personal\|project` | **Tag list** document |
 | POST | `/api/tags` | `{"journal"}` | **Tag list** document after "Create tag list": writes the starter list to a journal without `tags.md`; an existing `tags.md` is left as it is |
+| POST | `/api/tags` | `{"journal", "add": ["<tag>", …]}` | **Tag list** document after appending the tags `tags.md` doesn't list ([spec](spec.md#shared-json-documents), "Adding tags to the list"); 404 without `tags.md`, 400 for a tag that isn't lowercase kebab-case |
 | GET | `/api/notes` | `?journal=`, `&status=inbox\|reviewed`, `&kind=`, `&tag=` (repeatable) | **Note list** document |
-| GET | `/api/note` | `?journal=&id=<PURL>`, or `?journal=&file=<file name>` for a read-only note | **Note** document |
-| PATCH | `/api/note` | `{"journal", "id", "version", "verdict"?, "sections"?: {"<name>": "<body>"}, "fields"?: {"kind", "tags", "tried", "rating"}, "accept_drafts"?: ["<section>"]}` | **Note** document after the edit |
+| GET | `/api/note` | `?journal=&id=<PURL>`, or `?journal=&file=<file name>` for a read-only note | **Note** document, with its `links` and `backlinks` ([spec](spec.md), section 2) |
+| PATCH | `/api/note` | `{"journal", "id", "version", "verdict"?, "sections"?: {"<name>": "<body>"}, "fields"?: {"kind", "tags", "tried", "rating", "alternatives"}, "accept_drafts"?: ["<section>"]}` | **Note** document after the edit |
 | GET | `/api/search` | `?q=`, `&tag=` (repeatable), `&kind=`, `&journal=`, `&limit=` | Exactly `magpie search --json` |
 | POST | `/api/note/preview` | `{"target", "type"?, "to"}` | **Note preview** document (fetches GitHub metadata, writes nothing) |
 | POST | `/api/note` | `{"target", "text"?, "type"?, "to"}` | Exactly `magpie note --json` |
@@ -145,6 +146,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - Inbox notes in a list; `j`/`k` move, `Enter` opens.
    - The Verdict editor has focus; `Ctrl+Enter` saves. Kind, tags (from `tags.md`, with "Edit tag list", which opens `tags.md` in your editor), tried and rating are next to it.
    - A journal with notes but no `tags.md`: the sidebar's Tags section says "No tag list yet." with "Create tag list", and the editor offers "Create tag list" instead of "Edit tag list". Only that click writes the starter list ([spec](spec.md), section 3). A `tags.md` without tags: the Tags section says "Your tag list is empty." with "Edit tag list".
+   - **From GitHub topics**, under the tags: the note's topics that aren't its tags, as chips with a dashed border (at most 8, in GitHub's order, not the repository's own name; only topics that are valid tags). A click adds the tag to the form, saved with it, and appends it to `tags.md` now if the list doesn't have it (`POST /api/tags` with `add`). Without `tags.md` the chips are disabled until "Create tag list". A note without `topics` (a registry package) shows none. The same chips are in the note view's tag editor (the Verdict editor's fields) and in Add's preview of a new note, where a click appends the topic to `tags.md` so the save drafts it as a tag, as `magpie note` drafts the topics the list has.
    - Above the editor, short: "What it does" and "Use when", each cut to three bullets or lines with "Show all".
    - Saving a Verdict moves the note to reviewed and opens the next inbox note with its editor focused. An unsaved Verdict stays with its note while you move through the list.
    - **Goal:** review a note in under 15 seconds.
@@ -152,16 +154,21 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 3. **Note view.**
    - Under the title: "Tried" or "Not tried", and the rating ("Tried · rated 4 of 5"); nothing for a note neither tried nor rated.
    - The Verdict as the hero, marked with the accent; then Use when and Avoid when. The "Avoid when" label is red only when the section has text.
+   - **Alternatives**, under the Verdict ([decision 0027](decisions/0027-alternatives-active.md)): the note's `alternatives` as chips that open the note, or look unresolved like any link, each with a remove button ("Remove puppeteer from alternatives"). "+ Add" opens a combobox with the `[[` autocomplete's list; its last option, "Add “wkhtmltopdf”, no note yet", takes the text as typed. Each add or remove saves at once (`fields.alternatives`) and keeps an unsaved Verdict edit; after a remove, "Undo" puts the last one back where it was. Below, "Alternative to: pdfkit" names the notes that list this one, from `backlinks`.
    - "What it does", with a visible draft badge while it is a draft, and "Accept".
    - "My notes" and "Related". "My notes" is the free-form place to write: a multi-line Markdown editor that keeps the text as typed (blank lines, lists, code fences).
    - Use when, Avoid when, My notes and Related are always shown. When one is empty, or the file doesn't have it, it says "Nothing yet." and offers Edit. Saving a section the file doesn't have inserts it at its place in the schema's body order.
    - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
+   - **Links** ([decision 0027](decisions/0027-alternatives-active.md)): `[[target]]`, `[[target|label]]` and `[[target#heading]]` in any section, the Verdict included, resolved by core within the note's journal (the Note document's `links`). A resolved link shows the label or the note's name and opens that note as a click in the list does; it is a step in the browser's history (`#note/<journal>/<id>`), so Back returns to the note before. An unresolved link is muted with a dashed underline; its title says why ("No note named “puppeteer” in this journal", "Several notes are named “playwright”"), and screen readers hear the same in words. A missing one opens Add with the target filled in. Links in code are text.
+   - **`[[` autocomplete** in every section editor and the Verdict editor: typing `[[` lists up to 8 notes of the same journal whose name or file stem contains what follows (those that start with it first). ↑/↓ move, Enter or Tab inserts `[[<file stem>|<name>]]`, Esc closes the list and leaves the text as typed. The textarea points to the list with `aria-activedescendant`; a status line tells screen readers how many notes there are and which keys to use.
+   - **"Linked from"** at the end: the notes that link here, by name, with where ("in My notes", "as an alternative"). Empty: "No other note links here." Not shown for a read-only note.
    - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
    - Actions: open the repository, open in an editor, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).
    - PURLs are shown decoded (`pkg:npm/@playwright/cli`), everywhere in the app. The copied PURL and every request keep the encoded id.
    - Paths under the home directory are shown with `~` (`~/.magpie/notes/npm--pdfkit.md`), as `magpie recall` prints them, everywhere in the app: the note view, Check a package, Settings and Suggest. The API keeps the absolute path.
 4. **Add.**
    - Paste a URL, PURL or name; see the fetched preview; write the Verdict; save. The same logic as `magpie note`.
+   - Opened from an unresolved `[[link]]`, the box holds the link's target. The preview of a new note shows "From GitHub topics" (item 1).
    - **Import:** paste lines, see the dry-run table, apply. The same logic as `magpie import --dry-run`, then `magpie import`, including its lenient read. Changing the lines needs a new check before importing. While the lines have no item, the help line says what the first line starts with, as the CLI's hint does.
 5. **Settings** (read-only in v0.1): journal paths, whether `GITHUB_TOKEN` is set, the version, links to the docs. Also the theme (the system's, dark or light), saved in the browser only.
 6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
@@ -179,6 +186,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | `Enter` | Open the selected note |
 | `e` | Edit the Verdict |
 | Ctrl+Enter | Save |
+| `[[` | In an editor: link a note (↑ / ↓ choose, Enter or Tab inserts, Esc closes the list) |
 | `Esc` | Close the palette or editor; back to the list |
 | `g i` / `g s` | Go to Inbox / Search |
 | `?` | Show the keyboard map |

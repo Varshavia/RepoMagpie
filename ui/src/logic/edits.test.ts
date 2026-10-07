@@ -1,7 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { formOf, oneLine, parseTags, patchFor, tagProblems, triedLine } from "./edits.ts";
+import { formOf, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine } from "./edits.ts";
+
+// "From GitHub topics" (docs/ui.md §7): topics that could become tags.
+test("topicSuggestions: topics not among the tags, in GitHub's order, at most 8, without the repository's name", () => {
+  const topics = ["playwright", "testing", "browser-automation", "e2e", "cli", "agents", "mcp", "typescript", "automation", "chromium"];
+  assert.deepEqual(topicSuggestions(topics, ["testing"], "pkg:github/microsoft/playwright"), ["browser-automation", "e2e", "cli", "agents", "mcp", "typescript", "automation", "chromium"]);
+  assert.deepEqual(topicSuggestions(["playwright-cli", "cli"], [], "pkg:github/microsoft/playwright-cli"), ["cli"]);
+  // Only topics that are valid tags; no topics, no chips.
+  assert.deepEqual(topicSuggestions(["Not Valid", "a--b", "ok", 3, "ok"], [], "pkg:github/a/b"), ["ok"]);
+  assert.deepEqual(topicSuggestions(undefined, [], "pkg:npm/pdfkit"), []);
+  assert.deepEqual(topicSuggestions([], [], null), []);
+});
 
 // The edit the app sends (PATCH /api/note, spec "Editing a note"): only what the person changed,
 // with the version the note was read with.
@@ -9,7 +20,7 @@ import { formOf, oneLine, parseTags, patchFor, tagProblems, triedLine } from "./
 const NOTE: NoteJson = {
   id: "pkg:npm/left-pad", journal: "personal", file: "npm--left-pad.md", path: "/j/notes/npm--left-pad.md", version: "sha256:abc",
   read_only: false, status: "inbox", verdict: "", frontmatter: { id: "pkg:npm/left-pad", kind: "library", tags: ["text"], tried: false, rating: null },
-  sections: [], skills: [], warnings: [],
+  sections: [], skills: [], links: [], backlinks: [], warnings: [],
 };
 
 test("formOf reads the human-owned fields from the note", () => {

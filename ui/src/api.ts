@@ -64,6 +64,7 @@ export const api = {
   settings: () => get<SettingsJson>("/api/settings"),
   tags: (journal: Scope) => get<TagListJson>("/api/tags", { journal }),
   createTagList: (journal: Scope) => write<TagListJson>("POST", "/api/tags", { journal }),
+  addTags: (journal: Scope, add: string[]) => write<TagListJson>("POST", "/api/tags", { journal, add }),
   notes: (journal: Scope) => get<NoteListJson>("/api/notes", { journal }),
   note: (journal: Scope, address: Address) => get<NoteJson>("/api/note", { journal, ...addressParams(address) }),
   patch: (patch: Patch) => write<NoteJson>("PATCH", "/api/note", patch),

@@ -123,16 +123,24 @@ export interface HumanFields {
   tags?: string[];
   tried?: boolean;
   rating?: number | null;
+  alternatives?: string[]; // link targets; written as "[[<target>]]" (decision 0027)
 }
 
-// A person's edit of kind, tags, tried or rating. Values are checked against the schema first;
-// one bad value, or any other key, leaves the note untouched with a warning.
+// Removes a key and its lines from the frontmatter.
+const REMOVE = Symbol("remove");
+
+// A person's edit of kind, tags, tried, rating or alternatives. Values are checked against the schema
+// first; one bad value, or any other key, leaves the note untouched with a warning. alternatives
+// takes targets and writes each as a quoted wikilink; an empty list removes the key.
 export function setHumanFields(text: string, values: HumanFields): EditResult {
   for (const [key, value] of Object.entries(values)) {
     const problem = value === undefined ? null : humanFieldProblem(key, value);
     if (problem) return untouched(text, problem);
   }
-  return editFrontmatter(text, values as Record<string, unknown>, false);
+  const { alternatives, ...rest } = values;
+  const fields: Record<string, unknown> = { ...rest };
+  if (alternatives !== undefined) fields.alternatives = alternatives.length ? alternatives.map((target) => `[[${target.trim()}]]`) : REMOVE;
+  return editFrontmatter(text, fields, false);
 }
 
 function humanFieldProblem(key: string, value: unknown): string | null {
@@ -149,8 +157,12 @@ function humanFieldProblem(key: string, value: unknown): string | null {
       return value === null || (Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 5)
         ? null
         : "rating must be a whole number from 1 to 5, or empty.";
+    case "alternatives":
+      return Array.isArray(value) && value.every((target) => typeof target === "string" && /^[^[\]|#\r\n]+$/.test(target) && target.trim() !== "")
+        ? null
+        : "alternatives must be a list of note names or file stems, without [[ ]], | or #.";
     default:
-      return `${key} can't be edited by hand; only kind, tags, tried and rating can.`;
+      return `${key} can't be edited by hand; only kind, tags, tried, rating and alternatives can.`;
   }
 }
 
@@ -237,6 +249,20 @@ function editFrontmatter(text: string, values: Record<string, unknown>, toolOnly
       continue;
     }
     if (value === undefined) continue;
+    if (value === REMOVE) {
+      // The key's whole lines: from the start of its line to the end of its value's last line.
+      const pair = pairs.find((p) => isScalar(p.key) && p.key.value === key);
+      if (!pair) continue;
+      const keyRange = (pair.key as { range?: [number, number, number] }).range ?? [0, 0, 0];
+      const lineStart = frontmatter.lastIndexOf("\n", keyRange[0] - 1) + 1;
+      let end = (pair.value as { range?: [number, number, number] } | null)?.range?.[1] ?? keyRange[1];
+      if (frontmatter[end - 1] !== "\n") {
+        const newline = frontmatter.indexOf("\n", end);
+        end = newline === -1 ? frontmatter.length : newline + 1;
+      }
+      edits.push({ at: lineStart, to: end, insert: "" });
+      continue;
+    }
     const old = current[key];
     const isEmpty = old === undefined || old === null || old === "";
     if (SET_ONCE.has(key) && !isEmpty) continue;

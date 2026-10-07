@@ -203,6 +203,8 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 {"journal": "personal", "tags": ["testing", "pdf", "agent-skills"], "exists": true}
 ```
 
+**Adding tags to the list** ("From GitHub topics" in the local app, `POST /api/tags` with `{"journal", "add": ["<tag>", …]}`). Each tag must already be lowercase kebab-case (GitHub topics are); otherwise nothing is written and the answer is 400. Tags the list has are ignored; the others are appended to the end of `tags.md`, in order, as ``- `<tag>` ``, with the file's own line endings. Nothing else in the file changes. A journal without `tags.md` answers 404: "Create tag list" comes first. The answer is the Tag list document. Like "Create tag list", this happens only on the user's click (schema rule 5).
+
 **Note list.** The notes in one journal, after the filters, sorted by `name`. Each item is a summary; the full note is the Note document.
 
 ```json
@@ -224,19 +226,25 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
  "sections": [{"name": "Verdict", "heading": "Verdict", "body": "avoid: async streams painful; use puppeteer\n", "draft": false},
               {"name": null, "heading": "Benchmarks", "body": "...", "draft": false}],
  "skills": [{"name": "pdf-forms", "text": "fill PDF forms from a script"}, {"name": "pdf-merge", "text": ""}],
+ "links": [{"target": "puppeteer", "label": null, "id": "pkg:npm/puppeteer", "name": "puppeteer", "from": "Verdict"},
+           {"target": "wkhtmltopdf", "label": null, "id": null, "name": null, "reason": "missing", "from": "Related"}],
+ "backlinks": [{"id": "pkg:npm/puppeteer", "name": "puppeteer", "from": "alternatives"}],
  "warnings": []}
 ```
 
 - `frontmatter` holds the fields as written, unknown ones included. `status` and `verdict` are derived from the Verdict (schema rule 1), whatever the `status` field says.
 - `sections` keeps the file's order. `name` is the canonical section name, or `null` for a section the schema doesn't know; `body` is as written, comments included; `draft` is true when the body starts with the draft marker (schema rule 3).
 - `skills` lists the lines under "Notable skills"; `text` is `""` for an empty skill line (schema rule 4).
+- `links` lists the note's `[[links]]` in file order: the `alternatives` field first, then each section's ([decision 0027](decisions/0027-alternatives-active.md)). `target` is as written without its `#heading`; `label` is the text after `|`, or `null`. A link resolves within the note's journal: to the note whose file stem is the target, else to the one note whose `name` is the target, ignoring case. Then `id` and `name` are that note's. Otherwise both are `null`, and `reason` is `missing` (no such note) or `ambiguous` (several notes have that name). `from` is the section's name (its heading as written for a section the schema doesn't know), or `alternatives`. Links in code spans and fenced code blocks don't count.
+- `backlinks` lists the other notes in the journal that link here: one item per note and place, sorted by name. A note's link to itself is not a backlink.
+- A read-only note has no `links` and no `backlinks`, and links to it are `missing`.
 - `read_only` is true when the frontmatter can't be read or has no `id`. `id` is then `null`, and `warnings` says why. The app shows such a note read-only, addressed by its `file` name (see [UI](ui.md), "API"). The Note list's `read_only` follows the same rule.
 
 **Editing a note.** The app's edit of one note ([decision 0023](decisions/0023-api-is-the-json-contract.md)) is `{"journal", "id", "version", "verdict"?, "sections"?, "fields"?, "accept_drafts"?}`. All edits are applied, or none:
 - `version` must be the file's current version (`sha256:<hex>` of its bytes); otherwise nothing is written, and the answer is the Note document as the file is now, plus `"error"`.
 - `verdict`: one line. It fills an empty Verdict as `magpie note` does (comments in the section stay); otherwise it replaces the section's body. `""` clears it. `status` follows: `reviewed` with a Verdict, `inbox` without.
 - `sections`: `{"<section name>": "<body>"}` for the schema's sections except the Verdict. The body replaces the section's body, without blank lines around it, followed by one blank line before the next section. A drafted section loses its draft marker (schema rule 3), unless the body is unchanged. A missing section is inserted before the next section in schema order, or, with no later section, after the file's last line (adding a line break and a blank line only where they are missing); an empty body for a missing section writes nothing. A body can't hold a `## ` heading outside a code block.
-- `fields`: `kind` (one of the schema's kinds), `tags` (lowercase kebab-case), `tried` (true or false), `rating` (1 to 5, or `null`). A block list stays a block list. Any other key, `status` and the tool-owned fields included, is refused.
+- `fields`: `kind` (one of the schema's kinds), `tags` (lowercase kebab-case), `tried` (true or false), `rating` (1 to 5, or `null`), `alternatives` (a list of link targets, such as `["npm--puppeteer", "wkhtmltopdf"]`, without `[[ ]]`, `|` or `#`; each is written as `"[[<target>]]"`, in that order, and `[]` removes the key and its lines). A block list stays a block list. Any other key, `status` and the tool-owned fields included, is refused.
 - `accept_drafts`: section names whose draft marker is removed; the text stays.
 - The answer is the Note document after the edit. Everything outside the edited parts stays byte for byte.
 
@@ -402,10 +410,11 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 |---|---|---|
 | `recall`, and the hook | under 150 ms | 2,000 notes, warm cache |
 | `search`, `suggest` | under 500 ms | 2,000 notes, warm cache |
+| The link index (`linkIndex` in core, for the local app) | under 150 ms | 2,000 notes, warm cache |
 
-**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `suggest`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-suggest.ts`, `scripts/bench-recall.ts`; suggest on a project with 25 dependencies and a README, and with a description) and exits 1 over a budget. CI runs all three with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
+**Measurement:** a benchmark script runs each command 20 times as a separate process against a fixture journal of 2,000 generated notes, after one warm-up run that builds the cache. It reports the median and the 95th percentile. The budgets apply to the median on the CI runner. The fixture is generated in `.scratch/bench/`; no network. `npm run bench` runs it for `search`, `suggest`, `recall` and the hook (`scripts/bench-search.ts`, `scripts/bench-suggest.ts`, `scripts/bench-recall.ts`; suggest on a project with 25 dependencies and a README, and with a description) and exits 1 over a budget. The link index has no command of its own, so `scripts/bench-links.ts` calls it in one process, as the local app's server does, each run reading the cache from disk again; each generated note links to two others and to one subject without a note. CI runs all four with `--report-only`, which prints the numbers but never fails on timing. The hook's benchmark gets the journal from `MAGPIE_HOME`, as a real setup does.
 
-**Caches:** three per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"), and `note-list.json` (each note's summary in the Note list document, for the local app). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed; the note list reads again only the notes that were added or changed. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
+**Caches:** four per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when" and "Use when"), `note-list.json` (each note's summary in the Note list document, for the local app), and `links.json` (each note's id, name and links as written, for the link index). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed; the note list and the links read again only the notes that were added or changed. Links are resolved from the cached entries on every read. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. They store file names, not paths, so a journal can be moved.
 
 **Hook start-up:** `magpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
 

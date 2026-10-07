@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
@@ -20,6 +20,7 @@ async function start(t: TestContext, env: Record<string, string> = {}) {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--broken.md": "---\nid: [broken\n---\n",
+    "journal/tags.md": "- `pdf`\n",
     [`secret.md`]: `---\nid: pkg:npm/secret\nname: ${SECRET}\n---\n\n## Verdict\n${SECRET}\n`,
     "project/package.json": "{}",
   });
@@ -84,6 +85,11 @@ test("a write with the cookie but without a matching X-Magpie-Token header gets 
   const adopt = await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { "x-magpie-token": undefined });
   assert.equal(adopt.status, 403);
   assert.equal(existsSync(join(box.project, ".magpie")), false);
+  const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
+  for (const token of [undefined, "0".repeat(64)]) {
+    assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { "x-magpie-token": token })).status, 403, `tags add ${token}`);
+  }
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tags);
 });
 
 test("a bad Host gets 403, before anything else (DNS rebinding)", async (t) => {
@@ -108,6 +114,9 @@ test("cross-origin and Origin-less writes get 403", async (t) => {
   assert.equal(existsSync(box.note("npm--left-pad.md")), false);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "project" }, { origin })).status, 403, `tags ${origin}`);
   assert.equal(existsSync(join(box.project, ".magpie", "tags.md")), false);
+  const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
+  for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { origin })).status, 403, `tags add ${origin}`);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tags);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { origin })).status, 403, `adopt ${origin}`);
   assert.equal(existsSync(join(box.project, ".magpie")), false);
   for (const origin of [`http://127.0.0.1:${server.port}`, `http://localhost:${server.port}`]) {
@@ -137,6 +146,9 @@ test("writes accept application/json only; other types get 415", async (t) => {
     assert.equal((await http.write("POST", "/api/note/preview", body, { "content-type": type })).status, 415, String(type));
   }
   assert.equal((await http.write("POST", "/api/note/preview", body, { "content-type": "application/json; charset=utf-8" })).status, 200);
+  for (const type of [undefined, "text/plain", "application/x-www-form-urlencoded"]) {
+    assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { "content-type": type })).status, 415, `tags add ${type}`);
+  }
 });
 
 test("a body over 1 MB gets 413, with or without Content-Length", async (t) => {
