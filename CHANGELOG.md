@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The note view in `magpie ui` no longer has an "Open in Obsidian" button. Notes are still plain Markdown files that Obsidian or any other editor can open, and "Open in editor" stays.
 
+### Fixed
+
+- A damaged cache entry in `.cache/recall-index.json` (valid JSON, wrong shape) no longer makes `magpie recall` crash or the Claude Code hook stay silent on an install with an avoid note. The cache is rebuilt from the notes. The local app's caches (`links.json`, `note-list.json`) read such an entry again from its note.
+
 ## [0.1.0-beta.1] - 2026-10-07
 
 The first pre-release, for early testers.

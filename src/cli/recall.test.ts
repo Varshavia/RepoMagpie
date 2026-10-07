@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderNote, type NewNote } from "../core/write.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
@@ -69,6 +70,17 @@ test("--json prints the spec's document", async () => {
     path: join(box.journal, "notes", "npm--pdfkit.md"),
   });
   assert.equal(json.matches[0].journal, "project");
+});
+
+test("a damaged recall cache: an entry of the wrong shape is rebuilt from the notes, and recall answers as before", async () => {
+  const box = sandbox(FILES);
+  const before = await magpie(box, ["recall", "pdfkit", "--json"]); // builds the caches
+  for (const cacheFile of [join(box.journal, ".cache", "recall-index.json"), join(box.project, ".magpie", ".cache", "recall-index.json")]) {
+    const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, unknown>[] };
+    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e.file === "npm--pdfkit.md" ? { ...e, keys: "npm pdfkit", avoidWhen: "never" } : e)) }));
+  }
+  const after = await magpie(box, ["recall", "pdfkit", "--json"]);
+  assert.deepEqual([after.code, after.err, after.out], [before.code, "", before.out]);
 });
 
 test("no match: nothing on stdout, a short message on stderr, exit 0; --json gives an empty list", async () => {

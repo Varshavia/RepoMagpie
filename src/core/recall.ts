@@ -7,7 +7,7 @@ import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
-import { noteSignature, readCache, writeCache } from "./note-cache.ts";
+import { isRecord, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const RECALL_CACHE = "recall-index.json";
 const CACHE_VERSION = 1;
@@ -59,14 +59,23 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
   return { sources, warnings: personal.warnings };
 }
 
-// One journal's entries, from the cache when it matches the notes on disk.
+// One journal's entries, from the cache when it matches the notes on disk and every entry has the
+// expected shape; otherwise rebuilt from the notes, so a damaged cache can't silence recall or the hook.
 export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean } {
   const { files, signature } = noteSignature(journal);
   const cached = readCache(journal, RECALL_CACHE, CACHE_VERSION, signature);
-  if (Array.isArray(cached)) return { entries: cached as RecallEntry[], rebuilt: false };
+  if (Array.isArray(cached) && cached.every(isRecallEntry)) return { entries: cached as RecallEntry[], rebuilt: false };
   const entries = files.flatMap((file) => entryOf(readFileSync(join(journal, "notes", file), "utf8"), file) ?? []);
   if (files.length) writeCache(journal, RECALL_CACHE, CACHE_VERSION, signature, entries);
   return { entries, rebuilt: true };
+}
+
+function isRecallEntry(e: unknown): boolean {
+  return isRecord(e) && typeof e.file === "string" && typeof e.id === "string" && typeof e.name === "string" &&
+    Array.isArray(e.keys) && e.keys.every((key) => Array.isArray(key) && key.length === 2 && isTexts(key)) &&
+    typeof e.verdict === "string" && isTexts(e.avoidWhen) && isTexts(e.useWhen) &&
+    Array.isArray(e.drafts) && e.drafts.every((d) => d === "use_when" || d === "avoid_when") &&
+    (e.status === "inbox" || e.status === "reviewed");
 }
 
 function entryOf(text: string, file: string): RecallEntry | null {

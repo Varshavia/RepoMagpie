@@ -131,6 +131,29 @@ test("the recall cache: written to .cache/, reused while the notes are unchanged
   assert.ok(readFileSync(join(path, ".cache", RECALL_CACHE), "utf8").startsWith("{\""));
 });
 
+test("the recall cache: an entry of the wrong shape for an unchanged note makes it rebuilt from the notes", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  const good = loadRecallEntries(path).entries;
+  const cacheFile = join(path, ".cache", RECALL_CACHE);
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, unknown>[] };
+  const zod = cache.data.find((e) => e.file === "npm--zod.md") as Record<string, unknown>;
+  const { keys: _keys, ...noKeys } = zod;
+  const wrongs: unknown[] = [
+    noKeys, { ...zod, keys: "npm zod" }, { ...zod, keys: [["npm"]] }, { ...zod, keys: [[1, "zod"]] }, { ...zod, keys: [null] },
+    { ...zod, verdict: null }, { ...zod, avoidWhen: "never" }, { ...zod, useWhen: [1] }, { ...zod, drafts: ["verdict"] },
+    { ...zod, status: "done" }, { ...zod, file: 5 }, { ...zod, id: null }, { ...zod, name: null }, "nonsense", null, [],
+  ];
+  for (const wrong of wrongs) {
+    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e === zod ? wrong : e)) }));
+    const loaded = loadRecallEntries(path);
+    assert.deepEqual([loaded.rebuilt, loaded.entries], [true, good], JSON.stringify(wrong));
+    assert.deepEqual(ids(recall([{ scope: "personal", path, entries: loaded.entries }], "pdfkit", ["npm"])), ["personal pkg:npm/pdfkit exact"]);
+    assert.equal(loadRecallEntries(path).rebuilt, false, `the cache was rewritten after ${JSON.stringify(wrong)}`);
+  }
+  writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { "npm--zod.md": zod } })); // not a list
+  assert.deepEqual(loadRecallEntries(path).entries, good);
+});
+
 test("a journal without notes writes no cache", () => {
   const path = scratchBase("recall");
   assert.deepEqual(loadRecallEntries(path).entries, []);
