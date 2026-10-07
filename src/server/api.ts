@@ -5,8 +5,10 @@ import { runAdopt } from "../core/adopt.ts";
 import {
   addTags,
   createTagList,
+  emptyGraph,
   emptyNote,
   emptyPreview,
+  graphDocument,
   locateNote,
   noteDocument,
   noteListDocument,
@@ -82,6 +84,16 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const kind = query.get("kind") ?? undefined;
         if (kind !== undefined && !KINDS.includes(kind)) return bad(empty, `kind must be one of: ${KINDS.join(", ")}.`);
         return reply(noteListDocument(journal, { status, kind, tags: query.getAll("tag") }, context));
+      },
+    },
+
+    "/api/graph": {
+      GET: ({ query }) => {
+        const journal = scope(query.get("journal"));
+        if (!journal) return bad({ ...emptyGraph("personal"), journal: null }, JOURNAL);
+        const ghosts = query.get("ghosts");
+        if (ghosts !== null && ghosts !== "1" && ghosts !== "0") return bad(emptyGraph(journal), "ghosts must be 1 or 0.");
+        return reply(graphDocument(journal, { ghosts: ghosts === "1" }, context));
       },
     },
 

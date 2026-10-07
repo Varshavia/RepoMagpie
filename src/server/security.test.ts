@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
@@ -62,6 +62,7 @@ test("a wrong token, and a request without token or cookie, get 401", async (t) 
     await send(server.port, { path: "/?token=", headers: host }),
     await send(server.port, { path: "/", headers: host }),
     await send(server.port, { path: "/api/settings", headers: host }),
+    await send(server.port, { path: "/api/graph?journal=personal", headers: host }),
     await send(server.port, { path: "/assets/app.js", headers: host }),
     await send(server.port, { path: "/api/settings", headers: { ...host, cookie: `magpie_${server.port}=${wrong}` } }),
     await send(server.port, { path: "/api/settings", headers: { ...host, cookie: `magpie_1=${server.token}` } }),
@@ -96,11 +97,13 @@ test("a bad Host gets 403, before anything else (DNS rebinding)", async (t) => {
   const { http, server } = await start(t);
   const hosts = ["evil.example", `evil.example:${server.port}`, `127.0.0.1:${server.port + 1}`, `localhost.evil.example:${server.port}`, `127.0.0.2:${server.port}`, `[::1]:${server.port}`, "127.0.0.1", ""];
   for (const host of hosts) {
-    for (const r of [await http.get("/api/settings", { host }), await http.get(`/?token=${server.token}`, { host, cookie: undefined })]) {
+    for (const r of [await http.get("/api/settings", { host }), await http.get("/api/graph?journal=personal", { host }), await http.get(`/?token=${server.token}`, { host, cookie: undefined })]) {
       assert.equal(r.status, 403, host);
       assert.equal(r.headers["set-cookie"], undefined);
+      noSecret(r, host);
     }
   }
+  assert.equal((await http.get("/api/graph?journal=personal", { host: `localhost:${server.port}` })).status, 200);
   for (const host of [`127.0.0.1:${server.port}`, `localhost:${server.port}`]) assert.equal((await http.get("/api/settings", { host })).status, 200, host);
 });
 
@@ -130,6 +133,7 @@ test("no response ever has an Access-Control-* header (no CORS)", async (t) => {
   const origin = { origin: "http://evil.example" };
   const replies = [
     await http.get("/api/settings", origin),
+    await http.get("/api/graph?journal=personal", origin),
     await http.get("/", origin),
     await http.get("/nothing", origin),
     await send(server.port, { method: "OPTIONS", path: "/api/note", headers: { host: `127.0.0.1:${server.port}`, ...origin, "access-control-request-method": "PATCH" } }),
@@ -197,6 +201,8 @@ test("no path from a request reaches the file system: traversal in every paramet
     ok(await http.write("POST", "/api/note", { target: "pkg:npm/left-pad", to: p }), `note to ${p}`);
     ok(await http.write("POST", "/api/adopt", { target: p }), `adopt target ${p}`);
     ok(await http.get(`/api/suggest?journal=${q}`), `suggest journal ${p}`);
+    ok(await http.get(`/api/graph?journal=${q}`), `graph journal ${p}`);
+    ok(await http.get(`/api/graph?journal=personal&ghosts=${q}`), `graph ghosts ${p}`);
     const suggested = await http.get(`/api/suggest?description=${q}`);
     assert.ok(suggested.status === 200 || suggested.status === 400, `suggest description ${p}: ${suggested.status}`);
     noSecret(suggested, `suggest description ${p}`);
@@ -208,6 +214,22 @@ test("no path from a request reaches the file system: traversal in every paramet
   assert.equal(existsSync(join(box.project, ".magpie")), false, "no adopt wrote anything");
   for (const q of [SECRET, "secret"]) assert.deepEqual(JSON.parse((await http.get(`/api/search?q=${encodeURIComponent(q)}`)).body).results, [], q);
   noSecret(await http.get("/api/recall?package=secret&type=npm"), "recall");
+});
+
+test("the graph reads only the journal's notes: a link to a file outside it is a missing note, never read", async (t) => {
+  const { http, box } = await start(t);
+  const secret = join(box.root, "secret.md");
+  const targets = ["../secret", "../../secret.md", secret, secret.replace(/\\/g, "/"), "secret"];
+  writeFileSync(box.note("npm--pdfkit.md"), `${PDFKIT}\n## Related\n${targets.map((target) => `- [[${target}]]`).join("\n")}\n`);
+  for (const path of ["/api/graph?journal=personal", "/api/graph?journal=personal&ghosts=1", "/api/graph?journal=project&ghosts=1"]) {
+    const r = await http.get(path);
+    assert.equal(r.status, 200, path);
+    noSecret(r, path);
+  }
+  const graph = JSON.parse((await http.get("/api/graph?journal=personal&ghosts=1")).body) as { nodes: { type: string; target?: string; reason?: string }[] };
+  const ghosts = graph.nodes.filter((n) => n.type === "ghost");
+  assert.equal(ghosts.length, new Set(targets.map((target) => target.toLowerCase())).size); // on Linux, two spellings are one
+  assert.ok(ghosts.every((n) => n.reason === "missing"));
 });
 
 test("Content-Security-Policy and the other headers", async (t) => {
@@ -246,6 +268,7 @@ test("GITHUB_TOKEN never reaches the browser: no response contains its value", a
     await http.get("/api/search?q=pdf"),
     await http.get("/api/recall?package=pdfkit"),
     await http.get("/api/suggest?description=pdf"),
+    await http.get("/api/graph?journal=personal&ghosts=1"),
     await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/microsoft/playwright-cli", to: "personal" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/nobody/nothing", to: "personal" }),
@@ -272,6 +295,9 @@ test("an unknown path gets 404, a wrong method 405, and a bug 500 without intern
   assert.equal((await http.write("POST", "/api/settings", {})).status, 405);
   assert.equal((await http.get("/api/adopt")).status, 405);
   assert.equal((await http.write("POST", "/api/suggest", {})).status, 405);
+  const graphWrite = await http.write("POST", "/api/graph", { journal: "personal" });
+  assert.equal(graphWrite.status, 405);
+  assert.equal(graphWrite.headers.allow, "GET");
   mkdirSync(join(box.journal, "notes", "folder.md")); // a folder where a note should be: reading it throws
   const bug = await http.get("/api/notes?journal=personal");
   assert.equal(bug.status, 500);
