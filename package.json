@@ -40,7 +40,7 @@
     "check:build": "node scripts/check-build.ts",
     "test:e2e": "playwright test -c ui/playwright.config.ts",
     "bench": "npm run build && node scripts/bench-search.ts && node scripts/bench-suggest.ts && node scripts/bench-recall.ts",
-    "check:links": "node scripts/check-links.mjs",
+    "check:links": "node scripts/check-links.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

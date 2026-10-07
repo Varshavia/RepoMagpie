@@ -192,7 +192,7 @@ Run from the repo root. Node 22.18 or later runs the TypeScript source directly 
 | Command | What it does |
 |---|---|
 | `npm ci` | Install exactly what `package-lock.json` lists. Use it instead of `npm install` unless a dependency was approved and is being added (section 9). |
-| `npm test` | Product tests (`node --test "src/**/*.test.ts" "ui/src/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
+| `npm test` | Product tests and the scripts' tests (`node --test "src/**/*.test.ts" "ui/src/**/*.test.ts" "scripts/**/*.test.ts"`, through `scripts/test.ts`). Fails if the real `~/.magpie` changed while they ran (section 10). Test folders live in `.scratch/tests/`, never the OS temp folder. |
 | `npm run typecheck` | `tsc --noEmit` over `src/` and `scripts/`, then over `ui/` (its own `tsconfig.json`). |
 | `npm run build` | Bundle the CLI from `src/cli/main.ts` into `dist/cli/` with Vite ([decision 0025](docs/decisions/0025-bundle-the-cli.md)), then build the local app from `ui/` into `dist/ui/`. `dist/` is git-ignored. |
 | `npm run check:build` | The built CLI against the source: the same output for the same commands on a scratch journal (exit 1 if any differs). Run after `npm run build` when the build or the CLI's imports change. |
