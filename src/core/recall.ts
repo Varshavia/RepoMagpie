@@ -184,5 +184,11 @@ export function runRecall(queries: string[], type: PackageType | undefined, plac
 
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
 export function isAvoid(match: Pick<RecallMatch, "verdict" | "avoid_when">): boolean {
-  return /^avoid\b/i.test(match.verdict ?? "") || match.avoid_when.length > 0;
+  return verdictSaysAvoid(match.verdict) || match.avoid_when.length > 0;
+}
+
+// A Verdict that says to avoid the package: it starts with the word "avoid". magpie adopt names no
+// install command for one (spec §2); "Avoid when" lists situations, not the package.
+export function verdictSaysAvoid(verdict: string | null): boolean {
+  return /^avoid\b/i.test(verdict ?? "");
 }

@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DRAFT_MARKER as CORE_DRAFT_MARKER, KINDS as CORE_KINDS } from "../../../src/core/note.ts";
 import { readablePurl as coreReadablePurl } from "../../../src/core/identity.ts";
-import { isAvoid as coreIsAvoid } from "../../../src/core/recall.ts";
-import { DRAFT_MARKER, hookWouldAsk, isAvoid, KINDS, packageLabel, readablePurl, TAG_PATTERN } from "./schema.ts";
+import { isAvoid as coreIsAvoid, verdictSaysAvoid as coreVerdictSaysAvoid } from "../../../src/core/recall.ts";
+import { DRAFT_MARKER, hookWouldAsk, isAvoid, KINDS, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
 
 // The app can't bundle core's modules (they read files), so it mirrors some of core's values and
 // rules. These tests keep the mirror equal to core: core stays the single source.
@@ -24,6 +24,13 @@ test("isAvoid agrees with core's rule (decision 0024) on every case", () => {
     { verdict: "I avoid it", avoid_when: [] },
   ];
   for (const c of cases) assert.equal(isAvoid(c), coreIsAvoid(c), JSON.stringify(c));
+});
+
+test("verdictSaysAvoid agrees with core's (adopt, spec §2) on every case", () => {
+  const cases = ["avoid: async streams painful", "Avoid — unmaintained", "avoidable in small scripts", "fine for invoices", "I avoid it", "", null];
+  for (const c of cases) assert.equal(verdictSaysAvoid(c), coreVerdictSaysAvoid(c), JSON.stringify(c));
+  assert.equal(verdictSaysAvoid("AVOID"), true);
+  assert.equal(verdictSaysAvoid("fine; avoid the old API"), false);
 });
 
 test("the hook asks only for an exact avoid match; a name-only match informs", () => {
