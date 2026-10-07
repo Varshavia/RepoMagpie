@@ -77,7 +77,7 @@ So:
 
 The rules are [decision 0023](decisions/0023-api-is-the-json-contract.md)'s:
 - Edits a person makes in the app are human edits, written only through round-trip-safe core functions: `setSection`, `setVerdict`, and edits of the human-owned frontmatter keys `kind`, `tags`, `tried` and `rating`. `status` follows the Verdict.
-- Everything outside the edited part stays byte for byte.
+- Everything outside the edited part stays byte for byte. A section the file doesn't have is inserted before the next section in the schema's body order, or after the file's last line; an empty body for it writes nothing.
 - Tool-owned fields are never edited by hand.
 - Saving an edited draft section removes its draft marker; "Accept draft" removes it without changing the text.
 - A note whose frontmatter can't be read is read-only, with a warning and "Open in editor".
@@ -153,6 +153,8 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - Under the title: "Tried" or "Not tried", and the rating ("Tried · rated 4 of 5"); nothing for a note neither tried nor rated.
    - The Verdict as the hero, marked with the accent; then Use when and Avoid when. The "Avoid when" label is red only when the section has text.
    - "What it does", with a visible draft badge while it is a draft, and "Accept".
+   - "My notes" and "Related". "My notes" is the free-form place to write: a multi-line Markdown editor that keeps the text as typed (blank lines, lists, code fences).
+   - Use when, Avoid when, My notes and Related are always shown. When one is empty, or the file doesn't have it, it says "Nothing yet." and offers Edit. Saving a section the file doesn't have inserts it at its place in the schema's body order.
    - Skill lines: the described ones; the others behind one row ("9 skills, none described yet") that expands to their names.
    - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
    - Actions: open the repository, open in an editor, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).

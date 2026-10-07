@@ -68,6 +68,29 @@ test("note view: Tried and the rating under the title; nothing for a note neithe
   await expect(page.locator(".note-head .note-tried")).toHaveCount(0);
 });
 
+test("note view: My notes and Related are there when empty; My notes keeps multi-line Markdown as typed", async ({ page, magpie }) => {
+  // A hand-written note without the two sections: saving My notes adds it at the end, nothing else changes.
+  const file = magpie.note("npm--pdfkit.md");
+  const before = PDFKIT.replace("\n## My notes\n\n## Related\n", "");
+  writeFileSync(file, before);
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  await page.keyboard.type("pdfkit");
+  await page.getByRole("listbox", { name: "Search results" }).getByRole("option").filter({ hasText: "pdfkit" }).first().click();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  for (const name of ["My notes", "Related"]) await expect(page.getByRole("region", { name }).getByText("Nothing yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit My notes" }).click();
+  const typed = "Tried it for invoices.\n\n- streams were painful\n  - nested item\n\n```js\n## not a heading\ndoc.pipe(stream);\n```";
+  await page.getByRole("textbox", { name: "My notes" }).fill(typed);
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("My notes saved")).toBeVisible();
+  expect(readFileSync(file, "utf8")).toBe(`${before}\n## My notes\n${typed}\n`);
+  const myNotes = page.getByRole("region", { name: "My notes" });
+  await expect(myNotes.getByText("doc.pipe(stream);")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Related" }).getByText("Nothing yet.")).toBeVisible();
+});
+
 test("search: / focuses the box, Verdicts first, Enter opens the note; the status filter applies", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.keyboard.press("/");

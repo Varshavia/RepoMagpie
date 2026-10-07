@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The note view in `magpie ui` always shows "My notes" and "Related", like "Use when" and "Avoid when", so you can start them from the app. An empty one says "Nothing yet." and offers Edit. Saving a section the file doesn't have adds it at its place in the note and leaves the rest of the file as it was, including blank lines at the end.
+
 ### Removed
 
 - The note view in `magpie ui` no longer has an "Open in Obsidian" button. Notes are still plain Markdown files that Obsidian or any other editor can open, and "Open in editor" stays.
