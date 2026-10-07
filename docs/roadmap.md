@@ -237,7 +237,7 @@ The app becomes the place where you write and connect notes: links, backlinks, t
 ### Part 1: linked notes (`feat/linked-notes`)
 - [x] Decisions: the app is the workspace ([0026](decisions/0026-the-app-is-the-workspace.md)); `alternatives` becomes active, one side is enough ([0027](decisions/0027-alternatives-active.md)).
 - [x] Remove "Open in Obsidian" from the app. "Open in editor" stays.
-- [ ] "My notes" and "Related" are always shown in the note view, so you can start them from the app. Saving a section the file doesn't have inserts it at its canonical position.
+- [x] "My notes" and "Related" are always shown in the note view, so you can start them from the app. Saving a section the file doesn't have inserts it at its canonical position.
 - [ ] Links in core: `[[target]]`, `[[target|label]]`, `[[target#heading]]`, resolved within the journal by file stem, then by a unique name; otherwise unresolved (missing or ambiguous). A link index with outgoing and incoming links, warm in under 150 ms for 2,000 notes.
 - [ ] Links in the API and the app: `links` and `backlinks` in the Note document, in-app links, unresolved links that open Add, `[[` autocomplete, "Linked from", and live refresh.
 - [ ] `alternatives`: in the schema, core, `PATCH /api/note`, and the note view (chips, "+ Add", "Alternative to: …" on the other note).

@@ -157,7 +157,8 @@ function humanFieldProblem(key: string, value: unknown): string | null {
 // A person's edit of one section (decision 0023): its body is replaced and nothing else changes.
 // Blank lines around the new body are dropped, and one blank line separates it from the next
 // section. Saving a draft section accepts it, so the draft marker goes (schema rule 3), unless
-// the body is unchanged. A missing section is inserted before the next one in schema order. A
+// the body is unchanged. A missing section is inserted before the next one in schema order, or at
+// the end after the file's own last line; an empty body for a missing section changes nothing. A
 // Verdict edit also sets status to match it (schema rule 1). Only notes with readable
 // frontmatter are edited.
 export function setSection(text: string, name: SectionName, body: string): EditResult {
@@ -179,12 +180,18 @@ export function setSection(text: string, name: SectionName, body: string): EditR
     if (current.join("\n") === wanted.join("\n")) return { text, changed: false, warnings: [] };
     lines.splice(start, end - start, ...block, at + 1 < headings.length ? cr : "");
   } else {
+    if (!block.length) return { text, changed: false, warnings: [] };
     const order = SECTION_NAMES.indexOf(name);
     const next = headings.find((h) => SECTION_NAMES.findIndex((n) => n.toLowerCase() === h.name) > order);
     if (next) lines.splice(next.line, 0, `## ${name}${cr}`, ...block, cr);
     else {
-      while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-      lines.push(cr, `## ${name}${cr}`, ...block, "");
+      // At the end, after the file's own ending: a line break and a blank line only where missing.
+      if (lines[lines.length - 1] !== "") {
+        lines[lines.length - 1] += cr;
+        lines.push("");
+      }
+      if (lines.length < 2 || lines[lines.length - 2].trim() !== "") lines.splice(lines.length - 1, 0, cr);
+      lines.splice(lines.length - 1, 0, `## ${name}${cr}`, ...block);
     }
   }
   let result = lines.join("\n");

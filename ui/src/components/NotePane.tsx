@@ -36,8 +36,9 @@ export interface NotePaneProps {
 
 type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
 
-// Sections shown even when empty, so the person can fill them.
-const ALWAYS = ["Use when", "Avoid when"];
+// Sections shown even when empty, so the person can fill them. My notes is the free-form place to
+// write (decision 0026).
+const ALWAYS = ["Use when", "Avoid when", "My notes", "Related"];
 // Shown above the Verdict editor while reviewing.
 const CONTEXT = ["What it does", "Use when"];
 // Sections the person can edit here (spec, "Editing a note"); the Verdict has its own editor, and

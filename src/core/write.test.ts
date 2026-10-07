@@ -365,6 +365,63 @@ test("a missing section with no later section goes at the end after a blank line
   assert.equal(r.text, `${HAND_WRITTEN}\n## Related\n[[puppeteer]]\n`);
 });
 
+// "My notes" and "Related" can be started from the app (docs/ui.md §7), so a note without them
+// gets them at their place in the schema's body order, and every other byte stays.
+const WITH_RELATED = `${HAND_WRITTEN.replace("## My notes\nTried it in 2025.\n", "")}## Related\n- [[puppeteer]]\n`;
+
+test("a missing My notes goes before Related; the rest byte for byte", () => {
+  const r = setSection(WITH_RELATED, "My notes", "First thoughts.");
+  assert.equal(r.text, WITH_RELATED.replace("## Related\n", "## My notes\nFirst thoughts.\n\n## Related\n"));
+  assert.deepEqual(readNote(r.text).sections.map((s) => s.heading), ["Verdict", "Use when", "My own section", "Notable skills", "My notes", "Related"]);
+});
+
+test("a missing My notes after the last section keeps the file's own ending, blank lines and all", () => {
+  const base = HAND_WRITTEN.replace("## My notes\nTried it in 2025.\n", "");
+  const endings: [string, string][] = [
+    [base, `${base}## My notes\nNew.\n`], // ends with a blank line already: no second one
+    [`${base}\n\n`, `${base}\n\n## My notes\nNew.\n`],
+    [base.replace(/\n+$/, ""), `${base.replace(/\n+$/, "")}\n\n## My notes\nNew.\n`], // no final line break
+  ];
+  for (const [text, expected] of endings) assert.equal(setSection(text, "My notes", "New.").text, expected);
+  const crlf = base.replace(/\n/g, "\r\n");
+  assert.equal(setSection(crlf, "My notes", "New.").text, `${crlf}## My notes\r\nNew.\r\n`);
+  const crlfOpen = crlf.replace(/(\r\n)+$/, "");
+  assert.equal(setSection(crlfOpen, "My notes", "New.").text, `${crlfOpen}\r\n\r\n## My notes\r\nNew.\r\n`);
+});
+
+test("an empty body for a missing section changes nothing", () => {
+  const r = setSection(WITH_RELATED, "My notes", "\n  \n");
+  assert.equal(r.text, WITH_RELATED);
+  assert.equal(r.changed, false);
+  assert.deepEqual(r.warnings, []);
+});
+
+test("My notes keeps long Markdown as typed: blank lines, lists, code fences, indentation", () => {
+  const typed = [
+    "Tried it for invoices in 2025.",
+    "",
+    "",
+    "- streams were painful",
+    "  - nested: back-pressure   ",
+    "1. first",
+    "2. second",
+    "",
+    "```js",
+    "## not a heading inside code",
+    "doc.pipe(stream);",
+    "",
+    "    indented line",
+    "```",
+    "",
+    "> a quote with **bold** and `code`",
+    "x".repeat(2000),
+  ].join("\n");
+  const r = setSection(WITH_RELATED, "My notes", typed);
+  assert.equal(r.text, WITH_RELATED.replace("## Related\n", `## My notes\n${typed}\n\n## Related\n`));
+  assert.equal(readNote(r.text).sections.find((s) => s.name === "My notes")?.body.replace(/\n+$/, ""), typed);
+  assert.equal(setSection(r.text, "My notes", typed).changed, false);
+});
+
 test("saving an edited draft removes its draft marker (schema rule 3)", () => {
   for (const body of ["<!-- magpie:draft -->\nA library for PDFs.", "A library for PDFs."]) {
     const r = setSection(DRAFTED, "What it does", body);
