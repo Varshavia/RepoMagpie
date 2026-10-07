@@ -72,4 +72,4 @@ Only when the user explicitly asks for that note:
 magpie adopt <name-or-purl> --json
 ```
 
-It copies the note from the personal journal into the project journal and returns the install command in `install` (or several in `install_choices`, for the user to choose from). It never installs anything; run the install only if the user asks, and look the package up first as above.
+It copies the note from the personal journal into the project journal and returns the install command in `install` (or several in `install_choices`, for the user to choose from). When the note's Verdict says to avoid the package, it copies the note but names no command: tell the user what the Verdict says. It never installs anything; run the install only if the user asks, and look the package up first as above.
