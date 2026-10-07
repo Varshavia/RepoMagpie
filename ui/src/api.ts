@@ -2,14 +2,14 @@
 // cookie (the browser sends it); writes also carry the X-Magpie-Token header from the page's meta tag.
 // Every document type comes from core, so the app reads exactly what the CLI's --json prints.
 import type { AdoptJson } from "../../src/core/adopt.ts";
-import type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
+import type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
 import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
 import type { SearchResult } from "../../src/core/search.ts";
 import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson };
+export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -66,6 +66,7 @@ export const api = {
   createTagList: (journal: Scope) => write<TagListJson>("POST", "/api/tags", { journal }),
   addTags: (journal: Scope, add: string[]) => write<TagListJson>("POST", "/api/tags", { journal, add }),
   notes: (journal: Scope) => get<NoteListJson>("/api/notes", { journal }),
+  graph: (journal: Scope, ghosts: boolean) => get<GraphJson>("/api/graph", { journal, ghosts: ghosts ? "1" : undefined }),
   note: (journal: Scope, address: Address) => get<NoteJson>("/api/note", { journal, ...addressParams(address) }),
   patch: (patch: Patch) => write<NoteJson>("PATCH", "/api/note", patch),
   search: (params: { q: string; journal?: Scope; kind?: string; tag?: string[]; limit?: number }) =>

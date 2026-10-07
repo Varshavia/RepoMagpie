@@ -1,8 +1,8 @@
 // The keyboard map (docs/ui.md §7). Pure: a key press in, an action out. Single keys act only
 // outside text fields; Ctrl/Cmd+K, Ctrl/Cmd+Enter and Esc act everywhere. "g" starts a two-key
-// sequence (g i, g s).
+// sequence (g i, g s, g g).
 
-export type Action = "palette" | "search" | "next" | "previous" | "open" | "edit" | "save" | "escape" | "go-inbox" | "go-search" | "help";
+export type Action = "palette" | "search" | "next" | "previous" | "open" | "edit" | "save" | "escape" | "go-inbox" | "go-search" | "go-graph" | "help";
 
 export interface KeyInput {
   key: string;
@@ -16,7 +16,7 @@ export interface KeyInput {
 export type Pending = "g" | null;
 
 const SINGLE: Record<string, Action> = { "/": "search", j: "next", k: "previous", ArrowDown: "next", ArrowUp: "previous", Enter: "open", e: "edit", "?": "help" };
-const AFTER_G: Record<string, Action> = { i: "go-inbox", s: "go-search" };
+const AFTER_G: Record<string, Action> = { i: "go-inbox", s: "go-search", g: "go-graph" };
 
 export function keyAction(input: KeyInput, pending: Pending): { action: Action | null; pending: Pending } {
   const mod = input.mac ? input.meta : input.ctrl;
@@ -39,6 +39,6 @@ export const KEY_MAP: { keys: string; does: string }[] = [
   { keys: "Ctrl+Enter", does: "Save" },
   { keys: "[[", does: "In an editor: link a note (↑ / ↓ choose, Enter or Tab inserts, Esc closes the list)" },
   { keys: "Esc", does: "Close the palette or editor; back to the list" },
-  { keys: "g i / g s", does: "Go to Inbox / Search" },
+  { keys: "g i / g s / g g", does: "Go to Inbox / Search / Graph" },
   { keys: "?", does: "Show the keyboard map" },
 ];

@@ -11,6 +11,7 @@ export type View =
   | { page: "import" }
   | { page: "recall" }
   | { page: "suggest" }
+  | { page: "graph" }
   | { page: "settings" };
 
 // The journal list a view shows, or null for the other screens.
@@ -47,6 +48,8 @@ export function viewTitle(view: View): string {
       return "Check a package";
     case "suggest":
       return "Suggest for this project";
+    case "graph":
+      return "Graph";
     case "settings":
       return "Settings";
   }

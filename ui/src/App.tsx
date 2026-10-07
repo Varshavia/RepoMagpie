@@ -1,6 +1,6 @@
 // The local app (docs/ui.md §7): three panes, the command palette, the keyboard map, live updates
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ApiError, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
@@ -31,6 +31,9 @@ type ListState = { status: "loading" } | { status: "error"; error: string } | { 
 type Live = { tick: number; files: string[] };
 
 const SCOPES: Scope[] = ["personal", "project"];
+
+// The graph page is its own chunk, with sigma and graphology; the other screens never load it.
+const GraphPage = lazy(() => import("./components/GraphPage.tsx"));
 
 export function App() {
   const [settings, setSettings] = useState<SettingsJson | null>(null);
@@ -285,6 +288,7 @@ export function App() {
     { id: "import", label: "Import lines", keywords: "bulk", icon: "import", run: () => go({ page: "import" }) },
     { id: "recall", label: "Check a package", keywords: "recall hook install", icon: "package", run: () => go({ page: "recall" }) },
     { id: "suggest", label: "Suggest for this project", keywords: "fit candidates dependencies manifest", icon: "folder", run: () => go({ page: "suggest" }) },
+    { id: "graph", label: "Open graph", keywords: "map connections links tags network", icon: "graph", hint: "g g", run: () => go({ page: "graph" }) },
     { id: "settings", label: "Settings", keywords: "journal token version", icon: "gear", run: () => go({ page: "settings" }) },
     ...(journal === "personal" && hasProject
       ? [{ id: "project", label: "Switch to the project journal", keywords: "journal", icon: "users" as const, run: () => setJournal("project") }]
@@ -342,6 +346,8 @@ export function App() {
       case "go-search":
       case "search":
         return go({ page: "search" });
+      case "go-graph":
+        return go({ page: "graph" });
       case "help":
         setHelp(true);
         return;
@@ -513,6 +519,20 @@ export function App() {
           )}
         </section>
       </>
+    );
+  } else if (view.page === "graph") {
+    workspace = (
+      <Suspense
+        fallback={
+          <section className="pane" aria-label="Graph">
+            <p className="graph-status" role="status">
+              Loading the graph…
+            </p>
+          </section>
+        }
+      >
+        <GraphPage key={journal} journal={journal} theme={theme} onAdd={() => go({ page: "add" })} />
+      </Suspense>
     );
   } else {
     workspace = (

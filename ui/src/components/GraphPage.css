@@ -1,0 +1,37 @@
+/* The graph page's styles, loaded with its chunk (decision 0028); the --graph-* tokens are in
+   styles.css with the others. */
+
+.graph-page { position: relative; }
+.graph-page .pane-header .graph-status { overflow: hidden; padding: 0; text-overflow: ellipsis; white-space: nowrap; }
+.graph-actions { display: flex; gap: var(--xs); margin-left: auto; }
+.graph-body { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.graph-canvas { flex: 1; min-height: 0; background: var(--canvas); }
+.graph-canvas[data-waiting="true"] { visibility: hidden; }
+.graph-notice { padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); color: var(--ink-muted); font-size: 13px; }
+.graph-arranging { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); color: var(--ink-muted); }
+/* An empty element the page reads the graph tokens from, as the current theme resolves them. */
+.graph-probe { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.graph-legend {
+  position: absolute;
+  bottom: var(--md);
+  left: var(--md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+  padding: var(--sm) var(--md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.graph-legend ul { display: flex; flex-wrap: wrap; gap: var(--xs) var(--md); margin: 0; padding: 0; list-style: none; }
+.graph-legend li { display: flex; align-items: center; gap: var(--xs); }
+.swatch { display: inline-block; flex: none; }
+.swatch.dot { width: 10px; height: 10px; border-radius: var(--r-full); }
+.swatch.dot.small { width: 7px; height: 7px; }
+.swatch.dot.faded { background: color-mix(in srgb, var(--graph-tool) 45%, var(--canvas)); }
+.swatch.line { width: 16px; height: 1px; }
+.swatch.line.link { height: 2px; }
+.swatch.line.alternative { height: 3px; }

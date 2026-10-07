@@ -9,6 +9,13 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: process.env.CI ? "github" : "list",
-  use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, trace: "retain-on-failure" },
+  // The graph page draws with WebGL. Runners have no GPU: SwiftShader, Chromium's software renderer,
+  // is named explicitly, so every machine draws the same way (decision 0028).
+  use: {
+    ...devices["Desktop Chrome"],
+    viewport: { width: 1440, height: 900 },
+    trace: "retain-on-failure",
+    launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+  },
   projects: [{ name: "chromium" }],
 });

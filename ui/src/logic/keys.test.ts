@@ -39,6 +39,12 @@ test("g then i goes to the Inbox, g then s to Search; any other key drops the g"
   assert.deepEqual(act(key("i", { editable: true }), "g"), { action: null, pending: null });
 });
 
+test("g then g opens the graph; a third g starts a new sequence", () => {
+  assert.deepEqual(act(key("g"), "g"), { action: "go-graph", pending: null });
+  assert.deepEqual(act(key("g"), null), { action: null, pending: "g" });
+  assert.deepEqual(act(key("g", { editable: true }), "g"), { action: null, pending: null });
+});
+
 test("browser shortcuts pass through: Ctrl or Alt with any other key does nothing", () => {
   for (const input of [key("j", { ctrl: true }), key("e", { alt: true }), key("r", { meta: true, mac: true }), key("/", { ctrl: true })]) {
     assert.equal(act(input).action, null, input.key);
@@ -46,5 +52,5 @@ test("browser shortcuts pass through: Ctrl or Alt with any other key does nothin
 });
 
 test("the map shown with ? lists every key of docs/ui.md §7", () => {
-  assert.deepEqual(KEY_MAP.map((row) => row.keys), ["Ctrl/Cmd+K", "/", "j / k", "Enter", "e", "Ctrl+Enter", "[[", "Esc", "g i / g s", "?"]);
+  assert.deepEqual(KEY_MAP.map((row) => row.keys), ["Ctrl/Cmd+K", "/", "j / k", "Enter", "e", "Ctrl+Enter", "[[", "Esc", "g i / g s / g g", "?"]);
 });
