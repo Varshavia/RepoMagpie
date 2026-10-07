@@ -48,15 +48,24 @@ export function statusLine(counts: Shown["counts"]): string {
   return `Showing ${plural(counts.notes, "note")}, ${plural(counts.tags, "tag")} and ${plural(counts.connections, "connection")}`;
 }
 
-// A note's size grows with the log of its connections, so hubs stand out without hiding the rest.
-// Tag nodes are small and all the same size; their label says what they are.
+// Sizes are sigma's, about the radius in screen pixels at the default zoom. A note with no
+// connections is still clearly visible (about 14 px across); a note grows with the log of its
+// connections, so hubs stand out without hiding the rest. Tag nodes are a little smaller than the
+// smallest note, all the same size; their label says what they are.
 export function nodeSize(type: GraphNode["type"], degree: number): number {
-  return type === "note" ? 4 + 2.5 * Math.log2(1 + degree) : 3;
+  return type === "note" ? 8 + 2.5 * Math.log2(1 + degree) : 6;
+}
+
+// A small graph shows every label; a larger one names its larger nodes, and the rest as you zoom in.
+export const ALL_LABELS_BELOW = 150;
+
+export function allLabels(drawnNodes: number): boolean {
+  return drawnNodes < ALL_LABELS_BELOW;
 }
 
 // Edge sizes are in screen pixels at the default zoom. Colours are the DESIGN.md tokens.
 export function edgeStyle(type: EdgeType): { size: number; color: string } {
-  const size = { tagged: 0.8, link: 1.4, alternative: 2.6, similar: 1 }[type];
+  const size = { tagged: 1.5, link: 2.2, alternative: 3.4, similar: 1.2 }[type];
   return { size, color: `--graph-edge-${type}` };
 }
 
@@ -97,6 +106,9 @@ export function seedPosition(key: string): { x: number; y: number } {
 }
 
 // ForceAtlas2 for a fixed number of iterations, then it stops. Barnes-Hut above 1,000 nodes.
+// Strong gravity (a pull that grows with the distance to the centre), at 0.3, keeps notes without
+// connections close to the rest; at 0.05 they drifted to a ring far out, and fitting that ring left
+// the connected notes small in the middle. At 1 the clusters flatten into an even disc.
 export const LAYOUT = { iterations: 300, chunk: 25 };
 
 export function layoutSettings(order: number) {
@@ -104,7 +116,7 @@ export function layoutSettings(order: number) {
     barnesHutOptimize: order > 1000,
     barnesHutTheta: 0.5,
     strongGravityMode: true,
-    gravity: 0.05,
+    gravity: 0.3,
     scalingRatio: 10,
     slowDown: 1 + Math.log(Math.max(order, 1)),
     linLogMode: false,
