@@ -102,6 +102,30 @@ test("a repository note without packages has no install command; the run gives i
   assert.equal(run.url, "https://github.com/mattpocock/skills");
 });
 
+test("a Verdict that says to avoid: the note is still copied, but no install command is named", async () => {
+  const avoid = note({ id: "pkg:npm/pdfkit", verdict: "Avoid: async streams painful; use puppeteer" });
+  const p = place({ "journal/notes/npm--pdfkit.md": avoid, "project/package.json": "{}" });
+  const run = await runAdopt({ target: "pdfkit" }, p.context);
+  assert.equal(run.outcome, "ok");
+  assert.deepEqual(run.document, { id: "pkg:npm/pdfkit", from: p.personal("npm--pdfkit.md"), to: p.copy("npm--pdfkit.md"), install: null, install_choices: [] });
+  assert.equal(run.avoid, true);
+  assert.equal(readFileSync(p.copy("npm--pdfkit.md"), "utf8"), adopted(avoid));
+
+  const several = note({ id: "pkg:github/acme/tool", name: "acme/tool", verdict: "avoid", packages: ["pkg:npm/acme-tool", "pkg:pypi/acme-tool"] });
+  const q = place({ "journal/notes/github--acme--tool.md": several });
+  const repository = await runAdopt({ target: "pkg:github/acme/tool" }, q.context);
+  assert.deepEqual([repository.document.install, repository.document.install_choices, repository.avoid], [null, [], true]);
+});
+
+test("Avoid when text alone, or a Verdict that only mentions avoiding, still names the install command", async () => {
+  const p = place({ "journal/notes/npm--pdfkit.md": PDFKIT, "project/package.json": "{}" });
+  const run = await runAdopt({ target: "pdfkit" }, p.context);
+  assert.deepEqual([run.document.install, run.avoid], ["npm install pdfkit", false]);
+
+  const q = place({ "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: "avoidable overhead, but fine" }), "project/package.json": "{}" });
+  assert.equal((await runAdopt({ target: "pdfkit" }, q.context)).document.install, "npm install pdfkit");
+});
+
 test("a note already in the project journal: nothing changes, exit 1 with its path", async () => {
   const project = note({ id: "pkg:npm/pdfkit", verdict: "the team's verdict" });
   const p = place({ "journal/notes/npm--pdfkit.md": PDFKIT, "project/.magpie/notes/npm--pdfkit.md": project, "project/package.json": "{}" });

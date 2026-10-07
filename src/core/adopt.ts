@@ -1,5 +1,5 @@
 // magpie adopt <name> (spec §2): copies a note from the personal journal into the project journal
-// and names the install command. It never installs anything. Returns the --json document, which the
+// and names the install command, unless the note's Verdict says to avoid the package. It never installs anything. Returns the --json document, which the
 // CLI prints and the local app's API returns as is (decision 0023). Writes one note; never prints.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -8,6 +8,7 @@ import { fileNameClash, readablePurl, type PackageType } from "./identity.ts";
 import { createJournal, listNotes, noteFor } from "./journals.ts";
 import { readNote } from "./note.ts";
 import type { Outcome } from "./outcome.ts";
+import { verdictSaysAvoid } from "./recall.ts";
 import { locateJournal, resolveInput, type Context } from "./save.ts";
 import { setToolFields } from "./write.ts";
 
@@ -31,6 +32,7 @@ export interface AdoptRun {
   document: AdoptJson;
   name: string | null; // the note's name, for people
   url: string | null; // a GitHub repository's URL, for one without packages
+  avoid: boolean; // the Verdict says to avoid the package, so no install command is named
   notices: string[]; // things done on the way, such as creating the project journal
   warnings: string[];
 }
@@ -39,7 +41,7 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   const personal = locateJournal("personal", context);
   const warnings = personal.warnings;
   const stop = (error: string, outcome: Outcome, document: Partial<AdoptJson> = {}): AdoptRun =>
-    ({ outcome, document: { id: null, from: null, to: null, install: null, install_choices: [], ...document, error }, name: null, url: null, notices: [], warnings });
+    ({ outcome, document: { id: null, from: null, to: null, install: null, install_choices: [], ...document, error }, name: null, url: null, avoid: false, notices: [], warnings });
 
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
@@ -72,17 +74,20 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   }
 
   // A repository named by itself: its packages decide. One is the command; several are choices.
+  // A Verdict that says to avoid the package gets no command at all.
+  const { frontmatter, verdict } = readNote(text);
+  const avoid = verdictSaysAvoid(verdict);
   const root = dirname(project.path);
-  const commands = (resolved.purl.startsWith("pkg:github/") ? source.packages : [resolved.purl])
+  const commands = avoid ? [] : (resolved.purl.startsWith("pkg:github/") ? source.packages : [resolved.purl])
     .map((purl) => installCommand(purl, root))
     .filter((command): command is string => command !== null);
   const install = commands.length === 1 ? commands[0] : null;
-  const frontmatter = readNote(text).frontmatter;
   return {
     outcome: "ok",
     document: { ...found, install, install_choices: commands.length > 1 ? commands : [] },
     name: typeof frontmatter.name === "string" ? frontmatter.name : readablePurl(source.id),
     url: resolved.purl.startsWith("pkg:github/") ? repositoryUrl(resolved.purl) : null,
+    avoid,
     notices,
     warnings: [...warnings, ...copy.warnings],
   };

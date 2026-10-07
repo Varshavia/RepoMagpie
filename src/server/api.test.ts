@@ -137,6 +137,12 @@ test("POST /api/adopt returns exactly magpie adopt --json and writes the same no
     const cliResult = await cli(box, argv, fetch);
     assert.deepEqual(parsed(await http.write("POST", "/api/adopt", body)), { status: STATUS_FOR_EXIT[cliResult.code], document: cliResult.document }, JSON.stringify(body));
   }
+  // The personal pdfkit note's Verdict says to avoid: copied, with no install command (spec §2).
+  rmSync(join(box.project, ".magpie", "notes", "npm--pdfkit.md"));
+  const avoid = parsed(await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }));
+  assert.equal(avoid.status, 200);
+  assert.deepEqual(avoid.document, { id: "pkg:npm/pdfkit", from: box.note("npm--pdfkit.md"), to: join(box.project, ".magpie", "notes", "npm--pdfkit.md"), install: null, install_choices: [] });
+
   for (const body of [{}, { target: 3 }, { target: "pkg:npm/x", type: "maven" }]) {
     const r = parsed(await http.write("POST", "/api/adopt", body));
     assert.equal(r.status, 400, JSON.stringify(body));

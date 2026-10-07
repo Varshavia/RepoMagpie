@@ -411,6 +411,8 @@ test("suggest: a project with nothing to go on asks for a description", async ({
 
 test("adopt: the note reaches the project journal only after the confirm; the install command shows; nothing is installed", async ({ page, magpie }) => {
   writeFileSync(join(magpie.project, "pnpm-lock.yaml"), "");
+  const fine = PDFKIT.replace("avoid: async streams painful; use puppeteer", "fine for invoices");
+  writeFileSync(magpie.note("npm--pdfkit.md"), fine);
   const before = readdirSync(magpie.project).sort();
   await magpie.open(page);
   await page.getByRole("button", { name: /All notes/ }).click();
@@ -421,12 +423,23 @@ test("adopt: the note reaches the project journal only after the confirm; the in
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
   await expect(page.getByText("pnpm add pdfkit")).toBeVisible();
   await expect(page.getByRole("status").getByText("Copied to the project journal")).toBeVisible();
-  expect(readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8")).toBe(PDFKIT.replace(/\n---\n/, `\nadopted: ${today()}\n---\n`));
+  expect(readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8")).toBe(fine.replace(/\n---\n/, `\nadopted: ${today()}\n---\n`));
   expect(readdirSync(magpie.project).sort()).toEqual(before);
   await page.getByRole("button", { name: "Open the project's note" }).click();
   await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Adopt to project" })).toHaveCount(0);
+});
+
+test("adopt: a note whose Verdict says to avoid is copied, with no install command", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByText("Your note says to avoid pdfkit; no install command.")).toBeVisible();
+  await expect(page.getByText("npm install pdfkit")).toHaveCount(0);
+  expect(existsSync(magpie.note("npm--pdfkit.md", "project"))).toBe(true);
 });
 
 test("adopt: a repository note with one package gets its command; with several, one per package to choose from", async ({ page, magpie }) => {

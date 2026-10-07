@@ -28,6 +28,20 @@ test("copies the note, prints its path and the install command on stdout; messag
   assert.match(readFileSync(copy, "utf8"), /\nadopted: 2026-10-04\n---\n/);
 });
 
+test("a Verdict that says to avoid: the note is copied, no install command; --json has install null", async () => {
+  const files = { ...FILES, "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: "avoid: async streams painful; use puppeteer" }) };
+  const box = sandbox(files);
+  const r = await magpie(box, ["adopt", "pdfkit"]);
+  assert.equal(r.code, 0, r.err);
+  const copy = join(box.project, ".magpie", "notes", "npm--pdfkit.md");
+  assert.equal(r.out, `${copy}\nYour note says to avoid pdfkit; no install command.\n`);
+  assert.ok(existsSync(copy));
+
+  const json = await magpie(sandbox(files), ["adopt", "pdfkit", "--json"]);
+  assert.equal(json.code, 0);
+  assert.deepEqual([JSON.parse(json.out).install, JSON.parse(json.out).install_choices], [null, []]);
+});
+
 test("a GitHub repository: no install command, the repository's URL instead", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["adopt", "pkg:github/microsoft/playwright-cli"]);
