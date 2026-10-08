@@ -25,9 +25,9 @@ function world(files: Record<string, string>) {
     root,
     journal,
     project: join(root, "project"),
-    run: (command: unknown, options: { informOnly?: boolean; tool?: string; cwd?: string } = {}) => {
+    run: (command: unknown, options: { informOnly?: boolean; tool?: string; cwd?: string; bom?: boolean } = {}) => {
       const input = JSON.stringify({ hook_event_name: "PreToolUse", tool_name: options.tool ?? "Bash", tool_input: { command }, cwd: options.cwd ?? join(root, "project") });
-      const out = hookOutput(input, { env: { MAGPIE_HOME: journal }, home: join(root, "home"), cwd: root, informOnly: options.informOnly ?? false });
+      const out = hookOutput(`${options.bom ? "﻿" : ""}${input}`, { env: { MAGPIE_HOME: journal }, home: join(root, "home"), cwd: root, informOnly: options.informOnly ?? false });
       return out === null ? null : JSON.parse(out);
     },
   };
@@ -104,6 +104,14 @@ test("silent (null) when there is nothing to say: no install, no note, another t
   assert.equal(w.run(42), null);
   assert.equal(hookOutput("not json", { env: {}, home: w.root, cwd: w.root, informOnly: false }), null);
   assert.equal(hookOutput("null", { env: {}, home: w.root, cwd: w.root, informOnly: false }), null);
+});
+
+test("input that starts with a UTF-8 byte-order mark (a Windows PowerShell pipe) gives the same output", () => {
+  const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--puppeteer.md": PUPPETEER });
+  for (const command of ["npm install pdfkit", "pnpm add puppeteer", "npm test"]) {
+    assert.deepEqual(w.run(command, { bom: true }), w.run(command), command);
+  }
+  assert.notEqual(w.run("npm install pdfkit", { bom: true }), null);
 });
 
 // --- Alternatives (decision 0029): text only; they never change whether the hook asks ---

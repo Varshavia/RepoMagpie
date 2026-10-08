@@ -21,7 +21,7 @@ const CAP = 10_000; // Claude Code's limit for additionalContext and systemMessa
 export function hookOutput(input: string, ctx: HookContext): string | null {
   let call: { tool_name?: unknown; tool_input?: { command?: unknown }; cwd?: unknown } | null;
   try {
-    call = JSON.parse(input);
+    call = JSON.parse(input.replace(/^﻿/, "")); // a byte-order mark, as a Windows PowerShell pipe sends
   } catch {
     return null;
   }
