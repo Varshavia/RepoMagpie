@@ -68,6 +68,7 @@ test("--json prints the spec's document", async () => {
     drafts: ["use_when"],
     status: "reviewed",
     path: join(box.journal, "notes", "npm--pdfkit.md"),
+    alternatives: [],
   });
   assert.equal(json.matches[0].journal, "project");
 });

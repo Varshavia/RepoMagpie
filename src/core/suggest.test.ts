@@ -129,6 +129,7 @@ test("a dependency with an avoid note is listed in in_use_avoid, as recall shows
     drafts: [],
     status: "reviewed",
     path: join(p.root, "journal", "notes", "npm--pdfkit.md"),
+    alternatives: [],
   }]);
 });
 

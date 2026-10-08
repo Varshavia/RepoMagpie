@@ -16,7 +16,7 @@ const DOC: SuggestJson = {
     { id: "pkg:npm/tsx", journal: "personal", name: "tsx", verdict: null, status: "inbox", tags: [], score: 1, why: { keywords: ["pdf"], dependencies: [] }, path: "/h/notes/npm--tsx.md" },
   ],
   in_use_avoid: [{
-    query: "@foo/pdf", id: "pkg:npm/%40foo/pdf", journal: "personal", confidence: "exact", verdict: "avoid: slow", avoid_when: [], use_when: [], drafts: [], status: "reviewed", path: "/h/notes/npm--foo--pdf.md",
+    query: "@foo/pdf", id: "pkg:npm/%40foo/pdf", journal: "personal", confidence: "exact", verdict: "avoid: slow", avoid_when: [], use_when: [], drafts: [], status: "reviewed", path: "/h/notes/npm--foo--pdf.md", alternatives: [],
   }],
 };
 

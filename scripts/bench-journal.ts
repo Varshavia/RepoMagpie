@@ -33,7 +33,9 @@ function topicsFor(i: number): string[] {
 // note links to two others (by file stem and by name) and to one subject without a note.
 // `needsBuild: false` for a benchmark that calls core in-process instead of the built CLI.
 // `topics: true` also gives each note topics and a language (the graph's similarity reads them).
-export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true, topics = false): void {
+// `alternatives: true` gives one note in five 1 to 3 alternatives: another note by file stem, one by
+// name, and a subject without a note (recall reads them, from both sides).
+export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true, topics = false, alternatives = false): void {
   if (needsBuild && !existsSync(cli)) {
     console.error("No build found. Run npm run build first (npm run bench does).");
     process.exit(1);
@@ -62,6 +64,10 @@ export function withJournal(name: string, body: (root: string, journal: string) 
         related: `- [[npm--package-${(i + 1) % NOTES}]]\n- [[package-${(i * 7) % NOTES}|a neighbour]]\n- [[subject-${i % 50}]]`,
       });
       text = text.replace("- `skill-a` —", `- \`skill-a\` — ${words(i + 5, 8)}`); // one completed skill line
+      if (alternatives && i % 5 === 0) {
+        const targets = [`"[[npm--package-${(i + 11) % NOTES}]]"`, `"[[package-${(i * 13 + 7) % NOTES}]]"`, `"[[subject-${i % 40}]]"`];
+        text = text.replace("\nstatus:", `\nalternatives: [${targets.slice(0, 3 - ((i / 5) % 3)).join(", ")}]\nstatus:`);
+      }
       writeFileSync(join(journal, "notes", `npm--package-${i}.md`), text);
     }
     body(root, journal);
