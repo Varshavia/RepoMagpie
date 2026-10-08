@@ -246,8 +246,7 @@ export default function GraphPage({ journal, theme, focus: focusOn, refresh, onA
     const colors = palette(probe.current);
     focus.current.colors = colors;
     const graph = new Graph({ type: "undirected", multi: true });
-    syncGraph(graph, first, seedPosition);
-    paint(graph, colors);
+    syncGraph(graph, first, seedPosition, colors);
     let sigma: Sigma;
     try {
       sigma = new Sigma(graph, container.current, {
@@ -307,9 +306,11 @@ export default function GraphPage({ journal, theme, focus: focusOn, refresh, onA
     };
   }, [drawing, reduced, runLayout, refocus, select]);
 
-  // A filter or a toggle: the graph drops what is no longer drawn and adds what now is, where it
-  // was before, or next to a neighbour. The view keeps its bounds, so the camera doesn't jump. A
-  // layout still running starts again from the new graph.
+  // A filter, a toggle or a change on disk: the graph drops what is no longer drawn and adds what
+  // now is, where it was before, or next to a neighbour. The view keeps its bounds, so the camera
+  // doesn't jump. A layout still running starts again from the new graph. No bulk edge update here:
+  // after a dropped or added node or edge, sigma rebuilds its edge indices only on its next frame,
+  // and until then one throws ("can't be repaint"); new edges get their colour as they are added.
   useEffect(() => {
     const view = drawn.current;
     const colors = focus.current.colors;
@@ -317,11 +318,7 @@ export default function GraphPage({ journal, theme, focus: focusOn, refresh, onA
     view.shown = shown;
     const at = (key: string) => (view.graph.hasNode(key) ? (view.graph.getNodeAttributes(key) as Point) : view.left.get(key));
     const spread = 0.03 * extent(view.graph);
-    syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), view.left);
-    // A dropped or added node or edge makes sigma rebuild its indices on the next frame; until
-    // then a bulk colour update throws ("can't be repaint"). Rebuild them now.
-    view.sigma.refresh();
-    paint(view.graph, colors);
+    syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), colors, view.left);
     if (focus.current.hovered && !view.graph.hasNode(focus.current.hovered)) {
       focus.current.hovered = null;
       Object.assign(view.sigma.getContainer().dataset, { hovered: "" });
@@ -552,7 +549,7 @@ function GraphFilters({ doc, filters, onFilters, sources, onSources }: { doc: Gr
           <ul className="chips" aria-label="Chosen tags">
             {filters.tags.map((tag) => (
               <li key={tag}>
-                <button type="button" className="chip" aria-pressed="true" aria-label={`Remove the #${tag} filter`} onClick={() => set("tags", filters.tags.filter((t) => t !== tag))}>
+                <button type="button" className="chip chosen" aria-label={`Remove the #${tag} filter`} onClick={() => set("tags", filters.tags.filter((t) => t !== tag))}>
                   #{tag}
                   <Icon name="x" size={12} />
                 </button>
@@ -626,14 +623,18 @@ function Neighbours({ shown, current, onOpen }: { shown: Shown; current: GraphNo
               {group.nodes.map((node) => {
                 const i = index++;
                 return (
-                  <li key={`${group.label} ${node.key}`} id={`${id}-${i}`} role="option" aria-selected={i === at} 
+                  <li
+                    key={`${group.label} ${node.key}`}
+                    id={`${id}-${i}`}
+                    role="option"
+                    aria-selected={i === at}
                     className="link-option"
                     onClick={() => {
                       setActive(i);
                       onOpen(node);
                     }}
                   >
-                    <span className="label" translate="no">
+                    <span className="label" translate="no" title={nodeLabel(node)}>
                       {nodeLabel(node)}
                     </span>
                     <span className="detail">{nodeDetail(node)}</span>
@@ -806,38 +807,47 @@ function extent(graph: Graph): number {
 const edgeKey = (edge: GraphEdge) => `${edge.type} ${edge.source} ${edge.target}`;
 
 // Makes `graph` hold what is shown: drops the rest (remembering where nodes were, in `left`), adds
-// what is missing at `place`, and sets every node's size and labels for the graph's new size.
+// what is missing at `place`, and sets every node's size, labels and colour for the graph's new
+// size. Every node and edge has its colour from the moment sigma sees it: sigma runs the reducers
+// at once, and a node dimmed around a selection is mixed from its colour.
 // Labels: a small graph forces every one; a larger one leaves them to sigma's label grid, which
 // keeps at most one per cell, the largest node first. The hovered and selected nodes are forced by
 // the reducer.
-function syncGraph(graph: Graph, shown: Shown, place: (key: string) => Point, left?: Map<string, Point>): void {
+function syncGraph(graph: Graph, shown: Shown, place: (key: string) => Point, colors: Colors, left?: Map<string, Point>): void {
   const nodes = new Map(shown.nodes.map((n) => [n.key, n]));
   const edges = new Map(shown.edges.map((e) => [edgeKey(e), e]));
+  const every = allLabels(shown.nodes.length);
   for (const key of graph.filterEdges((key) => !edges.has(key))) graph.dropEdge(key);
   for (const key of graph.filterNodes((key) => !nodes.has(key))) {
     left?.set(key, { x: graph.getNodeAttribute(key, "x"), y: graph.getNodeAttribute(key, "y") });
     graph.dropNode(key);
   }
-  for (const node of shown.nodes) if (!graph.hasNode(node.key)) graph.addNode(node.key, place(node.key));
+  for (const node of shown.nodes) if (!graph.hasNode(node.key)) graph.addNode(node.key, { ...place(node.key), ...nodeAttributes(node, every, colors) });
   for (const [key, edge] of edges) {
-    if (!graph.hasEdge(key)) graph.addEdgeWithKey(key, edge.source, edge.target, { type: "line", edgeType: edge.type, size: edgeStyle(edge.type).size });
+    if (!graph.hasEdge(key)) graph.addEdgeWithKey(key, edge.source, edge.target, { type: "line", edgeType: edge.type, size: edgeStyle(edge.type).size, color: edgeColor(edge.type, colors) });
   }
-  const every = allLabels(shown.nodes.length);
-  graph.updateEachNodeAttributes((key, { x, y }) => {
-    const node = nodes.get(key) as GraphNode;
-    const common = { x, y, label: nodeLabel(node), forceLabel: every };
-    if (node.type === "note") return { ...common, size: nodeSize("note", node.degree), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1 };
-    if (node.type === "tag") return { ...common, size: nodeSize("tag", node.count, !every), tag: true, zIndex: 2 };
-    return { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0 };
-  });
+  graph.updateEachNodeAttributes((key, { x, y }) => ({ x, y, ...nodeAttributes(nodes.get(key) as GraphNode, every, colors) }));
 }
 
+function nodeAttributes(node: GraphNode, every: boolean, colors: Colors) {
+  const common = { label: nodeLabel(node), forceLabel: every };
+  if (node.type === "note") return { ...common, size: nodeSize("note", node.degree), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1, color: nodeColor({ kindGroup: node.kind_group, inbox: node.status === "inbox" }, colors) };
+  if (node.type === "tag") return { ...common, size: nodeSize("tag", node.count, !every), tag: true, zIndex: 2, color: nodeColor({ tag: true }, colors) };
+  return { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0, color: nodeColor({ ghost: true }, colors) };
+}
+
+// A note's kind colour (faded toward the canvas in the inbox), a tag's, or a missing note's (faded grey).
+function nodeColor(attr: { tag?: unknown; ghost?: unknown; inbox?: unknown; kindGroup?: unknown }, colors: Colors): string {
+  const base = attr.tag ? colors["--graph-tag"] : attr.ghost ? colors["--graph-other"] : colors[KIND_COLOR[attr.kindGroup as string] as keyof Colors];
+  return attr.inbox || attr.ghost ? mixRgb(base, colors["--canvas"], INBOX_FADE) : base;
+}
+
+const edgeColor = (type: GraphEdge["type"], colors: Colors) => colors[edgeStyle(type).color as keyof Colors];
+
+// A theme change: every colour again, nothing moved.
 function paint(graph: Graph, colors: Colors): void {
-  graph.updateEachNodeAttributes((_key, attr) => {
-    const base = attr.tag ? colors["--graph-tag"] : attr.ghost ? colors["--graph-other"] : colors[KIND_COLOR[attr.kindGroup as string] as keyof Colors];
-    return { ...attr, color: attr.inbox || attr.ghost ? mixRgb(base, colors["--canvas"], INBOX_FADE) : base };
-  });
-  graph.updateEachEdgeAttributes((_key, attr) => ({ ...attr, color: colors[edgeStyle(attr.edgeType).color as keyof Colors] }));
+  graph.updateEachNodeAttributes((_key, attr) => ({ ...attr, color: nodeColor(attr, colors) }));
+  graph.updateEachEdgeAttributes((_key, attr) => ({ ...attr, color: edgeColor(attr.edgeType, colors) }));
 }
 
 function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabel: boolean): Partial<Settings> {
