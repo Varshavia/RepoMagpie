@@ -256,6 +256,8 @@ test("the spec's --json examples parse, for the commands the skill uses", () => 
   for (const command of ["recall", "search", "suggest", "note", "adopt"]) assert.ok(shapes.has(command), `no --json example for ${command}`);
   assert.ok(has(shapes.get("suggest"), "in_use_avoid[].avoid_when"), "suggest's in_use_avoid holds recall matches");
   assert.ok(has(shapes.get("suggest"), "candidates[].alternatives[].verdict"), "suggest's candidates hold recall's alternatives");
+  assert.ok(has(shapes.get("recall"), "matches[].alternatives[].avoid"), "recall's matches hold their alternatives");
+  assert.ok(has(shapes.get("note"), "alternatives_added") && has(shapes.get("note"), "alternatives_present"), "note reports --alternative");
 });
 
 // A bare identifier in inline code (`verdict`, `matches[].avoid_when`) is a JSON field; values are
