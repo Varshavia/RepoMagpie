@@ -1,9 +1,11 @@
 // End-to-end flows of the graph page (decision 0028, docs/ui.md §7): how you get there, the status
 // line, drawing with WebGL and the layout worker under the app's CSP, the empty and no-WebGL
-// states; hover, click, the note pane, the search box, local mode, Esc and "Show in graph".
+// states; hover, click, the note pane, the search box, local mode, Esc and "Show in graph"; the
+// filters, the toggles, missing notes and the neighbours list.
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import type { GraphJson } from "../../src/core/documents.ts";
+import { DEFAULT_SOURCES, drawable, neighbourGroups, NO_FILTERS, nodeLabel, statusLine, type Filters } from "../src/logic/graph.ts";
 import { expect, test } from "./fixtures.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -135,6 +137,94 @@ test("Show in graph: from the note view, the graph opens on that note, in local 
   await expect(page.getByRole("complementary", { name: "Note" }).getByRole("button", { name: "Show in graph" })).toHaveCount(0);
 });
 
+test("graph: the filters choose the notes, and the status line counts what is drawn", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const everything = await status(page).textContent();
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const expected = (filters: Partial<Filters>) => statusLine(drawable(doc, DEFAULT_SOURCES, { ...NO_FILTERS, ...filters }).counts);
+  const filters = page.getByRole("group", { name: "Filters" });
+
+  await filters.getByRole("combobox", { name: "Kind group" }).selectOption("Skill pack");
+  await expect(status(page)).toHaveText(expected({ kindGroup: "skill-pack" }));
+  await expect(status(page)).toContainText("Showing 4 notes");
+  await filters.getByRole("button", { name: "Clear the filters" }).click();
+  await expect(status(page)).toHaveText(everything ?? "");
+
+  // Several tags: notes with any of them.
+  const tag = filters.getByRole("combobox", { name: /Add a tag filter/ });
+  await tag.selectOption({ label: "agent-skills (5)" });
+  await expect(status(page)).toContainText("Showing 5 notes");
+  await tag.selectOption({ label: "testing (1)" });
+  await expect(status(page)).toHaveText(expected({ tags: ["agent-skills", "testing"] }));
+  await expect(status(page)).toContainText("Showing 6 notes");
+  await filters.getByRole("button", { name: "Remove the #agent-skills filter" }).click();
+  await expect(status(page)).toHaveText(expected({ tags: ["testing"] }));
+
+  await filters.getByRole("radio", { name: "Inbox" }).click();
+  await expect(status(page)).toHaveText(expected({ tags: ["testing"], status: "inbox" }));
+  await filters.getByRole("checkbox", { name: "Tried only" }).check();
+  await expect(status(page)).toHaveText("Showing 0 notes, 0 tags and 0 connections");
+  await page.getByText("No notes match these filters.").getByRole("button", { name: "Clear the filters" }).click();
+  await expect(status(page)).toHaveText(everything ?? "");
+  await expect(filters.getByRole("checkbox", { name: "Tried only" })).not.toBeChecked();
+});
+
+test("graph: the toggles draw connections and missing notes without moving what is drawn; a missing note offers Add", async ({ page, magpie }) => {
+  const file = magpie.note("github--leonxlnx--taste-skill.md");
+  // A link, so that without tags something is still connected (no notice above the canvas to resize it).
+  writeFileSync(file, `${readFileSync(file, "utf8").replace(/\n*$/, "\n")}\nTried next to [[puppeteer]]; see also [[github--vercel-labs--agent-skills]].\n`);
+  await openGraph(page, magpie);
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal&ghosts=1")).json() as Promise<GraphJson>);
+  const draw = page.getByRole("group", { name: "Draw" });
+  const key = "note:github--vercel-labs--agent-skills.md";
+  const before = await nodeAt(page, key);
+
+  await draw.getByRole("checkbox", { name: "Tags" }).uncheck();
+  await expect(status(page)).toHaveText(statusLine(drawable(doc, { ...DEFAULT_SOURCES, tagged: false }).counts));
+  await expect(status(page)).toContainText("0 tags");
+  const after = await nodeAt(page, key);
+  expect([Math.round(after.x), Math.round(after.y)]).toEqual([Math.round(before.x), Math.round(before.y)]);
+  await draw.getByRole("checkbox", { name: "Tags" }).check();
+
+  const search = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  await search.fill("puppeteer");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" })).toHaveCount(0); // missing notes are off
+  await draw.getByRole("checkbox", { name: "Missing notes" }).check();
+  await expect(page.getByRole("group", { name: "Legend" })).toContainText("no note yet");
+  await search.fill("puppetee");
+  await search.fill("puppeteer");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option")).toHaveText([/puppeteer\s*No note yet/]);
+  await page.keyboard.press("Enter");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "ghost:puppeteer");
+  await page.getByRole("button", { name: "Add a note" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a note" })).toBeVisible();
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("puppeteer");
+});
+
+test("graph: the neighbours list names the selected node's neighbours by type; the arrows and Enter walk the graph", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  await expect(page.getByRole("listbox", { name: "The nodes with the most connections" }).getByRole("option").first()).toBeVisible();
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const shown = drawable(doc, DEFAULT_SOURCES);
+
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#agent");
+  await page.keyboard.press("Enter");
+  const list = page.getByRole("listbox", { name: "Neighbours of #agent-skills" });
+  const [group] = neighbourGroups(shown, "tag:agent-skills");
+  expect(group.label).toBe("Same tag");
+  await expect(list.getByRole("group", { name: "Same tag" }).getByRole("option")).toHaveText(group.nodes.map((n) => new RegExp(`^${nodeLabel(n)}`)));
+
+  await list.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const second = group.nodes[1];
+  await expect(canvas(page)).toHaveAttribute("data-selected", second.key);
+  await expect(page.getByRole("complementary", { name: "Note" }).getByRole("heading", { level: 2, name: nodeLabel(second) })).toBeVisible();
+  const next = page.getByRole("listbox", { name: `Neighbours of ${nodeLabel(second)}` });
+  await expect(next).toBeFocused();
+  await expect(next.getByRole("group", { name: "Same tag" })).toContainText("#agent-skills");
+});
+
 test("graph: the sidebar, g g and the palette open it; the status line counts in words; it draws, and the layout settles under the CSP", async ({ page, magpie }) => {
   const violations: string[] = [];
   page.on("console", (message) => {
@@ -227,4 +317,8 @@ test("graph: without WebGL it says so, and the status line still counts", async 
   await expect(page.getByText("This browser can't draw the graph: WebGL is off or not available.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: /^Showing/ })).toHaveText(await expectedStatus(page));
   await expect(page.locator(".graph-canvas")).toHaveCount(0);
+  // The accessible path still works: the neighbours list and the search box.
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#agent");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listbox", { name: "Neighbours of #agent-skills" }).getByRole("option")).toHaveCount(5);
 });

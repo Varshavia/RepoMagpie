@@ -158,7 +158,7 @@ Settled by [decision 0028](decisions/0028-the-graph-page.md):
 | fill colour | `kind`, in 4 groups: skill pack; tool (cli, library, framework, plugin); resource (awesome-list, template, platform, app); other | yes |
 | size | number of connections, on a log scale (not rating: most notes have none) | yes |
 | faded | `status: inbox` | yes |
-| tag nodes | smaller, neutral, labelled `#tag` | yes |
+| tag nodes | neutral, labelled `#tag`; under 150 drawn nodes a little smaller than any note, from 150 up sized by their note count (log scale) | yes |
 | edges | tag edges thin and faint; links solid; alternatives in their own colour and thicker; similarity faint | yes |
 | hollow vs. solid | `tried: false` vs. `tried: true` | later: needs a node program we don't have |
 | ring | drift: a red ring when upstream changed since review | later: drift doesn't exist yet, and it needs a node program |

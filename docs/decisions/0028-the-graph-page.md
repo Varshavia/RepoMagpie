@@ -37,7 +37,7 @@ Measured on 2026-10-07: each option bundled with esbuild (minified, ESM) and gzi
 **Licence notices:** the app's build writes the notices of every bundled library to `dist/ui/THIRD-PARTY-LICENSES.md` (Vite's `build.license`, as the CLI's build does since [0025](0025-bundle-the-cli.md)), and copies the icons' notice to `dist/ui/icons-LICENSE.txt`. Both ship in the npm package.
 
 ### Loading
-The graph page is its own lazy-loaded chunk. Other screens don't load it, and their first render doesn't change: their initial chunk stays within ±2 kB of its size before the graph. The budget still counts every script and style in `dist/ui/`, the graph's chunks included, so the total stays under 200 kB.
+The graph page is its own lazy-loaded chunk. Other screens don't load it, and their first render doesn't change: their first files (script, style and page, gzipped) grow by at most 3 kB over their size before the graph, 99.4 kB (the maintainer, 2026-10-08; it was ±2 kB). The budget still counts every script and style in `dist/ui/`, the graph's chunks included, so the total stays under 200 kB.
 
 ### Layout
 - **ForceAtlas2, in a web worker of our own.** The package's own worker (`graphology-layout-forceatlas2/worker`) starts from a `blob:` URL, which the app's CSP blocks. Instead, Vite builds a worker module into `dist/ui/`, served from `'self'`, that runs the package's synchronous layout. The CSP stays as it is.
@@ -52,7 +52,7 @@ The graph page is its own lazy-loaded chunk. Other screens don't load it, and th
 | Fill colour | `kind`, in the four groups of the [product](../product.md#visual-encoding) specification: skill pack; tool; resource; other. A legend is always visible |
 | Size | Number of connections, on a log scale. Not rating: most notes have none |
 | Faded | `status: inbox` |
-| Tag nodes | Smaller, neutral, labelled `#tag` |
+| Tag nodes | Neutral, labelled `#tag`. Under 150 drawn nodes, all a little smaller than the smallest note; from 150 up, sized by their note count on the notes' log scale, so popular tags keep their labels in sigma's label grid (the maintainer, 2026-10-08) |
 | Edges | Tag edges thin and faint; links solid; alternatives in their own colour and thicker; similarity faint |
 
 Colours are tokens in [`DESIGN.md`](../../DESIGN.md), dark and light, each checked against the canvas for 3:1 (non-text contrast).

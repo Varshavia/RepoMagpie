@@ -348,7 +348,7 @@ The palette is two neutral ramps (dark and light) with one accent and three sema
 ### Graph
 The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on `canvas` with its own tokens. Each is checked at 3:1 against `canvas` (non-text); the legend, always shown, says each in words.
 - **Kind groups (`graph-skill-pack`, `graph-tool`, `graph-resource`, `graph-other`):** a note's fill. Violet, blue, pink and grey: hues apart from the semantic colours, so a kind never reads as inbox, reviewed or avoid.
-- **Tag (`graph-tag`):** tag nodes. Neutral, near `ink`; they are small and always labelled `#tag`.
+- **Tag (`graph-tag`):** tag nodes, labelled `#tag`. Neutral, near `ink`. In a small graph they are small and every one is labelled; from 150 drawn nodes up they grow with their note count, so the popular ones keep their labels.
 - **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a stronger grey, drawn thicker; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation. A thin line is antialiased, so it shows lighter than its token: `graph-edge-tagged` is set at about 4.4:1, so that a tag edge, 1.5 px wide, still shows at 3:1 or more at the default zoom (measured on screenshots, 2026-10-08: 3.52 dark, 3.22 light).
 - **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
 

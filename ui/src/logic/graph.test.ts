@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, graphState, LAYOUT, layoutSettings, mixRgb, neighbours, nodeLabel, nodeSize, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
+import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, filtersActive, graphState, joinPosition, largest, LAYOUT, layoutSettings, mixRgb, neighbourGroups, neighbours, NO_FILTERS, nodeDetail, nodeLabel, nodeSize, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
 
 // The graph page's pure parts (decision 0028): what is drawn, where it starts, how big, and the
 // status line.
@@ -42,6 +42,16 @@ test("nodeSize: a note without connections is clearly visible; notes grow with t
   assert.equal(nodeSize("tag", 0), nodeSize("tag", 500));
   assert.ok(nodeSize("tag", 0) < nodeSize("note", 0));
   assert.ok(nodeSize("tag", 0) >= nodeSize("note", 0) - 2);
+});
+
+test("nodeSize: in a large graph, tags grow with their note count on the notes' log scale, so popular tags win their label cells", () => {
+  assert.equal(nodeSize("tag", 1, true), nodeSize("note", 1, true));
+  assert.equal(nodeSize("tag", 120, true), nodeSize("note", 120, true));
+  assert.ok(nodeSize("tag", 120, true) > nodeSize("tag", 12, true));
+  assert.ok(nodeSize("tag", 12, true) - nodeSize("tag", 1, true) > nodeSize("tag", 120, true) - nodeSize("tag", 12, true) - 2); // log scale
+  assert.ok(nodeSize("tag", 40, true) > nodeSize("note", 6, true)); // a popular tag beats a well-connected note
+  assert.equal(nodeSize("note", 5, true), nodeSize("note", 5)); // notes don't change
+  assert.equal(nodeSize("tag", 120, false), nodeSize("tag", 0)); // a small graph: all tags the same, as above
 });
 
 test("allLabels: every label below 150 drawn nodes; above, only the larger ones", () => {
@@ -144,6 +154,87 @@ test("nodeLabel: a note's name, or its file stem; #tag; a missing note's target"
   assert.equal(nodeLabel(note("npm--zod", { name: null })), "npm--zod");
   assert.equal(nodeLabel({ type: "tag", key: "tag:pdf", tag: "pdf", count: 1 }), "#pdf");
   assert.equal(nodeLabel({ type: "ghost", key: "ghost:x", target: "X", reason: "missing" }), "X");
+});
+
+// Notes p…u: kinds, tags, status and tried vary; q links to a missing note.
+const FILTERED: GraphJson = {
+  journal: "personal",
+  nodes: [
+    note("p", { kind_group: "tool", tags: ["pdf"], tried: true }),
+    note("q", { kind_group: "resource", tags: ["pdf", "react"], status: "inbox" }),
+    note("r", { kind_group: "skill-pack", tags: ["react"], tried: true }),
+    note("s", { kind_group: "tool" }),
+    { type: "tag", key: "tag:pdf", tag: "pdf", count: 2 },
+    { type: "tag", key: "tag:react", tag: "react", count: 2 },
+    { type: "ghost", key: "ghost:x", target: "x", reason: "missing" },
+  ],
+  edges: [
+    { type: "tagged", source: "note:p", target: "tag:pdf" },
+    { type: "tagged", source: "note:q", target: "tag:pdf" },
+    { type: "tagged", source: "note:q", target: "tag:react" },
+    { type: "tagged", source: "note:r", target: "tag:react" },
+    { type: "link", source: "note:p", target: "note:s", count: 1 },
+    { type: "alternative", source: "note:p", target: "note:q" },
+    { type: "similar", source: "note:r", target: "note:s", score: 0.4 },
+    { type: "link", source: "note:q", target: "ghost:x", count: 1 },
+  ],
+  counts: { notes: 4, tags: 2, edges_by_type: { tagged: 4, link: 1, alternative: 1, similar: 1 } },
+};
+const ALL_SOURCES = { tagged: true, link: true, alternative: true, similar: true, ghosts: true };
+const keys = (shown: Shown) => shown.nodes.map((n) => n.key);
+
+test("drawable with filters: notes by kind group, tags (any of them), status and tried; tags and missing notes follow their notes", () => {
+  assert.deepEqual(drawable(FILTERED, ALL_SOURCES, NO_FILTERS), drawable(FILTERED, ALL_SOURCES));
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, kindGroup: "tool" })), ["note:p", "note:s", "tag:pdf"]);
+  // Several tags: notes with any of them. A note's other tags come along.
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, tags: ["pdf"] })), ["note:p", "note:q", "tag:pdf", "tag:react", "ghost:x"]);
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, tags: ["pdf", "react"] })), ["note:p", "note:q", "note:r", "tag:pdf", "tag:react", "ghost:x"]);
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, status: "inbox" })), ["note:q", "tag:pdf", "tag:react", "ghost:x"]);
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, status: "reviewed" })), ["note:p", "note:r", "note:s", "tag:pdf", "tag:react"]);
+  assert.deepEqual(keys(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, tried: true })), ["note:p", "note:r", "tag:pdf", "tag:react"]);
+  const tools = drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, kindGroup: "tool" });
+  assert.deepEqual(tools.edges.map((e) => e.type), ["tagged", "link"]);
+  assert.deepEqual(tools.counts, { notes: 2, tags: 1, connections: 2 });
+  assert.deepEqual(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, kindGroup: "other" }).counts, { notes: 0, tags: 0, connections: 0 });
+  assert.equal(filtersActive(NO_FILTERS), false);
+  assert.equal(filtersActive({ ...NO_FILTERS, tags: ["pdf"] }), true);
+});
+
+test("drawable: a missing note shows only while an edge to it is drawn", () => {
+  assert.deepEqual(keys(drawable(FILTERED, { ...ALL_SOURCES, link: false })), ["note:p", "note:q", "note:r", "note:s", "tag:pdf", "tag:react"]);
+});
+
+test("neighbourGroups: the selected node's neighbours by edge type, in a fixed order, each group by name", () => {
+  const shown = drawable(FILTERED, ALL_SOURCES);
+  const named = (key: string) => neighbourGroups(shown, key).map((g) => [g.label, g.nodes.map(nodeLabel)]);
+  assert.deepEqual(named("note:p"), [["Alternatives", ["q"]], ["Links", ["s"]], ["Same tag", ["#pdf"]]]);
+  assert.deepEqual(named("note:q"), [["Alternatives", ["p"]], ["Links", ["x"]], ["Same tag", ["#pdf", "#react"]]]);
+  assert.deepEqual(named("tag:react"), [["Same tag", ["q", "r"]]]);
+  assert.deepEqual(named("note:s"), [["Links", ["p"]], ["Similar", ["r"]]]);
+  assert.deepEqual(neighbourGroups(drawable(FILTERED, DEFAULT_SOURCES), "note:s").map((g) => g.label), ["Links"]); // similarity off
+});
+
+test("largest: with nothing selected, the nodes with the most connections, then by name", () => {
+  const nodes = [note("a", { degree: 2 }), note("b", { degree: 5 }), note("c", { degree: 2 }), { type: "tag" as const, key: "tag:t", tag: "t", count: 3 }];
+  assert.deepEqual(largest({ nodes, edges: [], counts: { notes: 3, tags: 1, connections: 0 } }, 3).map(nodeLabel), ["b", "#t", "a"]);
+});
+
+test("nodeDetail: in words, what the graph shows by colour", () => {
+  assert.equal(nodeDetail(note("a", { kind_group: "skill-pack" })), "Skill pack");
+  assert.equal(nodeDetail(note("a", { kind_group: "resource", status: "inbox" })), "Resource, in the inbox");
+  assert.equal(nodeDetail({ type: "tag", key: "tag:t", tag: "t", count: 1 }), "Tag, 1 note");
+  assert.equal(nodeDetail({ type: "tag", key: "tag:t", tag: "t", count: 12 }), "Tag, 12 notes");
+  assert.equal(nodeDetail({ type: "ghost", key: "ghost:x", target: "x", reason: "missing" }), "No note yet");
+});
+
+test("joinPosition: a node joining the drawing goes where it was, else next to its first drawn neighbour, else to its seed", () => {
+  const edges = drawable(FILTERED, ALL_SOURCES).edges;
+  const at = new Map([["note:q", { x: 500, y: -300 }], ["note:p", { x: 0, y: 0 }]]);
+  assert.deepEqual(joinPosition("note:p", edges, (k) => at.get(k), 20), { x: 0, y: 0 });
+  const ghost = joinPosition("ghost:x", edges, (k) => at.get(k), 20);
+  assert.ok(Math.hypot(ghost.x - 500, ghost.y + 300) <= 20 && Math.hypot(ghost.x - 500, ghost.y + 300) > 0);
+  assert.deepEqual(joinPosition("ghost:x", edges, (k) => at.get(k), 20), ghost); // the same every time
+  assert.deepEqual(joinPosition("note:r", [], () => undefined, 20), seedPosition("note:r"));
 });
 
 test("layout: a fixed number of iterations; Barnes-Hut only for large graphs", () => {

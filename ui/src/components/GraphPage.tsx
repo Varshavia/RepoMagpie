@@ -1,8 +1,8 @@
 // The graph page (decision 0028, docs/ui.md §7): one journal's notes, the tags they carry and the
 // connections between them, drawn with sigma (WebGL) and laid out by ForceAtlas2 in a worker. Loaded
 // on demand, in its own chunk, so the other screens never load sigma or graphology. The canvas is a
-// visual aid, hidden from assistive technology; the status line, the search box, the selection line
-// and the legend say in words what it shows.
+// visual aid, hidden from assistive technology; the status line, the search box, the filters, the
+// neighbours list and the legend say in words what it shows.
 import Graph from "graphology";
 import { assignLayoutChanges, graphToByteArrays } from "graphology-layout-forceatlas2/helpers.js";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
@@ -17,19 +17,30 @@ import {
   DEFAULT_SOURCES,
   drawable,
   edgeStyle,
+  filtersActive,
   graphState,
+  joinPosition,
   KIND_COLOR,
+  KIND_GROUP_LABEL,
+  largest,
   LAYOUT,
   layoutSettings,
   mixRgb,
+  neighbourGroups,
   neighbours,
+  NO_FILTERS,
+  nodeDetail,
   nodeLabel,
   nodeSize,
   searchNodes,
   seedPosition,
   statusLine,
+  type Filters,
+  type GraphEdge,
   type GraphNode,
+  type KindGroup,
   type Shown,
+  type Sources,
 } from "../logic/graph.ts";
 import type { LayoutReply, LayoutRequest } from "../layout.worker.ts";
 import { MOD, type Theme } from "../platform.ts";
@@ -39,6 +50,7 @@ import "./GraphPage.css";
 type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; doc: GraphJson };
 type Colors = Record<(typeof TOKENS)[number], string>;
 type Depth = 0 | 1 | 2; // local mode: 0 shows everything
+type Point = { x: number; y: number };
 
 const TOKENS = [
   "--graph-skill-pack",
@@ -55,15 +67,20 @@ const TOKENS = [
   "--ink",
 ] as const;
 
-const KIND_GROUPS: [string, string][] = [
-  ["skill-pack", "Skill pack"],
-  ["tool", "Tool"],
-  ["resource", "Resource"],
-  ["other", "Other"],
+const KIND_GROUPS = Object.entries(KIND_GROUP_LABEL) as [KindGroup, string][];
+
+const SOURCE_TOGGLES: [keyof Sources, string][] = [
+  ["tagged", "Tags"],
+  ["link", "Links"],
+  ["alternative", "Alternatives"],
+  ["similar", "Similar"],
+  ["ghosts", "Missing notes"],
 ];
 
 const INBOX_FADE = 0.55; // toward the canvas
 const DIM = 0.7; // what isn't around the hovered or selected node, toward the canvas
+const LABEL_THRESHOLD = 12; // a larger graph: labels of nodes at least this size on screen
+const LARGEST = 20; // the neighbours list with nothing selected
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 // What the reducers read on every frame: kept in a ref, so a hover doesn't re-render React.
@@ -75,11 +92,20 @@ interface Focus {
   colors: Colors | null;
 }
 
+// What is drawn: sigma, its graph, what the graph mirrors, and where nodes that left it were.
+interface View {
+  sigma: Sigma;
+  graph: Graph;
+  fitted: boolean;
+  shown: Shown;
+  left: Map<string, Point>;
+}
+
 interface Props {
   journal: Scope;
   theme: Theme;
   focus: string | null; // "Show in graph": the node to select, in local mode
-  onAdd: () => void;
+  onAdd: (target?: string) => void; // a missing note: Add, with its target filled in
   // The note pane beside the graph; `open` selects another note of the graph (a [[link]] in it).
   renderNote: (note: { id: string; file: string }, open: (id: string) => void) => ReactNode;
 }
@@ -93,27 +119,29 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
   const [selected, setSelected] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth>(0);
   const [query, setQuery] = useState("");
+  const [sources, setSources] = useState<Sources>(DEFAULT_SOURCES);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const container = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLSpanElement>(null);
   const notePaneRef = useRef<HTMLElement>(null);
-  const drawn = useRef<{ sigma: Sigma; graph: Graph; fitted: boolean } | null>(null);
+  const drawn = useRef<View | null>(null);
   const worker = useRef<Worker | null>(null);
   const focus = useRef<Focus>({ hovered: null, selected: null, near: null, visible: null, colors: null });
   const focusHandled = useRef<string | null>(null);
   const reduced = useMemo(() => matchMedia(REDUCED_MOTION).matches, []);
-  const sources = DEFAULT_SOURCES;
 
+  // Missing notes are always fetched; their toggle only decides whether they are drawn.
   useEffect(() => {
     let current = true;
     setLoad({ status: "loading" });
-    api.graph(journal, sources.ghosts).then(
+    api.graph(journal, true).then(
       (doc) => current && setLoad({ status: "ready", doc }),
       (error: ApiError) => current && setLoad({ status: "error", error: error.message }),
     );
     return () => {
       current = false;
     };
-  }, [journal, attempt, sources.ghosts]);
+  }, [journal, attempt]);
 
   useEffect(() => {
     const query = matchMedia("(prefers-color-scheme: dark)");
@@ -122,26 +150,30 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
     return () => query.removeEventListener("change", changed);
   }, []);
 
-  const shown = useMemo(() => (load.status === "ready" ? drawable(load.doc, sources) : null), [load, sources]);
-  const state = load.status === "ready" ? graphState(load.doc, sources) : null;
+  const doc = load.status === "ready" ? load.doc : null;
+  const shown = useMemo(() => (doc ? drawable(doc, sources, filters) : null), [doc, sources, filters]);
+  const latest = useRef(shown);
+  latest.current = shown;
+  const state = doc ? graphState(doc, sources) : null;
   const byKey = useMemo(() => new Map((shown?.nodes ?? []).map((n) => [n.key, n])), [shown]);
   const current = selected ? (byKey.get(selected) ?? null) : null;
   const local = useMemo(() => (current && depth && shown ? around(shown, current.key, depth) : null), [current, depth, shown]);
   const counted = local ?? shown;
+  const drawing = Boolean(shown) && state !== "empty" && webgl;
 
   // The reducers' view of the selection, local mode and hover; then a redraw.
   const refocus = useCallback(() => {
     const f = focus.current;
     const lit = f.hovered ?? f.selected;
-    f.near = lit && shown ? neighbours(shown.edges, lit, 1) : null;
+    f.near = lit && latest.current ? neighbours(latest.current.edges, lit, 1) : null;
     drawn.current?.sigma.refresh();
-  }, [shown]);
+  }, []);
 
   useEffect(() => {
     focus.current.selected = current?.key ?? null;
     focus.current.visible = local ? new Set(local.nodes.map((n) => n.key)) : null;
     refocus();
-  }, [current, local, refocus]);
+  }, [current, local, shown, refocus]);
 
   const centre = useCallback(
     (key: string) => {
@@ -190,11 +222,15 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
     layout.postMessage(request, [nodes.buffer, edges.buffer]);
   }, [reduced]);
 
+  // Sigma, once per journal: from the nodes' seed positions, then the layout. Later changes (a
+  // filter, a toggle) are synced into the same graph below; nothing already drawn moves.
   useEffect(() => {
-    if (!shown || state === "empty" || !webgl || !container.current || !probe.current) return;
+    const first = latest.current;
+    if (!drawing || !first || !container.current || !probe.current) return;
     const colors = palette(probe.current);
     focus.current.colors = colors;
-    const graph = buildGraph(shown);
+    const graph = new Graph({ type: "undirected", multi: true });
+    syncGraph(graph, first, seedPosition);
     paint(graph, colors);
     let sigma: Sigma;
     try {
@@ -222,9 +258,9 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
       setWebgl(false);
       return;
     }
-    drawn.current = { sigma, graph, fitted: false };
+    drawn.current = { sigma, graph, fitted: false, shown: first, left: new Map() };
     // For the end-to-end tests: where a node is on screen, so a test can hover and click it as a person would.
-    Object.assign(container.current, { nodePosition: (key: string) => sigma.graphToViewport(graph.getNodeAttributes(key) as { x: number; y: number }) });
+    Object.assign(container.current, { nodePosition: (key: string) => sigma.graphToViewport(graph.getNodeAttributes(key) as Point) });
     // Hover: written to the container directly (no React render on every move); tests read data-hovered.
     sigma.on("enterNode", ({ node }) => {
       focus.current.hovered = node;
@@ -253,7 +289,30 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
       sigma.kill();
       drawn.current = null;
     };
-  }, [shown, state, webgl, reduced, runLayout, refocus, select]);
+  }, [drawing, reduced, runLayout, refocus, select]);
+
+  // A filter or a toggle: the graph drops what is no longer drawn and adds what now is, where it
+  // was before, or next to a neighbour. The view keeps its bounds, so the camera doesn't jump. A
+  // layout still running starts again from the new graph.
+  useEffect(() => {
+    const view = drawn.current;
+    const colors = focus.current.colors;
+    if (!view || !shown || !colors || view.shown === shown) return;
+    view.shown = shown;
+    const at = (key: string) => (view.graph.hasNode(key) ? (view.graph.getNodeAttributes(key) as Point) : view.left.get(key));
+    const spread = 0.03 * extent(view.graph);
+    syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), view.left);
+    // A dropped or added node or edge makes sigma rebuild its indices on the next frame; until
+    // then a bulk colour update throws ("can't be repaint"). Rebuild them now.
+    view.sigma.refresh();
+    paint(view.graph, colors);
+    if (focus.current.hovered && !view.graph.hasNode(focus.current.hovered)) {
+      focus.current.hovered = null;
+      Object.assign(view.sigma.getContainer().dataset, { hovered: "" });
+    }
+    view.sigma.setSettings({ labelRenderedSizeThreshold: allLabels(view.graph.order) ? 0 : LABEL_THRESHOLD });
+    if (worker.current) runLayout();
+  }, [shown, runLayout]);
 
   // "Show in graph": once the layout has settled, select the note, show its neighbours, centre it.
   useEffect(() => {
@@ -275,11 +334,11 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
   }, [theme, scheme, reduced]);
 
   // Esc clears the selection, then the search; not while a dialog or the note pane has the key.
-  const latest = useRef({ selected, query });
-  latest.current = { selected, query };
+  const keys = useRef({ selected, query });
+  keys.current = { selected, query };
   const escape = useCallback(() => {
-    if (latest.current.selected) select(null);
-    else if (latest.current.query) setQuery("");
+    if (keys.current.selected) select(null);
+    else if (keys.current.query) setQuery("");
     else return false;
     return true;
   }, [select]);
@@ -303,10 +362,15 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
     else void view.sigma.getCamera().animate(FITTED, { duration: 300 });
   };
 
-  const pick = (node: GraphNode) => {
+  // A node from the neighbours list: selected and centred.
+  const go = (node: GraphNode) => {
     select(node.key);
-    setQuery(nodeLabel(node));
     centre(node.key);
+  };
+
+  const pick = (node: GraphNode) => {
+    go(node);
+    setQuery(nodeLabel(node));
   };
 
   const openNote = (id: string) => {
@@ -314,7 +378,6 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
     if (node) pick(node);
   };
 
-  const drawing = shown && state !== "empty" && webgl;
   const noteOpen = current?.type === "note" ? current : null;
 
   return (
@@ -355,7 +418,7 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
         <EmptyState
           center
           action={
-            <button type="button" className="button secondary" onClick={onAdd}>
+            <button type="button" className="button secondary" onClick={() => onAdd()}>
               <Icon name="plus" />
               Add a note
             </button>
@@ -363,7 +426,7 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
         >
           {`Nothing to draw yet. Add a repository here, or from the palette (${MOD}+K).`}
         </EmptyState>
-      ) : shown ? (
+      ) : doc && shown ? (
         <>
           <div className="graph-toolbar">
             <GraphSearch nodes={shown.nodes} query={query} onQuery={setQuery} onPick={pick} onEscape={escape} />
@@ -372,6 +435,12 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
                 <span className="graph-selected">
                   Selected: <strong translate="no">{nodeLabel(current)}</strong>
                 </span>
+                {current.type === "ghost" ? (
+                  <button type="button" className="button secondary" onClick={() => onAdd(current.target)}>
+                    <Icon name="plus" />
+                    Add a note
+                  </button>
+                ) : null}
                 <div className="segmented" role="radiogroup" aria-label={`Show around ${nodeLabel(current)}`}>
                   {([0, 1, 2] as const).map((d) => (
                     <button key={d} type="button" role="radio" aria-checked={depth === d} onClick={() => setDepth(d)}>
@@ -382,10 +451,20 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
               </div>
             ) : null}
           </div>
+          <GraphFilters doc={doc} filters={filters} onFilters={setFilters} sources={sources} onSources={setSources} />
           <div className="graph-body" data-note={noteOpen !== null}>
+            <Neighbours shown={shown} current={current} onOpen={go} />
             <div className="graph-stage">
               {state === "unconnected" ? <p className="graph-notice">Your notes aren't connected yet. Add tags, or [[links]] in My notes.</p> : null}
-              {!webgl ? <p className="graph-notice">This browser can't draw the graph: WebGL is off or not available. The counts above still hold.</p> : null}
+              {!shown.counts.notes && filtersActive(filters) ? (
+                <p className="graph-notice">
+                  No notes match these filters.{" "}
+                  <button type="button" className="button ghost" onClick={() => setFilters(NO_FILTERS)}>
+                    Clear the filters
+                  </button>
+                </p>
+              ) : null}
+              {!webgl ? <p className="graph-notice">This browser can't draw the graph: WebGL is off or not available. The counts above and the neighbours list still hold.</p> : null}
               {/* Under reduced motion the canvas stays invisible (it keeps its size, which sigma needs) until the layout settles. */}
               {drawing ? <div className="graph-canvas" ref={container} aria-hidden="true" data-settled={settled} data-waiting={reduced && !settled} data-selected={current?.key ?? ""} /> : null}
               {drawing && reduced && !settled ? <p className="graph-arranging">Arranging the graph…</p> : null}
@@ -402,6 +481,151 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
           </div>
         </>
       ) : null}
+    </section>
+  );
+}
+
+// The filters (which notes) and the toggles (which connections, and missing notes).
+function GraphFilters({ doc, filters, onFilters, sources, onSources }: { doc: GraphJson; filters: Filters; onFilters: (f: Filters) => void; sources: Sources; onSources: (s: Sources) => void }) {
+  const id = useId();
+  const set = <K extends keyof Filters>(key: K, value: Filters[K]) => onFilters({ ...filters, [key]: value });
+  const tags = doc.nodes.flatMap((n) => (n.type === "tag" ? [n] : [])).sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0));
+  return (
+    <div className="filters graph-filters">
+      <div className="graph-filter-group" role="group" aria-label="Filters">
+        <select className="select" value={filters.kindGroup} onChange={(e) => set("kindGroup", e.target.value as KindGroup | "")} aria-label="Kind group">
+          <option value="">Any kind</option>
+          {KIND_GROUPS.map(([group, label]) => (
+            <option key={group} value={group}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <div className="segmented" role="radiogroup" aria-label="Status">
+          {(["", "reviewed", "inbox"] as const).map((s) => (
+            <button key={s || "any"} type="button" role="radio" aria-checked={filters.status === s} onClick={() => set("status", s)}>
+              {s === "" ? "Any" : s === "reviewed" ? "Reviewed" : "Inbox"}
+            </button>
+          ))}
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={filters.tried} onChange={(e) => set("tried", e.target.checked)} />
+          Tried only
+        </label>
+        <select
+          className="select"
+          value=""
+          onChange={(e) => e.target.value && set("tags", [...filters.tags, e.target.value])}
+          aria-label="Add a tag filter (notes with any of the chosen tags)"
+          disabled={tags.length === filters.tags.length}
+        >
+          <option value="">{filters.tags.length ? "Or with tag…" : "With tag…"}</option>
+          {tags
+            .filter((t) => !filters.tags.includes(t.tag))
+            .map((t) => (
+              <option key={t.tag} value={t.tag}>
+                {`${t.tag} (${t.count})`}
+              </option>
+            ))}
+        </select>
+        {filters.tags.length ? (
+          <ul className="chips" aria-label="Chosen tags">
+            {filters.tags.map((tag) => (
+              <li key={tag}>
+                <button type="button" className="chip" aria-pressed="true" aria-label={`Remove the #${tag} filter`} onClick={() => set("tags", filters.tags.filter((t) => t !== tag))}>
+                  #{tag}
+                  <Icon name="x" size={12} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {filtersActive(filters) ? (
+          <button type="button" className="button ghost" onClick={() => onFilters(NO_FILTERS)}>
+            Clear the filters
+          </button>
+        ) : null}
+      </div>
+      <div className="graph-filter-group" role="group" aria-labelledby={`${id}-draw`}>
+        <span className="section-label" id={`${id}-draw`}>
+          Draw
+        </span>
+        {SOURCE_TOGGLES.map(([source, label]) => (
+          <label key={source} className="check">
+            <input type="checkbox" checked={sources[source]} onChange={(e) => onSources({ ...sources, [source]: e.target.checked })} />
+            {label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// The accessible path (docs/ui.md §7): the selected node's neighbours by edge type, or the nodes
+// with the most connections. A listbox: the arrows move, Enter opens.
+function Neighbours({ shown, current, onOpen }: { shown: Shown; current: GraphNode | null; onOpen: (node: GraphNode) => void }) {
+  const id = useId();
+  const groups: { label: string; nodes: GraphNode[] }[] = current ? neighbourGroups(shown, current.key) : [{ label: "Most connected", nodes: largest(shown, LARGEST) }];
+  const options = groups.flatMap((g) => g.nodes);
+  const [active, setActive] = useState(0);
+  const at = Math.min(active, options.length - 1);
+  const title = current ? `Around ${nodeLabel(current)}` : "Most connected";
+  useEffect(() => setActive(0), [current]);
+  useEffect(() => {
+    if (at >= 0) document.getElementById(`${id}-${at}`)?.scrollIntoView({ block: "nearest" });
+  }, [id, at]);
+  let index = 0;
+  return (
+    <section className="graph-neighbours" aria-labelledby={`${id}-title`}>
+      <h2 className="graph-neighbours-title" id={`${id}-title`} translate="no">
+        {title}
+      </h2>
+      {options.length ? (
+        <div
+          className="graph-neighbour-list"
+          role="listbox"
+          tabIndex={0}
+          aria-label={current ? `Neighbours of ${nodeLabel(current)}` : "The nodes with the most connections"}
+          aria-activedescendant={`${id}-${at}`}
+          onKeyDown={(e) => {
+            const move = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: options.length - 1 }[e.key];
+            if (move !== undefined) setActive(Math.max(0, Math.min(options.length - 1, move)));
+            else if (e.key === "Enter") onOpen(options[at]);
+            else return;
+            e.preventDefault();
+            e.stopPropagation(); // not the app's j/k and Enter
+          }}
+        >
+          {groups.map((group, g) => (
+            <ul key={group.label} role="group" aria-labelledby={current ? `${id}-group-${g}` : undefined} aria-label={current ? undefined : group.label}>
+              {current ? (
+                <li role="presentation" className="graph-neighbour-group" id={`${id}-group-${g}`}>
+                  {group.label}
+                </li>
+              ) : null}
+              {group.nodes.map((node) => {
+                const i = index++;
+                return (
+                  <li key={`${group.label} ${node.key}`} id={`${id}-${i}`} role="option" aria-selected={i === at} 
+                    className="link-option"
+                    onClick={() => {
+                      setActive(i);
+                      onOpen(node);
+                    }}
+                  >
+                    <span className="label" translate="no">
+                      {nodeLabel(node)}
+                    </span>
+                    <span className="detail">{nodeDetail(node)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
+        </div>
+      ) : (
+        <p className="graph-neighbour-none">{current ? "No connections drawn." : "Nothing drawn."}</p>
+      )}
     </section>
   );
 }
@@ -472,7 +696,7 @@ function GraphSearch({ nodes, query, onQuery, onPick, onEscape }: { nodes: Graph
               <span className="label" translate="no">
                 {nodeLabel(node)}
               </span>
-              <span className="detail">{node.type === "note" ? (node.status === "inbox" ? "note, in the inbox" : "note") : node.type === "tag" ? `tag, ${node.count} ${node.count === 1 ? "note" : "notes"}` : "no note yet"}</span>
+              <span className="detail">{nodeDetail(node)}</span>
             </li>
           ))}
         </ul>
@@ -501,6 +725,12 @@ function Legend({ shown }: { shown: Shown }) {
           <span className="swatch dot faded" aria-hidden="true" />
           Faded: in the inbox
         </li>
+        {shown.nodes.some((n) => n.type === "ghost") ? (
+          <li>
+            <span className="swatch dot faded ghost" aria-hidden="true" />
+            Faded grey: no note yet
+          </li>
+        ) : null}
       </ul>
       <ul>
         {(["tagged", "link", "alternative", "similar"] as const)
@@ -544,23 +774,42 @@ function keepBounds(sigma: Sigma): void {
 
 const FITTED = { x: 0.5, y: 0.5, ratio: 1, angle: 0 };
 
+// The larger side of the graph's bounds, in graph coordinates.
+function extent(graph: Graph): number {
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
+  graph.forEachNode((_key, { x, y }) => {
+    [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
+  });
+  return graph.order > 1 ? Math.max(maxX - minX, maxY - minY) : 100;
+}
+
+const edgeKey = (edge: GraphEdge) => `${edge.type} ${edge.source} ${edge.target}`;
+
+// Makes `graph` hold what is shown: drops the rest (remembering where nodes were, in `left`), adds
+// what is missing at `place`, and sets every node's size and labels for the graph's new size.
 // Labels: a small graph forces every one; a larger one leaves them to sigma's label grid, which
 // keeps at most one per cell, the largest node first. The hovered and selected nodes are forced by
 // the reducer.
-function buildGraph(shown: Shown): Graph {
-  const graph = new Graph({ type: "undirected", multi: true });
+function syncGraph(graph: Graph, shown: Shown, place: (key: string) => Point, left?: Map<string, Point>): void {
+  const nodes = new Map(shown.nodes.map((n) => [n.key, n]));
+  const edges = new Map(shown.edges.map((e) => [edgeKey(e), e]));
+  for (const key of graph.filterEdges((key) => !edges.has(key))) graph.dropEdge(key);
+  for (const key of graph.filterNodes((key) => !nodes.has(key))) {
+    left?.set(key, { x: graph.getNodeAttribute(key, "x"), y: graph.getNodeAttribute(key, "y") });
+    graph.dropNode(key);
+  }
+  for (const node of shown.nodes) if (!graph.hasNode(node.key)) graph.addNode(node.key, place(node.key));
+  for (const [key, edge] of edges) {
+    if (!graph.hasEdge(key)) graph.addEdgeWithKey(key, edge.source, edge.target, { type: "line", edgeType: edge.type, size: edgeStyle(edge.type).size });
+  }
   const every = allLabels(shown.nodes.length);
-  for (const node of shown.nodes) {
-    const { x, y } = seedPosition(node.key);
+  graph.updateEachNodeAttributes((key, { x, y }) => {
+    const node = nodes.get(key) as GraphNode;
     const common = { x, y, label: nodeLabel(node), forceLabel: every };
-    if (node.type === "note") graph.addNode(node.key, { ...common, size: nodeSize("note", node.degree), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1 });
-    else if (node.type === "tag") graph.addNode(node.key, { ...common, size: nodeSize("tag", node.count), tag: true, zIndex: 2 });
-    else graph.addNode(node.key, { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0 });
-  }
-  for (const edge of shown.edges) {
-    graph.addEdgeWithKey(`${edge.type} ${edge.source} ${edge.target}`, edge.source, edge.target, { type: "line", edgeType: edge.type, size: edgeStyle(edge.type).size });
-  }
-  return graph;
+    if (node.type === "note") return { ...common, size: nodeSize("note", node.degree), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1 };
+    if (node.type === "tag") return { ...common, size: nodeSize("tag", node.count, !every), tag: true, zIndex: 2 };
+    return { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0 };
+  });
 }
 
 function paint(graph: Graph, colors: Colors): void {
@@ -578,8 +827,8 @@ function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabe
     labelWeight: "500",
     labelColor: { color: colors["--ink"] },
     // A larger graph: one label per grid cell of 160 px, the largest node there, if it is at least
-    // 12 on screen; more cells hold a label as you zoom in.
-    labelRenderedSizeThreshold: everyLabel ? 0 : 12,
+    // LABEL_THRESHOLD on screen; more cells hold a label as you zoom in.
+    labelRenderedSizeThreshold: everyLabel ? 0 : LABEL_THRESHOLD,
     labelGridCellSize: 160,
     labelDensity: 1,
     minEdgeThickness: 1,
