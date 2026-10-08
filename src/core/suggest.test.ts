@@ -61,7 +61,45 @@ test("from the manifests: keywords from dependency names, keywords and descripti
     score: "number",
     why: { keywords: ["cli"], dependencies: [] },
     path: join(p.root, "journal", "notes", "npm--commander.md"),
+    alternatives: [],
   });
+});
+
+// --- Alternatives (decision 0029), in recall's shape ---
+
+const withAlternatives = (text: string, entries: string[]) => text.replace("\nstatus:", `\nalternatives: [${entries.map((e) => JSON.stringify(e)).join(", ")}]\nstatus:`);
+
+test("every candidate lists its alternatives from both sides, in recall's shape; a project candidate resolves in the project journal", () => {
+  const p = place({
+    ...PERSONAL,
+    "journal/notes/npm--commander.md": withAlternatives(note({ id: "pkg:npm/commander", verdict: "fine for small CLIs", tags: ["cli"] }), ["[[yargs]]", "[[cac]]"]),
+    "journal/notes/npm--yargs.md": note({ id: "pkg:npm/yargs", verdict: "too much for small CLIs" }),
+    "journal/notes/npm--tsx.md": note({ id: "pkg:npm/tsx", whatItDoes: "Runs TypeScript files directly." }),
+    "journal/notes/npm--ts-node.md": withAlternatives(note({ id: "pkg:npm/ts-node", verdict: "slow start" }), ["[[tsx]]"]),
+    ...PROJECT,
+    "project/.magpie/notes/npm--commander.md": withAlternatives(note({ id: "pkg:npm/commander", verdict: "our CLI parser" }), ["[[yargs]]"]),
+  });
+  const candidates = runSuggest({ limit: 20 }, p).document.candidates;
+  const of = (journal: string, name: string) => candidates.find((c) => c.journal === journal && c.name === name)?.alternatives;
+  assert.deepEqual(of("personal", "commander"), [
+    { name: "yargs", id: "pkg:npm/yargs", journal: "personal", verdict: "too much for small CLIs", status: "reviewed", avoid: false, path: join(p.root, "journal", "notes", "npm--yargs.md") },
+    { name: "cac", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null },
+  ]);
+  assert.deepEqual(of("project", "commander"), [{ name: "yargs", id: null, journal: "project", verdict: null, status: null, avoid: false, path: null }]);
+  assert.deepEqual(of("personal", "tsx")?.map((a) => a.name), ["ts-node"], "the reverse side");
+});
+
+test("an in_use_avoid item lists its alternatives, as recall does", () => {
+  const p = place({
+    ...PERSONAL,
+    "journal/notes/npm--pdfkit.md": withAlternatives(note({ id: "pkg:npm/pdfkit", verdict: "avoid: async streams painful; use puppeteer" }), ["[[puppeteer]]"]),
+    "journal/notes/npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", verdict: "default for PDF rendering in new projects" }),
+    ...PROJECT,
+  });
+  const [pdfkit] = runSuggest({ limit: 20 }, p).document.in_use_avoid;
+  assert.deepEqual(pdfkit.alternatives, [
+    { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: join(p.root, "journal", "notes", "npm--puppeteer.md") },
+  ]);
 });
 
 test("why: the keywords a note matched, in keyword order, and the dependencies whose every word it matched", () => {

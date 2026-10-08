@@ -1,7 +1,7 @@
 // magpie suggest ["description"] (spec §2, §5, §8): the human output of core's runSuggest.
 import { exitCode } from "../core/outcome.ts";
 import type { JournalSource } from "../core/search.ts";
-import { runSuggest, type Candidate } from "../core/suggest.ts";
+import { runSuggest, type Candidate, type SuggestJson } from "../core/suggest.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 import { INBOX, purlType, renderRows } from "./results.ts";
@@ -21,6 +21,15 @@ export function whyLine(why: Candidate["why"]): string {
   if (why.dependencies.length) parts.push(`${why.dependencies.length === 1 ? "dependency" : "dependencies"} ${why.dependencies.join(", ")}`);
   if (words.length) parts.push(`matched ${words.join(", ")}`);
   return `Why: ${parts.join("; ")}`;
+}
+
+// An in-use avoid note's alternatives, by name: at most 3, then +N more (decision 0029). A name-only
+// match names none: its note is on another package.
+function insteadLine(m: SuggestJson["in_use_avoid"][number]): string[] {
+  if (m.confidence !== "exact" || !m.alternatives.length) return [];
+  const names = m.alternatives.slice(0, 3).map((a) => a.name);
+  if (m.alternatives.length > 3) names.push(`+${m.alternatives.length - 3} more`);
+  return [`Instead: ${names.join(", ")}`];
 }
 
 export async function suggestCommand(description: string | undefined, options: SuggestOptions, io: Io): Promise<number> {
@@ -43,7 +52,7 @@ export async function suggestCommand(description: string | undefined, options: S
     lines.push(...renderRows(avoid.map((m, i) => {
       const name = `${run.in_use_names[i]}${m.confidence === "name-only" ? " (name match only)" : ""}`;
       return ["", name, purlType(m.id), m.journal, verdictLine(m.verdict)];
-    }), io));
+    }), io, avoid.map(insteadLine)));
   }
   if (lines.length) io.out(`${lines.join("\n")}\n`);
 

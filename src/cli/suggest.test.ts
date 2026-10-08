@@ -65,7 +65,7 @@ test("--json prints exactly core's document, and nothing on stderr", async () =>
   assert.deepEqual(json.keywords, ["pdfkit", "vitest", "typescript", "cli", "tests"]);
   assert.deepEqual({ ...json.candidates[0], score: typeof json.candidates[0].score }, {
     id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine for small CLIs", status: "reviewed", tags: ["cli"], score: "number",
-    why: { keywords: ["cli"], dependencies: [] }, path: box.note("npm--commander.md"),
+    why: { keywords: ["cli"], dependencies: [] }, path: box.note("npm--commander.md"), alternatives: [],
   });
   assert.equal(json.in_use_avoid[0].id, "pkg:npm/pdfkit");
 });
@@ -102,6 +102,54 @@ test("no candidate: a short message on stderr, exit 0; the avoid group still sho
   assert.equal(r.code, 0);
   assert.equal(r.out, "Already in use, you noted to avoid:\n  pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer\n");
   assert.equal(r.err, "No notes match: kubernetes, operators.\n");
+});
+
+// --- Alternatives (decision 0029): an Instead line under each in-use avoid note; none for candidates ---
+
+const withAlternatives = (text: string, entries: string[]) => text.replace("\nstatus:", `\nalternatives: [${entries.map((e) => JSON.stringify(e)).join(", ")}]\nstatus:`);
+const ALTERNATIVES = {
+  ...FILES,
+  "journal/notes/npm--pdfkit.md": withAlternatives(FILES["journal/notes/npm--pdfkit.md"], ["[[puppeteer]]", "[[pdf-lib]]"]),
+  "journal/notes/npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", verdict: "default for PDF rendering in new projects" }),
+  "journal/notes/npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib" }),
+  "journal/notes/npm--commander.md": withAlternatives(FILES["journal/notes/npm--commander.md"], ["[[yargs]]"]),
+};
+
+test("an in-use avoid note names its alternatives on an Instead line; a candidate gets no extra line", async () => {
+  const box = sandbox(ALTERNATIVES);
+  const r = await magpie(box, ["suggest"]);
+  assert.equal(r.out, [
+    "1  commander  npm  personal  Verdict: fine for small CLIs  Why: matched cli",
+    "2  tsx        npm  personal  [inbox] no verdict yet  Why: matched typescript",
+    "",
+    "Already in use, you noted to avoid:",
+    "  pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer  Instead: puppeteer, pdf-lib",
+    "",
+  ].join("\n"));
+});
+
+test("in a terminal, the Instead line follows the Verdict, under the name; more than 3 end with +N more", async () => {
+  const box = sandbox({
+    ...ALTERNATIVES,
+    "journal/notes/npm--pdfkit.md": withAlternatives(FILES["journal/notes/npm--pdfkit.md"], ["[[puppeteer]]", "[[pdf-lib]]", "[[jspdf]]", "[[wkhtmltopdf]]", "[[pdfmake]]"]),
+  });
+  const r = await magpie(box, ["suggest", "kubernetes operators"], { columns: 80, env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
+  assert.equal(r.out, [
+    "Already in use, you noted to avoid:",
+    "  pdfkit  npm  personal",
+    "  Verdict: avoid: async streams painful; use puppeteer",
+    "  Instead: puppeteer, pdf-lib, jspdf, +2 more",
+    "",
+  ].join("\n"));
+});
+
+test("a name-only avoid note gets no Instead line", async () => {
+  const box = sandbox({
+    "journal/notes/pypi--pdfkit.md": withAlternatives(note({ id: "pkg:pypi/pdfkit", verdict: "avoid: wkhtmltopdf wrapper" }), ["[[weasyprint]]"]),
+    "project/package.json": JSON.stringify({ description: "A TypeScript CLI", dependencies: { pdfkit: "*" } }),
+  });
+  const r = await magpie(box, ["suggest", "kubernetes operators"]);
+  assert.equal(r.out, "Already in use, you noted to avoid:\n  pdfkit (name match only)  pypi  personal  Verdict: avoid: wkhtmltopdf wrapper\n");
 });
 
 test("in a terminal, the Verdict wraps under the name", async () => {
