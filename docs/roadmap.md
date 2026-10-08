@@ -262,6 +262,7 @@ A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alt
 **Done when:** every item works and has tests; the budgets hold (`graphData` under 300 ms, the page under 2 s at 2,000 notes, the bundle under 200 kB with other screens' first files at most 3 kB over 99.4 kB, the existing budgets unchanged); all checks, end-to-end tests and benchmarks pass.
 
 Follow-up, small, after `feat/graph` (the maintainer, 2026-10-08):
+- [x] Opening a note by id (`GET /api/note`, and `PATCH`, which reads through it) finds the file through the link cache instead of reading every note; a miss or a stale hit reads every note. Budget 50 ms at 2,000 notes, warm (spec §7, `scripts/bench-note.ts`). (2026-10-08: 431 ms → 31 ms median, p95 465 → 35 ms.)
 - [ ] A flaky test file: `src/hook/claude-code.test.ts` failed once on windows-latest, Node 24.21.0 (CI run 37696988052, commit 66e43f0) with "test failed" and no failing test: all 8 passed, then the file's process exited non-zero without an error. Not reproduced locally (Node 24.13 and 24.21, 60 full runs). CI now keeps a TAP report when `npm test` fails, with the file's exit code, signal and stderr; read it the next time this happens, then fix the cause.
 - [ ] `search-index.json`: a shape check, as `recall-index.json`, `links.json`, `note-list.json` and `graph.json` have. A cache that is valid JSON with the expected version and signature but a damaged index is rebuilt from the notes, not used; a failing test first, and the search benchmark before and after.
 

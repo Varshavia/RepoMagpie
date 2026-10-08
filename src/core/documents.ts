@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { graphData, type GraphData } from "./graph.ts";
 import { journalTagList, listNotes, parseTagList, STARTER_TAGS, type Place } from "./journals.ts";
-import { linkIndex, type Backlink, type Link } from "./links.ts";
+import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
 import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
@@ -217,10 +217,30 @@ export type NoteAddress = { id: string } | { file: string };
 // The note's path, when the address names a note in the journal's notes/ listing.
 export function locateNote(scope: Scope, address: NoteAddress, place: Place): { journal: Journal; path: string | null } {
   const journal = locateJournal(scope, place);
-  if (journal.error) return { journal, path: null };
-  if ("id" in address) return { journal, path: listNotes(journal.path).find((entry) => entry.id === address.id)?.path ?? null };
-  const file = noteFiles(journal.path).find((name) => name === address.file);
-  return { journal, path: file ? join(journal.path, "notes", file) : null };
+  return { journal, path: journal.error ? null : notePath(journal.path, address) };
+}
+
+function notePath(journal: string, address: NoteAddress, entries?: LinkEntries): string | null {
+  if ("id" in address) return noteById(journal, address.id, entries ?? linkEntries(journal));
+  const file = noteFiles(journal).find((name) => name === address.file);
+  return file ? join(journal, "notes", file) : null;
+}
+
+// A note by id, without reading every note: the link cache names the file (files added or changed
+// since it was written are read again), and the file is then checked, since a file can change
+// without its size or modification time changing. A miss, or a file that no longer has that id,
+// falls back to reading every note (at 2,000 notes: about 430 ms, against a few ms).
+function noteById(journal: string, id: string, { files, data }: LinkEntries): string | null {
+  const file = files.find((name) => data[name].id === id);
+  if (file) {
+    const path = join(journal, "notes", file);
+    try {
+      if (readNote(readFileSync(path, "utf8")).frontmatter.id === id) return path;
+    } catch {
+      // Gone or unreadable since: read every note.
+    }
+  }
+  return listNotes(journal).find((entry) => entry.id === id)?.path ?? null;
 }
 
 // The journal's tags.md, when it exists ("Edit tag list" in the app opens it).
@@ -231,18 +251,22 @@ export function tagListPath(scope: Scope, place: Place): string | null {
   return existsSync(path) ? path : null;
 }
 
+// One read of the link cache finds the note and gives its links and backlinks.
 export function noteDocument(scope: Scope, address: NoteAddress, place: Place): Result<NoteJson> {
-  const { journal, path } = locateNote(scope, address, place);
+  const journal = locateJournal(scope, place);
   if (journal.error) return { outcome: "failed", document: { ...emptyNote(scope), error: journal.error } };
+  const entries = linkEntries(journal.path);
+  const path = notePath(journal.path, address, entries);
   if (!path) return { outcome: "not-found", document: { ...emptyNote(scope), error: "No note with that id or file name in this journal." } };
-  return { outcome: "ok", document: noteJson(scope, path, readFileSync(path)) };
+  return { outcome: "ok", document: noteJson(scope, path, readFileSync(path), entries) };
 }
 
 export function emptyNote(scope: Scope): NoteJson {
   return { id: null, journal: scope, file: null, path: null, version: null, read_only: false, status: null, verdict: null, frontmatter: {}, sections: [], skills: [], links: [], backlinks: [], warnings: [] };
 }
 
-function noteJson(scope: Scope, path: string, bytes: Buffer): NoteJson {
+// `entries`: the link cache as already read for this request; after an edit, it is read again.
+function noteJson(scope: Scope, path: string, bytes: Buffer, entries?: LinkEntries): NoteJson {
   const note = readNote(bytes.toString("utf8"));
   const id = readableId(note);
   const warnings = [...note.warnings];
@@ -254,7 +278,7 @@ function noteJson(scope: Scope, path: string, bytes: Buffer): NoteJson {
     return match ? [{ name: match[1], text: match[2].trim() }] : [];
   });
   // The path is <journal>/notes/<file>; a note that can't be read is not in the index.
-  const index = linkIndex(dirname(dirname(path)));
+  const index = linkIndex(dirname(dirname(path)), entries);
   const file = basename(path);
   return {
     id,

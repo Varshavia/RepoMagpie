@@ -35,8 +35,7 @@ test("graph: data, layout and first frame at 2,000 notes", async ({ page, magpie
   await magpie.open(page);
   const canvas = page.locator(".graph-canvas");
   // Opened from a loaded Inbox, its first note shown: the server answers one request at a time,
-  // and the Inbox's own requests (the note takes about 470 ms at 2,000 notes) would otherwise be
-  // counted in the graph's time.
+  // and the Inbox's own requests would otherwise be counted in the graph's time.
   const open = async () => {
     await expect(page.getByRole("listbox", { name: "Inbox" }).getByRole("option").first()).toBeVisible();
     await expect(page.locator("#note-title")).toBeVisible();
