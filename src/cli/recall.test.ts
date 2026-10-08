@@ -199,7 +199,7 @@ test("--json: every match carries its alternatives in recall's shape", async () 
     { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: path("npm--puppeteer.md") },
     { name: "pdf-lib", id: "pkg:npm/pdf-lib", journal: "personal", verdict: null, status: "inbox", avoid: false, path: path("npm--pdf-lib.md") },
     { name: "jspdf", id: "pkg:npm/jspdf", journal: "personal", verdict: "avoid: tiny API", status: "reviewed", avoid: true, path: path("npm--jspdf.md") },
-    { name: "wkhtmltopdf", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null },
+    { name: "wkhtmltopdf", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null, reason: "missing" },
   ]);
 });
 

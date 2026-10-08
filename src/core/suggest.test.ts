@@ -83,9 +83,9 @@ test("every candidate lists its alternatives from both sides, in recall's shape;
   const of = (journal: string, name: string) => candidates.find((c) => c.journal === journal && c.name === name)?.alternatives;
   assert.deepEqual(of("personal", "commander"), [
     { name: "yargs", id: "pkg:npm/yargs", journal: "personal", verdict: "too much for small CLIs", status: "reviewed", avoid: false, path: join(p.root, "journal", "notes", "npm--yargs.md") },
-    { name: "cac", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null },
+    { name: "cac", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null, reason: "missing" },
   ]);
-  assert.deepEqual(of("project", "commander"), [{ name: "yargs", id: null, journal: "project", verdict: null, status: null, avoid: false, path: null }]);
+  assert.deepEqual(of("project", "commander"), [{ name: "yargs", id: null, journal: "project", verdict: null, status: null, avoid: false, path: null, reason: "missing" }]);
   assert.deepEqual(of("personal", "tsx")?.map((a) => a.name), ["ts-node"], "the reverse side");
 });
 
