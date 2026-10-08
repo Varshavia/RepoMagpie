@@ -6,21 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.2] - 2026-10-08
+
+The third pre-release: your alternatives before an install, in `magpie recall`, the Claude Code hook, `magpie suggest`, the app and the agent skill (v0.2 Connect, part 3).
+
 ### Added
 
 - Your alternatives, shown before an install. When a note has alternatives (its own `alternatives`, or notes that list it), `magpie recall` adds an "Alternatives" row to the card: each with its Verdict, `[inbox] no verdict yet`, or "(you also noted to avoid it)"; at most 3, then `+N more`, and every one with `--full`. Piped, they share one line.
 - The Claude Code hook names a note's alternatives. For an avoid note, the permission prompt gets an "Alternatives:" line, and the agent's context names them and says to offer them to you and to recall one before installing it. Other notes get a short "Alternatives:" suffix. Whether the hook asks doesn't change.
 - `magpie suggest` names the alternatives of a package the project already uses that you noted to avoid: "Instead: puppeteer, pdf-lib".
-- `alternatives` in `--json`: on every match of `magpie recall`, and on every `candidates[]` and `in_use_avoid[]` item of `magpie suggest`. Each has `name`, `id`, `journal`, `verdict`, `status`, `avoid` and `path`.
+- `alternatives` in `--json`: on every match of `magpie recall`, and on every `candidates[]` and `in_use_avoid[]` item of `magpie suggest`. Each has `name`, `id`, `journal`, `verdict`, `status`, `avoid` and `path`; one without a note also has `reason`: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name), as a link in the Note document has.
 - `magpie note <name> --alternative <target>` records a package you named to use instead. Repeat it for several. A name, a PURL or a file stem; a PURL is written as the file stem its note has or would have, so a note made later resolves it. An alternative already there isn't added twice, and the rest of the file stays exactly as it was. `--json` adds `alternatives_added` and `alternatives_present`.
-- Check a package in `magpie ui` shows the Alternatives row; Suggest's "In use, avoid" rows get an "Instead:" line. A name with a note opens it; one without opens Add.
-- The agent skill names your alternatives before an install, asks whether to install one instead, and offers to record an alternative you name.
+- Check a package in `magpie ui` shows the Alternatives row; Suggest's "In use, avoid" rows get an "Instead:" line. A name with a note opens it; one without opens Add, or Search when several notes have that name.
+- The agent skill names your alternatives before an install, asks whether to install one instead, and offers to record an alternative you name. When you answer No to the hook's prompt, Claude Code ends the agent's turn, so the agent offers your alternatives on your next message.
 
 ### Changed
 
-- In `--json` of `magpie recall` and `magpie suggest`, an alternative without a note has `reason`: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name), as a link in the Note document has.
-- In `magpie ui`, a link or an alternative whose name several notes have opens Search with that name. Before, such a link did nothing and such an alternative opened Add. On the graph page, a missing note of that kind offers "Search notes" instead of "Add a note".
-- The agent skill: when you answer No to the hook's prompt, Claude Code ends the agent's turn, so the agent now offers your alternatives on your next message instead of right after the No.
+- In `magpie ui`, a `[[link]]` whose name several notes have opens Search with that name. Before, it did nothing. On the graph page, a missing note of that kind offers "Search notes" instead of "Add a note".
 
 ### Fixed
 
@@ -94,6 +96,7 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...HEAD
+[0.2.0-beta.2]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...v0.2.0-beta.2
 [0.2.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.1.0-beta.1...v0.2.0-beta.1
 [0.1.0-beta.1]: https://github.com/Varshavia/RepoMagpie/releases/tag/v0.1.0-beta.1
