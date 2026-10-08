@@ -8,7 +8,7 @@
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes Claude Code ask you.
 - **Suggest:** `magpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
-**Status:** pre-release `0.1.0-beta.1`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.1`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
@@ -44,7 +44,7 @@ You need Node.js 22.12 or later.
 
    The hook never blocks an install. When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `magpie hook claude-code --inform-only`, so notes inform the agent and never ask.
 
-4. Open your journals in the browser to review inbox notes, search and edit:
+4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
 
    ```bash
    magpie ui
@@ -73,6 +73,12 @@ Check a package: what your journals say before an install, and what the Claude C
 Suggest for this project: the notes that fit, and why each one is a candidate.
 
 ![Suggest in magpie ui: candidates with a why line, and pdfkit listed apart as in use with an avoid note](docs/assets/screen-suggest.png)
+
+Link notes: write `[[puppeteer]]` in any section to link to that note, and add alternatives under the Verdict. "Linked from" at the end of a note lists the notes that link to it. A repository's GitHub topics show as tags you can add with one click.
+
+See a journal as a graph: notes, the tags they carry, their links and alternatives. Click a note to read and edit it beside the graph, or filter by kind, tag and status.
+
+![The graph page in magpie ui: 800 notes around their tags, with the most connected tags listed beside the graph](docs/assets/screen-graph.png)
 
 ## How it compares
 
