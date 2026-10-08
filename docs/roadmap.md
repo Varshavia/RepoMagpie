@@ -265,6 +265,14 @@ Follow-up, small, after `feat/graph` (the maintainer, 2026-10-08):
 - [x] Opening a note by id (`GET /api/note`, and `PATCH`, which reads through it) finds the file through the link cache instead of reading every note; a miss or a stale hit reads every note. Budget 50 ms at 2,000 notes, warm (spec §7, `scripts/bench-note.ts`). (2026-10-08: 431 ms → 31 ms median, p95 465 → 35 ms.)
 - [ ] A flaky test file: `src/hook/claude-code.test.ts` failed once on windows-latest, Node 24.21.0 (CI run 37696988052, commit 66e43f0) with "test failed" and no failing test: all 8 passed, then the file's process exited non-zero without an error. Not reproduced locally (Node 24.13 and 24.21, 60 full runs). CI now keeps a TAP report when `npm test` fails, with the file's exit code, signal and stderr; read it the next time this happens, then fix the cause.
 - [ ] `search-index.json`: a shape check, as `recall-index.json`, `links.json`, `note-list.json` and `graph.json` have. A cache that is valid JSON with the expected version and signature but a damaged index is rebuilt from the notes, not used; a failing test first, and the search benchmark before and after.
+- [ ] The graph's neighbours list: virtualise a large group. A tag on hundreds of notes renders every row; keep the listbox, its groups and its keys.
+- [ ] URL state: the graph's filters, toggles and selection in the URL, so Back and a reload keep them, as the note view's `#note/<journal>/<id>` does.
+- [ ] Thousands separators in counts, app-wide ("2,000 notes", not "2000 notes"): the sidebar, the lists and the graph's status line.
+- [ ] Arrow keys in segmented buttons, app-wide: ←/→ move the choice within the group, which is one Tab stop, as in the WAI-ARIA radio group pattern.
+
+Not doing, from the `web-design-guidelines` review of `feat/graph`:
+- Keyboard pan and zoom on the graph's canvas: the canvas is a visual aid; the search box, the filters and the neighbours list are the keyboard path ([decision 0028](decisions/0028-the-graph-page.md)).
+- Title Case for buttons and headings: every label and heading in the app is in sentence case, as the examples in [`DESIGN.md`](../DESIGN.md) (Writing) are; one page in Title Case would break that.
 
 ### Part 3: agent output
 - [ ] `magpie recall` and `magpie suggest` show alternatives and neighbours; the skill explains them.
