@@ -611,6 +611,39 @@ test("suggest: what magpie suggest finds for this project, in its order; the in-
   await expect(rows.first()).toContainText(described.candidates[0].name);
 });
 
+test("alternatives before an install: Check a package and Suggest name them; a resolved one opens its note, a missing one opens Add", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli]]", "[[wkhtmltopdf]]"]\n'));
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", dependencies: { pdfkit: "*" } }));
+  await magpie.open(page);
+
+  // Check a package: an Alternatives row on the card.
+  const check = async () => {
+    await page.getByRole("button", { name: "Check a package" }).click();
+    await page.getByLabel("Packages").fill("pdfkit");
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    return page.getByRole("article", { name: "pdfkit" }).getByRole("group", { name: "Alternatives" });
+  };
+  let row = await check();
+  await expect(row).toContainText("microsoft/playwright-cli: ");
+  const missing = row.getByRole("button", { name: /^wkhtmltopdf/ });
+  await expect(missing).toHaveAttribute("title", "No note named “wkhtmltopdf” in this journal");
+  await missing.click();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a note" })).toBeVisible();
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("wkhtmltopdf");
+  row = await check();
+  await row.getByRole("link", { name: "microsoft/playwright-cli" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
+
+  // Suggest: the in-use avoid row gets an Instead line; candidates nothing extra.
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
+  await expect(rows.last()).toContainText("In use, avoid");
+  await expect(rows.last()).toContainText("Instead: microsoft/playwright-cli, wkhtmltopdf");
+  for (const candidate of await rows.filter({ hasNotText: "In use, avoid" }).all()) await expect(candidate).not.toContainText("Instead:");
+  await rows.last().getByRole("link", { name: "microsoft/playwright-cli" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
+});
+
 test("suggest: a project with nothing to go on asks for a description", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();

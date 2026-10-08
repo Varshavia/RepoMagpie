@@ -2,17 +2,17 @@
 // would do with it (spec §6, decision 0024): an exact avoid note asks you first; any other match
 // informs; magpie never blocks an install.
 import { useId, useState } from "react";
-import { api, type ApiError, type PackageType, type RecallJson } from "../api.ts";
+import { api, type ApiError, type PackageType, type RecallJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { hookWouldAsk, packageLabel } from "../logic/schema.ts";
 import { homePath } from "../logic/text.ts";
 import { MOD } from "../platform.ts";
-import { FieldError } from "./common.tsx";
+import { AlternativeName, FieldError } from "./common.tsx";
 import { TypeChoice } from "./fields.tsx";
 
 type Match = RecallJson["matches"][number];
 
-export function RecallPage({ home }: { home: string | null }) { // paths under home are shown with ~
+export function RecallPage({ home, onOpenNote, onAdd }: { home: string | null } & Opening) { // paths under home are shown with ~
   const id = useId();
   const [text, setText] = useState("");
   const [type, setType] = useState<PackageType | "">("");
@@ -83,7 +83,7 @@ export function RecallPage({ home }: { home: string | null }) { // paths under h
           {result.queries.map((q) => {
             const matches = result.matches.filter((m) => m.query === q);
             return matches.length ? (
-              matches.map((m) => <Card key={`${m.query} ${m.journal} ${m.id}`} match={m} home={home} />)
+              matches.map((m) => <Card key={`${m.query} ${m.journal} ${m.id}`} match={m} home={home} onOpenNote={onOpenNote} onAdd={onAdd} />)
             ) : (
               <p className="recall-card" key={q}>
                 <span>
@@ -100,7 +100,14 @@ export function RecallPage({ home }: { home: string | null }) { // paths under h
   );
 }
 
-function Card({ match, home }: { match: Match; home: string | null }) {
+interface Opening {
+  onOpenNote: (journal: Scope, id: string) => void; // an alternative with a note
+  onAdd: (journal: Scope, target: string) => void; // one without
+}
+
+// The card as magpie recall prints it, with every alternative (decision 0029): each links to its
+// note, or, without one, is muted and opens Add.
+function Card({ match, home, onOpenNote, onAdd }: { match: Match; home: string | null } & Opening) {
   const ask = hookWouldAsk(match);
   const { type, name } = packageLabel(match.id);
   const draft = (list: "use_when" | "avoid_when") => (match.drafts as string[]).includes(list);
@@ -125,6 +132,19 @@ function Card({ match, home }: { match: Match; home: string | null }) {
             {draft("avoid_when") ? "(draft) " : ""}
             {match.avoid_when.join("; ")}
           </span>
+        </div>
+      ) : null}
+      {match.alternatives.length ? (
+        <div className="recall-line" role="group" aria-label="Alternatives">
+          <span className="section-label">Alternatives</span>
+          <ul className="recall-alternatives">
+            {match.alternatives.map((a, i) => (
+              <li key={`${a.name} ${i}`}>
+                <AlternativeName alternative={a} onOpen={onOpenNote} onAdd={onAdd} />
+                {a.id ? `: ${a.verdict ?? "[inbox] no verdict yet"}${a.avoid ? " (you also noted to avoid it)" : ""}` : null}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       {match.use_when.length ? (

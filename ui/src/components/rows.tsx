@@ -1,10 +1,11 @@
 // List rows (DESIGN.md, List row): two lines. Line 1: the name (full name on hover) and the type;
 // line 2: the Verdict, muted, or "no verdict yet". The Inbox badge is left out where every row is
 // an inbox note.
+import { Fragment } from "react";
 import type { NoteSummary } from "../../../src/core/documents.ts";
-import type { SearchResult } from "../api.ts";
+import type { Scope, SearchResult } from "../api.ts";
 import type { SuggestItem } from "../logic/suggest.ts";
-import { StatusBadge } from "./common.tsx";
+import { AlternativeName, StatusBadge } from "./common.tsx";
 
 const typeOf = (id: string | null) => id?.match(/^pkg:([^/]+)/)?.[1] ?? "";
 
@@ -25,7 +26,8 @@ export function NoteRow({ note, showInbox }: { note: NoteSummary; showInbox: boo
 }
 
 // A suggestion: a candidate, or a dependency you noted to avoid (labelled in words, not by colour alone).
-export function SuggestRow({ item }: { item: SuggestItem }) {
+// An avoid row's third line names its alternatives, as magpie suggest's Instead line does.
+export function SuggestRow({ item, onOpen, onAdd }: { item: SuggestItem; onOpen: (journal: Scope, id: string) => void; onAdd: (journal: Scope, target: string) => void }) {
   return (
     <>
       <span className="row-line">
@@ -40,6 +42,18 @@ export function SuggestRow({ item }: { item: SuggestItem }) {
       </span>
       <span className="row-verdict">{item.verdict ?? "no verdict yet"}</span>
       {item.why ? <span className="row-why" title={item.why}>{item.why}</span> : null}
+      {item.instead.length ? (
+        <span className="row-why">
+          {"Instead: "}
+          {item.instead.map((a, i) => (
+            <Fragment key={`${a.name} ${i}`}>
+              {i ? ", " : null}
+              <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} inRow />
+            </Fragment>
+          ))}
+          {item.moreInstead ? `, +${item.moreInstead} more` : null}
+        </span>
+      ) : null}
     </>
   );
 }

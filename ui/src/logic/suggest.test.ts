@@ -40,6 +40,30 @@ test("an avoid row keeps its confidence and its type", () => {
   assert.equal(avoid?.name, "foo/pdf");
 });
 
+// The Instead line (decision 0029), as magpie suggest prints it: an exact in-use avoid note's
+// alternatives, at most 3 and a count of the rest; none for a name-only match or a candidate.
+const alternative = (name: string) => ({ name, id: `pkg:npm/${name}`, journal: "personal" as const, verdict: "fine", status: "reviewed" as const, avoid: false, path: `/h/notes/npm--${name}.md` });
+
+test("an exact in-use avoid row carries up to 3 alternatives and the count of the rest; name-only and candidate rows none", () => {
+  const five = ["a", "b", "c", "d", "e"].map(alternative);
+  const doc: SuggestJson = {
+    ...DOC,
+    candidates: DOC.candidates.map((c) => ({ ...c, alternatives: [alternative("x")] })),
+    in_use_avoid: [
+      { ...DOC.in_use_avoid[0], alternatives: five },
+      { ...DOC.in_use_avoid[0], id: "pkg:github/foo/pdf", confidence: "name-only", alternatives: [alternative("y")] },
+      { ...DOC.in_use_avoid[0], id: "pkg:npm/bar", alternatives: [] },
+    ],
+  };
+  const items = suggestItems(doc);
+  assert.deepEqual(items.map((i) => [i.instead.map((a) => a.name), i.moreInstead]), [
+    [[], 0], [[], 0], [[], 0],
+    [["a", "b", "c"], 2],
+    [[], 0],
+    [[], 0],
+  ]);
+});
+
 test("each candidate carries its why line; an avoid row has none", () => {
   const items = suggestItems(DOC);
   assert.deepEqual(items.map((i) => i.why), ["Why: matched cli", "Why: matched cli", "Why: matched pdf", null]);

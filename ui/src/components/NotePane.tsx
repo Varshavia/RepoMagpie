@@ -2,7 +2,7 @@
 // The Verdict leads; then Use when and Avoid when, the other sections, skill lines, "Linked from",
 // metadata and actions. Every write sends the version the note was read with; a 409 shows the
 // conflict banner. [[Links]] open the note they resolve to, as core resolved them.
-import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
@@ -10,7 +10,7 @@ import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteH
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
 import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
-import { Banner, DraftBadge, EmptyState, FieldError, SkeletonNote, StatusBadge } from "./common.tsx";
+import { Banner, DraftBadge, EmptyState, FieldError, plainClick, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
 import { Alternatives } from "./Alternatives.tsx";
 import { LinkTextarea } from "./LinkTextarea.tsx";
@@ -18,10 +18,6 @@ import { ReviewForm } from "./ReviewForm.tsx";
 
 // What a [[link]] in the note needs: the note's resolved links, and where a click goes.
 const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void } | null>(null);
-
-// A plain click opens the note in the app; a click with a modifier, or the middle button, is left to
-// the browser (a new tab opens the same note from its address).
-const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 export interface NotePaneProps {
   journal: Scope;
