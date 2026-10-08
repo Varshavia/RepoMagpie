@@ -2,7 +2,7 @@
 // of the project magpie ui was started in, or from a typed description. Candidates come Verdict
 // first; the project's dependencies you noted to avoid follow. Your coding agent picks the fit.
 import { useEffect, useId, useRef, useState, type Ref } from "react";
-import { api, type ApiError } from "../api.ts";
+import { api, type ApiError, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { keywordLine, suggestItems, suggestKey, type SuggestItem } from "../logic/suggest.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
@@ -17,11 +17,13 @@ interface Props {
   projectRoot: string | null; // where magpie ui was started; null outside a project
   listRef: Ref<HTMLDivElement>;
   refresh: number; // grows on live updates: suggest again
+  onOpenNote: (journal: Scope, id: string) => void; // an avoid row's alternative with a note
+  onAdd: (journal: Scope, target: string) => void; // one without
 }
 
 const STEP = 20; // magpie suggest's default --limit
 
-export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, listRef, refresh }: Props) {
+export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, listRef, refresh, onOpenNote, onAdd }: Props) {
   const id = useId();
   const [text, setText] = useState("");
   const [description, setDescription] = useState<string | undefined>(undefined); // undefined: the project's files
@@ -157,7 +159,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
           selected={selected}
           onSelect={(key) => onSelect(key, false)}
           onOpen={(key) => onSelect(key, true)}
-          row={(item) => <SuggestRow item={item} />}
+          row={(item) => <SuggestRow item={item} onOpen={onOpenNote} onAdd={onAdd} />}
           listRef={listRef}
           rowHeight={TALL_ROW}
         />

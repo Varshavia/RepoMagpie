@@ -211,6 +211,15 @@ export function App() {
     [select],
   );
 
+  // Add for an alternative without a note (Check a package, Suggest): in the journal it was named in.
+  const addInJournal = useCallback(
+    (scope: Scope, target: string) => {
+      setJournal(scope);
+      go({ page: "add", target });
+    },
+    [go],
+  );
+
   // A followed [[link]] is a step in the browser's history: the note you left gets its address
   // first, so Back returns to it. A note's address also opens it on load (a link opened in a new tab).
   const followLink = useCallback(
@@ -519,6 +528,8 @@ export function App() {
           projectRoot={projectRoot}
           listRef={listRef}
           refresh={live.personal.tick + live.project.tick}
+          onOpenNote={openNote}
+          onAdd={addInJournal}
         />
         <section className="pane" aria-label="Note">
           {currentSuggestion?.id ? (
@@ -571,7 +582,7 @@ export function App() {
         ) : view.page === "import" ? (
           <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />
         ) : view.page === "recall" ? (
-          <RecallPage home={home} />
+          <RecallPage home={home} onOpenNote={openNote} onAdd={addInJournal} />
         ) : (
           <SettingsPage settings={settings} error={settingsError} theme={theme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
         )}

@@ -962,6 +962,7 @@ button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
 .recall-card.ask { border-left-color: var(--danger); }
 .recall-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--md); }
 .recall-line .section-label { padding-top: 3px; }
+.recall-alternatives { display: flex; flex-direction: column; gap: var(--xs); margin: 0; padding: 0; list-style: none; }
 
 .pane-action { margin-left: auto; }
 .suggest-form { display: flex; flex-direction: column; gap: var(--xs); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); }

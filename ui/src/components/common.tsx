@@ -1,6 +1,58 @@
 // Small components from DESIGN.md, "Components". Every coloured item also carries a word or a shape.
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
+import type { Alternative } from "../../../src/core/recall.ts";
 import { Icon } from "../icons.tsx";
+import { noteHash, type Scope } from "../logic/links.ts";
+
+// A plain click opens the note in the app; a click with a modifier, or the middle button, is left to
+// the browser (a new tab opens the same note from its address).
+export const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+
+// An alternative's name (decision 0029), as a [[link]] shows: one with a note links to it; one
+// without is muted with a dashed underline, says so in words, and opens Add with its name. In a list
+// row it is no tab stop (the row is one option of the listbox); the note pane has the same links.
+export function AlternativeName({ alternative: a, onOpen, onAdd, inRow = false }: {
+  alternative: Alternative;
+  onOpen: (journal: Scope, id: string) => void;
+  onAdd: (journal: Scope, target: string) => void;
+  inRow?: boolean;
+}) {
+  const tabIndex = inRow ? -1 : undefined;
+  if (a.id) {
+    const id = a.id;
+    return (
+      <a
+        className="wikilink"
+        href={noteHash(a.journal, id)}
+        tabIndex={tabIndex}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!plainClick(e)) return;
+          e.preventDefault();
+          onOpen(a.journal, id);
+        }}
+      >
+        <span translate="no">{a.name}</span>
+      </a>
+    );
+  }
+  const why = `No note named “${a.name}” in this journal`;
+  return (
+    <button
+      type="button"
+      className="wikilink unresolved"
+      title={why}
+      tabIndex={tabIndex}
+      onClick={(e) => {
+        e.stopPropagation();
+        onAdd(a.journal, a.name);
+      }}
+    >
+      <span translate="no">{a.name}</span>
+      <span className="visually-hidden">{` (${why}. Add it.)`}</span>
+    </button>
+  );
+}
 
 export function StatusBadge({ status, readOnly = false }: { status: "inbox" | "reviewed" | null; readOnly?: boolean }) {
   if (readOnly) return <span className="badge read-only">Read-only</span>;
