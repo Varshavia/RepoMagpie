@@ -50,7 +50,7 @@ $ magpie search pdf
 What the agent sees when it runs `npm install pdfkit` in Claude Code (the hook's `additionalContext`; Claude Code also asks you first, because the note says to avoid it):
 
 ```
-Note from your journal: pdfkit — avoid: async streams painful; use puppeteer (personal journal, ~/.magpie/notes/npm--pdfkit.md)
+Note from your journal: pdfkit — avoid: async streams painful; use puppeteer (personal journal, ~/.magpie/notes/npm--pdfkit.md). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). Offer them to the user instead of pdfkit, and recall an alternative before installing it.
 ```
 
 Every command also offers a machine-readable mode, for example `--json`, for agents ([decision 0008](decisions/0008-machine-readable-output.md)).

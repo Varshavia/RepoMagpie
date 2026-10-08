@@ -402,8 +402,8 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "ask",
-    "permissionDecisionReason": "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\n~/.magpie/notes/npm--pdfkit.md",
-    "additionalContext": "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs (personal journal, ~/.magpie/notes/npm--pdfkit.md)"
+    "permissionDecisionReason": "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\nAlternatives: puppeteer: default for PDF rendering in new projects\n~/.magpie/notes/npm--pdfkit.md",
+    "additionalContext": "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs (personal journal, ~/.magpie/notes/npm--pdfkit.md). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). Offer them to the user instead of pdfkit, and recall an alternative before installing it."
   }
 }
 ```
@@ -414,14 +414,18 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
-    "additionalContext": "Note from your journal: puppeteer — default for PDF rendering in new projects (project journal, ~/code/app/.magpie/notes/npm--puppeteer.md)"
+    "additionalContext": "Note from your journal: puppeteer — default for PDF rendering in new projects (project journal, ~/code/app/.magpie/notes/npm--puppeteer.md). Alternatives in your journal: playwright (browser tests, project journal). Recall an alternative before installing it."
   },
-  "systemMessage": "magpie: puppeteer — default for PDF rendering in new projects"
+  "systemMessage": "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright"
 }
 ```
 
 - `additionalContext` reaches the agent next to the tool's result; `systemMessage` is shown to the user; `permissionDecisionReason` is shown to the user in the permission prompt.
-- Each match is one line of `additionalContext` (and of `systemMessage`): the name, the Verdict (or `[inbox] no verdict yet`), "Avoid when" when the note has it, `(name match only)` for a name-only match, then the journal and path. A path in the home directory starts with `~`.
+- Each match is one line of `additionalContext` (and of `systemMessage`): the name, the Verdict (or `[inbox] no verdict yet`), "Avoid when" when the note has it, `(name match only)` for a name-only match, then the journal and path, then its alternatives (below). A path in the home directory starts with `~`.
+- **Alternatives** ([decision 0029](decisions/0029-recall-names-alternatives.md)): an exact match whose note has alternatives (recall's `alternatives`, section 2) names them, at most 3, then `+N more`. They add text only; whether the hook asks still depends on the matched note alone. A name-only match names none.
+  - The reason gets an `Alternatives:` line after the Verdict and "Avoid when": each alternative's name and Verdict (or `[inbox] no verdict yet`), `(you also noted to avoid it)` after an avoid note, and the name alone when it has no note; separated by `; `.
+  - `additionalContext` adds `Alternatives in your journal: <name> (<Verdict>, <journal> journal)`, separated by `; `, then `Recall an alternative before installing it.` For an avoid note it says `Offer them to the user instead of <name>, and recall an alternative before installing it.`
+  - `systemMessage` adds `. Alternatives: ` and their names, separated by `, `.
 - When a command installs several packages, one document covers them all. If any of them has an avoid note, the whole call asks, and the reason lists every avoid note first.
 - **Live test (2026-10-04):** in a Claude Code session with the hook installed, an install of a package with an avoid note prompted the user (`"ask"`), both in the default permission mode and in auto mode.
 - **Never denies:** the hook never returns `"deny"` and never exits with code 2. Its strongest answer is `"ask"`; the user decides. In an unattended `-p` run, Claude Code itself denies any call that would prompt, and the agent reads the reason (decision 0024).
