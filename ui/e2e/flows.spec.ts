@@ -155,6 +155,31 @@ test("links: an unresolved link is marked in words, not by colour alone; a missi
   await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("puppeteer");
 });
 
+test("links: an ambiguous link opens Search with its name; a missing file stem opens Add with the PURL it stands for", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("## Related\n", "## Related\n- [[zod]] or [[npm--puppeteer]]\n"));
+  for (const type of ["npm", "pypi"]) {
+    writeFileSync(magpie.note(`${type}--zod.md`), renderNote({ id: `pkg:${type}/zod`, name: "zod", explored: "2026-10-04", kind: "library", tags: [], verdict: `the ${type} one` }));
+  }
+  await magpie.open(page);
+  await openByName(page, "pdfkit", "pdfkit");
+  const related = page.getByRole("region", { name: "Related" });
+  const ambiguous = related.getByRole("button", { name: /^zod/ });
+  await expect(ambiguous).toHaveAttribute("title", "Several notes are named “zod”");
+  await expect(ambiguous).toHaveAccessibleName("zod (Several notes are named “zod”. Search for it.)");
+  await ambiguous.click();
+  const search = page.getByRole("searchbox", { name: "Search both journals" });
+  await expect(search).toHaveValue("zod");
+  const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+  await expect(results.filter({ hasText: /the (npm|pypi) one/ })).toHaveCount(2);
+
+  await search.fill("pdfkit");
+  await results.filter({ hasText: "pdfkit" }).first().click();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  await related.getByRole("button", { name: /^npm--puppeteer/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a note" })).toBeVisible();
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("pkg:npm/puppeteer");
+});
+
 test("links: Linked from refreshes when another note links here on disk", async ({ page, magpie }) => {
   await magpie.open(page);
   await openByName(page, "playwright", "microsoft/playwright-cli");
@@ -611,10 +636,14 @@ test("suggest: what magpie suggest finds for this project, in its order; the in-
   await expect(rows.first()).toContainText(described.candidates[0].name);
 });
 
-test("alternatives before an install: Check a package and Suggest name them; a resolved one opens its note, a missing one opens Add", async ({ page, magpie }) => {
-  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli]]", "[[wkhtmltopdf]]"]\n'));
+test("alternatives before an install: Check a package and Suggest name them; a resolved one opens its note, a missing one Add, an ambiguous one Search", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--pdfkit.md"), PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli]]", "[[pypi--weasyprint]]", "[[zod]]"]\n'));
+  for (const type of ["npm", "pypi"]) {
+    writeFileSync(magpie.note(`${type}--zod.md`), renderNote({ id: `pkg:${type}/zod`, name: "zod", explored: "2026-10-04", kind: "library", tags: [], verdict: `the ${type} one` }));
+  }
   writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", dependencies: { pdfkit: "*" } }));
   await magpie.open(page);
+  const search = page.getByRole("searchbox", { name: "Search both journals" });
 
   // Check a package: an Alternatives row on the card.
   const check = async () => {
@@ -625,11 +654,18 @@ test("alternatives before an install: Check a package and Suggest name them; a r
   };
   let row = await check();
   await expect(row).toContainText("microsoft/playwright-cli: ");
-  const missing = row.getByRole("button", { name: /^wkhtmltopdf/ });
-  await expect(missing).toHaveAttribute("title", "No note named “wkhtmltopdf” in this journal");
+  // A missing file stem opens Add with the PURL it stands for.
+  const missing = row.getByRole("button", { name: /^pypi--weasyprint/ });
+  await expect(missing).toHaveAttribute("title", "No note named “pypi--weasyprint” in this journal");
   await missing.click();
   await expect(page.getByRole("heading", { level: 1, name: "Add a note" })).toBeVisible();
-  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("wkhtmltopdf");
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("pkg:pypi/weasyprint");
+  row = await check();
+  const ambiguous = row.getByRole("button", { name: /^zod/ });
+  await expect(ambiguous).toHaveAttribute("title", "Several notes are named “zod”");
+  await expect(ambiguous).toHaveAccessibleName("zod (Several notes are named “zod”. Search for it.)");
+  await ambiguous.click();
+  await expect(search).toHaveValue("zod");
   row = await check();
   await row.getByRole("link", { name: "microsoft/playwright-cli" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
@@ -638,8 +674,11 @@ test("alternatives before an install: Check a package and Suggest name them; a r
   await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
   const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
   await expect(rows.last()).toContainText("In use, avoid");
-  await expect(rows.last()).toContainText("Instead: microsoft/playwright-cli, wkhtmltopdf");
+  await expect(rows.last()).toContainText(/Instead: microsoft\/playwright-cli, pypi--weasyprint \(.*\), zod \(/); // (the words for screen readers)
   for (const candidate of await rows.filter({ hasNotText: "In use, avoid" }).all()) await expect(candidate).not.toContainText("Instead:");
+  await rows.last().getByRole("button", { name: /^zod/ }).click();
+  await expect(search).toHaveValue("zod");
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
   await rows.last().getByRole("link", { name: "microsoft/playwright-cli" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "microsoft/playwright-cli" })).toBeVisible();
 });

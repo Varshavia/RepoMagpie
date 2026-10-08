@@ -267,6 +267,31 @@ test("graph: the toggles draw connections and missing notes without moving what 
   await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("puppeteer");
 });
 
+test("graph: an ambiguous missing note offers Search with its name; a file stem's Add gets the PURL it stands for", async ({ page, magpie }) => {
+  const file = magpie.note("github--leonxlnx--taste-skill.md");
+  writeFileSync(file, `${readFileSync(file, "utf8").replace(/\n*$/, "\n")}\nNot [[zod]], nor [[npm--puppeteer]].\n`);
+  for (const type of ["npm", "pypi"]) {
+    writeFileSync(magpie.note(`${type}--zod.md`), renderNote({ id: `pkg:${type}/zod`, name: "zod", explored: "2026-10-04", kind: "library", tags: [], verdict: `the ${type} one` }));
+  }
+  await openGraph(page, magpie);
+  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Missing notes" }).check();
+  const find = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  const matches = page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option");
+
+  await find.fill("zod");
+  await matches.filter({ hasText: "No note yet" }).click();
+  await expect(page.getByRole("button", { name: "Add a note" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Search notes" }).click();
+  await expect(page.getByRole("searchbox", { name: "Search both journals" })).toHaveValue("zod");
+
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
+  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Missing notes" }).check();
+  await find.fill("npm--puppeteer");
+  await matches.filter({ hasText: "No note yet" }).click();
+  await page.getByRole("button", { name: "Add a note" }).click();
+  await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("pkg:npm/puppeteer");
+});
+
 test("graph: the neighbours list names the selected node's neighbours by type; the arrows and Enter walk the graph", async ({ page, magpie }) => {
   await openGraph(page, magpie);
   await expect(page.getByRole("listbox", { name: "The nodes with the most connections" }).getByRole("option").first()).toBeVisible();

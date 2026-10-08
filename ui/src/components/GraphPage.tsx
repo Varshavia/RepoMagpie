@@ -108,11 +108,12 @@ interface Props {
   focus: string | null; // "Show in graph": the node to select, in local mode
   refresh: number; // grows when the journal's notes change on disk (notes-changed)
   onAdd:(target?: string) => void; // a missing note: Add, with its target filled in
+  onSearch: (name: string) => void; // an ambiguous one: Search, with its name
   // The note pane beside the graph; `open` selects another note of the graph (a [[link]] in it).
   renderNote: (note: { id: string; file: string }, open: (id: string) => void) => ReactNode;
 }
 
-export default function GraphPage({ journal, theme, focus: focusOn, refresh, onAdd, renderNote }: Props) {
+export default function GraphPage({ journal, theme, focus: focusOn, refresh, onAdd, onSearch, renderNote }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [webgl, setWebgl] = useState(hasWebGL);
@@ -448,7 +449,12 @@ export default function GraphPage({ journal, theme, focus: focusOn, refresh, onA
                 <span className="graph-selected">
                   Selected: <strong translate="no">{nodeLabel(current)}</strong>
                 </span>
-                {current.type === "ghost" ? (
+                {current.type === "ghost" && current.reason === "ambiguous" ? (
+                  <button type="button" className="button secondary" onClick={() => onSearch(current.target)}>
+                    <Icon name="search" />
+                    Search notes
+                  </button>
+                ) : current.type === "ghost" ? (
                   <button type="button" className="button secondary" onClick={() => onAdd(current.target)}>
                     <Icon name="plus" />
                     Add a note

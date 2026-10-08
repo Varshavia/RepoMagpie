@@ -21,8 +21,22 @@ export function linkText(link: Link): string {
   return link.label ?? link.name ?? link.target;
 }
 
-export function unresolvedTitle(link: Link): string {
+// Why a link, or an alternative from recall, opens no note. An ambiguous one opens Search with its
+// name; a missing one opens Add with addTarget's text.
+export function unresolvedTitle(link: Pick<Link, "target" | "reason">): string {
   return link.reason === "ambiguous" ? `Several notes are named “${link.target}”` : `No note named “${link.target}” in this journal`;
+}
+
+// What Add opens with for a missing target. A file stem (core's fileNameFor) stands for its subject:
+// npm--x is pkg:npm/x (pypi and cargo likewise), github--owner--repo the repository's URL. A scoped
+// npm stem lost its @ (npm--babel--core), so it stays as typed, as does any other target.
+export function addTarget(target: string): string {
+  const [type, ...parts] = target.split("--");
+  if (!parts.every((part) => part)) return target;
+  const kind = type.toLowerCase();
+  if (parts.length === 1 && (kind === "npm" || kind === "pypi" || kind === "cargo")) return `pkg:${kind}/${parts[0]}`;
+  if (parts.length === 2 && kind === "github") return `https://github.com/${parts[0]}/${parts[1]}`;
+  return target;
 }
 
 // "Linked from": one row per note, in core's order (by name), with where its links are.
