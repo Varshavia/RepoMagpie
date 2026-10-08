@@ -10,8 +10,8 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 ## Now / Next / Later
 
-- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, part 2 (the graph page, `feat/graph`): built, in review. Part 1 (linked notes) is merged.
+- **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
+  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged. The pre-release `0.2.0-beta.1` with both is prepared on `release/v0.2.0-beta.1`: version, CHANGELOG section and README; open until the maintainer tags and publishes it.
 - **Next:** v0.2 Connect, part 3 (agent output).
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -220,7 +220,7 @@ See [marketing.md](marketing.md).
 - [ ] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`.
 - [ ] End-to-end check and screenshots of the landing page, and screenshots for the README, with `microsoft/playwright-cli`.
 - [x] README rewrite for the accepted positioning, with one line about suggest; edit README and docs copy with `writing-guidelines` from `vercel-labs/agent-skills`.
-- [ ] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)). Prepared on `feat/launch-prep`: version `0.1.0-beta.1`, its CHANGELOG section, and the npm name `repomagpie` checked free on 2026-10-06. Open until the maintainer tags and publishes it.
+- [x] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)). Prepared on `feat/launch-prep`: version `0.1.0-beta.1`, its CHANGELOG section, and the npm name `repomagpie` checked free on 2026-10-06. Published 2026-10-07: the GitHub pre-release `v0.1.0-beta.1` and `repomagpie@0.1.0-beta.1` on npm.
 - [ ] Write the 30-second demo scenario (moved from step 1.5)
 - [ ] 30-second demo GIF: the "pdfkit moment", in the terminal theme from `DESIGN.md`
 - [x] Social preview image, with `taste-skill` (`docs/assets/social-preview.png`, 1280×640; the maintainer sets it in the repository settings)
