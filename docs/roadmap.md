@@ -278,6 +278,14 @@ Not doing, from the `web-design-guidelines` review of `feat/graph`:
 - [x] Decision: recall names alternatives ([0029](decisions/0029-recall-names-alternatives.md)).
 - [ ] `magpie recall`, the hook, `magpie suggest` and "Check a package" in the app show a note's alternatives; `magpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision.
 
+Follow-up, watch (the maintainer, 2026-10-08):
+- [ ] Recall's margin. `magpie recall` and the hook take about 145 ms at 2,000 notes on a Windows dev machine (budget 150). Most of it is Node's startup and loading the chunks (about 75 ms: the hook with no install) and reading 2,000 file times for the cache signature (30–35 ms); the cache read and its shape check take about 10 ms, alternatives 1–2 ms. Act when CI's Linux median passes 120 ms, or when a change adds more than 5 ms. Options for headroom:
+  - Node's compile cache (`module.enableCompileCache()`, Node 22.1+) for the built CLI, so the chunks aren't parsed and compiled on every run.
+  - Load `yaml` only when the cache is rebuilt: a warm run never parses a note, but the hook's chunk carries the YAML parser (part of the 268 kB `note` chunk).
+  - Read the file times in parallel (`fs.promises.stat` through libuv's thread pool) instead of 2,000 synchronous `statSync` calls.
+  - Compare the cache's signature file by file instead of `JSON.stringify` of both, and make the shape check cheaper (one pass, no closures).
+  - A smaller recall cache: keep only the fields the hook reads, and the alternatives already resolved, so a run parses and resolves less.
+
 ## v0.3 Trust
 - [ ] `magpie init`, if it missed v0.1.
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.

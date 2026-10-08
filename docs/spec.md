@@ -141,15 +141,16 @@ Output: the copy's path and `Install with: <command>` on stdout; for several pac
 Looks up notes for packages before an install. Used directly, by agents in skill mode, and by the hook (section 6).
 
 - Arguments: package names, optionally with a version or extras (`pdfkit@1.2.0`, `requests[socks]>=2`), or PURLs.
-- Flags: `--type npm|pypi|cargo`, `--full` (show every section).
+- Flags: `--type npm|pypi|cargo`, `--full` (show every section and every alternative).
 - **The type of a bare name:** `--type` if given; otherwise the nearest manifest, as for `note` (section 4). When the manifests don't settle it (none, or several), the name is looked up under every type they allow (all three when there is none), and a match under any of them counts as exact. `recall` never prompts and never fails for an ambiguous name.
 - Matching follows section 5. Output: one recall card per match (section 8), project journal first, then the personal one. No match: nothing on stdout, a short message on stderr (`No note for pdfkit.`), exit 0.
 
-`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "drafts": ["use_when"], "status": "reviewed", "path": "..."}]}`
+`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "drafts": ["use_when"], "status": "reviewed", "path": "...", "alternatives": [{"name": "puppeteer", "id": "pkg:npm/puppeteer", "journal": "personal", "verdict": "...", "status": "reviewed|inbox|null", "avoid": false, "path": "..."}]}]}`
 
 - `verdict` is `null` when the note has none (it is `inbox`), as in `search`.
 - `avoid_when` and `use_when` hold one item per bullet, without the draft marker and comments.
 - `drafts` names which of `avoid_when` and `use_when` are still drafts (schema rule 3); `[]` when none.
+- `alternatives` ([decision 0029](decisions/0029-recall-names-alternatives.md)): every alternative of the matched note, `[]` when none. They come from the `alternatives` field on both sides: the targets in the note's own field, and every note in the same journal that lists it. Targets resolve within the note's journal as links do (file stem, then a unique name). Each is listed once, never the note itself. `name` is the note's name, or the target as written when it has no note (missing or ambiguous); then `id`, `verdict`, `status` and `path` are `null`. `avoid` is `true` when the alternative is itself an avoid note (section 6). Order: reviewed alternatives that aren't avoid notes, then inbox ones, then avoid ones, then those without a note; ties by name. Added in 0.2; an addition, not a breaking change.
 
 ### `magpie init` (if time allows in v0.1; otherwise v0.3)
 
@@ -455,7 +456,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 
 **Rules**
 - **Verdict first.** Every result leads with the Verdict. A note without one says so: `[inbox] no verdict yet`.
-- **Recall card:** name, Verdict, "Avoid when", then "Use when". At most about 6 lines by default; `--full` shows every section.
+- **Recall card:** name, Verdict, "Avoid when", "Alternatives", then "Use when". At most about 6 lines by default, plus up to 3 more for alternatives; `--full` shows every section and every alternative. Each alternative is its name and Verdict (`puppeteer: default for PDF rendering`), `[inbox] no verdict yet` for an inbox note, `(you also noted to avoid it)` after an avoid note, and the name alone when it has no note. In a terminal each alternative has its own line, aligned under the first; at most 3, then `+N more (magpie recall <package> --full)`. Piped, they share one line, separated by `; `.
 - **Colour only carries meaning:** the "Avoid when" label and the `[inbox]` status. Every coloured item also has a text label, so nothing depends on colour alone.
 - **No colour** when stdout is not a terminal, or when `NO_COLOR` is set to a non-empty value ([no-color.org](https://no-color.org/)). `--json` output is never coloured.
 - **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `magpie search pdf | head` shows results only.
@@ -471,9 +472,35 @@ Recall card, exact match:
 ```
 $ magpie recall pdfkit
 pdfkit · npm · personal journal
-  Verdict      avoid: async streams painful; use puppeteer
-  Avoid when   you need streamed output for large PDFs
-  Use when     (draft) quick one-page PDFs from a script
+  Verdict       avoid: async streams painful; use puppeteer
+  Avoid when    you need streamed output for large PDFs
+  Alternatives  puppeteer: default for PDF rendering in new projects
+  Use when      (draft) quick one-page PDFs from a script
+  ~/.magpie/notes/npm--pdfkit.md
+```
+
+Several alternatives in a terminal:
+
+```
+$ magpie recall pdfkit
+pdfkit · npm · personal journal
+  Verdict       avoid: async streams painful; use puppeteer
+  Avoid when    you need streamed output for large PDFs
+  Alternatives  puppeteer: default for PDF rendering in new projects
+                pdf-lib: [inbox] no verdict yet
+                jspdf: avoid: tiny API (you also noted to avoid it)
+                +1 more (magpie recall pdfkit --full)
+  ~/.magpie/notes/npm--pdfkit.md
+```
+
+The same, piped:
+
+```
+$ magpie recall pdfkit | cat
+pdfkit · npm · personal journal
+  Verdict       avoid: async streams painful; use puppeteer
+  Avoid when    you need streamed output for large PDFs
+  Alternatives  puppeteer: default for PDF rendering in new projects; pdf-lib: [inbox] no verdict yet; jspdf: avoid: tiny API (you also noted to avoid it); +1 more (magpie recall pdfkit --full)
   ~/.magpie/notes/npm--pdfkit.md
 ```
 
