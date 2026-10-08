@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alternativeEntry, alternativeOptions, alternativesOf, alternativeTo, backlinkGroups, insertLink, linkCandidates, linkFor, linkQuery, linkText, noteHash, parseNoteHash, unresolvedTitle, withAlternative } from "./links.ts";
+import { addTarget, alternativeEntry, alternativeOptions, alternativesOf, alternativeTo, backlinkGroups, insertLink, linkCandidates, linkFor, linkQuery, linkText, noteHash, parseNoteHash, unresolvedTitle, withAlternative } from "./links.ts";
 
 // Links in the note view (docs/ui.md §7): how a link shows, "Linked from", the [[ autocomplete, and
 // the address a followed link leaves in the browser's history.
@@ -25,6 +25,20 @@ test("linkText: the label, else the note's name, else the target", () => {
 test("unresolvedTitle: why a link doesn't open a note", () => {
   assert.equal(unresolvedTitle(GHOST), "No note named “Ghost” in this journal");
   assert.equal(unresolvedTitle(TWO), "Several notes are named “playwright”");
+  // An alternative from Check a package or Suggest: its name and reason.
+  assert.equal(unresolvedTitle({ target: "pdf", reason: "ambiguous" }), "Several notes are named “pdf”");
+});
+
+test("addTarget: a missing target written as a file stem opens Add with what the stem stands for", () => {
+  assert.equal(addTarget("npm--pdfkit"), "pkg:npm/pdfkit");
+  assert.equal(addTarget("pypi--requests"), "pkg:pypi/requests");
+  assert.equal(addTarget("cargo--serde"), "pkg:cargo/serde");
+  assert.equal(addTarget("github--microsoft--playwright-cli"), "https://github.com/microsoft/playwright-cli");
+  // A scoped npm stem lost its @ (npm--babel--core), so it can't be recovered; nor can a stem
+  // with a part missing. Those, and any other target, stay as typed.
+  for (const target of ["npm--babel--core", "github--microsoft", "npm--", "github----repo", "puppeteer", "wkhtmltopdf", "pkg:npm/zod", "maven--x"]) {
+    assert.equal(addTarget(target), target);
+  }
 });
 
 test("backlinkGroups: one row per note, in core's order, with where each link is", () => {

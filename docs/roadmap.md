@@ -11,7 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is built on `feat/agent-output`, in review.
+  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is merged; its small follow-ups are on `fix/alternatives-followups`.
 - **Next:** the v0.2 Connect release, once part 3 is merged.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -246,7 +246,7 @@ The app becomes the place where you write and connect notes: links, backlinks, t
 **Done when:** every item works in the app and has tests; every new write keeps the rest of the file byte for byte; the link index meets its budget and the existing budgets still hold; all checks and end-to-end tests pass. (Met on `feat/linked-notes`, 2026-10-07, Windows dev machine, Node 24.13: 749 tests and 40 end-to-end flows pass; byte-for-byte tests for a new section, `alternatives` (entries written by hand stay as written) and appending to `tags.md`. Link index warm 46 ms median for 2,000 notes. The other budgets hold: search 267 ms, suggest 387 / 300 ms, recall 139 ms, the hook 136 / 79 ms; recall and the hook are close to their 150 ms on this machine today, with or without this branch's changes. Not yet seen green in CI.)
 
 Follow-up, small, after `feat/linked-notes` (the maintainer, 2026-10-07):
-- [ ] Unresolved links: an ambiguous link opens Search with its name; a missing link whose target is a file stem (`npm--pdfkit`, `github--owner--repo`) opens Add with the PURL it stands for. npm scopes can't be recovered from a stem; those stay as written.
+- [x] Unresolved links: an ambiguous link opens Search with its name; a missing link whose target is a file stem (`npm--pdfkit`, `github--owner--repo`) opens Add with the PURL it stands for. npm scopes can't be recovered from a stem; those stay as written. (Done on `fix/alternatives-followups`, 2026-10-08, for alternatives too: Check a package, Suggest and the graph's missing notes; `recall --json` and `suggest --json` give an unresolved alternative's `reason`, as links have.)
 
 ### Part 2: the graph page (`feat/graph`)
 A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alternatives` as edges (on by default), similarity from topics and language (off by default, at most 3 neighbours per note). Specification: [product](product.md#graph-specification); library, layout and encoding: [decision 0028](decisions/0028-the-graph-page.md).

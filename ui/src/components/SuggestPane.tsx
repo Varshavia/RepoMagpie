@@ -19,11 +19,12 @@ interface Props {
   refresh: number; // grows on live updates: suggest again
   onOpenNote: (journal: Scope, id: string) => void; // an avoid row's alternative with a note
   onAdd: (journal: Scope, target: string) => void; // one without
+  onSearch: (name: string) => void; // one whose name several notes have
 }
 
 const STEP = 20; // magpie suggest's default --limit
 
-export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, listRef, refresh, onOpenNote, onAdd }: Props) {
+export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, listRef, refresh, onOpenNote, onAdd, onSearch }: Props) {
   const id = useId();
   const [text, setText] = useState("");
   const [description, setDescription] = useState<string | undefined>(undefined); // undefined: the project's files
@@ -159,7 +160,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
           selected={selected}
           onSelect={(key) => onSelect(key, false)}
           onOpen={(key) => onSelect(key, true)}
-          row={(item) => <SuggestRow item={item} onOpen={onOpenNote} onAdd={onAdd} />}
+          row={(item) => <SuggestRow item={item} onOpen={onOpenNote} onAdd={onAdd} onSearch={onSearch} />}
           listRef={listRef}
           rowHeight={TALL_ROW}
         />

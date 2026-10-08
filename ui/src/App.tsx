@@ -21,7 +21,7 @@ import type { Form } from "./logic/edits.ts";
 import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
-import { noteHash, parseNoteHash } from "./logic/links.ts";
+import { addTarget, noteHash, parseNoteHash } from "./logic/links.ts";
 import { homePath } from "./logic/text.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
@@ -211,13 +211,24 @@ export function App() {
     [select],
   );
 
+  // A [[link]] or an alternative without a note (docs/ui.md §7). A missing one opens Add with what
+  // its target stands for (a file stem becomes its PURL or URL); an ambiguous one, Search with its name.
+  const addMissing = useCallback((target?: string) => go({ page: "add", target: target && addTarget(target) }), [go]);
+  const searchName = useCallback(
+    (name: string) => {
+      setSearch({ ...NO_SEARCH, query: name });
+      go({ page: "search" });
+    },
+    [go],
+  );
+
   // Add for an alternative without a note (Check a package, Suggest): in the journal it was named in.
   const addInJournal = useCallback(
     (scope: Scope, target: string) => {
       setJournal(scope);
-      go({ page: "add", target });
+      addMissing(target);
     },
-    [go],
+    [addMissing],
   );
 
   // A followed [[link]] is a step in the browser's history: the note you left gets its address
@@ -421,7 +432,8 @@ export function App() {
       onOpenNote={openNote}
       linkNotes={lists[scope].status === "ready" ? (lists[scope] as { notes: NoteSummary[] }).notes : []}
       onFollowLink={followLink}
-      onAddNote={(target) => go({ page: "add", target })}
+      onAddNote={addMissing}
+      onSearchName={searchName}
       onTagList={showTags}
       onShowInGraph={(file) => showInGraph(scope, file)}
       {...over}
@@ -530,6 +542,7 @@ export function App() {
           refresh={live.personal.tick + live.project.tick}
           onOpenNote={openNote}
           onAdd={addInJournal}
+          onSearch={searchName}
         />
         <section className="pane" aria-label="Note">
           {currentSuggestion?.id ? (
@@ -557,7 +570,8 @@ export function App() {
           theme={theme}
           focus={view.focus ?? null}
           refresh={live[journal].tick}
-          onAdd={(target) => go({ page: "add", target })}
+          onAdd={addMissing}
+          onSearch={searchName}
           renderNote={(note, open) =>
             notePane(journal, { id: note.id }, `${journal} id ${note.id}`, { onOpenNote: (_scope, id) => open(id), onFollowLink: (_scope, _from, to) => open(to), onShowInGraph: undefined })
           }
@@ -582,7 +596,7 @@ export function App() {
         ) : view.page === "import" ? (
           <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />
         ) : view.page === "recall" ? (
-          <RecallPage home={home} onOpenNote={openNote} onAdd={addInJournal} />
+          <RecallPage home={home} onOpenNote={openNote} onAdd={addInJournal} onSearch={searchName} />
         ) : (
           <SettingsPage settings={settings} error={settingsError} theme={theme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
         )}

@@ -2,19 +2,21 @@
 import type { MouseEvent, ReactNode } from "react";
 import type { Alternative } from "../../../src/core/recall.ts";
 import { Icon } from "../icons.tsx";
-import { noteHash, type Scope } from "../logic/links.ts";
+import { noteHash, unresolvedTitle, type Scope } from "../logic/links.ts";
 
 // A plain click opens the note in the app; a click with a modifier, or the middle button, is left to
 // the browser (a new tab opens the same note from its address).
 export const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 // An alternative's name (decision 0029), as a [[link]] shows: one with a note links to it; one
-// without is muted with a dashed underline, says so in words, and opens Add with its name. In a list
-// row it is no tab stop (the row is one option of the listbox); the note pane has the same links.
-export function AlternativeName({ alternative: a, onOpen, onAdd, inRow = false }: {
+// without is muted with a dashed underline and says so in words. A missing one opens Add, an
+// ambiguous one Search, with its name. In a list row it is no tab stop (the row is one option of
+// the listbox); the note pane has the same links.
+export function AlternativeName({ alternative: a, onOpen, onAdd, onSearch, inRow = false }: {
   alternative: Alternative;
   onOpen: (journal: Scope, id: string) => void;
   onAdd: (journal: Scope, target: string) => void;
+  onSearch: (name: string) => void;
   inRow?: boolean;
 }) {
   const tabIndex = inRow ? -1 : undefined;
@@ -36,7 +38,8 @@ export function AlternativeName({ alternative: a, onOpen, onAdd, inRow = false }
       </a>
     );
   }
-  const why = `No note named “${a.name}” in this journal`;
+  const why = unresolvedTitle({ target: a.name, reason: a.reason });
+  const ambiguous = a.reason === "ambiguous";
   return (
     <button
       type="button"
@@ -45,11 +48,12 @@ export function AlternativeName({ alternative: a, onOpen, onAdd, inRow = false }
       tabIndex={tabIndex}
       onClick={(e) => {
         e.stopPropagation();
-        onAdd(a.journal, a.name);
+        if (ambiguous) onSearch(a.name);
+        else onAdd(a.journal, a.name);
       }}
     >
       <span translate="no">{a.name}</span>
-      <span className="visually-hidden">{` (${why}. Add it.)`}</span>
+      <span className="visually-hidden">{` (${why}. ${ambiguous ? "Search for it" : "Add it"}.)`}</span>
     </button>
   );
 }

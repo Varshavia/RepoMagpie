@@ -27,7 +27,12 @@ export function NoteRow({ note, showInbox }: { note: NoteSummary; showInbox: boo
 
 // A suggestion: a candidate, or a dependency you noted to avoid (labelled in words, not by colour alone).
 // An avoid row's third line names its alternatives, as magpie suggest's Instead line does.
-export function SuggestRow({ item, onOpen, onAdd }: { item: SuggestItem; onOpen: (journal: Scope, id: string) => void; onAdd: (journal: Scope, target: string) => void }) {
+export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
+  item: SuggestItem;
+  onOpen: (journal: Scope, id: string) => void;
+  onAdd: (journal: Scope, target: string) => void;
+  onSearch: (name: string) => void;
+}) {
   return (
     <>
       <span className="row-line">
@@ -48,7 +53,7 @@ export function SuggestRow({ item, onOpen, onAdd }: { item: SuggestItem; onOpen:
           {item.instead.map((a, i) => (
             <Fragment key={`${a.name} ${i}`}>
               {i ? ", " : null}
-              <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} inRow />
+              <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} onSearch={onSearch} inRow />
             </Fragment>
           ))}
           {item.moreInstead ? `, +${item.moreInstead} more` : null}

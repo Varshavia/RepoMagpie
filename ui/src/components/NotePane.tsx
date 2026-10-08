@@ -17,7 +17,7 @@ import { LinkTextarea } from "./LinkTextarea.tsx";
 import { ReviewForm } from "./ReviewForm.tsx";
 
 // What a [[link]] in the note needs: the note's resolved links, and where a click goes.
-const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void } | null>(null);
+const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void; search: (name: string) => void } | null>(null);
 
 export interface NotePaneProps {
   journal: Scope;
@@ -41,7 +41,8 @@ export interface NotePaneProps {
   onOpenNote: (journal: Scope, id: string) => void;
   linkNotes: LinkNote[]; // the journal's notes, for the [[ autocomplete
   onFollowLink: (journal: Scope, from: string | null, to: string) => void; // a [[link]] or "Linked from"
-  onAddNote: (target: string) => void; // an unresolved link: Add, with the target filled in
+  onAddNote: (target: string) => void; // a missing link: Add, with the target filled in
+  onSearchName: (name: string) => void; // an ambiguous link: Search, with its name
   onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
   onShowInGraph?: (file: string) => void; // not in the graph's own note pane
 }
@@ -58,7 +59,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onTagList, onShowInGraph } = props;
+  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onSearchName, onTagList, onShowInGraph } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -325,7 +326,7 @@ export function NotePane(props: NotePaneProps) {
   const shown = [...missing, ...sections]
     .filter((s) => (ALWAYS.includes(s.name ?? "") || !isBlank(s.body)) && !context.includes(s))
     .sort((a, b) => rank(a.name) - rank(b.name));
-  const linking = { journal, links: note.links, open: (to: string) => onFollowLink(journal, note.id, to), add: onAddNote };
+  const linking = { journal, links: note.links, open: (to: string) => onFollowLink(journal, note.id, to), add: onAddNote, search: onSearchName };
   const linkedFrom = backlinkGroups(note.backlinks);
 
   return (
@@ -849,8 +850,9 @@ function Inlines({ parts }: { parts: Inline[] }) {
 }
 
 // A [[link]], as core resolved it: an in-app link to the note; or, unresolved, muted with a dashed
-// underline and its reason in the title and in words for screen readers. A missing one opens Add.
-// A link core doesn't know (it can't happen while the app and core find the same links) stays text.
+// underline and its reason in the title and in words for screen readers. A missing one opens Add,
+// an ambiguous one Search with its target. A link core doesn't know (it can't happen while the app
+// and core find the same links) stays text.
 function WikiLink({ target, text }: { target: string; text: string }) {
   const context = useContext(Links);
   const link = context ? linkFor(context.links, target) : null;
@@ -872,19 +874,12 @@ function WikiLink({ target, text }: { target: string; text: string }) {
     );
   }
   const why = unresolvedTitle(link);
-  if (link.reason === "missing") {
-    return (
-      <button type="button" className="wikilink unresolved" title={why} onClick={() => context.add(link.target)}>
-        <span translate="no">{linkText(link)}</span>
-        <span className="visually-hidden">{` (${why}. Add it.)`}</span>
-      </button>
-    );
-  }
+  const ambiguous = link.reason === "ambiguous";
   return (
-    <span className="wikilink unresolved" title={why}>
+    <button type="button" className="wikilink unresolved" title={why} onClick={() => (ambiguous ? context.search(link.target) : context.add(link.target))}>
       <span translate="no">{linkText(link)}</span>
-      <span className="visually-hidden">{` (${why})`}</span>
-    </span>
+      <span className="visually-hidden">{` (${why}. ${ambiguous ? "Search for it" : "Add it"}.)`}</span>
+    </button>
   );
 }
 
