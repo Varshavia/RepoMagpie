@@ -89,7 +89,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .description("show your notes before an install")
     .argument("<package...>", "package names (a version or extras are ignored) or PURLs")
     .addOption(new Option("--type <type>", "the package type of a bare name").choices(["npm", "pypi", "cargo"]))
-    .option("--full", "show every section of each note")
+    .option("--full", "show every section and every alternative of each note")
     .action(async (packages: string[], _options: unknown, command: Command) => {
       code = await (await import("./recall.ts")).recallCommand(packages, command.optsWithGlobals<RecallOptions>(), io);
     });
