@@ -147,6 +147,18 @@ export function setHumanFields(text: string, values: HumanFields): EditResult {
   return { text: edited.text, changed: edited.text !== text, warnings: [] };
 }
 
+// Adds entries at the end of the alternatives field (magpie note --alternative, decision 0029). Each
+// entry already there stays as written: it is named by its own target, the way editAlternatives
+// matches it. A field that isn't a list of strings is left alone, with a warning.
+export function addAlternatives(text: string, entries: string[]): EditResult {
+  const value = readNote(text).frontmatter.alternatives;
+  if (value !== undefined && value !== null && !(Array.isArray(value) && value.every((item) => typeof item === "string"))) {
+    return untouched(text, "The note's alternatives field isn't a list, so nothing was added; edit the file to fix it.");
+  }
+  const kept = ((value ?? []) as string[]).flatMap((item) => alternativeLinks([item]).slice(0, 1).map((link) => link.target));
+  return editAlternatives(text, [...kept, ...entries]);
+}
+
 const WIKILINK = /^\[\[[^[\]\r\n]+\]\]$/;
 const isWikilink = (entry: string) => WIKILINK.test(entry.trim()) && findLinks(entry.trim()).length === 1;
 // A requested entry's target, and what is written for it when it is new.

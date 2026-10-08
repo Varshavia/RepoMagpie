@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readNote, validate } from "./note.ts";
-import { acceptDraft, appendSkillLine, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
+import { acceptDraft, addAlternatives, appendSkillLine, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
 
 // A hand-written note: comments, odd spacing, a block list, an empty value, text above the
 // sections, an extra hand-written section, and sections a person typed.
@@ -531,6 +531,29 @@ test("alternatives: replaced in place; a block list stays a block list, its comm
 // Editing alternatives keeps every existing entry as written, labels and quotes included; only the
 // entry added or removed changes (the maintainer, 2026-10-07).
 const ZOD_YUP = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives:\n  - '[[zod|Zod]]'   # the one I use\n  - \"[[yup]]\"\n");
+
+// addAlternatives (magpie note --alternative, decision 0029): new entries at the end; every other
+// entry, and the rest of the file, byte for byte.
+test("addAlternatives: appends to a block list; every entry as written, odd ones included, and the rest of the file stay", () => {
+  const odd = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives:\n  - '[[zod|Zod]]'   # the one I use\n  - plain#name\n  - \"[[a]] or [[b]]\"\n  - \"[[]]\"\n  - \"[[zod]]\"\n");
+  const r = addAlternatives(odd, ["[[npm--joi]]"]);
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.text, odd.replace('  - "[[zod]]"\n', '  - "[[zod]]"\n  - "[[npm--joi]]"\n'));
+});
+
+test("addAlternatives: appends to a flow list; adds the key at the end of the frontmatter when there is none", () => {
+  const flow = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives: ['[[zod|Zod]]'] # mine\n");
+  assert.equal(addAlternatives(flow, ["[[yup]]", "[[joi]]"]).text, flow.replace("['[[zod|Zod]]']", "['[[zod|Zod]]', \"[[yup]]\", \"[[joi]]\"]"));
+  assert.equal(addAlternatives(HAND_WRITTEN, ["[[npm--puppeteer]]"]).text, HAND_WRITTEN.replace("status: reviewed\n---", 'status: reviewed\nalternatives: ["[[npm--puppeteer]]"]\n---'));
+});
+
+test("addAlternatives: a field that isn't a list of strings is left alone, with a warning", () => {
+  const scalar = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives: puppeteer\n");
+  const r = addAlternatives(scalar, ["[[zod]]"]);
+  assert.equal(r.text, scalar);
+  assert.equal(r.changed, false);
+  assert.match(r.warnings[0], /alternatives/);
+});
 
 test("alternatives: removing yup leaves the zod line exactly as written", () => {
   const r = setHumanFields(ZOD_YUP, { alternatives: ["zod"] });

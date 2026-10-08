@@ -32,6 +32,7 @@ Captures a verdict in one line, or creates a note from a URL.
 | `"text"` | The Verdict, human-written ([note schema](note-schema.md), rule 7) |
 | `--type npm\|pypi\|cargo` | The package type for a bare name, when the nearest manifest doesn't settle it |
 | `--to personal\|project` | Which journal to write to. Default: `personal` |
+| `--alternative <target>` | A package the user named to use instead, added to `alternatives` (step 6). Repeatable |
 
 Behaviour:
 1. Resolve the target to a PURL (section 4).
@@ -49,14 +50,24 @@ Behaviour:
    - The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable. It is never printed or logged.
 4. If the network fails (offline, timeout after 10 seconds, rate limit, a server error), write the note without metadata and warn on stderr. Exit 0. If GitHub says the repository doesn't exist (404) or rejects the token (401), write nothing and exit 1; for 401 the message says `GITHUB_TOKEN` may be invalid or expired.
 5. `--to project` without a project journal creates `.magpie/` (with a `.gitignore` for `.cache/`) at the git root, or in the working directory outside git, and says so.
+6. `--alternative <target>` ([decision 0029](decisions/0029-recall-names-alternatives.md)) adds a target to the note's `alternatives`, in the same write as the rest: with a new note, or alone on an existing one (without text it changes nothing else). Like the Verdict, it is written only from the user's own words. A Verdict already there is still never replaced: with text, step 2's exit 1 applies and nothing is written.
+   - The target is a name, a PURL or a file stem, without `[[ ]]`, `|` or `#` (otherwise exit 2; a PURL that doesn't parse too). It resolves in the journal written to, by the link rules (file stem, then a unique name); a PURL by the note with that `id` or package. A target with a note is written as `"[[<its file stem>]]"`. A PURL without a note is written as the file stem its note would have (section 4: `pkg:npm/puppeteer` as `"[[npm--puppeteer]]"`, `pkg:npm/@babel/core` as `"[[npm--babel--core]]"`), so a note created later resolves it. A name or file stem without a note is written as given: `"[[<target>]]"`.
+   - New entries go at the end of the field; every other entry, and the rest of the file, stay byte for byte (the round-trip-safe frontmatter edit). A field that isn't a list is left alone: exit 1, nothing written.
+   - A target already there, by its note or by its text (ignoring case), isn't added again: stderr says `Already an alternative: <target>`, exit 0.
+   - A note can't be its own alternative: exit 1, nothing written.
 
 ```
 $ magpie note pdfkit "avoid: async streams painful; use puppeteer"
 ✔ Saved to your personal journal: pdfkit
   ~/.magpie/notes/npm--pdfkit.md
+$ magpie note pdfkit --alternative puppeteer
+✔ Updated in your personal journal: pdfkit
+  ~/.magpie/notes/npm--pdfkit.md
 ```
 
-`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": []}`
+`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": []}`
+
+- `alternatives_added` and `alternatives_present` list the `--alternative` targets as given: those written, and those already there. Both are `[]` without the flag. Added in 0.2; an addition, not a breaking change.
 
 ### `magpie import <file>`
 
