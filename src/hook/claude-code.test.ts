@@ -106,6 +106,124 @@ test("silent (null) when there is nothing to say: no install, no note, another t
   assert.equal(hookOutput("null", { env: {}, home: w.root, cwd: w.root, informOnly: false }), null);
 });
 
+// --- Alternatives (decision 0029): text only; they never change whether the hook asks ---
+
+const withAlternatives = (text: string, entries: string[]) => text.replace("\nstatus:", `\nalternatives: [${entries.map((e) => JSON.stringify(e)).join(", ")}]\nstatus:`);
+const PLAYWRIGHT = note({ id: "pkg:npm/playwright", verdict: "browser tests" });
+const notePath = (w: { journal: string }, file: string) => join(w.journal, "notes", file);
+
+test("ask with one alternative: the reason names it with its Verdict; the context says to offer it", () => {
+  const w = world({ "journal/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]), "journal/notes/npm--puppeteer.md": PUPPETEER });
+  const path = notePath(w, "npm--pdfkit.md");
+  assert.deepEqual(w.run("npm install pdfkit"), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
+        `Avoid when: you need streamed output for large PDFs\nAlternatives: puppeteer: default for PDF rendering in new projects\n${path}`,
+      additionalContext: "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs " +
+        `(personal journal, ${path}). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). ` +
+        "Offer them to the user instead of pdfkit, and recall an alternative before installing it.",
+    },
+  });
+});
+
+test("ask with five alternatives: 3, then +2 more; an inbox, an avoid and an unresolved one say so", () => {
+  const w = world({
+    "journal/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]", "[[pdf-lib]]", "[[jspdf]]", "[[wkhtmltopdf]]"]),
+    "journal/notes/npm--puppeteer.md": PUPPETEER,
+    "journal/notes/npm--playwright.md": withAlternatives(PLAYWRIGHT, ["[[npm--pdfkit]]"]),
+    "journal/notes/npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib" }),
+    "journal/notes/npm--jspdf.md": note({ id: "pkg:npm/jspdf", verdict: "avoid: tiny API" }),
+  });
+  const path = notePath(w, "npm--pdfkit.md");
+  const out = w.run("npm i pdfkit");
+  assert.equal(out.hookSpecificOutput.permissionDecisionReason, "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
+    "Avoid when: you need streamed output for large PDFs\n" +
+    "Alternatives: playwright: browser tests; puppeteer: default for PDF rendering in new projects; pdf-lib: [inbox] no verdict yet; +2 more\n" + path);
+  assert.equal(out.hookSpecificOutput.additionalContext, "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs " +
+    `(personal journal, ${path}). Alternatives in your journal: playwright (browser tests, personal journal); ` +
+    "puppeteer (default for PDF rendering in new projects, personal journal); pdf-lib ([inbox] no verdict yet, personal journal); +2 more. " +
+    "Offer them to the user instead of pdfkit, and recall an alternative before installing it.");
+});
+
+test("an avoid alternative and an unresolved one, in full", () => {
+  const w = world({
+    "journal/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[jspdf]]", "[[wkhtmltopdf]]"]),
+    "journal/notes/npm--jspdf.md": note({ id: "pkg:npm/jspdf", verdict: "avoid: tiny API" }),
+  });
+  const out = w.run("npm i pdfkit");
+  assert.match(out.hookSpecificOutput.permissionDecisionReason, /\nAlternatives: jspdf: avoid: tiny API \(you also noted to avoid it\); wkhtmltopdf\n/);
+  assert.match(out.hookSpecificOutput.additionalContext,
+    /\. Alternatives in your journal: jspdf \(avoid: tiny API, personal journal; you also noted to avoid it\); wkhtmltopdf\. Offer them/);
+});
+
+test("inform with an alternative: the context names it and says to recall it; the message gets a short suffix", () => {
+  const w = world({ "journal/notes/npm--puppeteer.md": withAlternatives(PUPPETEER, ["[[playwright]]"]), "journal/notes/npm--playwright.md": PLAYWRIGHT });
+  const path = notePath(w, "npm--puppeteer.md");
+  assert.deepEqual(w.run("pnpm add puppeteer"), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: `Note from your journal: puppeteer — default for PDF rendering in new projects (personal journal, ${path}). ` +
+        "Alternatives in your journal: playwright (browser tests, personal journal). Recall an alternative before installing it.",
+    },
+    systemMessage: "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
+  });
+});
+
+test("an alternative that is an avoid note, from the other side: named and marked, and the hook still only informs", () => {
+  const w = world({ "journal/notes/npm--puppeteer.md": PUPPETEER, "journal/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]) });
+  const path = notePath(w, "npm--puppeteer.md");
+  assert.deepEqual(w.run("npm i puppeteer"), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: `Note from your journal: puppeteer — default for PDF rendering in new projects (personal journal, ${path}). ` +
+        "Alternatives in your journal: pdfkit (avoid: async streams painful; use puppeteer, personal journal; you also noted to avoid it). Recall an alternative before installing it.",
+    },
+    systemMessage: "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: pdfkit",
+  });
+});
+
+test("--inform-only with alternatives: no decision; the context still says to offer them", () => {
+  const w = world({ "journal/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]), "journal/notes/npm--puppeteer.md": PUPPETEER });
+  const path = notePath(w, "npm--pdfkit.md");
+  assert.deepEqual(w.run("npm install pdfkit", { informOnly: true }), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs " +
+        `(personal journal, ${path}). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). ` +
+        "Offer them to the user instead of pdfkit, and recall an alternative before installing it.",
+    },
+    systemMessage: "magpie: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs. Alternatives: puppeteer",
+  });
+});
+
+test("a multi-package install where only one package has alternatives: only its lines name them", () => {
+  const w = world({
+    "journal/notes/npm--puppeteer.md": withAlternatives(PUPPETEER, ["[[playwright]]"]),
+    "journal/notes/npm--playwright.md": PLAYWRIGHT,
+    "journal/notes/npm--chalk.md": note({ id: "pkg:npm/chalk", verdict: "colours" }),
+  });
+  assert.deepEqual(w.run("npm i chalk puppeteer"), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: [
+        `Note from your journal: chalk — colours (personal journal, ${notePath(w, "npm--chalk.md")})`,
+        `Note from your journal: puppeteer — default for PDF rendering in new projects (personal journal, ${notePath(w, "npm--puppeteer.md")}). ` +
+          "Alternatives in your journal: playwright (browser tests, personal journal). Recall an alternative before installing it.",
+      ].join("\n"),
+    },
+    systemMessage: "magpie: chalk — colours\nmagpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
+  });
+});
+
+test("a name-only match lists no alternatives", () => {
+  const w = world({ "journal/notes/pypi--pdfkit.md": withAlternatives(note({ id: "pkg:pypi/pdfkit", verdict: "fine" }), ["[[weasyprint]]"]) });
+  const out = w.run("npm i pdfkit");
+  assert.equal(out.systemMessage, "magpie: pdfkit — fine (name match only)");
+  assert.ok(!out.hookSpecificOutput.additionalContext.includes("Alternatives"));
+});
+
 test("each text stays under Claude Code's 10,000-character cap", () => {
   const w = world({ "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: `avoid: ${"x".repeat(20_000)}` }) });
   const out = w.run("npm i pdfkit");
