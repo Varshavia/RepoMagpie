@@ -17,5 +17,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
   },
-  projects: [{ name: "chromium" }],
+  // The graph page's timing at 2,000 notes runs last, alone, so no other test takes CPU while it
+  // measures (`--no-deps` runs it without the rest).
+  projects: [
+    { name: "chromium", testIgnore: /timing\.spec\.ts$/ },
+    { name: "timing", testMatch: /timing\.spec\.ts$/, dependencies: ["chromium"] },
+  ],
 });

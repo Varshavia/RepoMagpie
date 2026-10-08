@@ -154,11 +154,21 @@ export function searchNodes(nodes: GraphNode[], query: string): GraphNode[] {
     .map((c) => c.n);
 }
 
-export type GraphState = "empty" | "unconnected" | "ready";
+// empty: no notes. unconnected: nothing the Tags, Links or Alternatives toggles would draw.
+// off: there is, but the toggles that would draw it are switched off. ready: connections drawn.
+export type GraphState = "empty" | "unconnected" | "off" | "ready";
 
 export function graphState(doc: GraphJson, sources: Sources): GraphState {
   if (!doc.nodes.some((n) => n.type === "note")) return "empty";
-  return drawable(doc, sources).edges.length ? "ready" : "unconnected";
+  if (drawable(doc, sources).edges.length) return "ready";
+  return drawable(doc, { ...sources, tagged: true, link: true, alternative: true }).edges.length ? "off" : "unconnected";
+}
+
+// The notice over the canvas, when nothing connects what is drawn.
+export function notice(state: GraphState): string | null {
+  if (state === "unconnected") return "Your notes aren't connected yet. Add tags, or [[links]] in My notes.";
+  if (state === "off") return "No connections drawn. Turn on Tags or Links to see how your notes connect.";
+  return null;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -243,16 +253,19 @@ export function joinPosition(key: string, edges: GraphEdge[], at: (key: string) 
   return seedPosition(key);
 }
 
-// ForceAtlas2 for a fixed number of iterations, then it stops. Barnes-Hut above 1,000 nodes.
+// ForceAtlas2 for a fixed number of iterations, then it stops. Barnes-Hut above 1,000 nodes, at
+// θ 1.0: at 2,030 nodes it settles as far as θ 0.5 in 300 iterations, in 1.07 s instead of 2.28 s
+// (2026-10-08, measured without a browser). Below 1,000 the exact forces are fast enough (800
+// notes: 0.94 s) and settle further than Barnes-Hut.
 // Strong gravity (a pull that grows with the distance to the centre), at 0.3, keeps notes without
 // connections close to the rest; at 0.05 they drifted to a ring far out, and fitting that ring left
 // the connected notes small in the middle. At 1 the clusters flatten into an even disc.
-export const LAYOUT = { iterations: 300, chunk: 25 };
+export const LAYOUT = { iterations: 300, progressEvery: 250 }; // a progress frame at most every 250 ms
 
 export function layoutSettings(order: number) {
   return {
     barnesHutOptimize: order > 1000,
-    barnesHutTheta: 0.5,
+    barnesHutTheta: 1,
     strongGravityMode: true,
     gravity: 0.3,
     scalingRatio: 10,

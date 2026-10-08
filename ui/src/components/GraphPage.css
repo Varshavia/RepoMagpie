@@ -39,9 +39,13 @@
   .graph-note { position: absolute; inset: 0 0 0 auto; width: min(480px, 100%); box-shadow: -8px 0 24px var(--shadow); }
 }
 
-.graph-canvas { flex: 1; min-height: 0; background: var(--canvas); }
+.graph-canvas, .graph-blank { flex: 1; min-height: 0; background: var(--canvas); }
 .graph-canvas[data-waiting="true"] { visibility: hidden; }
-.graph-notice { padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); color: var(--ink-muted); font-size: 13px; }
+/* A strip over the top of the canvas: the canvas keeps its size, so the view doesn't move. Only its
+   buttons take the pointer; drags and clicks elsewhere reach the graph. */
+.graph-notices { position: absolute; inset: 0 0 auto; z-index: 1; pointer-events: none; }
+.graph-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--xs) var(--sm); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--surface-1) 92%, transparent); color: var(--ink-muted); font-size: 13px; }
+.graph-notice .button { pointer-events: auto; }
 .graph-arranging { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); color: var(--ink-muted); }
 /* An empty element the page reads the graph tokens from, as the current theme resolves them. */
 .graph-probe { position: absolute; width: 0; height: 0; overflow: hidden; }

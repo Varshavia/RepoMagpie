@@ -9,7 +9,10 @@ export interface LayoutRequest {
   edges: Float32Array;
   settings: object;
   iterations: number;
-  chunk: number; // iterations between progress messages
+  // At most one progress message per `every` ms: each one makes the page copy the positions and
+  // draw a frame, which at 2,000 nodes took CPU from this worker (1.4–2.0 s instead of 1.1 s for
+  // the whole layout, with progress every 25 iterations).
+  every: number;
   progress: boolean; // false under reduced motion: only the settled layout is sent
 }
 
@@ -19,11 +22,14 @@ export interface LayoutReply {
 }
 
 self.onmessage = (event: MessageEvent<LayoutRequest>) => {
-  const { nodes, edges, settings, iterations, chunk, progress } = event.data;
-  for (let i = 0; i < iterations; ) {
-    const end = Math.min(iterations, i + chunk);
-    for (; i < end; i++) iterate(settings, nodes, edges);
-    if (progress && i < iterations) self.postMessage({ nodes: nodes.slice(), done: false } satisfies LayoutReply);
+  const { nodes, edges, settings, iterations, every, progress } = event.data;
+  let sent = performance.now();
+  for (let i = 1; i <= iterations; i++) {
+    iterate(settings, nodes, edges);
+    if (progress && i < iterations && performance.now() - sent >= every) {
+      self.postMessage({ nodes: nodes.slice(), done: false } satisfies LayoutReply);
+      sent = performance.now();
+    }
   }
   self.postMessage({ nodes, done: true } satisfies LayoutReply, { transfer: [nodes.buffer] });
 };

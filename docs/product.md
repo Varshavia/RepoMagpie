@@ -168,7 +168,9 @@ The colours are tokens in [`DESIGN.md`](../DESIGN.md), dark and light, checked f
 ### Layout
 
 - ForceAtlas2, in a web worker built with the app, so the page never freezes. The package's own worker starts from a `blob:` URL, which the app's CSP blocks ([decision 0028](decisions/0028-the-graph-page.md)).
-- Deterministic: starting positions are seeded from each node's id, and the layout runs a fixed number of iterations, then stops. The same journal gives the same picture every time. "Re-run layout" runs it again.
+- Deterministic: starting positions are seeded from each node's id, and the layout runs a fixed number of iterations (300), then stops. The same journal gives the same picture every time. "Re-run layout" runs it again.
+- Speed: above 1,000 nodes the repulsion is approximated (Barnes-Hut, θ 1.0); at 2,030 nodes that settles as far as θ 0.5 in half the time (1.07 s instead of 2.28 s). Below 1,000, the exact forces settle further and are fast enough (800 notes: 0.94 s). While it runs, the page draws a progress frame at most every 250 ms: at 2,000 nodes, a frame every 25 iterations took enough CPU to slow the layout from 1.1 s to 1.4–2.0 s.
+- Live: a change to the journal on disk fetches the graph again. What is drawn keeps its place, a new note starts next to its first neighbour, and the camera doesn't move; "Re-run layout" lays it all out again.
 - No positions are stored.
 - Under `prefers-reduced-motion`, the layout is shown only once it has settled, and zoom and centre jump instead of gliding.
 

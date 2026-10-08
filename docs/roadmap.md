@@ -256,7 +256,7 @@ A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alt
 - [x] Page skeleton: a lazy-loaded route, the sidebar item, the palette entry and `g g`; rendering with the `DESIGN.md` tokens; the layout worker; the status line; the empty and WebGL states. (2026-10-08: the app 142.8 kB of 200 kB gzipped; the graph's chunk 39.9 kB and its worker 1.8 kB load only on the graph page; the other screens' first files 101.1 kB, 1.7 kB more than before.)
 - [x] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.
 - [x] Filters, edge toggles and the neighbours list, with ghost nodes behind their toggle.
-- [ ] Live updates; performance at 2,000 notes (data, layout and first frame in under 2 s).
+- [x] Live updates; performance at 2,000 notes (data, layout and first frame in under 2 s). (2026-10-08, a Windows dev machine, headless Chromium with SwiftShader: warm 1.25–1.55 s, cold 1.9–2.2 s while the graph cache is built; on the machine's GPU warm 1.03 s and every hover and zoom frame at 17 ms.)
 - [ ] Docs, end-to-end flows, screenshots in dark and light at 800 notes; review with `web-design-guidelines`; check and screenshot with `playwright-cli`.
 
 **Done when:** every item works and has tests; the budgets hold (`graphData` under 300 ms, the page under 2 s at 2,000 notes, the bundle under 200 kB with other screens' first files at most 3 kB over 99.4 kB, the existing budgets unchanged); all checks, end-to-end tests and benchmarks pass.
