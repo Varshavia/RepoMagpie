@@ -2,7 +2,7 @@
 // every note file has the modification time and size recorded with it; rebuildable and safe to
 // delete. A cache that can't be read is rebuilt; one that can't be written only costs time.
 // Stores file names, not paths, so a journal can be moved. Never prints.
-import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type Signature = Record<string, [number, number]>; // note file name → [mtimeMs, size]
@@ -76,15 +76,39 @@ export const isRecord = (v: unknown): v is Record<string, unknown> => typeof v =
 export const isTextOrNull = (v: unknown): boolean => v === null || typeof v === "string";
 export const isTexts = (v: unknown): boolean => Array.isArray(v) && v.every((item) => typeof item === "string");
 
-// Writes the cache whole, then renames it into place, so a reader never sees half a file.
+// Writes the cache whole, then renames it into place, so a reader never sees half a file. On
+// Windows another process (antivirus, the search indexer) can hold the file being replaced for a
+// moment, and the rename fails with EPERM, EACCES or EBUSY: it is tried again after 5, 10, 15 and
+// 20 ms, while the wait still fits in 50 ms from the first try, since the hook reads these caches
+// (Windows rounds each wait up to its timer tick, about 15.6 ms, so there it gets three tries more).
+// Then it gives up, as for any other error, and removes the temporary file.
+const HELD = new Set(["EPERM", "EACCES", "EBUSY"]);
+const RENAME_WAITS = [5, 10, 15, 20];
+const RENAME_BUDGET = 50; // ms
+
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
+  const file = join(journal, ".cache", name);
+  const temporary = `${file}.${process.pid}.tmp`;
   try {
     mkdirSync(join(journal, ".cache"), { recursive: true });
-    const file = join(journal, ".cache", name);
-    const temporary = `${file}.${process.pid}.tmp`;
     writeFileSync(temporary, JSON.stringify({ version, files: signature, data }));
-    renameSync(temporary, file);
+    const started = performance.now();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        renameSync(temporary, file);
+        return;
+      } catch (error) {
+        const wait = RENAME_WAITS[attempt];
+        if (!HELD.has((error as NodeJS.ErrnoException).code ?? "") || wait === undefined || performance.now() - started + wait > RENAME_BUDGET) throw error;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait); // a synchronous pause
+      }
+    }
   } catch {
     // A cache that can't be written only costs time on the next run.
+    try {
+      rmSync(temporary, { force: true });
+    } catch {
+      // The temporary file can't be removed either (no .cache folder, or it is held too).
+    }
   }
 }

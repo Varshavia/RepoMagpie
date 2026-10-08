@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - A damaged cache entry in `.cache/recall-index.json` (valid JSON, wrong shape) no longer makes `magpie recall` crash or the Claude Code hook stay silent on an install with an avoid note. The cache is rebuilt from the notes. The local app's caches (`links.json`, `note-list.json`) read such an entry again from its note.
+- On Windows, a cache in `.cache/` is still updated when another program, such as antivirus, holds the old file for a moment: magpie tries again for up to about 50 ms. A cache that can't be written leaves no `.tmp` file behind.
 
 ## [0.1.0-beta.1] - 2026-10-07
 
