@@ -8,12 +8,14 @@ import type { Io } from "./program.ts";
 export interface NoteOptions extends GlobalOptions {
   type?: PackageType;
   to: Journal["scope"];
+  alternative?: string[];
 }
 
 export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, io: Io): Promise<number> {
   const json = Boolean(options.json);
   const ask = io.interactive && !json ? io.ask : undefined;
-  const run = await runNote({ target, text, type: options.type, to: options.to }, contextOf(io, options), ask);
+  const request = { target, text, type: options.type, to: options.to, alternatives: options.alternative };
+  const run = await runNote(request, contextOf(io, options), ask);
   if (json) {
     io.out(`${JSON.stringify(run.document)}\n`);
     return exitCode(run.outcome);
@@ -26,6 +28,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
   }
   for (const warning of [...journal.warnings, ...r.warnings]) io.err(`warning: ${warning}\n`);
   for (const notice of r.notices) io.err(`${notice}\n`);
+  for (const target of r.alternatives.present) io.err(`Already an alternative: ${target}\n`);
   const where = journal.scope === "personal" ? "your personal journal" : "the project journal";
   const name = r.name ?? r.id;
   if (r.result === "created") io.err(`✔ Saved to ${where}: ${name}\n`);

@@ -34,7 +34,7 @@ test("--json prints exactly the spec's document and nothing on stderr", async ()
   const r = await magpie(box, ["note", "pdfkit", "ok", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [] });
 });
 
 test("a second Verdict is refused: exit 1, the path is printed, the file is unchanged", async () => {
@@ -53,7 +53,7 @@ test("text for an existing note with an empty Verdict writes it", async () => {
   await magpie(box, ["note", "pdfkit"]);
   const r = await magpie(box, ["note", "pdfkit", "later verdict", "--json"]);
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [] });
   valid(box.note("npm--pdfkit.md"));
 });
 
@@ -346,4 +346,117 @@ test("output never has colour codes", async () => {
   const box = sandbox();
   const r = await magpie(box, ["note", PLAYWRIGHT_URL, "ok"], { fetch: playwright(), interactive: true });
   assert.ok(!(r.out + r.err).includes("\u001b"));
+});
+
+// --- --alternative (decision 0029): the user's own words, written into the alternatives field ---
+
+const alternativesOf = (path: string) => readNote(readFileSync(path, "utf8")).frontmatter.alternatives;
+
+test("--alternative on a new note: written with it; a target without a note is written as given", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const r = await magpie(box, ["note", "pdfkit", "avoid: async streams painful", "--alternative", "puppeteer", "--json"]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(JSON.parse(r.out), {
+    id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [],
+    alternatives_added: ["puppeteer"], alternatives_present: [],
+  });
+  assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[puppeteer]]"]);
+  valid(box.note("npm--pdfkit.md"));
+});
+
+test("--alternative on an existing note, without text: only the field changes, byte for byte; a target with a note is written by its file stem", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "puppeteer", "default for PDF rendering"]);
+  await magpie(box, ["note", "pdfkit", "avoid: async streams painful"]);
+  const path = box.note("npm--pdfkit.md");
+  const before = readFileSync(path, "utf8").replace("status: reviewed\n", "status: reviewed   # mine\n") + "\nHand-written tail.\n";
+  writeFileSync(path, before);
+  const r = await magpie(box, ["note", "pdfkit", "--alternative", "puppeteer"]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.err, "✔ Updated in your personal journal: pdfkit\n");
+  assert.equal(readFileSync(path, "utf8"), before.replace("---\n\n## Verdict", 'alternatives: ["[[npm--puppeteer]]"]\n---\n\n## Verdict'));
+});
+
+test("--alternative takes a name, a PURL or a file stem; repeated, each is added in order", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "puppeteer", "ok"]);
+  await magpie(box, ["note", "pkg:npm/pdf-lib"]);
+  await magpie(box, ["note", "pkg:pypi/weasyprint"]);
+  await magpie(box, ["note", "pdfkit", "--alternative", "pkg:npm/pdf-lib", "--alternative", "pypi--weasyprint", "--alternative", "Puppeteer"]);
+  assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[npm--pdf-lib]]", "[[pypi--weasyprint]]", "[[npm--puppeteer]]"]);
+});
+
+test("a PURL target is written as the file stem its note would have, so a note created later resolves it", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "avoid: async streams painful", "--alternative", "pkg:npm/puppeteer", "--alternative", "pkg:npm/%40babel/core"]);
+  assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[npm--puppeteer]]", "[[npm--babel--core]]"]);
+  await magpie(box, ["note", "puppeteer", "default for PDF rendering in new projects"]);
+  const [pdfkit] = JSON.parse((await magpie(box, ["recall", "pdfkit", "--json"])).out).matches;
+  assert.deepEqual(pdfkit.alternatives[0], {
+    name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: box.note("npm--puppeteer.md"),
+  });
+  const again = JSON.parse((await magpie(box, ["note", "pdfkit", "--alternative", "npm--babel--core", "--json"])).out);
+  assert.deepEqual(again.alternatives_present, ["npm--babel--core"], "the stem written for a PURL counts as there");
+  assert.equal((await magpie(box, ["note", "pdfkit", "--alternative", "pkg:nope"])).code, 2, "a PURL that doesn't parse is a usage error");
+});
+
+test("an alternative already there, by its note or by its text (ignoring case), isn't added again; stderr says so, exit 0", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "puppeteer", "ok"]);
+  await magpie(box, ["note", "pdfkit", "--alternative", "puppeteer", "--alternative", "wkhtmltopdf"]);
+  const path = box.note("npm--pdfkit.md");
+  const before = readFileSync(path, "utf8");
+  const r = await magpie(box, ["note", "pdfkit", "--alternative", "npm--puppeteer", "--alternative", "WKHTMLTOPDF", "--alternative", "pkg:npm/puppeteer"]);
+  assert.equal(r.code, 0);
+  assert.equal(r.err, [
+    "Already an alternative: npm--puppeteer",
+    "Already an alternative: WKHTMLTOPDF",
+    "Already an alternative: pkg:npm/puppeteer",
+    "Already in your personal journal: pdfkit",
+    "",
+  ].join("\n"));
+  assert.equal(readFileSync(path, "utf8"), before);
+  const json = JSON.parse((await magpie(box, ["note", "pdfkit", "--alternative", "puppeteer", "--alternative", "pdf-lib", "--alternative", "PDF-LIB", "--json"])).out);
+  assert.deepEqual([json.alternatives_added, json.alternatives_present], [["pdf-lib"], ["puppeteer", "PDF-LIB"]]);
+});
+
+test("--alternative with text for a note that has a Verdict: refused as before, exit 1, nothing written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "first"]);
+  const before = readFileSync(box.note("npm--pdfkit.md"), "utf8");
+  const r = await magpie(box, ["note", "pdfkit", "second", "--alternative", "puppeteer"]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /already has a Verdict/);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), before);
+});
+
+test("--alternative --to project resolves in the project journal: a note only in the personal journal is written as given", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "puppeteer", "ok"]);
+  await magpie(box, ["note", "pdf-lib", "ok", "--to", "project"]);
+  const r = await magpie(box, ["note", "pdfkit", "--to", "project", "--alternative", "puppeteer", "--alternative", "pdf-lib"]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(alternativesOf(join(box.project, ".magpie", "notes", "npm--pdfkit.md")), ["[[puppeteer]]", "[[npm--pdf-lib]]"]);
+});
+
+test("--alternative that is a wikilink, has | or #, or is empty: a usage error (exit 2), nothing written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  for (const target of ["[[puppeteer]]", "a|b", "a#b", " "]) {
+    const r = await magpie(box, ["note", "pdfkit", "--alternative", target]);
+    assert.equal(r.code, 2, target);
+    assert.match(r.err, /--alternative takes a name, a PURL or a file stem/);
+  }
+  assert.equal(existsSync(box.note("npm--pdfkit.md")), false);
+});
+
+test("a note can't be its own alternative: exit 1, nothing written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "ok"]);
+  const before = readFileSync(box.note("npm--pdfkit.md"), "utf8");
+  for (const target of ["pdfkit", "npm--pdfkit", "pkg:npm/pdfkit"]) {
+    const r = await magpie(box, ["note", "pdfkit", "--alternative", target]);
+    assert.equal(r.code, 1, target);
+    assert.match(r.err, /pdfkit can't be an alternative to itself/);
+  }
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), before);
 });

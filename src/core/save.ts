@@ -2,7 +2,7 @@
 // note, fetch GitHub metadata, capture, write). Each run returns its --json document, which the CLI
 // prints and the local app's API returns as is (decision 0023). Writes notes; never prints.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { captureNote, type Capture } from "./capture.ts";
 import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
@@ -21,8 +21,11 @@ import {
   type NoteEntry,
   type Place,
 } from "./journals.ts";
+import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
 import type { Outcome } from "./outcome.ts";
+import { alternativeLinks, targetResolver } from "./wikilinks.ts";
+import { addAlternatives } from "./write.ts";
 
 // Where the journals are, plus what a write needs from the outside world.
 export interface Context extends Place {
@@ -62,6 +65,7 @@ export interface Item {
   useWhen?: string[];
   avoidWhen?: string[];
   myNotes?: string;
+  alternatives?: string[]; // note's --alternative targets, as the user gave them (decision 0029)
 }
 
 export interface ItemResult {
@@ -74,6 +78,7 @@ export interface ItemResult {
   warnings: string[];
   notices: string[]; // things done on the way, such as creating the project journal
   text: string | null; // the note's text after this item (written, or what a dry run would write); null when failed
+  alternatives: { added: string[]; present: string[] }; // the --alternative targets, as given
 }
 
 // Creates or updates the note for one item. `notes` is the journal's note list; a new note is
@@ -85,7 +90,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const warnings: string[] = [];
   const notices: string[] = [];
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
-    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null });
+    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] } });
 
   const atPath = notes.find((note) => note.path === path);
   if (!entry && (atPath || existsSync(path))) {
@@ -110,13 +115,30 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const capture = captureNote(existing, { ...item, metadata, today: context.today(), tagList: journalTagList(journal.path) });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
-  if (capture.text !== null && dryRun) {
-    if (entry) entry.text = capture.text;
-    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text: capture.text });
-  } else if (capture.text !== null) {
+
+  // The alternatives go into the same write as the rest, so a failure writes nothing.
+  let text = capture.text;
+  const alternatives = { added: [] as string[], present: [] as string[] };
+  if (item.alternatives?.length) {
+    const base = (text ?? existing) as string; // capture writes nothing only for an existing note
+    const plan = planAlternatives(journal.path, notes, path, base, item, capture.name);
+    if ("error" in plan) return fail(plan.error, entry?.path ?? null, capture.status, capture.name);
+    if (plan.entries.length) {
+      const edited = addAlternatives(base, plan.entries);
+      if (edited.warnings.length) return fail(edited.warnings[0], entry?.path ?? null, capture.status, capture.name);
+      text = edited.text;
+    }
+    Object.assign(alternatives, { added: plan.added, present: plan.present });
+  }
+  const result = capture.result === "unchanged" && text !== null ? "updated" : capture.result;
+
+  if (text !== null && dryRun) {
+    if (entry) entry.text = text;
+    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text });
+  } else if (text !== null) {
     try {
       if (createJournal(journal.path, journal.scope) && journal.scope === "project") notices.push(`Created the project journal: ${journal.path}`);
-      writeFileSync(path, capture.text);
+      writeFileSync(path, text);
     } catch (error) {
       return fail(`Couldn't write ${path}: ${(error as Error).message}`, null);
     }
@@ -125,14 +147,63 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   return {
     id: entry?.id ?? item.purl,
     path,
-    result: capture.result,
+    result,
     name: capture.name,
     status: capture.status,
     error: null,
     warnings,
     notices,
-    text: capture.text ?? existing,
+    text: text ?? existing,
+    alternatives,
   };
+}
+
+// --alternative targets for the note in `path` (decision 0029). A target resolves within the journal
+// by the link rules, a PURL by the note with that id or package. It is written as [[<file stem>]]:
+// its note's, or for a PURL without a note the stem its note would have (spec §4), so a note created
+// later resolves it; any other target as given. One already in the field, by its note or by its text
+// (ignoring case), isn't added again. A note can't be its own alternative.
+function planAlternatives(journal: string, notes: NoteEntry[], path: string, text: string, item: Item, name: string | null):
+  { entries: string[]; added: string[]; present: string[] } | { error: string } {
+  const links = linkEntries(journal);
+  const resolve = targetResolver(links.files.filter((file) => links.data[file].id !== null).map((file) => ({ file, name: links.data[file].name })));
+  const stemOf = (file: string) => file.slice(0, -".md".length);
+  const locate = (target: string): { file: string | null; written: string } => {
+    if (!target.toLowerCase().startsWith("pkg:")) {
+      const file = resolve(target).file;
+      return { file, written: file ? stemOf(file) : target };
+    }
+    const purl = resolveTarget(target); // runNote rejects a PURL that doesn't parse
+    const found = purl.kind === "ok" ? noteFor(notes, purl.purl) : undefined;
+    const file = found ? basename(found.path) : null;
+    return { file, written: file ? stemOf(file) : purl.kind === "ok" ? stemOf(fileNameFor(purl.purl)) : target };
+  };
+  const own = basename(path);
+  const isSelf = (target: string, at: { file: string | null; written: string }) =>
+    at.file === own || [stemOf(own), item.purl, name ?? ""].some((same) => [target, at.written].some((t) => t.toLowerCase() === same.toLowerCase()));
+
+  const field = readNote(text).frontmatter.alternatives;
+  const seen = (Array.isArray(field) ? field.filter((entry): entry is string => typeof entry === "string") : [])
+    .flatMap((entry) => alternativeLinks([entry]).slice(0, 1))
+    .map(({ target }) => {
+      const at = locate(target);
+      return { file: at.file, texts: [target.toLowerCase(), at.written.toLowerCase()] };
+    });
+  const plan = { entries: [] as string[], added: [] as string[], present: [] as string[] };
+  for (const given of item.alternatives ?? []) {
+    const target = given.trim();
+    const at = locate(target);
+    if (isSelf(target, at)) return { error: `${name ?? item.purl} can't be an alternative to itself.` };
+    const texts = [target.toLowerCase(), at.written.toLowerCase()];
+    if (seen.some((s) => (at.file !== null && s.file === at.file) || s.texts.some((t) => texts.includes(t)))) {
+      plan.present.push(given);
+      continue;
+    }
+    seen.push({ file: at.file, texts });
+    plan.entries.push(`[[${at.written}]]`);
+    plan.added.push(given);
+  }
+  return plan;
 }
 
 export type Resolved = { ok: true; purl: string; skillPath?: string } | { ok: false; error: string };
@@ -160,6 +231,7 @@ export interface NoteRequest {
   text?: string;
   type?: PackageType;
   to: Journal["scope"];
+  alternatives?: string[]; // --alternative, repeatable
 }
 
 // The --json document of magpie note (spec §2).
@@ -170,6 +242,8 @@ export interface NoteJson {
   created: boolean;
   status: Capture["status"];
   warnings: string[];
+  alternatives_added: string[];
+  alternatives_present: string[];
   error?: string;
 }
 
@@ -187,13 +261,19 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, error },
+    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], error },
   });
   if (journal.error) return stop(journal.error, "failed");
+  const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
+  if (bad !== undefined) return stop(`--alternative takes a name, a PURL or a file stem, without [[ ]], | or #: ${JSON.stringify(bad)}.`, "usage");
+  for (const target of request.alternatives ?? []) {
+    const purl = target.trim().toLowerCase().startsWith("pkg:") ? resolveTarget(target.trim()) : null;
+    if (purl && purl.kind !== "ok") return stop(`--alternative ${target}: ${purl.kind === "rejected" ? purl.reason : "not a PURL"}`, "usage");
+  }
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
 
-  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text };
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
     id: saved.id,
@@ -202,6 +282,8 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     created: saved.result === "created",
     status: saved.status,
     warnings: [...journal.warnings, ...saved.notices, ...saved.warnings],
+    alternatives_added: saved.alternatives.added,
+    alternatives_present: saved.alternatives.present,
   };
   if (saved.error !== null) document.error = saved.error;
   return { outcome: saved.error === null ? "ok" : "failed", document, journal, saved };

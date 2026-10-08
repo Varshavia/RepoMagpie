@@ -58,6 +58,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .argument("[text]", "your Verdict, in one line")
     .addOption(new Option("--type <type>", "the package type of a bare name").choices(["npm", "pypi", "cargo"]))
     .addOption(new Option("--to <journal>", "the journal to write to").choices(["personal", "project"]).default("personal"))
+    .option("--alternative <target>", "a package you named to use instead: a name, a PURL or a file stem (repeatable)", (target: string, targets: string[] = []) => [...targets, target])
     .action(async (target: string, text: string | undefined, _options: unknown, command: Command) => {
       code = await (await import("./note.ts")).noteCommand(target, text, command.optsWithGlobals<NoteOptions>(), io);
     });
