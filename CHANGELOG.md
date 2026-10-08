@@ -16,6 +16,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Check a package in `magpie ui` shows the Alternatives row; Suggest's "In use, avoid" rows get an "Instead:" line. A name with a note opens it; one without opens Add.
 - The agent skill names your alternatives before an install, asks whether to install one instead, and offers to record an alternative you name.
 
+### Changed
+
+- In `--json` of `magpie recall` and `magpie suggest`, an alternative without a note has `reason`: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name), as a link in the Note document has.
+- In `magpie ui`, a link or an alternative whose name several notes have opens Search with that name. Before, such a link did nothing and such an alternative opened Add. On the graph page, a missing note of that kind offers "Search notes" instead of "Add a note".
+- The agent skill: when you answer No to the hook's prompt, Claude Code ends the agent's turn, so the agent now offers your alternatives on your next message instead of right after the No.
+
+### Fixed
+
+- In `magpie ui`, a missing link or alternative written as a file stem opens Add with what the stem stands for: `[[npm--pdfkit]]` with `pkg:npm/pdfkit` (`pypi--` and `cargo--` likewise), `[[github--owner--repo]]` with `https://github.com/owner/repo`. Before, Add got the stem, which isn't a package name. A scoped npm stem (`npm--babel--core`) stays as written, because the stem lost its `@`.
+- The Claude Code hook ignores a UTF-8 byte-order mark at the start of its input. Before, such input, as a Windows PowerShell pipe sends it, made the hook stay silent.
+
 ## [0.2.0-beta.1] - 2026-10-08
 
 The second pre-release: linked notes and a graph page in `magpie ui` (v0.2 Connect, parts 1 and 2).
