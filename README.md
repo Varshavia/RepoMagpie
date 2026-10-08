@@ -42,7 +42,7 @@ You need Node.js 22.12 or later.
    }
    ```
 
-   The hook never blocks an install. When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `magpie hook claude-code --inform-only`, so notes inform the agent and never ask.
+   The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `magpie hook claude-code --inform-only`, so notes inform the agent and never ask.
 
 4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
 

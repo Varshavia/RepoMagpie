@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Your alternatives, shown before an install. When a note has alternatives (its own `alternatives`, or notes that list it), `magpie recall` adds an "Alternatives" row to the card: each with its Verdict, `[inbox] no verdict yet`, or "(you also noted to avoid it)"; at most 3, then `+N more`, and every one with `--full`. Piped, they share one line.
+- The Claude Code hook names a note's alternatives. For an avoid note, the permission prompt gets an "Alternatives:" line, and the agent's context names them and says to offer them to you and to recall one before installing it. Other notes get a short "Alternatives:" suffix. Whether the hook asks doesn't change.
+- `magpie suggest` names the alternatives of a package the project already uses that you noted to avoid: "Instead: puppeteer, pdf-lib".
+- `alternatives` in `--json`: on every match of `magpie recall`, and on every `candidates[]` and `in_use_avoid[]` item of `magpie suggest`. Each has `name`, `id`, `journal`, `verdict`, `status`, `avoid` and `path`.
+- `magpie note <name> --alternative <target>` records a package you named to use instead. Repeat it for several. A name, a PURL or a file stem; a PURL is written as the file stem its note has or would have, so a note made later resolves it. An alternative already there isn't added twice, and the rest of the file stays exactly as it was. `--json` adds `alternatives_added` and `alternatives_present`.
+- Check a package in `magpie ui` shows the Alternatives row; Suggest's "In use, avoid" rows get an "Instead:" line. A name with a note opens it; one without opens Add.
+- The agent skill names your alternatives before an install, asks whether to install one instead, and offers to record an alternative you name.
+
 ## [0.2.0-beta.1] - 2026-10-08
 
 The second pre-release: linked notes and a graph page in `magpie ui` (v0.2 Connect, parts 1 and 2).
