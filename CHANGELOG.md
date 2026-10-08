@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.1] - 2026-10-08
+
+The second pre-release: linked notes and a graph page in `magpie ui` (v0.2 Connect, parts 1 and 2).
+
 ### Added
 
 - Links between notes in `magpie ui`. Write `[[pdfkit]]`, `[[npm--pdfkit|a label]]` or `[[pdfkit#Verdict]]` in any section, and the note view shows it as a link that opens that note; the browser's Back returns. Typing `[[` in an editor lists the journal's notes to link. A link to a subject without a note looks muted, with a dashed underline, and opens Add. "Linked from" at the end of a note lists the notes that link to it, and refreshes when another note changes.
@@ -28,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A damaged cache entry in `.cache/recall-index.json` (valid JSON, wrong shape) no longer makes `magpie recall` crash or the Claude Code hook stay silent on an install with an avoid note. The cache is rebuilt from the notes. The local app's caches (`links.json`, `note-list.json`) read such an entry again from its note.
 - On Windows, a cache in `.cache/` is still updated when another program, such as antivirus, holds the old file for a moment: magpie tries again for up to about 50 ms. A cache that can't be written leaves no `.tmp` file behind.
 - Opening or saving a note in `magpie ui` no longer reads every note in the journal: the link cache names the note's file. With 2,000 notes, opening one takes about 30 ms instead of about 430 ms.
+- The local app now ships its licence notices: `dist/ui/THIRD-PARTY-LICENSES.md` for the libraries bundled into it, such as React, sigma, graphology and ForceAtlas2,, and `dist/ui/icons-LICENSE.txt` for its icons, copied from Phosphor Icons. 0.1.0-beta.1 shipped the app without them.
 
 ## [0.1.0-beta.1] - 2026-10-07
 
@@ -68,5 +73,6 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...HEAD
+[0.2.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.1.0-beta.1...v0.2.0-beta.1
 [0.1.0-beta.1]: https://github.com/Varshavia/RepoMagpie/releases/tag/v0.1.0-beta.1

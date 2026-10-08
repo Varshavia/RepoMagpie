@@ -1,6 +1,6 @@
 {
   "name": "repomagpie",
-  "version": "0.1.0-beta.1",
+  "version": "0.2.0-beta.1",
   "description": "Remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.",
   "keywords": [
     "dependencies",
