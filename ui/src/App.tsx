@@ -545,7 +545,7 @@ export function App() {
           journal={journal}
           theme={theme}
           focus={view.focus ?? null}
-          onAdd={() => go({ page: "add" })}
+          onAdd={(target) => go({ page: "add", target })}
           renderNote={(note, open) =>
             notePane(journal, { id: note.id }, `${journal} id ${note.id}`, { onOpenNote: (_scope, id) => open(id), onFollowLink: (_scope, _from, to) => open(to), onShowInGraph: undefined })
           }

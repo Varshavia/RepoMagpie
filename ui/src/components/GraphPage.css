@@ -9,16 +9,33 @@
 .graph-selection { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sm); color: var(--ink-muted); font-size: 13px; }
 .graph-selected strong { color: var(--ink); font-weight: 600; }
 
-/* The note pane narrows the graph; on a narrow screen it slides over it. */
-.graph-body { position: relative; display: grid; flex: 1; grid-template-columns: minmax(0, 1fr); min-height: 0; }
-.graph-body[data-note="true"] { grid-template-columns: minmax(0, 1fr) min(480px, 45%); }
+.graph-filters { justify-content: space-between; gap: var(--xs) var(--lg); }
+.graph-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--xs) var(--md); font-size: 12px; }
+.graph-filter-group .check { min-height: 28px; }
+.graph-filter-group .chips { gap: var(--xxs); }
+
+/* The neighbours list on the left; the note pane narrows the graph; on a narrow screen the list
+   goes under the graph and the note pane slides over it. */
+.graph-body { position: relative; display: grid; flex: 1; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; }
+.graph-body[data-note="true"] { grid-template-columns: 240px minmax(0, 1fr) min(480px, 40%); }
+.graph-neighbours { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--hairline); }
+.graph-neighbours-title { padding: var(--md) var(--md) var(--xs); overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.graph-neighbour-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--sm); }
+.graph-neighbour-list:focus-visible { outline-offset: -2px; }
+.graph-neighbour-list ul { list-style: none; }
+.graph-neighbour-list .link-option { min-height: 28px; padding: 0 var(--sm); font-size: 13px; }
+.graph-neighbour-list .link-option:hover { background: var(--surface-1); }
+.graph-neighbour-list:not(:focus) .link-option[aria-selected="true"]:not(:hover) { background: transparent; }
+.graph-neighbour-group { padding: var(--sm) var(--md) var(--xxs); color: var(--ink-subtle); font-size: 12px; font-weight: 600; }
+.graph-neighbour-none { padding: 0 var(--md); color: var(--ink-muted); font-size: 13px; }
 .graph-stage { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .graph-note { position: relative; min-height: 0; overflow-y: auto; border-left: 1px solid var(--hairline); background: var(--canvas); }
 .graph-note-close { position: absolute; top: var(--sm); right: var(--sm); z-index: 1; }
 .graph-note .back-button { display: none; } /* the pane has its own close button */
 .graph-note .note-head { padding-right: var(--xxl); }
 @media (max-width: 960px) {
-  .graph-body[data-note="true"] { grid-template-columns: minmax(0, 1fr); }
+  .graph-body, .graph-body[data-note="true"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .graph-neighbours { order: 2; max-height: 30vh; border-top: 1px solid var(--hairline); border-right: 0; }
   .graph-note { position: absolute; inset: 0 0 0 auto; width: min(480px, 100%); box-shadow: -8px 0 24px var(--shadow); }
 }
 
@@ -46,6 +63,7 @@
 .swatch.dot { width: 10px; height: 10px; border-radius: var(--r-full); }
 .swatch.dot.small { width: 7px; height: 7px; }
 .swatch.dot.faded { background: color-mix(in srgb, var(--graph-tool) 45%, var(--canvas)); }
+.swatch.dot.faded.ghost { background: color-mix(in srgb, var(--graph-other) 45%, var(--canvas)); }
 .swatch.line { width: 16px; height: 1px; }
 .swatch.line.link { height: 2px; }
 .swatch.line.alternative { height: 3px; }

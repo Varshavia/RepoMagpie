@@ -25,15 +25,47 @@ export interface Shown {
   counts: { notes: number; tags: number; connections: number };
 }
 
-// What is drawn for these sources: every note; tag nodes with their edges; missing notes when asked.
-export function drawable(doc: GraphJson, sources: Sources): Shown {
-  const nodes = doc.nodes.filter((n) => n.type === "note" || (n.type === "tag" ? sources.tagged : sources.ghosts));
-  const keys = new Set(nodes.map((n) => n.key));
-  const edges = doc.edges.filter((e) => sources[e.type] && keys.has(e.source) && keys.has(e.target));
-  const notes = nodes.filter((n) => n.type === "note").length;
-  const tags = nodes.filter((n) => n.type === "tag").length;
-  return { nodes, edges, counts: { notes, tags, connections: edges.length } };
+export type KindGroup = Extract<GraphNode, { type: "note" }>["kind_group"];
+
+// Which notes are drawn. Several tags: notes with any of them.
+export interface Filters {
+  kindGroup: KindGroup | "";
+  tags: string[];
+  status: "" | "inbox" | "reviewed";
+  tried: boolean;
 }
+
+export const NO_FILTERS: Filters = { kindGroup: "", tags: [], status: "", tried: false };
+
+export function filtersActive(filters: Filters): boolean {
+  return Boolean(filters.kindGroup || filters.tags.length || filters.status || filters.tried);
+}
+
+// What is drawn for these sources and filters: the notes that pass the filters, then the edges of
+// the drawn types between them and tag or missing-note nodes, then the tag and missing-note nodes
+// that keep at least one drawn edge.
+export function drawable(doc: GraphJson, sources: Sources, filters: Filters = NO_FILTERS): Shown {
+  const passes = (n: GraphNode) =>
+    n.type !== "note"
+      ? n.type === "tag"
+        ? sources.tagged
+        : sources.ghosts
+      : (!filters.kindGroup || n.kind_group === filters.kindGroup) &&
+        (!filters.tags.length || n.tags.some((t) => filters.tags.includes(t))) &&
+        (!filters.status || n.status === filters.status) &&
+        (!filters.tried || n.tried);
+  const candidates = new Set(doc.nodes.filter(passes).map((n) => n.key));
+  const edges = doc.edges.filter((e) => sources[e.type] && candidates.has(e.source) && candidates.has(e.target));
+  const ends = new Set(edges.flatMap((e) => [e.source, e.target]));
+  const nodes = doc.nodes.filter((n) => candidates.has(n.key) && (n.type === "note" || ends.has(n.key)));
+  return { nodes, edges, counts: count(nodes, edges) };
+}
+
+const count = (nodes: GraphNode[], edges: GraphEdge[]): Shown["counts"] => ({
+  notes: nodes.filter((n) => n.type === "note").length,
+  tags: nodes.filter((n) => n.type === "tag").length,
+  connections: edges.length,
+});
 
 // The node itself and every node within `depth` steps along the drawn edges.
 export function neighbours(edges: GraphEdge[], key: string, depth: 1 | 2): Set<string> {
@@ -59,12 +91,50 @@ export function around(shown: Shown, key: string, depth: 1 | 2): Shown {
   const near = neighbours(shown.edges, key, depth);
   const nodes = shown.nodes.filter((n) => near.has(n.key));
   const edges = shown.edges.filter((e) => near.has(e.source) && near.has(e.target));
-  return { nodes, edges, counts: { notes: nodes.filter((n) => n.type === "note").length, tags: nodes.filter((n) => n.type === "tag").length, connections: edges.length } };
+  return { nodes, edges, counts: count(nodes, edges) };
+}
+
+export const NEIGHBOUR_GROUPS: [EdgeType, string][] = [
+  ["alternative", "Alternatives"],
+  ["link", "Links"],
+  ["tagged", "Same tag"],
+  ["similar", "Similar"],
+];
+
+const byLabel = (a: GraphNode, b: GraphNode) => {
+  const [x, y] = [nodeLabel(a).toLowerCase(), nodeLabel(b).toLowerCase()];
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
+// The neighbours list (docs/ui.md §7): the node's neighbours along the drawn edges, grouped by
+// edge type in a fixed order, each group by name. Empty groups are left out.
+export function neighbourGroups(shown: Shown, key: string): { type: EdgeType; label: string; nodes: GraphNode[] }[] {
+  const byKey = new Map(shown.nodes.map((n) => [n.key, n]));
+  return NEIGHBOUR_GROUPS.map(([type, label]) => {
+    const near = new Set(shown.edges.filter((e) => e.type === type && (e.source === key || e.target === key)).map((e) => (e.source === key ? e.target : e.source)));
+    return { type, label, nodes: [...near].flatMap((k) => byKey.get(k) ?? []).sort(byLabel) };
+  }).filter((group) => group.nodes.length);
+}
+
+const connections = (n: GraphNode) => (n.type === "note" ? n.degree : n.type === "tag" ? n.count : 0);
+
+// With nothing selected, the neighbours list shows the nodes with the most connections.
+export function largest(shown: Shown, limit: number): GraphNode[] {
+  return [...shown.nodes].sort((a, b) => connections(b) - connections(a) || byLabel(a, b)).slice(0, limit);
 }
 
 // The name a node goes by: a note's name or file stem, #tag, a missing note's target.
 export function nodeLabel(node: GraphNode): string {
   return node.type === "note" ? (node.name ?? node.file.replace(/\.md$/, "")) : node.type === "tag" ? `#${node.tag}` : node.target;
+}
+
+export const KIND_GROUP_LABEL: Record<KindGroup, string> = { "skill-pack": "Skill pack", tool: "Tool", resource: "Resource", other: "Other" };
+
+// In words, what the graph shows by colour and fading (docs/ui.md §9).
+export function nodeDetail(node: GraphNode): string {
+  if (node.type === "tag") return `Tag, ${plural(node.count, "note")}`;
+  if (node.type === "ghost") return "No note yet";
+  return `${KIND_GROUP_LABEL[node.kind_group]}${node.status === "inbox" ? ", in the inbox" : ""}`;
 }
 
 const MAX_MATCHES = 8;
@@ -99,10 +169,12 @@ export function statusLine(counts: Shown["counts"]): string {
 
 // Sizes are sigma's, about the radius in screen pixels at the default zoom. A note with no
 // connections is still clearly visible (about 14 px across); a note grows with the log of its
-// connections, so hubs stand out without hiding the rest. Tag nodes are a little smaller than the
-// smallest note, all the same size; their label says what they are.
-export function nodeSize(type: GraphNode["type"], degree: number): number {
-  return type === "note" ? 8 + 2.5 * Math.log2(1 + degree) : 6;
+// connections, so hubs stand out without hiding the rest. In a small graph, tag nodes are a little
+// smaller than the smallest note, all the same size; their label says what they are. In a large one
+// (`large`: from ALL_LABELS_BELOW nodes up), a tag's connections are its notes, on the notes' scale:
+// sigma's label grid names the largest node in each cell, so popular tags keep their names.
+export function nodeSize(type: GraphNode["type"], connections: number, large = false): number {
+  return type === "note" || (type === "tag" && large) ? 8 + 2.5 * Math.log2(1 + connections) : 6;
 }
 
 // A small graph shows every label; a larger one names its larger nodes, and the rest as you zoom in.
@@ -152,6 +224,23 @@ export function seedPosition(key: string): { x: number; y: number } {
   const angle = next() * 2 * Math.PI;
   const radius = 100 * Math.sqrt(next());
   return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+}
+
+type Point = { x: number; y: number };
+
+// Where a node joining a drawn graph starts (a toggle, a filter, a new note): where it was, else
+// next to its first neighbour that has a place (within `spread`, from its seed), else at its seed.
+export function joinPosition(key: string, edges: GraphEdge[], at: (key: string) => Point | undefined, spread: number): Point {
+  const was = at(key);
+  if (was) return was;
+  for (const e of edges) {
+    const other = e.source === key ? e.target : e.target === key ? e.source : null;
+    const anchor = other === null ? undefined : at(other);
+    if (!anchor) continue;
+    const offset = seedPosition(key);
+    return { x: anchor.x + (offset.x * spread) / 100, y: anchor.y + (offset.y * spread) / 100 };
+  }
+  return seedPosition(key);
 }
 
 // ForceAtlas2 for a fixed number of iterations, then it stops. Barnes-Hut above 1,000 nodes.
