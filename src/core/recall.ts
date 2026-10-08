@@ -8,7 +8,7 @@ import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
-import { alternativeLinks, targetResolver, type FoundLink } from "./wikilinks.ts";
+import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
 const CACHE_VERSION = 2; // 2: entries carry alternatives
@@ -51,7 +51,7 @@ export interface RecallMatch {
 }
 
 // An alternative of a matched note (decision 0029): a note in the same journal, or an unresolved
-// target, shown by its name as written.
+// target, shown by its name as written, with why it doesn't resolve.
 export interface Alternative {
   name: string;
   id: string | null;
@@ -60,6 +60,7 @@ export interface Alternative {
   status: "reviewed" | "inbox" | null;
   avoid: boolean;
   path: string | null;
+  reason?: "missing" | "ambiguous"; // only when id is null, as a [[link]]'s (links.ts)
 }
 
 // The journals recall reads (spec §3): the personal journal and, if found, the project journal,
@@ -193,7 +194,7 @@ function match(query: string, source: RecallSource, entry: RecallEntry, confiden
 // A journal's entries by file, and for each file the entries whose alternatives resolve to it. Built
 // once per entries list, so the hook's several packages share it.
 interface AlternativeIndex {
-  resolve: (target: string) => string | null;
+  resolve: (target: string) => Resolution;
   byFile: Map<string, RecallEntry>;
   listedBy: Map<string, RecallEntry[]>;
 }
@@ -204,12 +205,11 @@ function alternativeIndex(entries: RecallEntry[]): AlternativeIndex {
   if (index) return index;
   // An entry without a `name` carries its file stem as its name, which never changes a resolution:
   // the stem rule comes first.
-  const resolver = targetResolver(entries);
-  const resolve = (target: string) => resolver(target).file;
+  const resolve = targetResolver(entries);
   const byFile = new Map(entries.map((entry) => [entry.file, entry]));
   const listedBy = new Map<string, RecallEntry[]>();
   for (const entry of entries) {
-    for (const file of new Set(entry.alternatives.map(({ target }) => resolve(target)))) {
+    for (const file of new Set(entry.alternatives.map(({ target }) => resolve(target).file))) {
       if (file && file !== entry.file) listedBy.set(file, [...(listedBy.get(file) ?? []), entry]);
     }
   }
@@ -239,11 +239,13 @@ function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[]
     path: join(source.path, "notes", other.file),
   });
   for (const { target } of entry.alternatives) {
-    const file = resolve(target);
+    const resolution = resolve(target);
+    const { file } = resolution;
     const key = file ?? `?${target.toLowerCase()}`; // file names never start with "?"
     if (file === entry.file || found.has(key)) continue;
     const other = file ? byFile.get(file) : undefined;
-    found.set(key, other ? note(other) : { name: target, id: null, journal: source.scope, verdict: null, status: null, avoid: false, path: null });
+    const reason = resolution.file === null ? resolution.reason : "missing";
+    found.set(key, other ? note(other) : { name: target, id: null, journal: source.scope, verdict: null, status: null, avoid: false, path: null, reason });
   }
   for (const other of listedBy.get(entry.file) ?? []) if (!found.has(other.file)) found.set(other.file, note(other));
   const rank = (a: Alternative) => (a.path === null ? 3 : a.avoid ? 2 : a.status === "inbox" ? 1 : 0);

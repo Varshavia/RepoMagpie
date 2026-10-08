@@ -157,12 +157,12 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 - **The type of a bare name:** `--type` if given; otherwise the nearest manifest, as for `note` (section 4). When the manifests don't settle it (none, or several), the name is looked up under every type they allow (all three when there is none), and a match under any of them counts as exact. `recall` never prompts and never fails for an ambiguous name.
 - Matching follows section 5. Output: one recall card per match (section 8), project journal first, then the personal one. No match: nothing on stdout, a short message on stderr (`No note for pdfkit.`), exit 0.
 
-`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "drafts": ["use_when"], "status": "reviewed", "path": "...", "alternatives": [{"name": "puppeteer", "id": "pkg:npm/puppeteer", "journal": "personal", "verdict": "...", "status": "reviewed|inbox|null", "avoid": false, "path": "..."}]}]}`
+`--json`: `{"matches": [{"query": "pdfkit", "id": "pkg:npm/pdfkit", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "avoid_when": [...], "use_when": [...], "drafts": ["use_when"], "status": "reviewed", "path": "...", "alternatives": [{"name": "puppeteer", "id": "pkg:npm/puppeteer", "journal": "personal", "verdict": "...", "status": "reviewed|inbox|null", "avoid": false, "path": "..."}, {"name": "wkhtmltopdf", "id": null, "journal": "personal", "verdict": null, "status": null, "avoid": false, "path": null, "reason": "missing|ambiguous"}]}]}`
 
 - `verdict` is `null` when the note has none (it is `inbox`), as in `search`.
 - `avoid_when` and `use_when` hold one item per bullet, without the draft marker and comments.
 - `drafts` names which of `avoid_when` and `use_when` are still drafts (schema rule 3); `[]` when none.
-- `alternatives` ([decision 0029](decisions/0029-recall-names-alternatives.md)): every alternative of the matched note, `[]` when none. They come from the `alternatives` field on both sides: the targets in the note's own field, and every note in the same journal that lists it. Targets resolve within the note's journal as links do (file stem, then a unique name). Each is listed once, never the note itself. `name` is the note's name, or the target as written when it has no note (missing or ambiguous); then `id`, `verdict`, `status` and `path` are `null`. `avoid` is `true` when the alternative is itself an avoid note (section 6). Order: reviewed alternatives that aren't avoid notes, then inbox ones, then avoid ones, then those without a note; ties by name. Added in 0.2; an addition, not a breaking change.
+- `alternatives` ([decision 0029](decisions/0029-recall-names-alternatives.md)): every alternative of the matched note, `[]` when none. They come from the `alternatives` field on both sides: the targets in the note's own field, and every note in the same journal that lists it. Targets resolve within the note's journal as links do (file stem, then a unique name). Each is listed once, never the note itself. `name` is the note's name, or the target as written when it has no note; then `id`, `verdict`, `status` and `path` are `null`, and `reason` is `missing` (no such note) or `ambiguous` (several notes have that name), as for a link in the Note document ("Shared JSON documents", below). A resolved alternative has no `reason`. `avoid` is `true` when the alternative is itself an avoid note (section 6). Order: reviewed alternatives that aren't avoid notes, then inbox ones, then avoid ones, then those without a note; ties by name. Added in 0.2; an addition, not a breaking change.
 
 ### `magpie init` (if time allows in v0.1; otherwise v0.3)
 
@@ -389,7 +389,7 @@ Checked against the [Claude Code hooks reference](https://code.claude.com/docs/e
 }
 ```
 
-**Input** (stdin): Claude Code's JSON; `magpie` reads `tool_name` and `tool_input.command`.
+**Input** (stdin): Claude Code's JSON; `magpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand.
 
 **Detecting installs.** The command line is split the way git-guard does it ([`.claude/hooks/git-guard.mjs`](../.claude/hooks/git-guard.mjs)): chained commands (`&&`, `||`, `;`, pipes), quotes, line continuations, prefixes such as `sudo` or `env`, and nested shells. Recognised installs:
 

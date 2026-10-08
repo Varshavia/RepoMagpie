@@ -172,7 +172,7 @@ const withAlternatives = (text: string, entries: string[]) => text.replace("\nst
 const PUPPETEER = note({ id: "pkg:npm/puppeteer", verdict: "default for PDF rendering in new projects" });
 const alternatives = (s: RecallSource[], query: string) => recall(s, query, ["npm"])[0].alternatives;
 const names = (s: RecallSource[], query: string) => alternatives(s, query).map((a) => a.name);
-const unresolved = (name: string, journal = "personal") => ({ name, id: null, journal, verdict: null, status: null, avoid: false, path: null });
+const unresolved = (name: string, journal = "personal", reason = "missing") => ({ name, id: null, journal, verdict: null, status: null, avoid: false, path: null, reason });
 
 test("alternatives: forward (by file stem or name), reverse, and both sides once", () => {
   const forward = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer]]"]), "npm--puppeteer.md": PUPPETEER });
@@ -192,13 +192,13 @@ test("alternatives: forward (by file stem or name), reverse, and both sides once
   assert.deepEqual(names(sources(["personal", both]), "puppeteer"), ["pdfkit"]);
 });
 
-test("alternatives: an unresolved or ambiguous target is shown by its name as written, with no note", () => {
+test("alternatives: an unresolved or ambiguous target is shown by its name as written, with no note and its reason", () => {
   const s = sources(["personal", journal({
     "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[wkhtmltopdf|wk]]", "[[pdf]]"]),
     "npm--pdf.md": note({ id: "pkg:npm/pdf", name: "pdf" }),
     "pypi--pdf.md": note({ id: "pkg:pypi/pdf", name: "pdf" }),
   })]);
-  assert.deepEqual(alternatives(s, "pdfkit"), [unresolved("pdf"), unresolved("wkhtmltopdf")]);
+  assert.deepEqual(alternatives(s, "pdfkit"), [unresolved("pdf", "personal", "ambiguous"), unresolved("wkhtmltopdf")]);
 });
 
 test("alternatives: an avoid note and an inbox note are marked; order is reviewed, inbox, avoid, unresolved, then by name", () => {
