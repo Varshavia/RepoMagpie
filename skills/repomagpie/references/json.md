@@ -15,7 +15,11 @@ The fields this skill reads, per command. Every command prints one JSON document
 - `matches[].drafts`: which of `"avoid_when"` and `"use_when"` are still drafts, not yet accepted by the user. Say "(draft)" when you quote them.
 - `matches[].status`: `"reviewed"` or `"inbox"`.
 - `matches[].path`: the note's file.
-
+- `matches[].alternatives[]`: what the user noted to use instead, from the note's own alternatives field and from notes that list this one; `[]` when none. Reviewed ones first, then inbox ones, then avoid ones, then names without a note.
+- `matches[].alternatives[].name`: the alternative's name.
+- `matches[].alternatives[].verdict`: its Verdict, or `null` (in the inbox, or no note).
+- `matches[].alternatives[].avoid`: `true` when the user also noted to avoid it.
+- `matches[].alternatives[].path`: its note's file, or `null` when the journal has no note on it.
 An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `matches[].avoid_when` has items.
 
 ## `magpie search <query> --json`
@@ -27,7 +31,8 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `results[].id`: the note's PURL.
 - `results[].journal`: `"personal"` or `"project"`.
 - `results[].verdict`: the Verdict (for a skill, the skill line's text), or `null` for an inbox note.
-- `results[].status`: `"reviewed"` or `"inbox"`.- `results[].path`: the note's file; read it for the full note.
+- `results[].status`: `"reviewed"` or `"inbox"`.
+- `results[].path`: the note's file; read it for the full note.
 
 ## `magpie suggest ["description"] --json`
 
@@ -41,9 +46,11 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `candidates[].why.dependencies`: the project's dependencies the note matched by name, such as `@playwright/test`; `[]` for a description.
 - `candidates[].status`: `"reviewed"` or `"inbox"`.
 - `candidates[].path`: the note's file; read it when the Verdict and tags aren't enough to judge the fit.
+- `candidates[].alternatives[]`: the note's alternatives, with the same fields as in recall.
 - `in_use_avoid[]`: packages the project already uses that have an avoid note, each shaped like a recall match.
 - `in_use_avoid[].query`: the dependency's name.
 - `in_use_avoid[].verdict`, `in_use_avoid[].avoid_when`: what the note says.
+- `in_use_avoid[].alternatives[]`: what the user noted to use instead, as in recall.
 
 ## `magpie note <name-or-url> ["text"] --json`
 
@@ -53,6 +60,8 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `created`: `true` for a new note, `false` for an existing one.
 - `status`: `"reviewed"` with a Verdict, `"inbox"` without.
 - `warnings`: things that went wrong without stopping it, such as no network for a GitHub URL.
+- `alternatives_added`: the `--alternative` names written to the note; `[]` without the flag.
+- `alternatives_present`: the `--alternative` names the note already had; nothing was written for them.
 
 ## `magpie adopt <name-or-purl> --json`
 
