@@ -138,7 +138,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 ## 7. Screens and flows (v0.1)
 
 **Layout:** three panes, like Obsidian ([`DESIGN.md`](../DESIGN.md), Layout).
-- **Left sidebar:** journal switcher (Personal / Project), Inbox with a count, kinds, tags, settings.
+- **Left sidebar:** journal switcher (Personal / Project), Inbox with a count, the screens (All notes, Search, Add, Import, Check a package, Suggest, Graph), kinds, tags, settings.
 - **Centre:** the list or the results. Rows have two lines: the name (the full name on hover) and the package type, then the Verdict, or "no verdict yet". The Inbox badge appears in All notes and search, not in the Inbox, where every row is an inbox note.
 - **Right:** the note.
 - **Command palette** on Ctrl/Cmd+K, for search and every action. Its notes and skills are the first six results of `magpie search` for exactly what is typed, in the same order. Until that search answers, it says "Searching…"; a failed search shows its error. Never "Nothing matches" before the answer.
@@ -164,7 +164,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
    - **`[[` autocomplete** in every section editor and the Verdict editor: typing `[[` lists up to 8 notes of the same journal whose name or file stem contains what follows (those that start with it first). ↑/↓ move, Enter or Tab inserts `[[<file stem>|<name>]]`, Esc closes the list and leaves the text as typed. The textarea points to the list with `aria-activedescendant`; a status line tells screen readers how many notes there are and which keys to use.
    - **"Linked from"** at the end: the notes that link here, by name, with where ("in My notes", "as an alternative"). Empty: "No other note links here." Not shown for a read-only note.
    - Metadata chips: kind, licence ("licence unknown" for `unknown`), language, packages by name (`@playwright/cli` for `pkg:npm/%40playwright/cli`), tags.
-   - Actions: open the repository, open in an editor, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7).
+   - Actions: open the repository, open in an editor, copy the PURL; on a personal note, when there is a project, "Adopt to project" (item 7); "Show in graph" (item 8), except on a read-only note and in the graph's own note pane.
    - PURLs are shown decoded (`pkg:npm/@playwright/cli`), everywhere in the app. The copied PURL and every request keep the encoded id.
    - Paths under the home directory are shown with `~` (`~/.magpie/notes/npm--pdfkit.md`), as `magpie recall` prints them, everywhere in the app: the note view, Check a package, Settings and Suggest. The API keeps the absolute path.
 4. **Add.**
@@ -175,7 +175,19 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 6. **Recall:** a "Check a package" box that shows what `magpie recall` finds and what the Claude Code hook would do: ask first for an exact avoid note, otherwise show the note to the agent.
 7. **Suggest for this project** ("Suggest" in the sidebar and the palette): what `magpie suggest` finds for the project `magpie ui` was started in, from its manifests and README, or from a description typed in the box. Two panes, like Search: the list, then the note. The list says which words it looked for; candidates come Verdict first, in `magpie suggest`'s order, each with a third line that says why ("Why: dependency @playwright/test; matched coding, agent", as `magpie suggest` prints it); the project's dependencies with an avoid note follow, labelled "In use, avoid" in words. "Show more" asks for 20 more. With nothing to go on (no manifest, no README), it asks for a description.
    - **Adopt to project**, on a personal note when there is a project: a first click shows what happens and who can read it ("The project journal is committed with the code; anyone who can read this repository can read this note."); only "Copy to the project journal" writes, through `POST /api/adopt`. Then the install command, with a copy button and "Run it yourself" (for a repository with several packages, one command per package and a line that says to choose; for a note whose Verdict says to avoid, no command but "Your note says to avoid <name>; no install command."), and "Open the project's note". A note the project already has is refused, with its path.
-8. **Later, not v0.1:** a graph page (v0.2 part 2, [decision 0026](decisions/0026-the-app-is-the-workspace.md)); export or nest (v0.4).
+8. **Graph** (v0.2 part 2, [decision 0028](decisions/0028-the-graph-page.md); "Graph" in the sidebar after Suggest, "Open graph" in the palette, `g g`): one journal's notes, the tags they carry and the connections between them, drawn with sigma (WebGL) and laid out by ForceAtlas2 in a web worker. It follows the journal switcher. Its code is its own chunk; the other screens never load it. Encoding, layout and what waits: the [product](product.md#graph-specification) graph specification.
+   - **Status line** in words, above the graph: "Showing 214 notes, 31 tags and 486 connections". It counts what is drawn, so it changes with every filter, toggle and local mode.
+   - **Search box:** a name, file stem or `#tag`; up to 8 matches, as the `[[` autocomplete lists them. Enter selects the node and pans to it; the zoom stays.
+   - **Hover** lights a node and its neighbours and dims the rest. **Click** on a note selects it and opens it in a pane beside the graph, where you read and edit it as in the note view; a `[[link]]` there selects that note in the graph. A click on a tag selects it and lights its notes. A missing note, once selected, offers "Add a note", which opens Add with its target. A click on the empty canvas clears the selection.
+   - **Local mode:** with a node selected, "Everything", "1 step" or "2 steps" around it.
+   - **Filters:** kind group, status (Any, Reviewed, Inbox), "Tried only", and tags (several: notes with any of them, removable chips). Tags and missing notes follow their notes. "Clear the filters".
+   - **Draw:** Tags, Links and Alternatives (on), Similar and Missing notes (off). Turning one on or off, or a filter, keeps every node that stays where it was; one that joins starts where it was before, or next to its first neighbour.
+   - **Neighbours list**, left of the graph (under it below 960 px): the selected node's neighbours, grouped as Alternatives, Links, Same tag and Similar, each with its kind and inbox status or its note count in words; with nothing selected, the 20 most connected nodes. A listbox: ↑/↓, Home and End move, Enter selects and centres. With the search box and the filters, it is how the page is used without a mouse or a screen; the canvas is `aria-hidden` and has no tab stop.
+   - **Legend** under the graph: every colour in words.
+   - **Re-run layout** lays the graph out again from where it is; **Fit to screen** fits it.
+   - **Live:** a change on disk fetches the graph again; what is drawn keeps its place and the camera stays.
+   - **Show in graph**, in the note view's actions: opens the graph on that note, selected, in local mode (1 step).
+9. **Later:** export or nest (v0.4).
 
 **Keyboard map**
 
@@ -188,7 +200,7 @@ All paths are under `http://127.0.0.1:<port>`. Every API response is JSON, excep
 | `e` | Edit the Verdict |
 | Ctrl+Enter | Save |
 | `[[` | In an editor: link a note (↑ / ↓ choose, Enter or Tab inserts, Esc closes the list) |
-| `Esc` | Close the palette or editor; back to the list |
+| `Esc` | Close the palette or editor; back to the list. In the graph: clear the selection, then the search |
 | `g i` / `g s` / `g g` | Go to Inbox / Search / Graph |
 | `?` | Show the keyboard map |
 
@@ -206,6 +218,19 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | Read-only | A note that can't be parsed: the read-only banner and "Open in editor" |
 | Conflict | The conflict banner and "Reload". It also appears while you edit, as soon as a live update shows the file changed. Reload shows the file as it is now and keeps your unsaved changes in the form |
 | Unsaved changes | The browser asks before the page closes or reloads |
+
+The graph page's own states, each in words:
+
+| State | Shown as |
+|---|---|
+| No notes | "Nothing to draw yet. Add a repository here, or from the palette (Ctrl+K)." with "Add a note" |
+| No connections in the journal | A strip over the top of the graph: "Your notes aren't connected yet. Add tags, or [[links]] in My notes." |
+| Connections, all switched off | The same strip: "No connections drawn. Turn on Tags or Links to see how your notes connect." |
+| Filters match nothing | The strip: "No notes match these filters." with "Clear the filters" |
+| WebGL unavailable | The strip: "This browser can't draw the graph: WebGL is off or not available. The counts above and the neighbours list still hold." The status line, the search box, the filters and the neighbours list work |
+| Arranging (reduced motion) | "Arranging the graph…"; the graph appears once its layout has settled |
+
+A notice lies over the graph, so it never resizes the canvas or moves the view.
 
 ## 9. Accessibility
 
@@ -225,6 +250,13 @@ Every screen has these states, each with words that say what to do ([`DESIGN.md`
 | First render with 2,000 notes | Under 1 s on a mid-range laptop, with a warm cache, as for search and recall ([spec](spec.md), section 7) | The end-to-end test "2,000 notes": from the URL `magpie ui` printed to the first rows on screen. It also reports the cold first run, which builds the note-list cache |
 | Long lists | Virtualised: only visible rows are in the DOM | A unit test of the windowing; the 2,000-note measurement |
 | Search from the app | The same as `magpie search`: under 500 ms with a warm cache ([spec](spec.md), section 7) | The search benchmark |
+| Opening a note | Under 50 ms at 2,000 notes with a warm cache ([spec](spec.md), section 7) | `scripts/bench-note.ts` |
+| The graph's chunk | Other screens never load it; their first files (script, style and page) at most 3 kB over 99.4 kB, their size before the graph ([decision 0028](decisions/0028-the-graph-page.md)) | `npm run check:bundle`; the end-to-end test "other screens don't load its chunk" |
+| The graph's data | Under 300 ms at 2,000 notes, warm ([spec](spec.md), section 7) | `scripts/bench-graph.ts` |
+| The graph page at 2,000 notes | Data fetched, layout settled and first frame drawn in under 2 s on a mid-range laptop, with a warm cache | `ui/e2e/graph-timing.spec.ts`, from the click on Graph with the page's performance marks (`graph:fetch`, `graph:data`, `graph:settled`, `graph:drawn`); it runs last, alone. It also reports the cold first open, which builds the graph cache, and the gaps between frames while hovering and zooming. CI reports only |
+| Hover and zoom | No visible stutter at 2,000 notes | The same test's frame gaps. In headless Chromium WebGL runs in software (SwiftShader), so there they measure the renderer, not the page |
+
+Measured on `feat/graph` (2026-10-08, a Windows dev machine): the app 148.1 kB gzipped; the other screens' first files 101.3 kB (+1.9 kB); the graph's chunk 43.8 kB with 1.2 kB of styles and its 1.8 kB worker. Opening a note 32 ms. The graph page at 2,000 notes, headless with SwiftShader: 1.25–1.55 s warm, 1.9–2.2 s cold. On the machine's GPU (an RTX 4060 Ti, through ANGLE and Direct3D 11): 1.03 s warm, 1.84 s cold, and every frame at 17 ms while hovering and zooming; under SwiftShader the longest gaps are 117 ms (hover) and 267 ms (zoom), while sigma's own drawing takes under 6 ms a frame.
 
 Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (JavaScript 86.9 kB, CSS 4.6 kB, HTML 0.4 kB); first render with 2,000 notes 417 ms with a warm cache, 944 ms cold. `GET /api/notes` on 2,000 notes takes about 37 ms with the note-list cache and about 500 ms without it. With Suggest and Adopt (`feat/suggest-adopt`, 2026-10-06): 94.5 kB gzipped.
 
@@ -237,7 +269,7 @@ Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (
 | `VoltAgent/awesome-design-md` | Reference for the structure of [`DESIGN.md`](../DESIGN.md) (token groups, colour roles, components with variants, prose subsections), studied in the Linear, Raycast and Vercel entries. No palette or identity copied |
 | `Leonxlnx/taste-skill` | Character: avoiding the template look, one radius rule, skeletons and empty states, contrast checks. Its scope excludes dashboards, so it doesn't shape the dense lists. Adopted and skipped rules: [decision 0022](decisions/0022-frontend-stack.md) |
 | `vercel-labs/agent-skills` | `web-design-guidelines`: a review pass on every screen before each UI pull request, with findings fixed or listed. `react-best-practices`: during implementation. `writing-guidelines`: all UI copy |
-| `microsoft/playwright-cli` | During development: the agent drives the running app to check flows and capture screenshots for pull requests and the README. On `feat/ui-app` it wasn't installed on the agent's machine; the screenshots came from the end-to-end suite (`SCREENS=1`) instead |
+| `microsoft/playwright-cli` | During development: the agent drives the running app to check flows and capture screenshots for pull requests and the README. On `feat/ui-app` it wasn't installed on the agent's machine; the screenshots came from the end-to-end suite (`SCREENS=1`) instead. Nor on `feat/graph`: the graph's screenshots (dark and light, 9 and 800 notes) came from a script with the repository's `@playwright/test` |
 | `Egonex-AI/Understand-Anything` | Optional, for the maintainer: map the codebase once the app lands |
 | `mattpocock/skills` | `tdd` for server and app logic; `code-review` before each pull request |
 
@@ -245,7 +277,7 @@ Measured on `feat/ui-app` (2026-10-06, a Windows dev machine): 91.8 kB gzipped (
 - **Server** (`node:test`, an in-process server on a random port): every endpoint; each response compared with the CLI's `--json` output for the same input; every security rule in section 3 (bad Host, missing token or header, cross-origin and Origin-less writes, traversal attempts, 409 on conflicts, 413, 415).
 - **Core:** round-trip tests for `setSection` and human-field edits, as for `setToolFields`.
 - **App logic** (`ui/src/logic/`: list windowing, the keyboard map, note text, the edit request, import labels, palette matching, and the values the app mirrors from core): unit tests with `node:test`, run by `npm test`.
-- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault, under a fake home directory (`HOME` and `USERPROFILE`), so paths show as `~/.magpie/…`, screenshots show nothing of the machine, and the real `~/.magpie` is never read. The flows: inbox review, search, the note view's tried and rating line, paths with `~`, the favicon, add, import, a 409 conflict, live updates, read-only notes, the palette (the same results as `magpie search`, "Searching…" and errors) and keyboard map, decoded PURLs, a journal without `tags.md` or with an empty one, suggest (the same candidates as `magpie suggest`, the in-use avoid row, a description, nothing to go on), adopt (nothing written before the confirm, the install command, a repository's one or several packages, no command for a Verdict that says to avoid, nothing installed, a note the project already has), the skip link, no CSP violations, the 2,000-note first render, and the graph page (`ui/e2e/graph.spec.ts`: how you get there, the status line, drawing and the layout worker under the CSP, the empty and no-WebGL states, its chunk loaded only there). `npm run build` first, then `npm run test:e2e`.
+- **End-to-end** (`@playwright/test`, Chromium only, one CI job; `ui/e2e/`): `magpie ui` from the source on a temporary journal in `.scratch/e2e/`, built from the example vault, under a fake home directory (`HOME` and `USERPROFILE`), so paths show as `~/.magpie/…`, screenshots show nothing of the machine, and the real `~/.magpie` is never read. The flows: inbox review, search, the note view's tried and rating line, paths with `~`, the favicon, add, import, a 409 conflict, live updates, read-only notes, the palette (the same results as `magpie search`, "Searching…" and errors) and keyboard map, decoded PURLs, a journal without `tags.md` or with an empty one, suggest (the same candidates as `magpie suggest`, the in-use avoid row, a description, nothing to go on), adopt (nothing written before the confirm, the install command, a repository's one or several packages, no command for a Verdict that says to avoid, nothing installed, a note the project already has), the skip link, no CSP violations, the 2,000-note first render, and the graph page (`ui/e2e/graph.spec.ts`: how you get there, the status line, drawing and the layout worker under the CSP, the empty and no-WebGL states, its chunk loaded only there; hover, a click to the note pane and an edit there that shows in the graph, a tag click, Esc; the search box centring a node, also right after a toggle; local mode; the filters and their counts; the toggles, missing notes and Add; the neighbours list by keyboard; an alternative added in the pane drawn as an edge; "Show in graph"; the notices over the canvas and the two texts; a resize across 960 px with a selection, checked on the canvas's pixels; live updates that keep positions). The 2,000-note timing is `ui/e2e/graph-timing.spec.ts`, its own Playwright project after the rest. `npm run build` first, then `npm run test:e2e`.
 - **WebGL in headless Chromium:** runners have no GPU, so `ui/playwright.config.ts` launches Chromium with `--use-angle=swiftshader --enable-unsafe-swiftshader`: WebGL through SwiftShader, Chromium's software renderer. Checked on 2026-10-08 on Windows (Playwright's Chromium 1243): headless Chromium reports "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))" with or without the flags; the flags make the choice explicit for Linux CI.
 - **Screenshots:** `SCREENS=1 npm run test:e2e` writes every screen and state in dark and light to `.scratch/screens/` (`ui/e2e/screens.spec.ts`); CI skips them.
 - **Before each UI pull request:** a `web-design-guidelines` pass, the bundle-size check, and a `writing-guidelines` pass on the copy.

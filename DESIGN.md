@@ -351,6 +351,10 @@ The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on
 - **Tag (`graph-tag`):** tag nodes, labelled `#tag`. Neutral, near `ink`. In a small graph they are small and every one is labelled; from 150 drawn nodes up they grow with their note count, so the popular ones keep their labels.
 - **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a stronger grey, drawn thicker; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation. A thin line is antialiased, so it shows lighter than its token: `graph-edge-tagged` is set at about 4.4:1, so that a tag edge, 1.5 px wide, still shows at 3:1 or more at the default zoom (measured on screenshots, 2026-10-08: 3.52 dark, 3.22 light).
 - **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
+- **Missing notes** (a link or alternative to a subject without a note, off until "Missing notes" is on) are `graph-other` faded the same way; the legend says "Faded grey: no note yet".
+- **Around a hovered or selected node**, everything else is mixed 70% toward `canvas` and loses its label; the node gets a ring in `ink` and its label on a `surface-2` plate. Labels are `ink` with a halo in `canvas`, so they stay readable over nodes and edges.
+- **Notices** lie over the top of the graph as a strip of `surface-1` (92%, so the graph shows faintly through) with a `hairline` under it, in `ink-muted`, so they never resize the canvas. Only their buttons take the pointer.
+- **The neighbours list** beside the graph uses the list rows of the `[[` autocomplete; each says in words what the graph shows by colour (kind group, in the inbox, a tag's note count).
 
 ### Contrast
 Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5:1 (AA), inputs and the focus ring 3:1.

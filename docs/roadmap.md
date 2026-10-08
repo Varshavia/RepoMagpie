@@ -11,7 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. Remaining: the beta release and the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, part 2 (the graph page, `feat/graph`). Part 1 (linked notes) is merged.
+  Also now: v0.2 Connect, part 2 (the graph page, `feat/graph`): built, in review. Part 1 (linked notes) is merged.
 - **Next:** v0.2 Connect, part 3 (agent output).
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -257,7 +257,7 @@ A graph page in the app: notes as nodes, tags as hub nodes, `[[links]]` and `alt
 - [x] Interactions: hover, click to the note pane, the search box, local mode, Esc, and "Show in graph" from the note view.
 - [x] Filters, edge toggles and the neighbours list, with ghost nodes behind their toggle.
 - [x] Live updates; performance at 2,000 notes (data, layout and first frame in under 2 s). (2026-10-08, a Windows dev machine, headless Chromium with SwiftShader: warm 1.25–1.55 s, cold 1.9–2.2 s while the graph cache is built; on the machine's GPU warm 1.03 s and every hover and zoom frame at 17 ms.)
-- [ ] Docs, end-to-end flows, screenshots in dark and light at 800 notes; review with `web-design-guidelines`; check and screenshot with `playwright-cli`.
+- [x] Docs, end-to-end flows, screenshots in dark and light at 800 notes; review with `web-design-guidelines`; check and screenshot with `playwright-cli`. (`playwright-cli` isn't installed on the agent's machine; the screenshots came from a script with the repository's `@playwright/test`, as on `feat/ui-app`.)
 
 **Done when:** every item works and has tests; the budgets hold (`graphData` under 300 ms, the page under 2 s at 2,000 notes, the bundle under 200 kB with other screens' first files at most 3 kB over 99.4 kB, the existing budgets unchanged); all checks, end-to-end tests and benchmarks pass.
 
