@@ -100,6 +100,47 @@ test("graph: hover lights a node; a click on a note opens it beside the graph, o
   await expect(page.getByText(/^Selected:/)).toHaveCount(0);
 });
 
+test("graph: a note clicked in the graph opens beside it, and an edit there shows in the graph", async ({ page, magpie }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(`${e.message} ${e.stack?.split("\n").slice(0, 5).join(" | ")}`));
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text().slice(0, 400)));
+  await openGraph(page, magpie);
+  const before = await expectedStatus(page);
+  const key = "note:github--vercel-labs--agent-skills.md";
+  const note = await nodeAt(page, key);
+  await page.mouse.click(note.x, note.y);
+  const pane = page.getByRole("complementary", { name: "Note" });
+  await expect(pane.getByRole("heading", { level: 2, name: "vercel-labs/agent-skills" })).toBeVisible();
+
+  await pane.getByRole("button", { name: "Edit Related" }).click();
+  await pane.getByRole("textbox", { name: "Related" }).fill("- [[github--leonxlnx--taste-skill]]");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("Related saved")).toBeVisible();
+  // The file changed on disk: the graph is fetched again and draws the new link.
+  const connections = (text: string) => Number(/and (\d+) connections?$/.exec(text)?.[1]);
+  await expect.poll(async () => connections((await status(page).textContent()) ?? "")).toBe(connections(before) + 1);
+  await expect(page.getByRole("listbox", { name: "Neighbours of vercel-labs/agent-skills" }).getByRole("group", { name: "Links" })).toContainText("Leonxlnx/taste-skill");
+  await expect(canvas(page)).toHaveAttribute("data-selected", key);
+  expect(errors).toEqual([]); // the refetch synced into a graph with a selection, which dims the rest
+});
+
+test("graph: adding an alternative in the note pane draws an alternative edge", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  await expect(page.getByRole("group", { name: "Legend" })).not.toContainText("Alternative");
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("taste");
+  await page.keyboard.press("Enter");
+  const pane = page.getByRole("complementary", { name: "Note" });
+  const row = pane.getByRole("region", { name: "Alternatives" });
+  await row.getByRole("button", { name: "Add an alternative" }).click();
+  await page.getByRole("combobox", { name: /^Add an alternative/ }).pressSequentially("vercel");
+  await expect(page.getByRole("listbox", { name: "Alternatives to add" }).getByRole("option").first()).toContainText("vercel-labs/agent-skills");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").getByText("vercel-labs/agent-skills added as an alternative")).toBeVisible();
+  const neighbours = page.getByRole("listbox", { name: "Neighbours of Leonxlnx/taste-skill" });
+  await expect(neighbours.getByRole("group", { name: "Alternatives" })).toContainText("vercel-labs/agent-skills");
+  await expect(page.getByRole("group", { name: "Legend" })).toContainText("Alternative");
+});
+
 test("graph: the search box finds a note, selects it and centres it; Esc clears the selection, then the search", async ({ page, magpie }) => {
   await openGraph(page, magpie);
   const search = page.getByRole("combobox", { name: "Find a note or tag in the graph" });

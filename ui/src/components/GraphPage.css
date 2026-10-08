@@ -13,6 +13,7 @@
 .graph-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--xs) var(--md); font-size: 12px; }
 .graph-filter-group .check { min-height: 28px; }
 .graph-filter-group .chips { gap: var(--xxs); }
+.graph-filter-group button.chip.chosen { background: var(--accent-wash); color: var(--accent-text); }
 
 /* The neighbours list on the left; the note pane narrows the graph; on a narrow screen the list
    goes under the graph and the note pane slides over it. */
@@ -24,6 +25,9 @@
 .graph-neighbour-list:focus-visible { outline-offset: -2px; }
 .graph-neighbour-list ul { list-style: none; }
 .graph-neighbour-list .link-option { min-height: 28px; padding: 0 var(--sm); font-size: 13px; }
+/* A long name truncates (its full text on hover); the kind, inbox or note count stays readable. */
+.graph-neighbour-list .link-option .label { flex: 1 1 auto; }
+.graph-neighbour-list .link-option .detail { flex: none; max-width: 60%; }
 .graph-neighbour-list .link-option:hover { background: var(--surface-1); }
 .graph-neighbour-list:not(:focus) .link-option[aria-selected="true"]:not(:hover) { background: transparent; }
 .graph-neighbour-group { padding: var(--sm) var(--md) var(--xxs); color: var(--ink-subtle); font-size: 12px; font-weight: 600; }
