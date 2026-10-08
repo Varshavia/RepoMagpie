@@ -11,8 +11,8 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is merged; its small follow-ups are on `fix/alternatives-followups`.
-- **Next:** the v0.2 Connect release, once part 3 is merged.
+  Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups.
+- **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
 | Part | Status |
@@ -232,7 +232,7 @@ See [marketing.md](marketing.md).
 - [ ] Product Hunt
 
 ## v0.2 Connect
-The app becomes the place where you write and connect notes: links, backlinks, the `alternatives` relation and a graph, built into `magpie ui` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). Three parts, each on its own branch.
+The app becomes the place where you write and connect notes: links, backlinks, the `alternatives` relation and a graph, built into `magpie ui` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). Three parts, each on its own branch. Released in beta: parts 1 and 2 in `0.2.0-beta.1`, part 3 in `0.2.0-beta.2` (2026-10-08).
 
 ### Part 1: linked notes (`feat/linked-notes`)
 - [x] Decisions: the app is the workspace ([0026](decisions/0026-the-app-is-the-workspace.md)); `alternatives` becomes active, one side is enough ([0027](decisions/0027-alternatives-active.md)).

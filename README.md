@@ -8,7 +8,7 @@
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes Claude Code ask you.
 - **Suggest:** `magpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
-**Status:** pre-release `0.2.0-beta.1`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.2`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
