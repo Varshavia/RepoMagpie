@@ -25,7 +25,7 @@ The roadmap's part 3 said "alternatives and neighbours". Same-tag notes and `[[l
 
 ## Consequences
 - Recall's entries carry each note's raw `alternatives`, so the recall cache's version goes up and an old cache is rebuilt once.
-- Recall resolves targets with the same rules as the link index, without loading `src/core/links.ts`: the hook's chunk must stay small.
+- Recall resolves targets with the same rules as the link index, without loading `src/core/links.ts`: the hook's chunk must stay small. The rule moves into `src/core/wikilinks.ts` (the link syntax, the `alternatives` field and the resolver; it imports nothing), and both use it. One rule in one place can't drift; a second copy with a test that the two agree would have to be kept in step by hand. The hook loads 1.8 kB more.
 - `RecallMatch` gains an `alternatives` list, in `magpie recall --json`, `magpie suggest --json` (`candidates[]` and `in_use_avoid[]`) and the API. It is an addition to the JSON contract, not a breaking change ([0023](0023-api-is-the-json-contract.md)).
 - The recall card gains an "Alternatives" row, the hook's prompt and context name the alternatives, and suggest's human output adds an "Instead:" line under each `in_use_avoid` item.
 - `magpie note` gains `--alternative`, written through the round-trip-safe frontmatter edit, so the rest of the file stays byte for byte.

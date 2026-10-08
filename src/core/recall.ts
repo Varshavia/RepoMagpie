@@ -7,10 +7,11 @@ import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
-import { isRecord, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
+import { isRecord, isTextOrNull, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
+import { alternativeLinks, targetResolver, type FoundLink } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // 2: entries carry alternatives
 
 type ListName = "use_when" | "avoid_when";
 
@@ -25,6 +26,7 @@ export interface RecallEntry {
   useWhen: string[];
   drafts: ListName[];
   status: "inbox" | "reviewed";
+  alternatives: FoundLink[]; // the alternatives field's targets, in order, as written
 }
 
 export interface RecallSource {
@@ -45,6 +47,19 @@ export interface RecallMatch {
   drafts: ListName[];
   status: "inbox" | "reviewed";
   path: string;
+  alternatives: Alternative[];
+}
+
+// An alternative of a matched note (decision 0029): a note in the same journal, or an unresolved
+// target, shown by its name as written.
+export interface Alternative {
+  name: string;
+  id: string | null;
+  journal: RecallSource["scope"];
+  verdict: string | null;
+  status: "reviewed" | "inbox" | null;
+  avoid: boolean;
+  path: string | null;
 }
 
 // The journals recall reads (spec §3): the personal journal and, if found, the project journal,
@@ -75,7 +90,8 @@ function isRecallEntry(e: unknown): boolean {
     Array.isArray(e.keys) && e.keys.every((key) => Array.isArray(key) && key.length === 2 && isTexts(key)) &&
     typeof e.verdict === "string" && isTexts(e.avoidWhen) && isTexts(e.useWhen) &&
     Array.isArray(e.drafts) && e.drafts.every((d) => d === "use_when" || d === "avoid_when") &&
-    (e.status === "inbox" || e.status === "reviewed");
+    (e.status === "inbox" || e.status === "reviewed") &&
+    Array.isArray(e.alternatives) && e.alternatives.every((a) => isRecord(a) && typeof a.target === "string" && isTextOrNull(a.label));
 }
 
 function entryOf(text: string, file: string): RecallEntry | null {
@@ -102,6 +118,7 @@ function entryOf(text: string, file: string): RecallEntry | null {
     useWhen: items(section("Use when")?.body ?? ""),
     drafts: [section("Use when")?.draft ? "use_when" : null, section("Avoid when")?.draft ? "avoid_when" : null].filter((d): d is ListName => d !== null),
     status: note.status,
+    alternatives: alternativeLinks(fm.alternatives),
   };
 }
 
@@ -169,7 +186,63 @@ function match(query: string, source: RecallSource, entry: RecallEntry, confiden
     drafts: entry.drafts,
     status: entry.status,
     path: join(source.path, "notes", entry.file),
+    alternatives: alternativesOf(source, entry),
   };
+}
+
+// A journal's entries by file, and for each file the entries whose alternatives resolve to it. Built
+// once per entries list, so the hook's several packages share it.
+interface AlternativeIndex {
+  resolve: (target: string) => string | null;
+  byFile: Map<string, RecallEntry>;
+  listedBy: Map<string, RecallEntry[]>;
+}
+const alternativeIndexes = new WeakMap<RecallEntry[], AlternativeIndex>();
+
+function alternativeIndex(entries: RecallEntry[]): AlternativeIndex {
+  let index = alternativeIndexes.get(entries);
+  if (index) return index;
+  // An entry without a `name` carries its file stem as its name, which never changes a resolution:
+  // the stem rule comes first.
+  const resolver = targetResolver(entries);
+  const resolve = (target: string) => resolver(target).file;
+  const byFile = new Map(entries.map((entry) => [entry.file, entry]));
+  const listedBy = new Map<string, RecallEntry[]>();
+  for (const entry of entries) {
+    for (const file of new Set(entry.alternatives.map(({ target }) => resolve(target)))) {
+      if (file && file !== entry.file) listedBy.set(file, [...(listedBy.get(file) ?? []), entry]);
+    }
+  }
+  index = { resolve, byFile, listedBy };
+  alternativeIndexes.set(entries, index);
+  return index;
+}
+
+// The alternatives of one note (decision 0029): the targets in its own field, then the notes that
+// list it; each once, never the note itself. Reviewed first, then inbox, avoid and unresolved ones.
+function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[] {
+  const { resolve, byFile, listedBy } = alternativeIndex(source.entries);
+  const found = new Map<string, Alternative>();
+  const note = (other: RecallEntry): Alternative => ({
+    name: other.name,
+    id: other.id,
+    journal: source.scope,
+    verdict: other.verdict || null,
+    status: other.status,
+    avoid: isAvoid({ verdict: other.verdict || null, avoid_when: other.avoidWhen }),
+    path: join(source.path, "notes", other.file),
+  });
+  for (const { target } of entry.alternatives) {
+    const file = resolve(target);
+    const key = file ?? `?${target.toLowerCase()}`; // file names never start with "?"
+    if (file === entry.file || found.has(key)) continue;
+    const other = file ? byFile.get(file) : undefined;
+    found.set(key, other ? note(other) : { name: target, id: null, journal: source.scope, verdict: null, status: null, avoid: false, path: null });
+  }
+  for (const other of listedBy.get(entry.file) ?? []) if (!found.has(other.file)) found.set(other.file, note(other));
+  const rank = (a: Alternative) => (a.path === null ? 3 : a.avoid ? 2 : a.status === "inbox" ? 1 : 0);
+  const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...found.values()].sort((a, b) => rank(a) - rank(b) || compare(a.name.toLowerCase(), b.name.toLowerCase()) || compare(a.name, b.name));
 }
 
 const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];

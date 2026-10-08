@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scratchBase } from "./fixtures/scratch.ts";
+import { linkIndex } from "./links.ts";
 import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, type RecallSource } from "./recall.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
@@ -92,6 +93,7 @@ test("a match carries the Verdict, Avoid when and Use when as items, drafts, sta
     drafts: [],
     status: "reviewed",
     path: join(path, "notes", "npm--pdfkit.md"),
+    alternatives: [],
   });
   const [lib] = recall(sources(["personal", path]), "pdf-lib", ["npm"]);
   assert.equal(lib.verdict, null);
@@ -142,6 +144,8 @@ test("the recall cache: an entry of the wrong shape for an unchanged note makes 
     noKeys, { ...zod, keys: "npm zod" }, { ...zod, keys: [["npm"]] }, { ...zod, keys: [[1, "zod"]] }, { ...zod, keys: [null] },
     { ...zod, verdict: null }, { ...zod, avoidWhen: "never" }, { ...zod, useWhen: [1] }, { ...zod, drafts: ["verdict"] },
     { ...zod, status: "done" }, { ...zod, file: 5 }, { ...zod, id: null }, { ...zod, name: null }, "nonsense", null, [],
+    { ...zod, alternatives: undefined }, { ...zod, alternatives: "[[x]]" }, { ...zod, alternatives: ["[[x]]"] },
+    { ...zod, alternatives: [{ target: 1, label: null }] }, { ...zod, alternatives: [{ target: "x" }] }, { ...zod, alternatives: [null] },
   ];
   for (const wrong of wrongs) {
     writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e === zod ? wrong : e)) }));
@@ -158,4 +162,112 @@ test("a journal without notes writes no cache", () => {
   const path = scratchBase("recall");
   assert.deepEqual(loadRecallEntries(path).entries, []);
   assert.equal(existsSync(join(path, ".cache")), false);
+});
+
+// --- Alternatives (decision 0029): the alternatives field, from both sides, within one journal ---
+
+// A note with `alternatives: [...]` in its frontmatter, each entry written as given.
+const withAlternatives = (text: string, entries: string[]) => text.replace("\nstatus:", `\nalternatives: [${entries.map((e) => JSON.stringify(e)).join(", ")}]\nstatus:`);
+
+const PUPPETEER = note({ id: "pkg:npm/puppeteer", verdict: "default for PDF rendering in new projects" });
+const alternatives = (s: RecallSource[], query: string) => recall(s, query, ["npm"])[0].alternatives;
+const names = (s: RecallSource[], query: string) => alternatives(s, query).map((a) => a.name);
+const unresolved = (name: string, journal = "personal") => ({ name, id: null, journal, verdict: null, status: null, avoid: false, path: null });
+
+test("alternatives: forward (by file stem or name), reverse, and both sides once", () => {
+  const forward = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer]]"]), "npm--puppeteer.md": PUPPETEER });
+  const path = join(forward, "notes", "npm--puppeteer.md");
+  const puppeteer = { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path };
+  assert.deepEqual(alternatives(sources(["personal", forward]), "pdfkit"), [puppeteer]);
+  assert.deepEqual(names(sources(["personal", forward]), "puppeteer"), ["pdfkit"], "the reverse side");
+
+  const byName = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]), "npm--puppeteer.md": PUPPETEER });
+  assert.equal(alternatives(sources(["personal", byName]), "pdfkit")[0].id, "pkg:npm/puppeteer");
+
+  const both = journal({
+    "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer]]"]),
+    "npm--puppeteer.md": withAlternatives(PUPPETEER, ["[[pdfkit]]"]),
+  });
+  assert.deepEqual(names(sources(["personal", both]), "pdfkit"), ["puppeteer"]);
+  assert.deepEqual(names(sources(["personal", both]), "puppeteer"), ["pdfkit"]);
+});
+
+test("alternatives: an unresolved or ambiguous target is shown by its name as written, with no note", () => {
+  const s = sources(["personal", journal({
+    "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[wkhtmltopdf|wk]]", "[[pdf]]"]),
+    "npm--pdf.md": note({ id: "pkg:npm/pdf", name: "pdf" }),
+    "pypi--pdf.md": note({ id: "pkg:pypi/pdf", name: "pdf" }),
+  })]);
+  assert.deepEqual(alternatives(s, "pdfkit"), [unresolved("pdf"), unresolved("wkhtmltopdf")]);
+});
+
+test("alternatives: an avoid note and an inbox note are marked; order is reviewed, inbox, avoid, unresolved, then by name", () => {
+  const s = sources(["personal", journal({
+    "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[zzz-missing]]", "[[jspdf]]", "[[pdf-lib]]", "[[aaa-missing]]", "[[puppeteer]]", "[[html-pdf]]", "[[playwright]]"]),
+    "npm--puppeteer.md": PUPPETEER,
+    "npm--playwright.md": note({ id: "pkg:npm/playwright", verdict: "fine" }),
+    "npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib" }),
+    "npm--jspdf.md": note({ id: "pkg:npm/jspdf", verdict: "avoid: tiny API" }),
+    "npm--html-pdf.md": note({ id: "pkg:npm/html-pdf", avoidWhen: ["you need it maintained"] }),
+  })]);
+  assert.deepEqual(alternatives(s, "pdfkit").map((a) => [a.name, a.status, a.avoid]), [
+    ["playwright", "reviewed", false],
+    ["puppeteer", "reviewed", false],
+    ["pdf-lib", "inbox", false],
+    ["html-pdf", "inbox", true],
+    ["jspdf", "reviewed", true],
+    ["aaa-missing", null, false],
+    ["zzz-missing", null, false],
+  ]);
+  assert.equal(alternatives(s, "pdfkit")[2].verdict, null);
+});
+
+test("alternatives: a note never lists itself; a target written twice, in another case or with a label, counts once", () => {
+  const s = sources(["personal", journal({
+    "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[pdfkit]]", "[[npm--pdfkit]]", "[[npm--puppeteer]]", "[[Puppeteer|the browser]]", "puppeteer", "[[Wk]]", "[[wk|x]]"]),
+    "npm--puppeteer.md": withAlternatives(PUPPETEER, ["[[NPM--PDFKIT]]"]),
+  })]);
+  assert.deepEqual(names(s, "pdfkit"), ["puppeteer", "Wk"]);
+});
+
+test("alternatives: resolved within the note's own journal; a target only in the other journal is unresolved", () => {
+  const project = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]) });
+  const personal = journal({ "npm--puppeteer.md": PUPPETEER, "npm--pdfkit.md": PDFKIT });
+  const [inProject, inPersonal] = recall(sources(["personal", personal], ["project", project]), "pdfkit", ["npm"]);
+  assert.deepEqual([inProject.journal, inProject.alternatives], ["project", [unresolved("puppeteer", "project")]]);
+  assert.deepEqual([inPersonal.journal, inPersonal.alternatives], ["personal", []]);
+});
+
+test("alternatives resolve as the link index resolves the same field (one rule, src/core/wikilinks.ts)", () => {
+  const path = journal({
+    "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer]]", "[[Pdf-Lib|lib]]", "[[pdf]]", "[[missing]]", "plain-name", "[[NPM--ZOD#Verdict]]"]),
+    "npm--puppeteer.md": PUPPETEER,
+    "npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib" }),
+    "npm--pdf.md": note({ id: "pkg:npm/pdf", name: "pdf" }),
+    "pypi--pdf.md": note({ id: "pkg:pypi/pdf", name: "pdf" }),
+    "npm--zod.md": note({ id: "pkg:npm/zod" }),
+    "plain-name.md": note({ id: "pkg:npm/plain", name: "plain" }),
+    "npm--broken.md": "---\nid: [\nname: pdf-lib\n---\n",
+  });
+  const fromIndex = linkIndex(path).outgoing["npm--pdfkit.md"].filter((l) => l.from === "alternatives").map((l) => l.id);
+  const fromRecall = alternatives(sources(["personal", path]), "pdfkit").map((a) => a.id);
+  const order = (ids: (string | null)[]) => [...ids].sort((a, b) => String(a).localeCompare(String(b)));
+  assert.deepEqual(order(fromRecall), order(fromIndex));
+  assert.deepEqual(order(fromRecall), order(["pkg:npm/pdf-lib", "pkg:npm/plain", "pkg:npm/puppeteer", "pkg:npm/zod", null, null]));
+});
+
+test("the recall cache: entries keep the alternatives as written; a version 1 cache is rebuilt once", () => {
+  const path = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer|Puppeteer]]", "wkhtmltopdf"]), "npm--puppeteer.md": PUPPETEER });
+  const { entries } = loadRecallEntries(path);
+  assert.deepEqual(entries.find((e) => e.file === "npm--pdfkit.md")?.alternatives, [{ target: "npm--puppeteer", label: "Puppeteer" }, { target: "wkhtmltopdf", label: null }]);
+  assert.deepEqual(entries.find((e) => e.file === "npm--puppeteer.md")?.alternatives, []);
+
+  const cacheFile = join(path, ".cache", RECALL_CACHE);
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, unknown>[] };
+  assert.equal(cache.version, 2);
+  const versionOne = cache.data.map(({ alternatives: _alternatives, ...rest }) => rest);
+  writeFileSync(cacheFile, JSON.stringify({ version: 1, files: cache.files, data: versionOne }));
+  const upgraded = loadRecallEntries(path);
+  assert.deepEqual([upgraded.rebuilt, upgraded.entries], [true, entries]);
+  assert.equal(loadRecallEntries(path).rebuilt, false);
 });

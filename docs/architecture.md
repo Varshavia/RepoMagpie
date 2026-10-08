@@ -38,12 +38,14 @@ src/
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
                note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links)
+               wikilinks: the [[wikilink]] syntax, the alternatives field and how a target resolves; shared by
+               links and recall, so the hook doesn't load the link index (decision 0029)
                links: [[wikilinks]] and alternatives, resolved within a journal; the link index (decision 0026)
                graph: the graph's nodes and edges (tags, links, alternatives, similarity, missing notes) (decision 0028)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
                install-detect: package installs in a shell command line
-               recall: recall's matching rules, the journals it reads, its cache
+               recall: recall's matching rules, the journals it reads, its cache, each match's alternatives
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
                suggest: suggest's keywords, scoring and the project's dependencies left out
                adopt: copying a personal note into the project journal; the install command
