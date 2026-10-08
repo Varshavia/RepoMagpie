@@ -28,7 +28,20 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+      # The usual output, and a TAP report kept when the tests fail: for a test file that fails
+      # without a failing test, it records the file's exit code, signal and stderr, which the spec
+      # output leaves out.
+      - name: npm test
+        id: test
+        run: npm test -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination="${{ runner.temp }}/test-report.tap"
+      - name: Keep the TAP report (when the tests failed)
+        if: failure() && steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-report-${{ matrix.os }}-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/test-report.tap
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run typecheck
       - run: npm run test:hooks
       - run: npm run build
