@@ -11,7 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is in progress on `feat/agent-output`.
+  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is built on `feat/agent-output`, in review.
 - **Next:** the v0.2 Connect release, once part 3 is merged.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -276,7 +276,9 @@ Not doing, from the `web-design-guidelines` review of `feat/graph`:
 
 ### Part 3: agent output (`feat/agent-output`)
 - [x] Decision: recall names alternatives ([0029](decisions/0029-recall-names-alternatives.md)).
-- [ ] `magpie recall`, the hook, `magpie suggest` and "Check a package" in the app show a note's alternatives; `magpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision.
+- [x] `magpie recall`, the hook, `magpie suggest` and "Check a package" in the app show a note's alternatives; `magpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision. (Also the app's Suggest page: an "Instead:" line under "In use, avoid", the maintainer, 2026-10-08.)
+
+**Done when:** the hook's prompt for an avoid note names its alternatives, and the agent's context says to offer them; `recall`, `suggest` and the app show alternatives; `magpie note --alternative` records one without changing anything else in the file; recall, the hook and suggest stay within their budgets, and the hook's chunk imports nothing beyond the shared wikilink rule; all checks and end-to-end tests pass. (Met on `feat/agent-output`, 2026-10-08, Windows dev machine, Node 24.13: 841 tests (839 pass, 2 skipped), 147 hook tests and 62 end-to-end flows pass. Recall 130 ms, the hook 123 / 73 ms; on a journal where one note in five has alternatives, 134 ms and 128 / 72 ms. Suggest 332 / 281 ms, and 356 / 294 ms with alternatives. The app 148.4 kB gzipped; the other screens' first files 101.6 kB (+0.3). The hook loads `note`, `note-cache`, `recall` and the new `wikilinks` (1.8 kB). Not yet seen green in CI.)
 
 Follow-up, watch (the maintainer, 2026-10-08):
 - [ ] Recall's margin. `magpie recall` and the hook take about 145 ms at 2,000 notes on a Windows dev machine (budget 150). Most of it is Node's startup and loading the chunks (about 75 ms: the hook with no install) and reading 2,000 file times for the cache signature (30–35 ms); the cache read and its shape check take about 10 ms, alternatives 1–2 ms. Act when CI's Linux median passes 120 ms, or when a change adds more than 5 ms. Options for headroom:
