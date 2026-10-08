@@ -67,21 +67,33 @@ export function alternativeLinks(value: unknown): FoundLink[] {
 const LINKS_CACHE = "links.json";
 const LINKS_VERSION = 1;
 
-interface Entry {
+export interface Entry {
   id: string | null;
   name: string | null;
   links: (FoundLink & { from: string })[];
 }
 
-export function linkIndex(journal: string): LinkIndex {
-  const { outgoing, incoming } = resolvedLinkIndex(journal);
+export interface LinkEntries {
+  files: string[];
+  data: Record<string, Entry>;
+}
+
+// Each note file's id, name and links as written, from the link cache: files added or changed since
+// it was written are read again. One read of it serves both finding a note by id and the link index
+// (each read stats every note: about 22 ms at 2,000 notes).
+export function linkEntries(journal: string): LinkEntries {
+  return noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path), isEntry);
+}
+
+export function linkIndex(journal: string, entries = linkEntries(journal)): LinkIndex {
+  const { outgoing, incoming } = resolvedLinkIndex(journal, entries);
   return { outgoing, incoming };
 }
 
 // The link index, plus the file each outgoing link resolves to (null when unresolved), in the same
 // order as `outgoing`. The graph joins notes by file, since two files may carry the same id.
-export function resolvedLinkIndex(journal: string): LinkIndex & { targets: Record<string, (string | null)[]> } {
-  const { files, data } = noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path), isEntry);
+export function resolvedLinkIndex(journal: string, entries = linkEntries(journal)): LinkIndex & { targets: Record<string, (string | null)[]> } {
+  const { files, data } = entries;
   const notes = files.filter((file) => data[file].id !== null);
   const byStem = new Map<string, string[]>();
   const byName = new Map<string, string[]>();

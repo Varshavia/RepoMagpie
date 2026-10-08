@@ -74,6 +74,8 @@ jobs:
         run: node scripts/bench-links.ts --report-only
       - name: Graph data benchmark (report only)
         run: node scripts/bench-graph.ts --report-only
+      - name: Opening a note benchmark (report only)
+        run: node scripts/bench-note.ts --report-only
 
   # The local app (docs/ui.md §10, §11): the built bundle against its size budget, then the
   # end-to-end tests against magpie ui on a temporary journal. Chromium only.

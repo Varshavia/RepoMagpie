@@ -1,6 +1,7 @@
-import { test } from "node:test";
+import { mock, test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { fakeFetch, recorded } from "./fixtures/fake-fetch.ts";
@@ -337,6 +338,72 @@ test("Note: an unknown id or file, a package of another note, and paths are not 
     assert.equal(r.document.path, null);
     assert.equal(locateNote("personal", address, s.context).path, null);
   }
+});
+
+// --- Finding a note by id ---
+
+// 40 more notes, p0 … p39, so a scan of the journal shows in the count of files read.
+const MANY = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`journal/notes/npm--p${i}.md`, PDFKIT.replace("id: pkg:npm/pdfkit", `id: pkg:npm/p${i}`).replace("name: pdfkit", `name: p${i}`)]));
+
+// How many note files (in a notes/ folder) `run` reads.
+function noteReads(t: TestContext, run: () => void): number {
+  const reads = mock.method(fs, "readFileSync");
+  syncBuiltinESMExports();
+  t.after(() => {
+    mock.restoreAll();
+    syncBuiltinESMExports();
+  });
+  run();
+  const count = reads.mock.calls.filter((call) => /[\\/]notes[\\/][^\\/]+\.md$/.test(String(call.arguments[0]))).length;
+  mock.restoreAll();
+  syncBuiltinESMExports();
+  return count;
+}
+
+test("a note found by id, with warm caches, reads that note, not the whole journal: GET and PATCH", (t) => {
+  const s = setup(MANY);
+  assert.equal(noteDocument("personal", { id: "pkg:npm/p7" }, s.context).document.file, "npm--p7.md"); // builds the caches
+  let version = "";
+  const get = noteReads(t, () => {
+    const r = noteDocument("personal", { id: "pkg:npm/p7" }, s.context);
+    assert.equal(r.document.file, "npm--p7.md");
+    version = r.document.version as string;
+  });
+  assert.ok(get <= 2, `GET read ${get} note files`);
+  const patch = noteReads(t, () => {
+    const r = patchNote({ journal: "personal", id: "pkg:npm/p7", version, fields: { rating: 4 } }, s.context);
+    assert.equal(r.outcome, "ok");
+    assert.equal(r.document.frontmatter.rating, 4);
+  });
+  assert.ok(patch <= 6, `PATCH read ${patch} note files`);
+});
+
+test("finding by id stays right when the cache is stale: a note added, renamed, or whose id changed", () => {
+  const s = setup();
+  const find = (id: string) => locateNote("personal", { id }, s.context).path;
+  assert.equal(find("pkg:npm/pdfkit"), s.note("npm--pdfkit.md")); // the cache is written
+  writeFileSync(s.note("npm--zod.md"), PDFKIT.replace("id: pkg:npm/pdfkit", "id: pkg:npm/zod"));
+  assert.equal(find("pkg:npm/zod"), s.note("npm--zod.md"));
+  renameSync(s.note("npm--pdfkit.md"), s.note("npm--pdfkit-old.md"));
+  assert.equal(find("pkg:npm/pdfkit"), s.note("npm--pdfkit-old.md"));
+  writeFileSync(s.note("npm--zod.md"), PDFKIT.replace("id: pkg:npm/pdfkit", "id: pkg:npm/zod-next"));
+  assert.equal(find("pkg:npm/zod"), null);
+  assert.equal(find("pkg:npm/zod-next"), s.note("npm--zod.md"));
+});
+
+test("a cache that names the wrong file for an id falls back to reading the notes", () => {
+  const s = setup();
+  const find = (id: string) => locateNote("personal", { id }, s.context).path;
+  assert.equal(noteDocument("personal", { id: "pkg:npm/pdfkit" }, s.context).document.file, "npm--pdfkit.md"); // writes the link cache
+  // The cache's signature still matches the notes, but its entry for pdfkit names another id, as
+  // if the file had changed without its size or modification time changing.
+  const cacheFile = join(dirname(s.note("npm--pdfkit.md")), "..", ".cache", "links.json");
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, { id: string }> };
+  cache.data["npm--pdfkit.md"].id = "pkg:npm/ghost";
+  writeFileSync(cacheFile, JSON.stringify(cache));
+  assert.equal(find("pkg:npm/ghost"), null); // the hit is checked against the file
+  assert.equal(find("pkg:npm/pdfkit"), s.note("npm--pdfkit.md")); // the miss reads the notes
+  assert.equal(noteDocument("personal", { id: "pkg:npm/pdfkit" }, s.context).document.file, "npm--pdfkit.md");
 });
 
 // --- PATCH ---
