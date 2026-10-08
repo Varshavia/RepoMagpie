@@ -60,6 +60,17 @@ test("SKILL.md frontmatter follows the Agent Skills format", () => {
   assert.ok(body.split("\n").length < 500, "keep SKILL.md under 500 lines");
 });
 
+// --- Behaviour seen in a live test ---------------------------------------------------------------
+
+// Live test, 2026-10-08: when the user answers No to the hook's prompt, Claude Code ends the turn and
+// waits, so the agent can't offer the alternatives right after the No; it can on the next message.
+test("after a No to the hook's prompt, the skill offers the alternatives on the user's next message", () => {
+  const hook = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("the magpie hook"));
+  assert.ok(hook, "SKILL.md names the magpie hook");
+  assert.match(hook, /next message/);
+  assert.doesNotMatch(hook, /If the user declines the install, offer/);
+});
+
 test("the skill's links stay inside the skill folder, one level deep, and exist", () => {
   for (const file of skillFiles()) {
     for (const m of withoutFences(readFileSync(file, "utf8")).matchAll(/\]\(([^)\s]+)\)/g)) {
@@ -234,18 +245,16 @@ function specShapes(): Map<string, unknown> {
   return shapes;
 }
 
+// A path through an example list may go through any of its items: recall's example alternatives
+// are one with a note and one without, and only the second has a `reason`.
 function has(shape: unknown, path: string): boolean {
-  let at: unknown = shape;
-  for (const part of path.split(".")) {
-    const m = /^([a-z][a-z0-9_]*)(\[\])?$/.exec(part);
-    if (!m || !at || typeof at !== "object" || Array.isArray(at) || !(m[1] in at)) return false;
-    at = (at as Record<string, unknown>)[m[1]];
-    if (m[2]) {
-      if (!Array.isArray(at)) return false;
-      at = at[0];
-    }
-  }
-  return true;
+  const [part, ...rest] = path.split(".");
+  const m = /^([a-z][a-z0-9_]*)(\[\])?$/.exec(part);
+  if (!m || !shape || typeof shape !== "object" || Array.isArray(shape) || !(m[1] in shape)) return false;
+  const at = (shape as Record<string, unknown>)[m[1]];
+  const next = (item: unknown) => !rest.length || has(item, rest.join("."));
+  if (!m[2]) return next(at);
+  return Array.isArray(at) && (!rest.length || at.some(next));
 }
 
 const FIELD = /^[a-z][a-z0-9_]*(\[\])?(\.[a-z][a-z0-9_]*(\[\])?)*$/;

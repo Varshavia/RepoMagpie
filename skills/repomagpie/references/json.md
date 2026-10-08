@@ -20,6 +20,7 @@ The fields this skill reads, per command. Every command prints one JSON document
 - `matches[].alternatives[].verdict`: its Verdict, or `null` (in the inbox, or no note).
 - `matches[].alternatives[].avoid`: `true` when the user also noted to avoid it.
 - `matches[].alternatives[].path`: its note's file, or `null` when the journal has no note on it.
+- `matches[].alternatives[].reason`: only for an alternative without a note: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name; `magpie search <name> --json` lists them).
 An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `matches[].avoid_when` has items.
 
 ## `magpie search <query> --json`
