@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { readProject } from "./manifests.ts";
 import type { Outcome } from "./outcome.ts";
-import { isAvoid, loadRecallEntries, recall, type RecallMatch, type RecallSource } from "./recall.ts";
+import { alternativesOfFile, isAvoid, loadRecallEntries, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
 import { projectFirst, type JournalSource } from "./search.ts";
 import { loadIndex, type SearchDoc } from "./search-index.ts";
 
@@ -30,6 +30,7 @@ export interface Candidate {
     dependencies: string[]; // the project's dependencies whose every word it matched; [] for a description
   };
   path: string;
+  alternatives: Alternative[]; // as in `magpie recall --json` (decision 0029)
 }
 
 // A candidate scoring under this share of the best candidate's score is dropped (spec §5). Picked
@@ -77,8 +78,9 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
     journals.unshift({ scope: "project", path: projectJournal });
   }
 
-  // What the project already uses: what recall would match for each dependency (spec §5).
-  const sources: RecallSource[] = project.dependencies.length ? journals.map((j) => ({ ...j, entries: loadRecallEntries(j.path).entries })) : [];
+  // What the project already uses: what recall would match for each dependency (spec §5). Recall's
+  // entries also give each candidate its alternatives.
+  const sources: RecallSource[] = journals.map((j) => ({ ...j, entries: loadRecallEntries(j.path).entries }));
   const inUse = project.dependencies.flatMap((d) => recall(sources, d.name, [d.type]));
   const usedIds = new Set(inUse.map((m) => m.id));
   const dependencyNames = [...new Set(project.dependencies.map((d) => d.name))];
@@ -86,7 +88,7 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   document.in_use_avoid = avoid.map(({ name: _name, ...match }) => match);
 
   const scored: { candidate: Candidate; group: number }[] = [];
-  for (const journal of journals) {
+  for (const [n, journal] of journals.entries()) {
     const index = loadIndex(journal.path).index;
     const best = new Map<string, { score: number; terms: Set<string> }>(); // note file → its best document's score, the keywords of all
     // Prefix matching only: the keywords are real words from manifests and descriptions, and fuzzy
@@ -114,6 +116,7 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
           score: Math.round((score + tagPoints(doc.tags, keywords)) * 100) / 100,
           why: { keywords: matched, dependencies: source === "manifests" ? matchedDependencies(dependencyNames, matched) : [] },
           path: join(journal.path, "notes", file),
+          alternatives: alternativesOfFile(sources[n], file),
         },
       });
     }

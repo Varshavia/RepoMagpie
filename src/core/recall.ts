@@ -218,6 +218,12 @@ function alternativeIndex(entries: RecallEntry[]): AlternativeIndex {
   return index;
 }
 
+// The alternatives of the note in `file` of the source's journal; [] for a file recall can't read.
+export function alternativesOfFile(source: RecallSource, file: string): Alternative[] {
+  const entry = alternativeIndex(source.entries).byFile.get(file);
+  return entry ? alternativesOf(source, entry) : [];
+}
+
 // The alternatives of one note (decision 0029): the targets in its own field, then the notes that
 // list it; each once, never the note itself. Reviewed first, then inbox, avoid and unresolved ones.
 function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[] {

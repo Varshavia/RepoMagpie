@@ -11,9 +11,9 @@ const DOC: SuggestJson = {
   source: "manifests",
   keywords: ["pdf", "cli"],
   candidates: [
-    { id: "pkg:npm/commander", journal: "project", name: "commander", verdict: "our CLI parser", status: "reviewed", tags: [], score: 3, why: { keywords: ["cli"], dependencies: [] }, path: "/p/.magpie/notes/npm--commander.md" },
-    { id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine", status: "reviewed", tags: [], score: 2, why: { keywords: ["cli"], dependencies: [] }, path: "/h/notes/npm--commander.md" },
-    { id: "pkg:npm/tsx", journal: "personal", name: "tsx", verdict: null, status: "inbox", tags: [], score: 1, why: { keywords: ["pdf"], dependencies: [] }, path: "/h/notes/npm--tsx.md" },
+    { id: "pkg:npm/commander", journal: "project", name: "commander", verdict: "our CLI parser", status: "reviewed", tags: [], score: 3, why: { keywords: ["cli"], dependencies: [] }, path: "/p/.magpie/notes/npm--commander.md", alternatives: [] },
+    { id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine", status: "reviewed", tags: [], score: 2, why: { keywords: ["cli"], dependencies: [] }, path: "/h/notes/npm--commander.md", alternatives: [] },
+    { id: "pkg:npm/tsx", journal: "personal", name: "tsx", verdict: null, status: "inbox", tags: [], score: 1, why: { keywords: ["pdf"], dependencies: [] }, path: "/h/notes/npm--tsx.md", alternatives: [] },
   ],
   in_use_avoid: [{
     query: "@foo/pdf", id: "pkg:npm/%40foo/pdf", journal: "personal", confidence: "exact", verdict: "avoid: slow", avoid_when: [], use_when: [], drafts: [], status: "reviewed", path: "/h/notes/npm--foo--pdf.md", alternatives: [],

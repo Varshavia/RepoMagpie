@@ -204,8 +204,9 @@ test("every command the skill shows passes --json", () => {
 // --- JSON fields -------------------------------------------------------------------------------
 
 // The --json example of each command in docs/spec.md section 2, as an object. "[...]" is an
-// example list and "[<a match as in recall --json>]" a list of recall matches; any other
-// placeholder fails the parse, so this test learns about it.
+// example list, "[<a match as in recall --json>]" a list of recall matches and
+// "[<alternatives as in recall --json>]" a match's alternatives; any other placeholder fails the
+// parse, so this test learns about it.
 function specShapes(): Map<string, unknown> {
   const spec = readFileSync(join(repo, "docs", "spec.md"), "utf8");
   const raw = new Map<string, string>();
@@ -226,7 +227,8 @@ function specShapes(): Map<string, unknown> {
   const recall = parse("recall", lists(raw.get("recall")!));
   const shapes = new Map<string, unknown>();
   for (const [command, json] of raw) {
-    const text = lists(json).replace(/\[<a match as in recall --json>\]/g, JSON.stringify(recall.matches));
+    const text = lists(json).replace(/\[<a match as in recall --json>\]/g, JSON.stringify(recall.matches))
+      .replace(/\[<alternatives as in recall --json>\]/g, JSON.stringify(recall.matches[0].alternatives));
     shapes.set(command, { ...parse(command, text), error: null }); // spec §1: a failure adds "error"
   }
   return shapes;
@@ -253,6 +255,7 @@ test("the spec's --json examples parse, for the commands the skill uses", () => 
   const shapes = specShapes();
   for (const command of ["recall", "search", "suggest", "note", "adopt"]) assert.ok(shapes.has(command), `no --json example for ${command}`);
   assert.ok(has(shapes.get("suggest"), "in_use_avoid[].avoid_when"), "suggest's in_use_avoid holds recall matches");
+  assert.ok(has(shapes.get("suggest"), "candidates[].alternatives[].verdict"), "suggest's candidates hold recall's alternatives");
 });
 
 // A bare identifier in inline code (`verdict`, `matches[].avoid_when`) is a JSON field; values are
