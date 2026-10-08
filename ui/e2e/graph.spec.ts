@@ -1,10 +1,12 @@
 // End-to-end flows of the graph page (decision 0028, docs/ui.md §7): how you get there, the status
 // line, drawing with WebGL and the layout worker under the app's CSP, the empty and no-WebGL
 // states; hover, click, the note pane, the search box, local mode, Esc and "Show in graph"; the
-// filters, the toggles, missing notes and the neighbours list.
+// filters, the toggles, missing notes and the neighbours list; the notices over the canvas,
+// resizing across 960 px, and live updates. The 2,000-note timing is in graph-timing.spec.ts.
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import type { GraphJson } from "../../src/core/documents.ts";
+import { renderNote } from "../../src/core/write.ts";
 import { DEFAULT_SOURCES, drawable, neighbourGroups, NO_FILTERS, nodeLabel, statusLine, type Filters } from "../src/logic/graph.ts";
 import { expect, test } from "./fixtures.ts";
 
@@ -25,6 +27,29 @@ async function openGraph(page: Page, magpie: { open: (page: Page) => Promise<voi
   await magpie.open(page);
   await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+}
+
+// How many pixels of the canvas, as the page shows it, differ from its background (its top-left
+// corner, which the stage padding keeps clear of nodes). The screenshot is decoded in a blank page,
+// outside the app's CSP. A blank canvas gives 0.
+async function drawnPixels(page: Page): Promise<number> {
+  const png = await canvas(page).screenshot();
+  const blank = await page.context().newPage();
+  try {
+    return await blank.evaluate(async (data) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${data}`;
+      await image.decode();
+      const context = new OffscreenCanvas(image.width, image.height).getContext("2d") as OffscreenCanvasRenderingContext2D;
+      context.drawImage(image, 0, 0);
+      const px = context.getImageData(0, 0, image.width, image.height).data;
+      let drawn = 0;
+      for (let i = 0; i < px.length; i += 4) if (Math.abs(px[i] - px[0]) + Math.abs(px[i + 1] - px[1]) + Math.abs(px[i + 2] - px[2]) > 30) drawn++;
+      return drawn;
+    }, png.toString("base64"));
+  } finally {
+    await blank.close();
+  }
 }
 
 // Where a node is on the page, from the graph's own positions (the canvas has no DOM per node).
@@ -223,6 +248,94 @@ test("graph: the neighbours list names the selected node's neighbours by type; t
   const next = page.getByRole("listbox", { name: `Neighbours of ${nodeLabel(second)}` });
   await expect(next).toBeFocused();
   await expect(next.getByRole("group", { name: "Same tag" })).toContainText("#agent-skills");
+});
+
+test("graph: resized across 960 px with a node selected, the canvas follows its container and still draws", async ({ page, magpie }) => {
+  // Below 960 px the neighbours list moves under the graph, so the canvas's container changes size.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openGraph(page, magpie);
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#agent");
+  await page.keyboard.press("Enter");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "tag:agent-skills");
+  await expect.poll(() => drawnPixels(page)).toBeGreaterThan(1000);
+  for (const width of [900, 1280, 900, 1280]) {
+    const before = await canvas(page).boundingBox();
+    await page.setViewportSize({ width, height: 800 });
+    await expect.poll(async () => (await canvas(page).boundingBox())?.height !== before?.height).toBe(true);
+    // Sigma's canvases have the container's size, and something is drawn on them.
+    await expect
+      .poll(() => canvas(page).evaluate((el) => [...el.querySelectorAll("canvas")].every((c) => c.clientWidth === el.clientWidth && c.clientHeight === el.clientHeight)))
+      .toBe(true);
+    await expect.poll(() => drawnPixels(page), { message: `drawn at ${width} px` }).toBeGreaterThan(1000);
+  }
+});
+
+test("graph: a node picked right after a toggle is still centred (not from positions sigma hasn't normalised yet)", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const search = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  await search.fill("taste");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option")).toHaveCount(1);
+  // In one task: the toggle (React runs its effects, which recolour the graph; sigma normalises the
+  // new positions on its next frame), then Enter in the search box, before that frame.
+  await page.evaluate(() => {
+    [...document.querySelectorAll("label")].find((label) => label.textContent?.trim() === "Similar")?.querySelector("input")?.click();
+    document.querySelector('input[name="graph-search"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  });
+  const key = "note:github--leonxlnx--taste-skill.md";
+  await expect(canvas(page)).toHaveAttribute("data-selected", key);
+  await expect
+    .poll(async () => {
+      const at = await nodeAt(page, key);
+      return Math.abs(at.x - (at.left + at.width / 2)) < at.width * 0.05 && Math.abs(at.y - (at.top + at.height / 2)) < at.height * 0.05;
+    })
+    .toBe(true);
+});
+
+test("graph: a notice lies over the canvas; with every connection switched off it says how to turn them on, and nothing moves", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const box = await canvas(page).boundingBox();
+  const key = "note:github--vercel-labs--agent-skills.md";
+  const before = await nodeAt(page, key);
+  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags" }).uncheck(); // the journal has tags, no links
+  await expect(page.getByText("No connections drawn. Turn on Tags or Links to see how your notes connect.")).toBeVisible();
+  expect(await canvas(page).boundingBox()).toEqual(box);
+  const after = await nodeAt(page, key);
+  expect([after.x, after.y]).toEqual([before.x, before.y]);
+});
+
+test.describe("notes without connections", () => {
+  test.use({ empty: true });
+
+  test("graph: the journal has no connections yet: the notice says how to add them", async ({ page, magpie }) => {
+    for (const name of ["zod", "pdfkit"]) writeFileSync(magpie.note(`npm--${name}.md`), renderNote({ id: `pkg:npm/${name}`, name, explored: "2026-10-08", kind: "library", tags: [] }));
+    await openGraph(page, magpie);
+    await expect(page.getByText("Your notes aren't connected yet. Add tags, or [[links]] in My notes.")).toBeVisible();
+    await expect(status(page)).toHaveText("Showing 2 notes, 0 tags and 0 connections");
+  });
+});
+
+test("graph: a change on disk updates it in place: what is drawn keeps its place, a new note starts next to its neighbour", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const key = "note:github--vercel-labs--agent-skills.md";
+  const before = await nodeAt(page, key);
+
+  // A link written in another editor: one more connection.
+  const file = magpie.note("github--leonxlnx--taste-skill.md");
+  writeFileSync(file, `${readFileSync(file, "utf8").replace(/\n*$/, "\n")}\nSee also [[github--vercel-labs--agent-skills]].\n`);
+  const linked = statusLine(drawable({ ...doc, edges: [...doc.edges, { type: "link", source: "note:github--leonxlnx--taste-skill.md", target: key, count: 1 }] }, DEFAULT_SOURCES).counts);
+  await expect(status(page)).toHaveText(linked);
+
+  // A new note with a tag: it joins next to that tag.
+  writeFileSync(magpie.note("npm--skills-kit.md"), renderNote({ id: "pkg:npm/skills-kit", name: "skills-kit", explored: "2026-10-08", kind: "library", tags: ["data-engineering"] }));
+  await expect(status(page)).toContainText(`Showing ${doc.counts.notes + 1} notes`);
+  const added = await nodeAt(page, "note:npm--skills-kit.md");
+  const tag = await nodeAt(page, "tag:data-engineering");
+  expect(Math.hypot(added.x - tag.x, added.y - tag.y)).toBeLessThan(60);
+
+  const after = await nodeAt(page, key);
+  expect([after.x, after.y]).toEqual([before.x, before.y]); // the camera didn't move
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true"); // no new layout
 });
 
 test("graph: the sidebar, g g and the palette open it; the status line counts in words; it draws, and the layout settles under the CSP", async ({ page, magpie }) => {

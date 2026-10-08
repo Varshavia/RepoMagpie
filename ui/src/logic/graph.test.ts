@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, filtersActive, graphState, joinPosition, largest, LAYOUT, layoutSettings, mixRgb, neighbourGroups, neighbours, NO_FILTERS, nodeDetail, nodeLabel, nodeSize, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
+import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, filtersActive, graphState, joinPosition, largest, LAYOUT, layoutSettings, mixRgb, neighbourGroups, neighbours, NO_FILTERS, nodeDetail, nodeLabel, nodeSize, notice, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
 
 // The graph page's pure parts (decision 0028): what is drawn, where it starts, how big, and the
 // status line.
@@ -82,11 +82,24 @@ test("statusLine: in words, singular and plural", () => {
   assert.equal(statusLine({ notes: 0, tags: 0, connections: 0 }), "Showing 0 notes, 0 tags and 0 connections");
 });
 
-test("graphState: no notes, notes without connections, or something to draw", () => {
+test("graphState: no notes, no connections in the journal, connections all switched off, or something to draw", () => {
+  const off = { tagged: false, link: false, alternative: false, similar: false, ghosts: false };
   assert.equal(graphState({ ...DOC, nodes: [], edges: [], counts: counts() }, DEFAULT_SOURCES), "empty");
   assert.equal(graphState({ ...DOC, edges: [] }, DEFAULT_SOURCES), "unconnected");
-  assert.equal(graphState(DOC, { tagged: false, link: false, alternative: false, similar: false, ghosts: false }), "unconnected");
+  assert.equal(graphState(DOC, off), "off");
+  assert.equal(graphState(DOC, { ...DEFAULT_SOURCES, tagged: false }), "ready"); // links still draw
+  // Only similarity, switched off: the journal has nothing Tags or Links would draw.
+  assert.equal(graphState({ ...DOC, edges: DOC.edges.filter((e) => e.type === "similar") }, DEFAULT_SOURCES), "unconnected");
+  // Only a link to a missing note, with missing notes off: nothing between notes yet.
+  assert.equal(graphState({ ...DOC, edges: DOC.edges.filter((e) => e.target === "ghost:x") }, DEFAULT_SOURCES), "unconnected");
   assert.equal(graphState(DOC, DEFAULT_SOURCES), "ready");
+});
+
+test("notice: the journal has no connections, or they are all switched off", () => {
+  assert.equal(notice("unconnected"), "Your notes aren't connected yet. Add tags, or [[links]] in My notes.");
+  assert.equal(notice("off"), "No connections drawn. Turn on Tags or Links to see how your notes connect.");
+  assert.equal(notice("ready"), null);
+  assert.equal(notice("empty"), null);
 });
 
 test("edgeStyle: tag edges thin, links solid, alternatives thicker in their own colour, similarity faint", () => {
@@ -241,6 +254,8 @@ test("layout: a fixed number of iterations; Barnes-Hut only for large graphs", (
   assert.ok(Number.isInteger(LAYOUT.iterations) && LAYOUT.iterations > 0);
   assert.equal(layoutSettings(100).barnesHutOptimize, false);
   assert.equal(layoutSettings(2000).barnesHutOptimize, true);
+  // θ 1.0: at 2,030 nodes as settled as θ 0.5 after 300 iterations, in half the time (1.07 s, not 2.28 s).
+  assert.equal(layoutSettings(2000).barnesHutTheta, 1);
   assert.deepEqual(layoutSettings(300), layoutSettings(300));
 });
 

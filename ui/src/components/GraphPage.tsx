@@ -32,6 +32,7 @@ import {
   nodeDetail,
   nodeLabel,
   nodeSize,
+  notice,
   searchNodes,
   seedPosition,
   statusLine,
@@ -105,12 +106,13 @@ interface Props {
   journal: Scope;
   theme: Theme;
   focus: string | null; // "Show in graph": the node to select, in local mode
-  onAdd: (target?: string) => void; // a missing note: Add, with its target filled in
+  refresh: number; // grows when the journal's notes change on disk (notes-changed)
+  onAdd:(target?: string) => void; // a missing note: Add, with its target filled in
   // The note pane beside the graph; `open` selects another note of the graph (a [[link]] in it).
   renderNote: (note: { id: string; file: string }, open: (id: string) => void) => ReactNode;
 }
 
-export default function GraphPage({ journal, theme, focus: focusOn, onAdd, renderNote }: Props) {
+export default function GraphPage({ journal, theme, focus: focusOn, refresh, onAdd, renderNote }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [webgl, setWebgl] = useState(hasWebGL);
@@ -130,18 +132,25 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
   const focusHandled = useRef<string | null>(null);
   const reduced = useMemo(() => matchMedia(REDUCED_MOTION).matches, []);
 
-  // Missing notes are always fetched; their toggle only decides whether they are drawn.
+  // Missing notes are always fetched; their toggle only decides whether they are drawn. A change on
+  // disk (`refresh`) fetches again while the graph stays on screen; the new data is synced into it,
+  // so what is drawn keeps its place. A failed refetch keeps what is shown; the next change tries again.
   useEffect(() => {
     let current = true;
-    setLoad({ status: "loading" });
+    setLoad((l) => (l.status === "ready" ? l : { status: "loading" }));
+    performance.mark("graph:fetch");
     api.graph(journal, true).then(
-      (doc) => current && setLoad({ status: "ready", doc }),
-      (error: ApiError) => current && setLoad({ status: "error", error: error.message }),
+      (doc) => {
+        if (!current) return;
+        performance.mark("graph:data");
+        setLoad({ status: "ready", doc });
+      },
+      (error: ApiError) => current && setLoad((l) => (l.status === "ready" ? l : { status: "error", error: error.message })),
     );
     return () => {
       current = false;
     };
-  }, [journal, attempt]);
+  }, [journal, attempt, refresh]);
 
   useEffect(() => {
     const query = matchMedia("(prefers-color-scheme: dark)");
@@ -178,10 +187,14 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
   const centre = useCallback(
     (key: string) => {
       const view = drawn.current;
-      const data = view?.sigma.getNodeDisplayData(key);
-      if (!view || !data) return;
-      const camera = view.sigma.getCamera();
-      const target = { x: data.x, y: data.y, ratio: camera.ratio, angle: 0 }; // pans; the zoom stays yours
+      if (!view || !view.graph.hasNode(key)) return;
+      // From the node's graph position, not sigma.getNodeDisplayData: after a change to the graph
+      // (a toggle, a filter, a live update) sigma's display data holds raw positions until its next
+      // frame, and a camera aimed at them points far off the graph, leaving the canvas blank.
+      const { sigma } = view;
+      const { x, y } = sigma.viewportToFramedGraph(sigma.graphToViewport(view.graph.getNodeAttributes(key) as Point));
+      const camera = sigma.getCamera();
+      const target = { x, y, ratio: camera.ratio, angle: 0 }; // pans; the zoom stays yours
       if (reduced) camera.setState(target);
       else void camera.animate(target, { duration: 300 });
     },
@@ -210,6 +223,9 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
       if (!event.data.done) return;
       layout.terminate();
       worker.current = null;
+      // Performance marks for the page's budget (data, layout settled, first frame after it; docs/ui.md §10).
+      performance.mark("graph:settled");
+      view.sigma.once("afterRender", () => performance.mark("graph:drawn"));
       keepBounds(view.sigma);
       if (!view.fitted) {
         view.sigma.getCamera().setState(FITTED);
@@ -218,7 +234,7 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
       setSettled(true);
     };
     const { nodes, edges } = graphToByteArrays(view.graph, () => 1);
-    const request: LayoutRequest = { nodes, edges, settings: layoutSettings(view.graph.order), iterations: LAYOUT.iterations, chunk: LAYOUT.chunk, progress: !reduced };
+    const request: LayoutRequest = { nodes, edges, settings: layoutSettings(view.graph.order), iterations: LAYOUT.iterations, every: LAYOUT.progressEvery, progress: !reduced };
     layout.postMessage(request, [nodes.buffer, edges.buffer]);
   }, [reduced]);
 
@@ -455,18 +471,22 @@ export default function GraphPage({ journal, theme, focus: focusOn, onAdd, rende
           <div className="graph-body" data-note={noteOpen !== null}>
             <Neighbours shown={shown} current={current} onOpen={go} />
             <div className="graph-stage">
-              {state === "unconnected" ? <p className="graph-notice">Your notes aren't connected yet. Add tags, or [[links]] in My notes.</p> : null}
-              {!shown.counts.notes && filtersActive(filters) ? (
-                <p className="graph-notice">
-                  No notes match these filters.{" "}
-                  <button type="button" className="button ghost" onClick={() => setFilters(NO_FILTERS)}>
-                    Clear the filters
-                  </button>
-                </p>
-              ) : null}
-              {!webgl ? <p className="graph-notice">This browser can't draw the graph: WebGL is off or not available. The counts above and the neighbours list still hold.</p> : null}
               {/* Under reduced motion the canvas stays invisible (it keeps its size, which sigma needs) until the layout settles. */}
-              {drawing ? <div className="graph-canvas" ref={container} aria-hidden="true" data-settled={settled} data-waiting={reduced && !settled} data-selected={current?.key ?? ""} /> : null}
+              {drawing ? <div className="graph-canvas" ref={container} aria-hidden="true" data-settled={settled} data-waiting={reduced && !settled} data-selected={current?.key ?? ""} /> : <div className="graph-blank" />}
+              {/* Over the top of the canvas, so a notice never resizes it or moves the view. */}
+              <div className="graph-notices">
+                {!webgl ? <p className="graph-notice">This browser can't draw the graph: WebGL is off or not available. The counts above and the neighbours list still hold.</p> : null}
+                {!shown.counts.notes && filtersActive(filters) ? (
+                  <p className="graph-notice">
+                    No notes match these filters.{" "}
+                    <button type="button" className="button ghost" onClick={() => setFilters(NO_FILTERS)}>
+                      Clear the filters
+                    </button>
+                  </p>
+                ) : state && notice(state) ? (
+                  <p className="graph-notice">{notice(state)}</p>
+                ) : null}
+              </div>
               {drawing && reduced && !settled ? <p className="graph-arranging">Arranging the graph…</p> : null}
               <Legend shown={shown} />
             </div>
@@ -834,6 +854,9 @@ function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabe
     minEdgeThickness: 1,
     zIndex: true,
     stagePadding: 64, // room for the labels of the outermost nodes
+    // A very short window can leave the canvas 0 px tall for a moment; sigma would then throw on
+    // every render until it grows again. The ResizeObserver tells it the new size.
+    allowInvalidContainer: true,
     renderEdgeLabels: false,
     zoomDuration: reduced ? 0 : 250,
     inertiaDuration: reduced ? 0 : 150,
