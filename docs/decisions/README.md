@@ -37,3 +37,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
 | 0028 | [The graph page](0028-the-graph-page.md) | accepted |
+| 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |

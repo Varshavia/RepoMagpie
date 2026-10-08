@@ -11,8 +11,8 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged. The pre-release `0.2.0-beta.1` with both is prepared on `release/v0.2.0-beta.1`: version, CHANGELOG section and README; open until the maintainer tags and publishes it.
-- **Next:** v0.2 Connect, part 3 (agent output).
+  Also now: v0.2 Connect, parts 1 (linked notes) and 2 (the graph page) are merged and out in the pre-release `0.2.0-beta.1` (2026-10-08). Part 3 (agent output) is in progress on `feat/agent-output`.
+- **Next:** the v0.2 Connect release, once part 3 is merged.
 - **Later:** v0.3 Trust, v0.4 Share.
 
 | Part | Status |
@@ -274,8 +274,9 @@ Not doing, from the `web-design-guidelines` review of `feat/graph`:
 - Keyboard pan and zoom on the graph's canvas: the canvas is a visual aid; the search box, the filters and the neighbours list are the keyboard path ([decision 0028](decisions/0028-the-graph-page.md)).
 - Title Case for buttons and headings: every label and heading in the app is in sentence case, as the examples in [`DESIGN.md`](../DESIGN.md) (Writing) are; one page in Title Case would break that.
 
-### Part 3: agent output
-- [ ] `magpie recall` and `magpie suggest` show alternatives and neighbours; the skill explains them.
+### Part 3: agent output (`feat/agent-output`)
+- [x] Decision: recall names alternatives ([0029](decisions/0029-recall-names-alternatives.md)).
+- [ ] `magpie recall`, the hook, `magpie suggest` and "Check a package" in the app show a note's alternatives; `magpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision.
 
 ## v0.3 Trust
 - [ ] `magpie init`, if it missed v0.1.
