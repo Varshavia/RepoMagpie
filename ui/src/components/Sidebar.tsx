@@ -1,10 +1,10 @@
 // The left pane (DESIGN.md, Layout): journal switcher, Inbox with its count, all notes, the other
 // screens, then kinds and tags. Below 960 px only the icons show; each item keeps its name for
 // screen readers and as a tooltip.
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
-import type { Counts, TagListState } from "../logic/notes.ts";
+import { shownTags, SIDEBAR_TAGS, type Counts, type TagListState } from "../logic/notes.ts";
 import type { View } from "../view.ts";
 
 interface Props {
@@ -39,6 +39,8 @@ function Item({ icon, label, count, current, onClick, hint }: { icon: IconName; 
 
 export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, counts, tagList, onCreateTagList, onEditTagList, view, onView, inert }: Props) {
   const is = (page: View["page"], value?: string) => view.page === page && (value === undefined || ("value" in view && view.value === value));
+  const tags = counts?.tags ?? [];
+  const [allTags, setAllTags] = useState(false); // "Show all N tags"
   return (
     <nav className="sidebar" aria-label="Journals and screens" inert={inert}>
       <div className="brand">
@@ -103,13 +105,19 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
               <Item icon="pencil" label="Edit tag list" current={false} onClick={onEditTagList} hint="opens tags.md in your editor" />
             </div>
           ) : null}
-          {(counts?.tags ?? []).map((t) => (
+          {shownTags(tags, allTags, view.page === "tag" ? view.value : null).map((t) => (
             <button key={t.name} type="button" className="nav-item" aria-current={is("tag", t.name) ? "page" : undefined} onClick={() => onView({ page: "tag", value: t.name })}>
               <Icon name="tag" />
               <span className="label">{t.name}</span>
               <span className="count">{t.count}</span>
             </button>
           ))}
+          {tags.length > SIDEBAR_TAGS ? (
+            <button type="button" className="nav-item nav-more" aria-expanded={allTags} onClick={() => setAllTags((all) => !all)} title={allTags ? "Show fewer tags" : `Show all ${tags.length} tags`}>
+              <Icon name="caret" />
+              <span className="label">{allTags ? "Show fewer tags" : `Show all ${tags.length} tags`}</span>
+            </button>
+          ) : null}
         </div>
       ) : null}
 

@@ -550,6 +550,9 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
 .disclosure { margin-left: calc(-1 * var(--sm)); }
 .disclosure .icon { transition: transform var(--fast) ease-out; }
 .disclosure[aria-expanded="true"] .icon { transform: rotate(90deg); }
+/* The sidebar's "Show all N tags" (decision 0030): quieter than a tag. */
+.nav-more { color: var(--ink-subtle); }
+.nav-more[aria-expanded="true"] .icon { transform: rotate(90deg); }
 
 .skill-names { margin-top: var(--xs); }
 
