@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { DRAFT_MARKER as CORE_DRAFT_MARKER, KINDS as CORE_KINDS } from "../../../src/core/note.ts";
 import { readablePurl as coreReadablePurl } from "../../../src/core/identity.ts";
 import { isAvoid as coreIsAvoid, verdictSaysAvoid as coreVerdictSaysAvoid } from "../../../src/core/recall.ts";
-import { DRAFT_MARKER, hookWouldAsk, isAvoid, KINDS, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
+import { isStopTopic as coreIsStopTopic } from "../../../src/core/topic-tags.ts";
+import { DRAFT_MARKER, hookWouldAsk, isAvoid, isStopTopic, KINDS, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
 
 // The app can't bundle core's modules (they read files), so it mirrors some of core's values and
 // rules. These tests keep the mirror equal to core: core stays the single source.
@@ -31,6 +32,12 @@ test("verdictSaysAvoid agrees with core's (adopt, spec §2) on every case", () =
   for (const c of cases) assert.equal(verdictSaysAvoid(c), coreVerdictSaysAvoid(c), JSON.stringify(c));
   assert.equal(verdictSaysAvoid("AVOID"), true);
   assert.equal(verdictSaysAvoid("fine; avoid the old API"), false);
+});
+
+test("isStopTopic agrees with core's stop list (decision 0030) on every case", () => {
+  const cases = ["hacktoberfest", "hacktoberfest2023", "hacktoberfest-2023", "hacktoberfest20234", "hacktoberfester", "open-source", "opensource", "open-sourced", "good-first-issue", "good-first-issues", "pdf", ""];
+  for (const c of cases) assert.equal(isStopTopic(c), coreIsStopTopic(c), c);
+  assert.deepEqual(cases.filter(isStopTopic), ["hacktoberfest", "hacktoberfest2023", "open-source", "opensource", "good-first-issue"]);
 });
 
 test("the hook asks only for an exact avoid match; a name-only match informs", () => {

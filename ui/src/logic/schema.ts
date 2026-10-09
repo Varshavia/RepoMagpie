@@ -24,6 +24,11 @@ export function packageLabel(purl: string): { type: string; name: string } {
 // Tags are lowercase kebab-case (note schema; core's tag list).
 export const TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// A topic that never becomes a tag (decision 0030; core's src/core/topic-tags.ts).
+export function isStopTopic(topic: string): boolean {
+  return /^(hacktoberfest(\d{4})?|open-source|opensource|good-first-issue)$/.test(topic);
+}
+
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
 export function isAvoid(match: { verdict: string | null; avoid_when: string[] }): boolean {
   return verdictSaysAvoid(match.verdict) || match.avoid_when.length > 0;

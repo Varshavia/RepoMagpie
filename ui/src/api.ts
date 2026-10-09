@@ -7,9 +7,10 @@ import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
 import type { SearchResult } from "../../src/core/search.ts";
 import type { SuggestJson } from "../../src/core/suggest.ts";
+import type { TagsFromTopicsJson } from "../../src/core/tags-from-topics.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson };
+export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -65,6 +66,7 @@ export const api = {
   tags: (journal: Scope) => get<TagListJson>("/api/tags", { journal }),
   createTagList: (journal: Scope) => write<TagListJson>("POST", "/api/tags", { journal }),
   addTags: (journal: Scope, add: string[]) => write<TagListJson>("POST", "/api/tags", { journal, add }),
+  fromTopics: (journal: Scope, dryRun: boolean) => write<TagsFromTopicsJson>("POST", "/api/tags/from-topics", { journal, dry_run: dryRun }),
   notes: (journal: Scope) => get<NoteListJson>("/api/notes", { journal }),
   graph: (journal: Scope, ghosts: boolean) => get<GraphJson>("/api/graph", { journal, ghosts: ghosts ? "1" : undefined }),
   note: (journal: Scope, address: Address) => get<NoteJson>("/api/note", { journal, ...addressParams(address) }),

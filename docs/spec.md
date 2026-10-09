@@ -95,6 +95,23 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - `tags_md_added`: the tags appended to `tags.md`, in order (in a dry run, those that would be). Added in 0.2; an addition.
 
+### `magpie tags --from-topics`
+
+"Add GitHub topics as tags" for the notes a journal already has ([decision 0030](decisions/0030-github-topics-become-tags.md)). The user runs it on purpose, so it is a human edit (schema rule 2).
+
+- Flags: `--from-topics` (the only action; without it, exit 2), `--journal personal|project` (default `personal`), `--dry-run` (report what would happen, write nothing).
+- For each note, it adds the topics that could become tags (`note`, step 3: valid tags, not the repository's own name, not on the stop list) and aren't tags yet, after the existing tags, until the note has 8 tags. A note with 8 or more gets none. It never removes or reorders a tag. Registry packages have no topics, so they get none.
+- The ranking is `note`'s: topics in `tags.md`, then topics another note in the journal carries, then the rest. It reads the journal as it was before the run.
+- The new tags go into the frontmatter with the round-trip-safe edit: a block list gets new lines at its indentation, a flow list new items with its own separator; every existing entry and the rest of the file stay byte for byte. Tags new to `tags.md` are appended as in `note`, step 3.
+- A note whose frontmatter can't be read, or whose `tags` isn't a list of tags, is skipped, reported, and never written.
+- A second run adds nothing.
+- Output: one line per note on stdout (`pkg:github/langgenius/dify: + workflow, llm, agent`); skipped notes on stderr (`skipped <path>: <reason>`); then a total on stderr (`Added 7 tags to 2 notes, and 5 new tags to tags.md.`, `Would add …` with `--dry-run`), or `No GitHub topics to add as tags.`
+- Exit 0, also with skipped notes; 1 if the journal can't be used or `tags.md` can't be written.
+
+`--json`: `{"journal": "personal", "notes": [{"id": "pkg:github/langgenius/dify", "path": "...", "added": ["workflow", "llm"]}], "skipped": [{"path": "...", "reason": "..."}], "tags_md_added": ["llm"]}`
+
+- `notes`: only the notes that get tags, by file name. `skipped`: the notes left unchanged, with why. `tags_md_added`: the tags appended to `tags.md`, in order. With `--dry-run`, what would be.
+
 ### `magpie search <query>`
 
 Keyword search across both journals.

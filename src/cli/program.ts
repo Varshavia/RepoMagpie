@@ -11,6 +11,7 @@ import type { NoteOptions } from "./note.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
 import type { SuggestOptions } from "./suggest.ts";
+import type { TagsOptions } from "./tags.ts";
 import type { UiOptions } from "./ui.ts";
 
 // Each command's module is loaded only when that command runs, so a quick command (recall) doesn't
@@ -71,6 +72,16 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--dry-run", "report what would happen; write nothing")
     .action(async (file: string, _options: unknown, command: Command) => {
       code = await (await import("./import.ts")).importCommand(file, command.optsWithGlobals<ImportOptions>(), io);
+    });
+
+  program
+    .command("tags")
+    .description("add GitHub topics as tags to your notes, up to 8 per note")
+    .option("--from-topics", "add each note's GitHub topics that aren't tags yet, until it has 8 tags")
+    .addOption(new Option("--journal <journal>", "the journal to tag").choices(["personal", "project"]).default("personal"))
+    .option("--dry-run", "report what would happen; write nothing")
+    .action(async (_options: unknown, command: Command) => {
+      code = (await import("./tags.ts")).tagsCommand(command.optsWithGlobals<TagsOptions>(), io);
     });
 
   program

@@ -159,6 +159,46 @@ export function addAlternatives(text: string, entries: string[]): EditResult {
   return editAlternatives(text, [...kept, ...entries]);
 }
 
+// Adds tags after the note's existing ones ("Add GitHub topics as tags", decision 0030). Each entry
+// already there keeps its exact text (quotes, a comment on its line); a block list gets new lines at
+// its indentation, a flow list new items with its own separator. A missing or empty value gets the
+// whole list. A value that isn't a list of strings, or frontmatter that can't be read, is left alone,
+// with a warning.
+export function appendTagEntries(text: string, tags: string[]): EditResult {
+  const bounds = readableFrontmatter(text);
+  if (!bounds) return untouched(text, "The frontmatter can't be read; the note was left unchanged.");
+  const frontmatter = text.slice(bounds.start, bounds.end);
+  const doc = parseDocument(frontmatter);
+  const pair = isMap(doc.contents) ? (doc.contents.items as Pair[]).find((p) => isScalar(p.key) && p.key.value === "tags") : undefined;
+  const value = pair?.value;
+  if (!pair || value === null || (isScalar(value) && (value.value === null || value.value === ""))) return editFrontmatter(text, { tags }, false);
+  if (!isSeq(value) || !value.items.every((item) => isScalar(item) && typeof item.value === "string")) {
+    return untouched(text, "The note's tags field isn't a list of tags, so nothing was added; edit the file to fix it.");
+  }
+  const items = value.items as Scalar<string>[];
+  if (!items.length) return editFrontmatter(text, { tags }, false);
+  if (!tags.length) return { text, changed: false, warnings: [] };
+
+  const range = (item: Scalar<string>) => item.range as [number, number, number];
+  const last = range(items[items.length - 1])[1];
+  let at: number;
+  let insert: string;
+  if (value.flow) {
+    const separator = items.length > 1 ? frontmatter.slice(range(items[0])[1], range(items[1])[0]) : ", ";
+    at = last;
+    insert = tags.map((tag) => separator + valueText(tag)).join("");
+  } else {
+    // After the last entry's line, at the first entry's indentation ("  - ").
+    const first = range(items[0])[0];
+    const prefix = frontmatter.slice(frontmatter.lastIndexOf("\n", first - 1) + 1, first);
+    const newline = frontmatter[last - 1] === "\n" ? last - 1 : frontmatter.indexOf("\n", last);
+    at = newline === -1 ? frontmatter.length : newline + 1;
+    insert = tags.map((tag) => `${prefix}${valueText(tag)}${bounds.eol}`).join("");
+  }
+  const result = text.slice(0, bounds.start) + frontmatter.slice(0, at) + insert + frontmatter.slice(at) + text.slice(bounds.end);
+  return { text: result, changed: result !== text, warnings: [] };
+}
+
 const WIKILINK = /^\[\[[^[\]\r\n]+\]\]$/;
 const isWikilink = (entry: string) => WIKILINK.test(entry.trim()) && findLinks(entry.trim()).length === 1;
 // A requested entry's target, and what is written for it when it is new.
@@ -392,9 +432,10 @@ function editFrontmatter(text: string, values: Record<string, unknown>, toolOnly
         edits.push({ at: range[0], to: range[1], insert: newText + ending });
       }
     } else {
-      // An empty value: write right after the colon.
-      const space = /[ \t]/.test(frontmatter[colon] ?? "") ? "" : " ";
-      edits.push({ at: colon, to: colon, insert: newText ? `${space}${newText}` : "" });
+      // An empty value: write after the colon and the space that follows it, or after the colon and a
+      // new space ("key:   # comment" becomes "key: value  # comment").
+      const at = /[ \t]/.test(frontmatter[colon] ?? "") ? colon + 1 : colon;
+      edits.push({ at, to: at, insert: newText ? `${at === colon ? " " : ""}${newText}` : "" });
     }
   }
 

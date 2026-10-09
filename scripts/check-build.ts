@@ -25,6 +25,7 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["recall", "@playwright/cli", "--type", "npm", "--json"] },
   { args: ["search", "browser", "--json"] },
   { args: ["suggest", "--json"] },
+  { args: ["tags", "--from-topics", "--dry-run", "--json"] },
   { args: ["hook", "claude-code"], input: hook("npm install @playwright/cli") },
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
 ];

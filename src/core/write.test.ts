@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readNote, validate } from "./note.ts";
-import { acceptDraft, addAlternatives, appendSkillLine, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
+import { acceptDraft, addAlternatives, appendSkillLine, appendTagEntries, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
 
 // A hand-written note: comments, odd spacing, a block list, an empty value, text above the
 // sections, an extra hand-written section, and sections a person typed.
@@ -545,6 +545,47 @@ test("addAlternatives: appends to a flow list; adds the key at the end of the fr
   const flow = HAND_WRITTEN.replace("rating:\n", "rating:\nalternatives: ['[[zod|Zod]]'] # mine\n");
   assert.equal(addAlternatives(flow, ["[[yup]]", "[[joi]]"]).text, flow.replace("['[[zod|Zod]]']", "['[[zod|Zod]]', \"[[yup]]\", \"[[joi]]\"]"));
   assert.equal(addAlternatives(HAND_WRITTEN, ["[[npm--puppeteer]]"]).text, HAND_WRITTEN.replace("status: reviewed\n---", 'status: reviewed\nalternatives: ["[[npm--puppeteer]]"]\n---'));
+});
+
+test("setHumanFields: an empty value followed by a comment gets the value after the colon's space; the comment stays", () => {
+  const text = HAND_WRITTEN.replace("rating:\n", "rating:   # once tried\n");
+  const r = setHumanFields(text, { rating: 4 });
+  assert.equal(r.text, HAND_WRITTEN.replace("rating:\n", "rating: 4  # once tried\n"));
+  assert.equal(readNote(r.text).frontmatter.rating, 4);
+});
+
+// appendTagEntries ("Add GitHub topics as tags", decision 0030): new tags after the existing ones;
+// every existing entry, its quotes and comments, and the rest of the file stay byte for byte.
+test("appendTagEntries: appends to a block list, at its indentation; comments and quotes stay", () => {
+  const odd = HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n    - 'pdf'   # mine\n    - documents\n    # a comment line\n");
+  const r = appendTagEntries(odd, ["llm", "rag"]);
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.text, odd.replace("    - documents\n", "    - documents\n    - llm\n    - rag\n"));
+});
+
+test("appendTagEntries: appends to a flow list with its own separator; an empty or missing value gets the list", () => {
+  const flow = HAND_WRITTEN.replace("tags:\n  - pdf\n", 'tags: [ "pdf",  documents ] # mine\n');
+  assert.equal(appendTagEntries(flow, ["llm"]).text, flow.replace('"pdf",  documents ]', '"pdf",  documents,  llm ]'));
+  for (const empty of ["tags: []\n", "tags:\n", "tags:   # none yet\n"]) {
+    const text = HAND_WRITTEN.replace("tags:\n  - pdf\n", empty);
+    assert.match(appendTagEntries(text, ["llm", "rag"]).text, /^tags: \[llm, rag\]/m, JSON.stringify(empty));
+  }
+  const without = HAND_WRITTEN.replace("tags:\n  - pdf\n", "");
+  assert.equal(appendTagEntries(without, ["llm"]).text, without.replace("status: reviewed\n---", "status: reviewed\ntags: [llm]\n---"));
+});
+
+test("appendTagEntries: keeps CRLF line endings", () => {
+  const crlf = HAND_WRITTEN.replace(/\n/g, "\r\n");
+  assert.equal(appendTagEntries(crlf, ["llm"]).text, crlf.replace("  - pdf\r\n", "  - pdf\r\n  - llm\r\n"));
+});
+
+test("appendTagEntries: a tags value that isn't a list of strings, or frontmatter that can't be read, is left alone, with a warning", () => {
+  for (const text of [HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags: pdf\n"), HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags: [pdf, 3]\n"), "---\nid: [\n---\n", "no frontmatter\n"]) {
+    const r = appendTagEntries(text, ["llm"]);
+    assert.equal(r.text, text);
+    assert.equal(r.changed, false);
+    assert.equal(r.warnings.length, 1, text);
+  }
 });
 
 test("addAlternatives: a field that isn't a list of strings is left alone, with a warning", () => {

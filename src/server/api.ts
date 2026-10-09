@@ -26,6 +26,7 @@ import { runRecall } from "../core/recall.ts";
 import { importFailure, runImport, runNote, type Context } from "../core/save.ts";
 import { runSearch } from "../core/search.ts";
 import { runSuggest } from "../core/suggest.ts";
+import { tagsFromTopics } from "../core/tags-from-topics.ts";
 
 export interface ApiRequest {
   query: URLSearchParams;
@@ -73,6 +74,17 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const journal = scope(body.journal);
         if (!journal) return bad({ journal: null, tags: [], exists: false }, JOURNAL);
         return reply(body.add === undefined ? createTagList(journal, context) : addTags(journal, body.add, context));
+      },
+    },
+
+    // "Add GitHub topics as tags" (decision 0030): first with dry_run true (what it will do), then false.
+    "/api/tags/from-topics": {
+      POST: ({ body }) => {
+        const journal = scope(body.journal);
+        const empty = { journal, notes: [], skipped: [], tags_md_added: [] };
+        if (!journal) return bad(empty, JOURNAL);
+        if (typeof body.dry_run !== "boolean") return bad(empty, "dry_run must be true or false.");
+        return reply(tagsFromTopics({ journal, dryRun: body.dry_run }, context));
       },
     },
 
