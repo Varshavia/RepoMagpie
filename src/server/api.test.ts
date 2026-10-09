@@ -199,6 +199,30 @@ test("POST /api/note with tags writes those tags for a new note, appending the n
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `browsers`\n");
 });
 
+test("POST /api/tags/from-topics returns exactly magpie tags --from-topics --json, dry run and applied", async (t) => {
+  const { box, fetch, http } = await start(t);
+  const widget = "---\nid: pkg:github/acme/widget\nname: acme/widget\ntopics: [charts, pdf, widget]\nkind: other\ntags: []\ntried: false\nstatus: inbox\n---\n\n## Verdict\n";
+  writeFileSync(box.note("github--acme--widget.md"), widget);
+  const tagsBefore = readFileSync(join(box.journal, "tags.md"), "utf8");
+  const dry = await cli(box, ["tags", "--from-topics", "--dry-run"], fetch);
+  assert.deepEqual(parsed(await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: true })), { status: 200, document: dry.document });
+  assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), widget);
+
+  const real = await cli(box, ["tags", "--from-topics"], fetch);
+  const written = readFileSync(box.note("github--acme--widget.md"), "utf8");
+  const tagsWritten = readFileSync(join(box.journal, "tags.md"), "utf8");
+  writeFileSync(box.note("github--acme--widget.md"), widget);
+  writeFileSync(join(box.journal, "tags.md"), tagsBefore);
+  assert.deepEqual(parsed(await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: false })), { status: 200, document: real.document });
+  assert.deepEqual((real.document as { notes: { added: string[] }[] }).notes.map((n) => n.added), [["pdf", "charts"]]);
+  assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), written);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tagsWritten);
+
+  for (const body of [{}, { journal: "elsewhere", dry_run: true }, { journal: "personal", dry_run: "yes" }, { journal: "personal" }]) {
+    assert.equal((await http.write("POST", "/api/tags/from-topics", body)).status, 400, JSON.stringify(body));
+  }
+});
+
 test("POST /api/import returns exactly magpie import --json", async (t) => {
   const { box, fetch, http } = await start(t);
   const text = "- pkg:npm/chalk — verdict: fine | use: colours\n- https://example.com/x — verdict: no\n- pkg:npm/pdfkit — verdict: again\n";

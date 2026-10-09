@@ -5,6 +5,7 @@ import { api, type ApiError, type NoteJson, type Scope, type SearchResult, type 
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { ProjectState } from "./components/fields.tsx";
+import { FromTopicsBanner, FromTopicsButton, useFromTopics } from "./components/FromTopics.tsx";
 import { ImportPage } from "./components/ImportPage.tsx";
 import { KeyMapDialog } from "./components/KeyMapDialog.tsx";
 import { NotePane, type NotePaneProps } from "./components/NotePane.tsx";
@@ -267,6 +268,17 @@ export function App() {
     [loadList, loadTags, loadSettings, projectState],
   );
 
+  // "Add GitHub topics as tags" (decision 0030): the list also updates through the live update.
+  const fromTopics = useFromTopics(
+    journal,
+    (doc) => {
+      const count = doc.notes.reduce((sum, n) => sum + n.added.length, 0);
+      toast(doc.error ?? `Added ${count} ${count === 1 ? "tag" : "tags"} to ${doc.notes.length} ${doc.notes.length === 1 ? "note" : "notes"}`);
+      afterWrite(doc.journal);
+    },
+    toast,
+  );
+
   const onSaved = useCallback(
     (doc: NoteJson, message: string) => {
       toast(message);
@@ -463,7 +475,11 @@ export function App() {
                 <kbd>j</kbd> <kbd>k</kbd> move · <kbd>Enter</kbd> review
               </span>
             ) : null}
+            {view.page === "all" && items.length ? <FromTopicsButton busy={fromTopics.busy} onClick={fromTopics.check} /> : null}
           </header>
+          {view.page === "all" && fromTopics.plan ? (
+            <FromTopicsBanner plan={fromTopics.plan} busy={fromTopics.busy} onApply={fromTopics.apply} onCancel={fromTopics.cancel} />
+          ) : null}
           {state.status === "loading" ? (
             <SkeletonRows label="Loading the notes" />
           ) : state.status === "error" ? (

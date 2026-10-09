@@ -16,10 +16,14 @@ const SECRET = "SECRET-OUTSIDE-THE-JOURNALS";
 const GITHUB_TOKEN = "ghp_test_token_never_in_a_response_42";
 const PDFKIT = "---\nid: pkg:npm/pdfkit\nname: pdfkit\nexplored: 2026-10-03\nkind: library\ntags: [pdf]\ntried: true\nrating:\nstatus: reviewed\n---\n\n## Verdict\navoid: async streams painful\n";
 
+// A note "Add GitHub topics as tags" would change (decision 0030).
+const WIDGET = "---\nid: pkg:github/acme/widget\nname: acme/widget\ntopics: [charts, cli]\nkind: other\ntags: []\ntried: false\nstatus: inbox\n---\n\n## Verdict\n";
+
 async function start(t: TestContext, env: Record<string, string> = {}) {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--broken.md": "---\nid: [broken\n---\n",
+    "journal/notes/github--acme--widget.md": WIDGET,
     "journal/tags.md": "- `pdf`\n",
     [`secret.md`]: `---\nid: pkg:npm/secret\nname: ${SECRET}\n---\n\n## Verdict\n${SECRET}\n`,
     "project/package.json": "{}",
@@ -89,8 +93,10 @@ test("a write with the cookie but without a matching X-Magpie-Token header gets 
   const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
   for (const token of [undefined, "0".repeat(64)]) {
     assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { "x-magpie-token": token })).status, 403, `tags add ${token}`);
+    assert.equal((await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: false }, { "x-magpie-token": token })).status, 403, `from-topics ${token}`);
   }
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tags);
+  assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), WIDGET);
 });
 
 test("a bad Host gets 403, before anything else (DNS rebinding)", async (t) => {
@@ -119,7 +125,9 @@ test("cross-origin and Origin-less writes get 403", async (t) => {
   assert.equal(existsSync(join(box.project, ".magpie", "tags.md")), false);
   const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
   for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { origin })).status, 403, `tags add ${origin}`);
+  for (const origin of origins) assert.equal((await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: false }, { origin })).status, 403, `from-topics ${origin}`);
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tags);
+  assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), WIDGET);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { origin })).status, 403, `adopt ${origin}`);
   assert.equal(existsSync(join(box.project, ".magpie")), false);
   for (const origin of [`http://127.0.0.1:${server.port}`, `http://localhost:${server.port}`]) {
@@ -152,6 +160,7 @@ test("writes accept application/json only; other types get 415", async (t) => {
   assert.equal((await http.write("POST", "/api/note/preview", body, { "content-type": "application/json; charset=utf-8" })).status, 200);
   for (const type of [undefined, "text/plain", "application/x-www-form-urlencoded"]) {
     assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { "content-type": type })).status, 415, `tags add ${type}`);
+    assert.equal((await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: false }, { "content-type": type })).status, 415, `from-topics ${type}`);
   }
 });
 
@@ -191,6 +200,7 @@ test("no path from a request reaches the file system: traversal in every paramet
     ok(await http.get(`/api/notes?journal=${q}`), `notes journal ${p}`);
     ok(await http.get(`/api/tags?journal=${q}`), `tags journal ${p}`);
     ok(await http.write("POST", "/api/tags", { journal: p }), `create tags journal ${p}`);
+    ok(await http.write("POST", "/api/tags/from-topics", { journal: p, dry_run: false }), `from-topics journal ${p}`);
     ok(await http.get(`/api/search?q=pdf&journal=${q}`), `search journal ${p}`);
     ok(await http.write("PATCH", "/api/note", { journal: "personal", id: p, version: "sha256:0", fields: { rating: 1 } }), `patch id ${p}`);
     ok(await http.write("PATCH", "/api/note", { journal: p, id: "pkg:npm/pdfkit", version: "sha256:0" }), `patch journal ${p}`);
@@ -294,6 +304,7 @@ test("an unknown path gets 404, a wrong method 405, and a bug 500 without intern
   assert.equal(wrong.headers.allow, "GET, PATCH, POST");
   assert.equal((await http.write("POST", "/api/settings", {})).status, 405);
   assert.equal((await http.get("/api/adopt")).status, 405);
+  assert.equal((await http.get("/api/tags/from-topics?journal=personal")).status, 405);
   assert.equal((await http.write("POST", "/api/suggest", {})).status, 405);
   const graphWrite = await http.write("POST", "/api/graph", { journal: "personal" });
   assert.equal(graphWrite.status, 405);

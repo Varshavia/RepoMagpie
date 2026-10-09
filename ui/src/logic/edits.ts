@@ -1,7 +1,8 @@
 // The app's edit of one note (spec, "Editing a note"): only what the person changed, with the version
 // the note was read with. Core checks and applies it; these helpers only shape the request.
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { TAG_PATTERN } from "./schema.ts";
+import type { TagsFromTopicsJson } from "../../../src/core/tags-from-topics.ts";
+import { isStopTopic, TAG_PATTERN } from "./schema.ts";
 
 export interface Form {
   verdict: string;
@@ -64,12 +65,13 @@ export function parseTags(text: string): string[] {
   return [...new Set(text.toLowerCase().split(/[\s,]+/).filter(Boolean))];
 }
 
-// "From GitHub topics": the note's topics that could become tags, in GitHub's order, at most 8. Not
-// one the note has, not the repository's own name, and only ones that are valid tags.
+// The note view's "From GitHub topics": the note's topics that could become tags, in GitHub's order,
+// at most 8. Not one the note has, not the repository's own name, not on the stop list, and only ones
+// that are valid tags. Not ranked: that needs every note (decision 0030).
 export function topicSuggestions(topics: unknown, tags: string[], id: string | null): string[] {
   if (!Array.isArray(topics)) return [];
   const repo = id?.match(/^pkg:github\/[^/]+\/([^/?#@]+)/)?.[1]?.toLowerCase();
-  const valid = topics.filter((t): t is string => typeof t === "string" && TAG_PATTERN.test(t) && !tags.includes(t) && t !== repo);
+  const valid = topics.filter((t): t is string => typeof t === "string" && TAG_PATTERN.test(t) && !isStopTopic(t) && !tags.includes(t) && t !== repo);
   return [...new Set(valid)].slice(0, 8);
 }
 
@@ -77,6 +79,17 @@ export function topicSuggestions(topics: unknown, tags: string[], id: string | n
 // topic_tags), without the tags chosen so far, at most 8.
 export function addTopicSuggestions(topicTags: string[], tags: string[]): string[] {
   return topicTags.filter((t) => !tags.includes(t)).slice(0, 8);
+}
+
+// "Add GitHub topics as tags" (decision 0030): what it will do, from its dry run.
+export function fromTopicsSummary(doc: TagsFromTopicsJson): string {
+  const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
+  const { notes, tags_md_added: added, skipped } = doc;
+  const what = !notes.length
+    ? "Nothing to add: every note has its GitHub topics as tags, or 8 tags already."
+    : `Adds up to 8 tags to ${plural(notes.length, "note")}${added.length ? `, and ${plural(added.length, "new tag")} to your tag list.` : ". Your tag list already has them."}`;
+  if (!skipped.length) return what;
+  return `${what} ${plural(skipped.length, "note")} can't be read, so ${skipped.length === 1 ? "it stays as it is" : "they stay as they are"}.`;
 }
 
 // The tags core would refuse.

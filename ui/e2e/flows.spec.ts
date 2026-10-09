@@ -5,6 +5,9 @@ import { join, sep } from "node:path";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
 import { runSuggest } from "../../src/core/suggest.ts";
+import { tagsFromTopics } from "../../src/core/tags-from-topics.ts";
+import { readNote } from "../../src/core/note.ts";
+import { fromTopicsSummary } from "../src/logic/edits.ts";
 import { whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
@@ -296,6 +299,40 @@ test("topics: Add's preview shows the tags the save writes; one can be removed, 
   await page.getByRole("button", { name: "Save note" }).click();
   await expect(page.getByRole("status").getByText("Saved to your personal journal")).toBeVisible();
   expect(sent).toEqual({ target: "https://github.com/acme/widget", to: "personal", tags: ["testing", "graphs"] });
+});
+
+test("Add GitHub topics as tags: the first click says what it will do and writes nothing; the second applies it; a second run adds nothing", async ({ page, magpie }) => {
+  const notesDir = join(magpie.journal, "notes");
+  const read = () => Object.fromEntries([...readdirSync(notesDir), "../tags.md"].map((f) => [f, readFileSync(join(notesDir, f), "utf8")]));
+  const before = read();
+  const place = { home: magpie.journal, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.journal };
+  const expected = tagsFromTopics({ journal: "personal", dryRun: true }, place).document;
+  expect(expected.notes.length).toBeGreaterThan(0);
+
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("button", { name: "Add GitHub topics as tags" }).click();
+  const panel = page.getByRole("region", { name: "Add GitHub topics as tags" });
+  await expect(panel.getByText(fromTopicsSummary(expected))).toBeVisible();
+  expect(read()).toEqual(before);
+
+  await panel.getByRole("button", { name: "Add the tags" }).click();
+  const count = expected.notes.reduce((sum, n) => sum + n.added.length, 0);
+  await expect(page.getByRole("status").getByText(`Added ${count} tags to ${expected.notes.length} notes`)).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  for (const note of expected.notes) {
+    const tags = readNote(readFileSync(note.path, "utf8")).frontmatter.tags as string[];
+    expect(tags.slice(-note.added.length)).toEqual(note.added);
+    expect(tags.length).toBeLessThanOrEqual(8);
+  }
+  expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toBe(`${before["../tags.md"]}${expected.tags_md_added.map((t) => `- \`${t}\`\n`).join("")}`);
+  // The sidebar's tags come from the notes: the list reloaded.
+  await expect(page.getByRole("navigation", { name: "Journals and screens" }).getByRole("button", { name: new RegExp(`^${expected.tags_md_added[0]}\\s*\\d+$`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add GitHub topics as tags" }).click();
+  await expect(panel.getByText("Nothing to add: every note has its GitHub topics as tags, or 8 tags already.")).toBeVisible();
+  await panel.getByRole("button", { name: "Close" }).click();
+  await expect(panel).toHaveCount(0);
 });
 
 test("alternatives: entries written by hand stay as written; Undo brings back a removed one with its label", async ({ page, magpie }) => {

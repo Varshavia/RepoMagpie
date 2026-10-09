@@ -5,8 +5,13 @@
 export const TAG_LIMIT = 8;
 
 const TAG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-// Topics that say how a repository is run, not what it is about.
+// Topics that say how a repository is run, not what it is about. The app mirrors this
+// (ui/src/logic/schema.ts) for the note view's chips; a test keeps the two equal.
 const STOP = /^(hacktoberfest(\d{4})?|open-source|opensource|good-first-issue)$/;
+
+export function isStopTopic(topic: string): boolean {
+  return STOP.test(topic);
+}
 
 export interface KnownTags {
   tagList: readonly string[]; // the journal's tags.md
@@ -18,7 +23,7 @@ export interface KnownTags {
 // each group (Array.prototype.sort is stable).
 export function rankTopics(topics: readonly unknown[], id: string, known: KnownTags): string[] {
   const repo = id.match(/^pkg:github\/[^/]+\/([^/?#@]+)/)?.[1]?.toLowerCase();
-  const usable = [...new Set(topics)].filter((t): t is string => typeof t === "string" && TAG.test(t) && !STOP.test(t) && t !== repo);
+  const usable = [...new Set(topics)].filter((t): t is string => typeof t === "string" && TAG.test(t) && !isStopTopic(t) && t !== repo);
   const group = (topic: string) => (known.tagList.includes(topic) ? 0 : known.shared.has(topic) ? 1 : 2);
   return usable.sort((a, b) => group(a) - group(b));
 }
