@@ -1,9 +1,9 @@
 // Add (docs/ui.md §7): paste a URL, PURL or name; see the preview; write the Verdict; save. The same
 // logic as magpie note, through POST /api/note/preview and POST /api/note.
 import { useId, useState, type ReactNode } from "react";
-import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope, type TagListJson } from "../api.ts";
+import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { oneLine, topicSuggestions } from "../logic/edits.ts";
+import { addTopicSuggestions, oneLine } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, FieldError } from "./common.tsx";
@@ -15,19 +15,17 @@ interface Props {
   initialTarget?: string; // from an unresolved [[link]]
   onOpenNote: (journal: Scope, id: string) => void;
   onSaved: (journal: Scope) => void;
-  noTagList: (journal: Scope) => boolean; // the journal has no tags.md
-  onCreateTagList: (journal: Scope) => void;
-  onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
 }
 
-export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, onSaved, noTagList, onCreateTagList, onTagList }: Props) {
+export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, onSaved }: Props) {
   const id = useId();
   const [target, setTarget] = useState(initialTarget ?? "");
   const [to, setTo] = useState<Scope>(defaultJournal);
   const [type, setType] = useState<PackageType | "">("");
   const [verdict, setVerdict] = useState("");
   const [preview, setPreview] = useState<NotePreviewJson | null>(null);
-  const [busy, setBusy] = useState<"" | "preview" | "save" | "topic">("");
+  const [tags, setTags] = useState<string[]>([]); // a new note's tags: the preview's, as the user leaves them (decision 0030)
+  const [busy, setBusy] = useState<"" | "preview" | "save">("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedNoteJson | null>(null);
 
@@ -47,24 +45,11 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
     setError(null);
     setSaved(null);
     try {
-      setPreview(await api.preview(request));
+      const doc = await api.preview(request);
+      setPreview(doc);
+      setTags(doc.tags);
     } catch (e) {
       setPreview(null);
-      setError((e as ApiError).message);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  // "From GitHub topics": a picked topic joins tags.md now, so the save drafts it as a tag, as
-  // magpie note drafts the topics the list has (spec §2).
-  async function addTopic(tag: string) {
-    setBusy("topic");
-    setError(null);
-    try {
-      onTagList(await api.addTags(to, [tag]));
-      setPreview((p) => (p && !p.tags.includes(tag) ? { ...p, tags: [...p.tags, tag].sort() } : p));
-    } catch (e) {
       setError((e as ApiError).message);
     } finally {
       setBusy("");
@@ -78,7 +63,8 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
     setError(null);
     try {
       const text = oneLine(verdict);
-      const doc = await api.save({ ...request, text: text || undefined });
+      // The tags shown are the ones written; the save appends the new ones to tags.md.
+      const doc = await api.save({ ...request, text: text || undefined, tags: preview && !preview.exists ? tags : undefined });
       setSaved(doc);
       setTarget("");
       setVerdict("");
@@ -146,9 +132,14 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
       </form>
 
       {preview ? (
-        <Preview preview={preview} onOpen={() => preview.id && onOpenNote(to, preview.id)}>
+        <Preview
+          preview={preview}
+          tags={preview.exists ? preview.tags : tags}
+          onRemoveTag={preview.exists ? undefined : (tag) => setTags((t) => t.filter((x) => x !== tag))}
+          onOpen={() => preview.id && onOpenNote(to, preview.id)}
+        >
           {preview.exists ? null : (
-            <TopicChips topics={topicSuggestions(preview.topics, preview.tags, preview.id)} noTagList={noTagList(to)} busy={busy !== ""} onAdd={(tag) => void addTopic(tag)} onCreateTagList={() => onCreateTagList(to)} />
+            <TopicChips topics={addTopicSuggestions(preview.topic_tags, tags)} noTagList={false} busy={busy !== ""} onAdd={(tag) => setTags((t) => [...t, tag])} />
           )}
         </Preview>
       ) : null}
@@ -201,7 +192,7 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
   );
 }
 
-function Preview({ preview, onOpen, children }: { preview: NotePreviewJson; onOpen: () => void; children?: ReactNode }) {
+function Preview({ preview, tags, onRemoveTag, onOpen, children }: { preview: NotePreviewJson; tags: string[]; onRemoveTag?: (tag: string) => void; onOpen: () => void; children?: ReactNode }) {
   const packages = preview.packages.map((p) => packageLabel(p).name);
   const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...packages].filter((c): c is string => Boolean(c));
   const id = preview.id && readablePurl(preview.id);
@@ -233,18 +224,27 @@ function Preview({ preview, onOpen, children }: { preview: NotePreviewJson; onOp
           <p>{preview.what_it_does}</p>
         </div>
       ) : null}
-      {chips.length || preview.tags.length ? (
+      {chips.length || tags.length ? (
         <ul className="chips" aria-label="Details">
           {chips.map((c) => (
             <li key={c} className="chip meta">
               {c}
             </li>
           ))}
-          {preview.tags.map((t) => (
-            <li key={t}>
-              <span className="chip tag">{t}</span>
-            </li>
-          ))}
+          {tags.map((t) =>
+            onRemoveTag ? (
+              <li key={t} className="chip tag removable">
+                <span translate="no">{t}</span>
+                <button type="button" className="chip-remove" onClick={() => onRemoveTag(t)} aria-label={`Remove tag ${t}`} title="Remove">
+                  <Icon name="x" size={12} />
+                </button>
+              </li>
+            ) : (
+              <li key={t}>
+                <span className="chip tag">{t}</span>
+              </li>
+            ),
+          )}
         </ul>
       ) : null}
       {children}

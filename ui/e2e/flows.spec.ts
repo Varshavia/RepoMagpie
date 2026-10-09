@@ -262,26 +262,40 @@ test("topics: without tags.md the chips wait for Create tag list", async ({ page
   expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toBe(`${STARTER_TAGS}- \`codex\`\n`);
 });
 
-test("topics: in the Add preview a chip appends the topic to tags.md and shows it among the preview's tags", async ({ page, magpie }) => {
-  // No network in these tests: the preview of a GitHub URL is served here.
+test("topics: Add's preview shows the tags the save writes; one can be removed, a chip adds one, and the save sends them", async ({ page, magpie }) => {
+  // No network in these tests: the preview and the save of a GitHub URL are served here; core's
+  // side (the ranking, tags.md) has its own tests.
   await page.route("**/api/note/preview", (route) =>
     route.fulfill({
       json: {
         id: "pkg:github/acme/widget", journal: "personal", path: null, exists: false, verdict: null, name: "acme/widget", url: "https://github.com/acme/widget",
-        what_it_does: "Widgets.", language: "TypeScript", license: "MIT", topics: ["widget", "testing", "charts"], kind: "library", tags: ["testing"], packages: [], skills: [], warnings: [],
+        what_it_does: "Widgets.", language: "TypeScript", license: "MIT", topics: ["widget", "testing", "charts", "graphs"], topic_tags: ["testing", "charts", "graphs"],
+        kind: "library", tags: ["testing", "charts"], packages: [], skills: [], warnings: [],
       },
     }),
   );
+  let sent: unknown = null;
+  await page.route("**/api/note", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    sent = route.request().postDataJSON();
+    return route.fulfill({ json: { id: "pkg:github/acme/widget", journal: "personal", path: null, created: true, status: "inbox", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: ["graphs"] } });
+  });
+  const tagsBefore = readFileSync(join(magpie.journal, "tags.md"), "utf8");
   await magpie.open(page);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByLabel("Package, PURL or GitHub URL").fill("https://github.com/acme/widget");
   await page.getByRole("button", { name: "Preview" }).click();
+  const preview = page.getByRole("region", { name: "Preview" });
   const topics = page.getByRole("group", { name: "From GitHub topics" });
-  await expect(topics.getByRole("button")).toHaveText(["charts"]); // not the repository's name, not a tag it has
-  await topics.getByRole("button", { name: "Add tag charts" }).click();
-  await expect(page.getByRole("region", { name: "Preview" }).getByText("charts", { exact: true })).toBeVisible();
-  await expect(topics).toHaveCount(0);
-  expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toMatch(/- `charts`\n$/);
+  await expect(topics.getByRole("button")).toHaveText(["graphs"]); // core's ranking, without the tags shown
+  await preview.getByRole("button", { name: "Remove tag charts" }).click();
+  await expect(topics.getByRole("button")).toHaveText(["charts", "graphs"]);
+  await topics.getByRole("button", { name: "Add tag graphs" }).click();
+  await expect(preview.getByRole("button", { name: /^Remove tag / })).toHaveCount(2);
+  expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toBe(tagsBefore); // nothing written before Save
+  await page.getByRole("button", { name: "Save note" }).click();
+  await expect(page.getByRole("status").getByText("Saved to your personal journal")).toBeVisible();
+  expect(sent).toEqual({ target: "https://github.com/acme/widget", to: "personal", tags: ["testing", "graphs"] });
 });
 
 test("alternatives: entries written by hand stay as written; Undo brings back a removed one with its label", async ({ page, magpie }) => {

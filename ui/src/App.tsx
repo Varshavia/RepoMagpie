@@ -257,12 +257,14 @@ export function App() {
     applyTheme(t);
   }, []);
 
+  // After Add or Import: the list, and tags.md, which a new note's tags may have grown (decision 0030).
   const afterWrite = useCallback(
     (scope: Scope) => {
       loadList(scope, true);
+      loadTags(scope);
       if (scope === "project" && projectState !== "exists") loadSettings();
     },
-    [loadList, loadSettings, projectState],
+    [loadList, loadTags, loadSettings, projectState],
   );
 
   const onSaved = useCallback(
@@ -589,9 +591,6 @@ export function App() {
             initialTarget={view.target}
             onOpenNote={openNote}
             onSaved={afterWrite}
-            noTagList={(scope) => tagState[scope] === "missing"}
-            onCreateTagList={createTagList}
-            onTagList={showTags}
           />
         ) : view.page === "import" ? (
           <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- A new note for a GitHub repository gets up to 8 tags from its GitHub topics, through `magpie note`, `magpie import` and Add in `magpie ui`. Topics already in `tags.md` come first, then topics your other notes carry, then the rest. The repository's own name and topics such as `hacktoberfest` and `open-source` are skipped. Before, a topic became a tag only if `tags.md` already listed it. Tags stay yours: remove the ones you don't want.
+- New tags are added to the end of `tags.md` when the note is saved; the rest of the file stays exactly as it was. A journal without `tags.md` gets one. `magpie note` and `magpie import` say which tags they added, and `--json` lists them in `tags_md_added`.
+- Add's preview in `magpie ui` shows the tags the save will write, each with a remove button. A "From GitHub topics" chip adds a tag to the preview, and `tags.md` changes only when you save.
+
 ## [0.2.0-beta.2] - 2026-10-08
 
 The third pre-release: your alternatives before an install, in `magpie recall`, the Claude Code hook, `magpie suggest`, the app and the agent skill (v0.2 Connect, part 3).

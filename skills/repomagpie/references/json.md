@@ -63,6 +63,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `warnings`: things that went wrong without stopping it, such as no network for a GitHub URL.
 - `alternatives_added`: the `--alternative` names written to the note; `[]` without the flag.
 - `alternatives_present`: the `--alternative` names the note already had; nothing was written for them.
+- `tags_md_added`: tags from a new GitHub repository note's topics that were added to the journal's tag list (tags.md); `[]` otherwise.
 
 ## `magpie adopt <name-or-purl> --json`
 

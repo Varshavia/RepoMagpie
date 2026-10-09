@@ -6,12 +6,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { graphData, type GraphData } from "./graph.ts";
-import { journalTagList, listNotes, parseTagList, STARTER_TAGS, type Place } from "./journals.ts";
+import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
 import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
-import { locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
+import { knownTags, locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
+import { rankTopics } from "./topic-tags.ts";
 import { packageVersion } from "./version.ts";
 
 type Scope = Journal["scope"];
@@ -83,19 +84,11 @@ export function addTags(scope: Scope, tags: unknown, place: Place): Result<TagLi
   if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(tag))) {
     return usage("add must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
   }
-  const file = join(journal.path, "tags.md");
-  if (!existsSync(file)) return { outcome: "not-found", document: { journal: scope, tags: [], exists: false, error: "This journal has no tags.md yet. Create the tag list first." } };
-  const text = readFileSync(file, "utf8");
-  const listed = parseTagList(text);
-  const added = [...new Set(tags as string[])].filter((tag) => !listed.includes(tag));
-  if (added.length) {
-    const eol = text.includes("\r\n") ? "\r\n" : "\n";
-    const close = text === "" || text.endsWith("\n") ? "" : eol;
-    try {
-      writeFileSync(file, text + close + added.map((tag) => `- \`${tag}\`${eol}`).join(""));
-    } catch (error) {
-      return { outcome: "failed", document: { journal: scope, tags: listed, exists: true, error: `Couldn't write tags.md: ${(error as Error).message}` } };
-    }
+  if (!existsSync(join(journal.path, "tags.md"))) return { outcome: "not-found", document: { journal: scope, tags: [], exists: false, error: "This journal has no tags.md yet. Create the tag list first." } };
+  try {
+    appendTags(journal.path, tags as string[]);
+  } catch (error) {
+    return { outcome: "failed", document: { journal: scope, tags: readTagList(journal.path), exists: true, error: `Couldn't write tags.md: ${(error as Error).message}` } };
   }
   return tagListDocument(scope, place);
 }
@@ -345,6 +338,7 @@ export interface NotePreviewJson {
   language: string | null;
   license: string | null;
   topics: string[];
+  topic_tags: string[]; // the topics that could become tags, ranked (decision 0030): "From GitHub topics"
   kind: string | null;
   tags: string[];
   packages: string[];
@@ -354,7 +348,7 @@ export interface NotePreviewJson {
 }
 
 export function emptyPreview(scope: Scope): NotePreviewJson {
-  return { id: null, journal: scope, path: null, exists: false, verdict: null, name: null, url: null, what_it_does: null, language: null, license: null, topics: [], kind: null, tags: [], packages: [], skills: [], warnings: [] };
+  return { id: null, journal: scope, path: null, exists: false, verdict: null, name: null, url: null, what_it_does: null, language: null, license: null, topics: [], topic_tags: [], kind: null, tags: [], packages: [], skills: [], warnings: [] };
 }
 
 // What magpie note <target> would write, without writing: a dry run of the same save, read back.
@@ -366,10 +360,13 @@ export async function previewNote(request: { target: string; type?: "npm" | "pyp
   const resolved = await resolveInput(request.target, request.type, context.cwd);
   if (!resolved.ok) return fail("usage", resolved.error);
 
-  const saved = await saveItem(journal, listNotes(journal.path), { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target }, context, true);
+  const notes = listNotes(journal.path);
+  const tagList = journalTagList(journal.path);
+  const saved = await saveItem(journal, notes, { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target }, context, true, [...tagList]);
   if (saved.text === null) return fail("failed", saved.error ?? "The note can't be previewed.", saved.id);
   const note = readNote(saved.text);
   const fm = note.frontmatter;
+  const topicTags = rankTopics(textList(fm.topics), saved.id, knownTags(notes, tagList, saved.path));
   const text = (value: unknown) => (typeof value === "string" ? value : null);
   const whatItDoes = (note.sections.find((s) => s.name === "What it does")?.body ?? "").replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").trim();
   const exists = saved.result !== "created";
@@ -387,6 +384,7 @@ export async function previewNote(request: { target: string; type?: "npm" | "pyp
       language: text(fm.language),
       license: text(fm.license),
       topics: textList(fm.topics),
+      topic_tags: topicTags,
       kind: text(fm.kind),
       tags: textList(fm.tags),
       packages: textList(fm.packages),

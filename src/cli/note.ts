@@ -35,6 +35,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
   else if (r.result === "updated") io.err(`✔ Updated in ${where}: ${name}\n`);
   else if (r.result === "unchanged") io.err(`Already in ${where}: ${name}\n`);
   else io.err(`magpie note: ${r.error}\n`);
+  if (r.tagsMdAdded.length) io.err(`Added to tags.md: ${r.tagsMdAdded.join(", ")}\n`);
   if (r.path) io.out(`${r.path}\n`);
   return exitCode(run.outcome);
 }

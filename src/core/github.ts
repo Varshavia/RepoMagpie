@@ -123,11 +123,6 @@ export function draftKind(metadata: Pick<RepoMetadata, "plugin" | "skills" | "bi
   return "other";
 }
 
-// The drafted tags: topics that are already in the journal's tag list (schema rule 5).
-export function draftTags(topics: string[], tagList: string[]): string[] {
-  return [...new Set(topics.filter((topic) => tagList.includes(topic)))].sort();
-}
-
 type Got = { ok: true; text: string } | { ok: false; problem: FetchProblem };
 
 async function get(path: string, slug: string, options: Options, raw = false): Promise<Got> {

@@ -52,6 +52,8 @@ const scope = (value: unknown): Scope | null => (SCOPES as readonly unknown[]).i
 const type = (value: unknown): PackageType | undefined | null =>
   value === undefined || value === null ? undefined : (TYPES as readonly unknown[]).includes(value) ? (value as PackageType) : null;
 const optionalText = (value: unknown): string | undefined | null => (value === undefined || value === null ? undefined : typeof value === "string" ? value : null);
+const optionalTags = (value: unknown): string[] | undefined | null =>
+  value === undefined || value === null ? undefined : Array.isArray(value) && value.every((tag) => typeof tag === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(tag)) ? value : null;
 
 // The endpoints by path, then method. `open` opens a file in the default app (POST /api/open).
 export function endpoints(context: Context, open: (path: string) => Promise<void>): Record<string, Record<string, Handler>> {
@@ -114,7 +116,9 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (text === null) return bad(empty, "text must be your Verdict, in one line.");
         const packageType = type(body.type);
         if (packageType === null) return bad(empty, "type must be npm, pypi or cargo.");
-        return reply(await runNote({ target: body.target, text, type: packageType, to }, context));
+        const tags = optionalTags(body.tags);
+        if (tags === null) return bad(empty, "tags must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
+        return reply(await runNote({ target: body.target, text, type: packageType, to, tags }, context));
       },
     },
 

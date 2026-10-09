@@ -628,6 +628,9 @@ span.wikilink { cursor: help; }
 button.chip.suggestion { border: 1px dashed var(--hairline-strong); background: transparent; }
 button.chip.suggestion:hover:not(:disabled) { border-style: solid; color: var(--ink); }
 button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
+/* Add's preview: a new note's tags, each with a remove button (decision 0030). */
+.chip.tag.removable { padding-right: var(--xxs); }
+.chip.tag.removable > span::before { content: "#"; color: var(--ink-subtle); }
 
 /* The [[ autocomplete under a section editor (LinkTextarea). */
 .link-input { position: relative; display: flex; flex-direction: column; }

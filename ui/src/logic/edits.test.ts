@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { formOf, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine } from "./edits.ts";
+import { addTopicSuggestions, formOf, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine } from "./edits.ts";
 
 // "From GitHub topics" (docs/ui.md §7): topics that could become tags.
 test("topicSuggestions: topics not among the tags, in GitHub's order, at most 8, without the repository's name", () => {
@@ -12,6 +12,14 @@ test("topicSuggestions: topics not among the tags, in GitHub's order, at most 8,
   assert.deepEqual(topicSuggestions(["Not Valid", "a--b", "ok", 3, "ok"], [], "pkg:github/a/b"), ["ok"]);
   assert.deepEqual(topicSuggestions(undefined, [], "pkg:npm/pdfkit"), []);
   assert.deepEqual(topicSuggestions([], [], null), []);
+});
+
+test("addTopicSuggestions: core's ranked topics without the tags chosen so far, at most 8; a removed tag comes back", () => {
+  const ranked = ["llm", "pdf", "a", "b", "c", "d", "e", "f", "g", "h"];
+  assert.deepEqual(addTopicSuggestions(ranked, ranked.slice(0, 8)), ["g", "h"]);
+  assert.deepEqual(addTopicSuggestions(ranked, ["pdf", "a", "b", "c", "d", "e", "f"]), ["llm", "g", "h"]);
+  assert.deepEqual(addTopicSuggestions(ranked, []), ranked.slice(0, 8));
+  assert.deepEqual(addTopicSuggestions([], ["x"]), []);
 });
 
 // The edit the app sends (PATCH /api/note, spec "Editing a note"): only what the person changed,

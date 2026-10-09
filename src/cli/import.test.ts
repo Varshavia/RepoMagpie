@@ -41,6 +41,7 @@ test("every item becomes a note; --json reports each line and the counts exactly
     created: 3,
     updated: 0,
     failed: 0,
+    tags_md_added: ["playwright"],
   });
   for (const file of ["github--microsoft--playwright-cli.md", "npm--pdfkit.md", "cargo--ripgrep.md"]) valid(box.note(file));
 });
@@ -155,6 +156,37 @@ test("--dry-run gives the same results as a real run when lines repeat a subject
   assert.deepEqual(JSON.parse(real.out).items.map((i: { result: string }) => i.result), ["created", "updated", "failed"]);
 });
 
+// Decision 0030: several repositories in one import; a later one ranks the tags an earlier one added first.
+test("import of several repositories appends each tag once; a dry run gives the same results and writes nothing", async () => {
+  const responses = recorded("microsoft--playwright-cli", "voltagent--awesome-design-md");
+  const repo = (path: string) => responses[path] as object;
+  const fetch = () => fakeFetch({
+    ...responses,
+    "/repos/microsoft/playwright-cli": { ...repo("/repos/microsoft/playwright-cli"), topics: ["browser", "shared", "testing"] },
+    "/repos/voltagent/awesome-design-md": { ...repo("/repos/voltagent/awesome-design-md"), topics: ["a", "b", "c", "d", "e", "f", "g", "shared", "testing"] },
+  });
+  const lines = ["- https://github.com/microsoft/playwright-cli", "- https://github.com/voltagent/awesome-design-md"];
+  const box = sandbox({ "journal/tags.md": "- `testing`\n" });
+  const dry = await magpie(box, ["import", importFile(box, lines), "--dry-run", "--json"], { fetch: fetch() });
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `testing`\n");
+  assert.equal(existsSync(join(box.journal, "notes")), false);
+  const real = await magpie(box, ["import", importFile(box, lines), "--json"], { fetch: fetch() });
+  assert.equal(real.code, 0, real.err);
+  assert.deepEqual(JSON.parse(dry.out), JSON.parse(real.out));
+  assert.deepEqual(JSON.parse(real.out).tags_md_added, ["browser", "shared", "a", "b", "c", "d", "e", "f"]);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `testing`\n- `browser`\n- `shared`\n- `a`\n- `b`\n- `c`\n- `d`\n- `e`\n- `f`\n");
+  const tags = (file: string) => readNote(readFileSync(box.note(file), "utf8")).frontmatter.tags;
+  assert.deepEqual(tags("github--microsoft--playwright-cli.md"), ["testing", "browser", "shared"]);
+  assert.deepEqual(tags("github--voltagent--awesome-design-md.md"), ["shared", "testing", "a", "b", "c", "d", "e", "f"]);
+});
+
+test("the human output names the tags added to tags.md", async () => {
+  const box = sandbox({ "journal/tags.md": "- `mine`\n" });
+  const r = await magpie(box, ["import", importFile(box, ["- https://github.com/microsoft/playwright-cli"])], { fetch: playwright() });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /^Added 1 tag to tags\.md: playwright$/m);
+});
+
 test("a GitHub line while offline is saved without metadata, with a warning; exit 0", async () => {
   const box = sandbox();
   const offline: Fetch = (() => Promise.reject(new TypeError("fetch failed"))) as Fetch;
@@ -177,7 +209,7 @@ test("a file that can't be read: exit 1; --json gives empty items, zero counts a
   const r = await magpie(box, ["import", "missing.md", "--json"]);
   assert.equal(r.code, 1);
   const json = JSON.parse(r.out);
-  assert.deepEqual({ ...json, error: typeof json.error }, { items: [], created: 0, updated: 0, failed: 0, error: "string" });
+  assert.deepEqual({ ...json, error: typeof json.error }, { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], error: "string" });
   assert.match(json.error, /missing\.md/);
   const human = await magpie(box, ["import", "missing.md"]);
   assert.match(human.err, /^magpie import: Can't read /m);
