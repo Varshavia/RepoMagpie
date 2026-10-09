@@ -13,6 +13,8 @@ const PLAYWRIGHT: RepoMetadata = {
   license: "Apache-2.0",
   topics: ["playwright", "testing"],
   skills: ["dev", "playwright-cli"],
+  skillFolders: 1,
+  template: false,
   packages: ["pkg:npm/%40playwright/cli"],
   plugin: false,
   bin: true,

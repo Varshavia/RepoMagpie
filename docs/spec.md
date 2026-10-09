@@ -43,7 +43,21 @@ Behaviour:
    - for a URL: refresh the tool-owned fields (schema rule 2) and append skill lines for newly detected skills only.
 3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and file list (no README) and draft from them ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)):
    - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty; an agent may draft more later through the skill.
-   - `kind`: the first that matches: `cli` if the root `package.json` has `bin`; `skill-pack` if any `SKILL.md` exists; `plugin` if the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`; `awesome-list` if the topics include `awesome-list`; otherwise `other`.
+   - `kind`: the first rule that matches ([decision 0030](decisions/0030-github-topics-become-tags.md), which gives the reason for each place):
+     1. `awesome-list`: the topic `awesome-list`;
+     2. `template`: the topic `template`, `starter` or `boilerplate`, or GitHub's template flag;
+     3. `skill-pack`: the repository's name (not the owner's) contains `skill`, ignoring case;
+     4. `platform`: the topic `paas`, `baas`, `backend-as-a-service`, `low-code`, `lowcode`, `no-code`, `nocode`, `platform` or `llmops`;
+     5. `app`: the topic `self-hosted`, `webapp`, `web-app`, `desktop-app`, `docker` or `nextjs-app`;
+     6. `skill-pack`: the topic `agent-skills`, `claude-skills` or `skills`;
+     7. `framework`: the topic `framework`;
+     8. `cli`: the root `package.json` has `bin`;
+     9. `library`: it publishes a package (`packages` below isn't empty);
+     10. `skill-pack`: 3 or more folders hold a `SKILL.md` (the root counts), not counting folders inside a hidden folder (a path part that starts with `.`, such as `.agents/` or `.claude/`);
+     11. `plugin`: the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`;
+     12. otherwise `other`.
+
+     Existing notes keep their kind: it is guessed only at creation.
    - `tags`: up to 8 of the repository's GitHub topics ([decision 0030](decisions/0030-github-topics-become-tags.md)). Only topics that are valid tags, not the repository's own name (ignoring case), not on the stop list (`hacktoberfest`, `hacktoberfest` followed by a year, `open-source`, `opensource`, `good-first-issue`). Ranked: topics already in `tags.md`, then topics another note in the journal carries in its `topics` or `tags`, then the rest; GitHub's (alphabetical) order within each group. A registry package has no topics, so `[]`.
    - `tags.md`: each of these tags that the list doesn't have is appended to it as ``- `<tag>` ``, after the note is written, with the file's own line endings; the rest of the file stays byte for byte. A journal without `tags.md` gets one with a `# Tags` heading and just these tags; a journal this save creates gets the starter list first (section 3). stderr says `Added to tags.md: <tags>`.
    - `packages`: from the manifests at the repository root only: `package.json` `name` (skipped when `"private": true`), `pyproject.toml` `[project]` `name`, `Cargo.toml` `[package]` `name`. Known limitation (v0.1): the name is recorded whether or not the package is published on its registry.

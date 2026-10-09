@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { draftKind, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
+import { countSkillFolders, draftKind, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
 
 // Recorded GET responses (src/core/fixtures/github/); no test touches the network.
 function recorded(name: string): Record<string, unknown> {
@@ -48,6 +48,8 @@ test("playwright-cli: metadata, skills by folder name, package and bin from the 
       license: "Apache-2.0",
       topics: ["playwright"],
       skills: ["dev", "playwright-cli"],
+      skillFolders: 1, // dev is in .claude/skills/
+      template: false,
       packages: ["pkg:npm/%40playwright/cli"],
       plugin: false,
       bin: true,
@@ -304,22 +306,69 @@ for (const [title, file, text, purl] of MANIFESTS) {
   });
 }
 
-// --- drafts: kind (first match wins) and tags ---
+// --- drafts: kind (decision 0030: the first rule that matches) ---
 
-const KIND_CASES: [string, Parameters<typeof draftKind>[0], string][] = [
-  ["cli beats everything", { plugin: true, skills: ["a"], bin: true, topics: ["awesome-list"] }, "cli"],
-  ["skill-pack beats plugin", { plugin: true, skills: ["a"], bin: false, topics: ["awesome-list"] }, "skill-pack"],
-  ["plugin without SKILL.md", { plugin: true, skills: [], bin: false, topics: ["awesome-list"] }, "plugin"],
-  ["awesome-list from topics", { plugin: false, skills: [], bin: false, topics: ["awesome-list"] }, "awesome-list"],
-  ["otherwise other", { plugin: false, skills: [], bin: false, topics: ["pdf"] }, "other"],
-  ["unknown skills count as none", { plugin: false, skills: null, bin: false, topics: [] }, "other"],
+type KindInput = Parameters<typeof draftKind>[0];
+const BASE: KindInput = { name: "acme/widget", topics: [], template: false, skillFolders: 0, packages: [], plugin: false, bin: false };
+const KIND_CASES: [string, Partial<KindInput>, string][] = [
+  ["1 awesome-list beats template and app", { topics: ["awesome-list", "template", "self-hosted"], template: true }, "awesome-list"],
+  ["2 GitHub's template flag beats app", { template: true, topics: ["docker"] }, "template"],
+  ["2 template from the topic starter", { topics: ["starter"] }, "template"],
+  ["2 template from the topic boilerplate", { topics: ["boilerplate"], bin: true }, "template"],
+  ["3 a name with skill beats platform, ignoring case", { name: "Leonxlnx/Taste-Skill", topics: ["no-code"] }, "skill-pack"],
+  ["3 the owner's name doesn't count", { name: "skillful/widget" }, "other"],
+  ["4 platform beats app", { topics: ["self-hosted", "paas"] }, "platform"],
+  ["4 platform from nocode", { topics: ["nocode"] }, "platform"],
+  ["5 app beats the topic skills", { topics: ["skills", "docker"], skillFolders: 7 }, "app"],
+  ["5 app beats a command and a package", { topics: ["self-hosted"], bin: true, packages: ["pkg:pypi/widget"] }, "app"],
+  ["6 the topic skills beats framework and a command", { topics: ["framework", "agent-skills"], bin: true }, "skill-pack"],
+  ["7 framework beats a command and a package", { topics: ["framework"], bin: true, packages: ["pkg:npm/widget"] }, "framework"],
+  ["8 a command beats a package", { bin: true, packages: ["pkg:npm/widget"] }, "cli"],
+  ["9 a package beats skill folders and a plugin", { packages: ["pkg:pypi/widget"], skillFolders: 6, plugin: true }, "library"],
+  ["10 3 skill folders beat a plugin", { skillFolders: 3, plugin: true }, "skill-pack"],
+  ["11 2 skill folders with a plugin manifest: plugin", { skillFolders: 2, plugin: true }, "plugin"],
+  ["12 2 skill folders alone: other", { skillFolders: 2 }, "other"],
+  ["12 unknown skill folders and packages count as none", { skillFolders: null, packages: null }, "other"],
 ];
 
-for (const [title, metadata, kind] of KIND_CASES) {
+for (const [title, over, kind] of KIND_CASES) {
   test(`draftKind: ${title}`, () => {
-    assert.equal(draftKind(metadata), kind);
+    assert.equal(draftKind({ ...BASE, ...over }), kind);
   });
 }
+
+test("countSkillFolders: one per folder holding a SKILL.md, the root included; not inside a hidden folder", () => {
+  assert.equal(countSkillFolders(["SKILL.md", "skills/a/SKILL.md", "skills/b/SKILL.md", "skills/b/SKILL.md", "README.md"]), 3);
+  assert.equal(countSkillFolders([".agents/skills/a/SKILL.md", ".claude/skills/a/SKILL.md", "apps/studio/.claude/skills/x/SKILL.md", "docs/.hidden/SKILL.md"]), 0);
+  assert.equal(countSkillFolders(["skills/notaskill.md", "skills/a/skill.md"]), 0);
+});
+
+// The maintainer's first ten repositories and three skill packs, recorded with gh api GET
+// (fixtures/kinds.json). The guesses decision 0030 accepts, debatable ones included.
+test("draftKind on the maintainer's repositories", () => {
+  const fixture = JSON.parse(readFileSync(new URL("fixtures/kinds.json", import.meta.url), "utf8")) as {
+    repositories: { full_name: string; topics: string[]; is_template: boolean; skill_md: string[]; packages: string[]; bin: boolean; plugin: boolean }[];
+  };
+  const guesses = Object.fromEntries(fixture.repositories.map((r) => [
+    r.full_name,
+    draftKind({ name: r.full_name, topics: r.topics, template: r.is_template, skillFolders: countSkillFolders(r.skill_md), packages: r.packages, bin: r.bin, plugin: r.plugin }),
+  ]));
+  assert.deepEqual(guesses, {
+    "coollabsio/coolify": "app", // a PaaS, but no platform topic; self-hosted and docker
+    "OpenHands/OpenHands": "cli", // its root package.json has bin (debatable: an app)
+    "getmaxun/maxun": "platform",
+    "open-webui/open-webui": "app",
+    "browser-use/browser-use": "library", // 7 SKILL.md folders, but it publishes a package
+    "langflow-ai/langflow": "library", // publishes a package; no app or platform topic (debatable)
+    "supabase/supabase": "other", // no platform topic, private package.json (accepted)
+    "Stirling-Tools/Stirling-PDF": "app",
+    "unclecode/crawl4ai": "library",
+    "langgenius/dify": "platform", // low-code and no-code, before its topic skills
+    "mattpocock/skills": "skill-pack",
+    "vercel-labs/agent-skills": "skill-pack",
+    "Leonxlnx/taste-skill": "skill-pack",
+  });
+});
 
 test("draftKind on the recorded repositories", async () => {
   const kinds: string[] = [];

@@ -14,6 +14,8 @@ export interface RepoMetadata {
   license: string; // SPDX id, or "unknown" (decision 0020)
   topics: string[];
   skills: string[] | null; // SKILL.md folder names; null when the file list couldn't be read
+  skillFolders: number | null; // folders holding a SKILL.md, not inside a hidden folder (decision 0030); null likewise
+  template: boolean; // GitHub's template flag
   packages: string[] | null; // PURLs from the root manifests; null when they couldn't be read
   plugin: boolean; // the root has .claude-plugin/plugin.json or marketplace.json
   bin: boolean; // the root package.json has "bin"
@@ -51,6 +53,7 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     license: { spdx_id?: string | null } | null;
     topics?: string[];
     default_branch: string;
+    is_template?: boolean;
   };
   const spdx = info.license?.spdx_id;
   const metadata: RepoMetadata = {
@@ -61,6 +64,8 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     license: spdx && spdx !== "NOASSERTION" ? spdx : "unknown",
     topics: info.topics ?? [],
     skills: null,
+    skillFolders: null,
+    template: info.is_template === true,
     packages: null,
     plugin: false,
     bin: false,
@@ -77,6 +82,7 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
   const files = (listing.tree ?? []).filter((entry) => entry.type === "blob").map((entry) => entry.path);
   if (listing.truncated) warnings.push(`GitHub's file list for ${info.full_name} was cut short; some skills may be missing.`);
   metadata.skills = skillNames(files, info.full_name);
+  metadata.skillFolders = countSkillFolders(files);
   metadata.plugin = files.includes(".claude-plugin/plugin.json") || files.includes(".claude-plugin/marketplace.json");
 
   const packages: string[] = [];
@@ -114,13 +120,38 @@ export function packageFromManifest(file: Manifest, text: string): string | null
   return resolved.kind === "ok" ? resolved.purl : null;
 }
 
-// The drafted kind (spec §2): the first that matches.
-export function draftKind(metadata: Pick<RepoMetadata, "plugin" | "skills" | "bin" | "topics">): string {
+const TEMPLATE = ["template", "starter", "boilerplate"];
+const PLATFORM = ["paas", "baas", "backend-as-a-service", "low-code", "lowcode", "no-code", "nocode", "platform", "llmops"];
+const APP = ["self-hosted", "webapp", "web-app", "desktop-app", "docker", "nextjs-app"];
+const SKILL_TOPICS = ["agent-skills", "claude-skills", "skills"];
+
+// The drafted kind (spec §2, decision 0030): the first rule that matches. The order and the reason
+// for each place are in the decision.
+export function draftKind(metadata: Pick<RepoMetadata, "name" | "topics" | "template" | "skillFolders" | "packages" | "plugin" | "bin">): string {
+  const has = (topics: string[]) => metadata.topics.some((topic) => topics.includes(topic));
+  if (has(["awesome-list"])) return "awesome-list";
+  if (metadata.template || has(TEMPLATE)) return "template";
+  if (metadata.name.split("/").at(-1)?.toLowerCase().includes("skill")) return "skill-pack";
+  if (has(PLATFORM)) return "platform";
+  if (has(APP)) return "app";
+  if (has(SKILL_TOPICS)) return "skill-pack";
+  if (has(["framework"])) return "framework";
   if (metadata.bin) return "cli";
-  if (metadata.skills?.length) return "skill-pack";
+  if (metadata.packages?.length) return "library";
+  if ((metadata.skillFolders ?? 0) >= 3) return "skill-pack";
   if (metadata.plugin) return "plugin";
-  if (metadata.topics.includes("awesome-list")) return "awesome-list";
   return "other";
+}
+
+// The folders that hold a SKILL.md (the root counts as one), not inside a hidden folder: skills in
+// .agents/, .claude/ or .cursor/ help develop the repository; they aren't what it offers.
+export function countSkillFolders(files: string[]): number {
+  const folders = files
+    .filter((path) => path === "SKILL.md" || path.endsWith("/SKILL.md"))
+    .map((path) => path.split("/").slice(0, -1))
+    .filter((parts) => !parts.some((part) => part.startsWith(".")))
+    .map((parts) => parts.join("/"));
+  return new Set(folders).size;
 }
 
 type Got = { ok: true; text: string } | { ok: false; problem: FetchProblem };
