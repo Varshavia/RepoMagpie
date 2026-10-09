@@ -335,6 +335,37 @@ test("Add GitHub topics as tags: the first click says what it will do and writes
   await expect(panel).toHaveCount(0);
 });
 
+test("the sidebar shows the 15 tags with the most notes; Show all N tags expands in place and collapses again", async ({ page, magpie }) => {
+  // One more note with 20 tags of its own: the journal now has more than 15 tags.
+  const many = Array.from({ length: 20 }, (_, i) => `many-${String(i).padStart(2, "0")}`);
+  writeFileSync(magpie.note("npm--many-tags.md"), renderNote({ id: "pkg:npm/many-tags", name: "many-tags", explored: "2026-10-09", kind: "library", tags: many }));
+  const counts = new Map<string, number>();
+  for (const file of readdirSync(join(magpie.journal, "notes"))) {
+    const tags = readNote(readFileSync(magpie.note(file), "utf8")).frontmatter.tags;
+    for (const tag of Array.isArray(tags) ? (tags as string[]) : []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  const sorted = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([tag]) => tag);
+  expect(sorted.length).toBeGreaterThan(15);
+
+  await magpie.open(page);
+  const nav = page.getByRole("navigation", { name: "Journals and screens" });
+  const tag = (name: string) => nav.getByRole("button", { name: new RegExp(`^${name}\\s*\\d+$`) });
+  for (const name of sorted.slice(0, 15)) await expect(tag(name)).toBeVisible();
+  for (const name of sorted.slice(15)) await expect(tag(name)).toHaveCount(0);
+
+  const more = nav.getByRole("button", { name: `Show all ${sorted.length} tags` });
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await more.click();
+  for (const name of sorted) await expect(tag(name)).toBeVisible();
+  const fewer = nav.getByRole("button", { name: "Show fewer tags" });
+  await expect(fewer).toHaveAttribute("aria-expanded", "true");
+  await tag(sorted[sorted.length - 1]).click(); // open a tag past the first 15
+  await fewer.click();
+  for (const name of sorted.slice(15, -1)) await expect(tag(name)).toHaveCount(0);
+  await expect(tag(sorted[sorted.length - 1])).toBeVisible(); // the open tag stays
+  await expect(page.getByRole("heading", { level: 1, name: `Tag: ${sorted[sorted.length - 1]}` })).toBeVisible();
+});
+
 test("alternatives: entries written by hand stay as written; Undo brings back a removed one with its label", async ({ page, magpie }) => {
   const file = magpie.note("npm--pdfkit.md");
   const handWritten = PDFKIT.replace("status: reviewed\n", "status: reviewed\nalternatives:\n  - '[[github--microsoft--playwright-cli|Playwright]]'  # mine\n  - \"[[yup]]\"\n");

@@ -28,6 +28,16 @@ export function sidebarCounts(notes: NoteSummary[]): Counts {
   };
 }
 
+// The sidebar's tags at scale (docs/ui.md §7, decision 0030): the 15 with the most notes (sidebarCounts
+// sorts them), or all of them. The tag open in the centre stays visible.
+export const SIDEBAR_TAGS = 15;
+
+export function shownTags<T extends { name: string }>(tags: T[], all: boolean, current: string | null): T[] {
+  if (all || tags.length <= SIDEBAR_TAGS) return tags;
+  const top = tags.slice(0, SIDEBAR_TAGS);
+  return top.some((t) => t.name === current) ? top : [...top, ...tags.filter((t) => t.name === current)];
+}
+
 // The sidebar's Tags section, from the Tag list document: "missing" for a journal with notes but no
 // tags.md ("Create tag list"), "empty" for a tags.md without tags ("Edit tag list"). A journal not
 // created yet gets the starter list with its first note, so it is "ready".

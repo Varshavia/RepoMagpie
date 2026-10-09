@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteSummary } from "../../../src/core/documents.ts";
-import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState } from "./notes.ts";
+import { filterNotes, nextAfter, noteKey, shownTags, SIDEBAR_TAGS, sidebarCounts, tagListState } from "./notes.ts";
 
 // The sidebar's Tags section from the Tag list document: an empty state for a journal with notes but
 // no tags.md ("Create tag list"), or with a tags.md that lists no tags ("Edit tag list").
@@ -34,6 +34,18 @@ test("sidebarCounts: all, inbox, kinds by name, tags by count then name", () => 
     kinds: [{ name: "cli", count: 1 }, { name: "library", count: 2 }],
     tags: [{ name: "pdf", count: 2 }, { name: "testing", count: 1 }],
   });
+});
+
+// The sidebar's Tags section at scale (decision 0030): the 15 tags with the most notes, or all of them.
+test("shownTags: the first 15 (counts come sorted), all when asked; the tag open in the centre stays visible", () => {
+  const tags = Array.from({ length: 40 }, (_, i) => ({ name: `t${String(i).padStart(2, "0")}`, count: 40 - i }));
+  assert.equal(SIDEBAR_TAGS, 15);
+  assert.deepEqual(shownTags(tags, false, null), tags.slice(0, 15));
+  assert.deepEqual(shownTags(tags, true, null), tags);
+  assert.deepEqual(shownTags(tags, false, "t30"), [...tags.slice(0, 15), tags[30]]);
+  assert.deepEqual(shownTags(tags, false, "t03"), tags.slice(0, 15));
+  assert.deepEqual(shownTags(tags, false, "gone"), tags.slice(0, 15));
+  assert.deepEqual(shownTags(tags.slice(0, 15), false, null), tags.slice(0, 15));
 });
 
 test("filterNotes: inbox, all, one kind, one tag; the document's order is kept", () => {
