@@ -73,6 +73,12 @@ export function topicSuggestions(topics: unknown, tags: string[], id: string | n
   return [...new Set(valid)].slice(0, 8);
 }
 
+// Add's "From GitHub topics" (decision 0030): the topics core ranked as possible tags (the preview's
+// topic_tags), without the tags chosen so far, at most 8.
+export function addTopicSuggestions(topicTags: string[], tags: string[]): string[] {
+  return topicTags.filter((t) => !tags.includes(t)).slice(0, 8);
+}
+
 // The tags core would refuse.
 export function tagProblems(tags: string[]): string[] {
   return tags.filter((t) => !TAG_PATTERN.test(t));

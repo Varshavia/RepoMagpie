@@ -72,7 +72,7 @@ export const api = {
   search: (params: { q: string; journal?: Scope; kind?: string; tag?: string[]; limit?: number }) =>
     get<{ query: string; results: SearchResult[] }>("/api/search", { q: params.q, journal: params.journal, kind: params.kind, tag: params.tag, limit: String(params.limit ?? 10) }),
   preview: (body: { target: string; type?: PackageType; to: Scope }) => write<NotePreviewJson>("POST", "/api/note/preview", body),
-  save: (body: { target: string; text?: string; type?: PackageType; to: Scope }) => write<SavedNoteJson>("POST", "/api/note", body),
+  save: (body: { target: string; text?: string; type?: PackageType; to: Scope; tags?: string[] }) => write<SavedNoteJson>("POST", "/api/note", body),
   importLines: (body: { text: string; to: Scope; dry_run: boolean }) => write<ImportJson>("POST", "/api/import", body),
   open: (journal: Scope, address: Address) => write<{ opened: boolean; path: string | null }>("POST", "/api/open", { journal, ...addressParams(address) }),
   openTagList: (journal: Scope) => write<{ opened: boolean; path: string | null }>("POST", "/api/open", { journal, tag_list: true }),

@@ -44,7 +44,8 @@ Behaviour:
 3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and file list (no README) and draft from them ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)):
    - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty; an agent may draft more later through the skill.
    - `kind`: the first that matches: `cli` if the root `package.json` has `bin`; `skill-pack` if any `SKILL.md` exists; `plugin` if the root has `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`; `awesome-list` if the topics include `awesome-list`; otherwise `other`.
-   - `tags`: the topics that are already in the journal's `tags.md`; otherwise `[]`.
+   - `tags`: up to 8 of the repository's GitHub topics ([decision 0030](decisions/0030-github-topics-become-tags.md)). Only topics that are valid tags, not the repository's own name (ignoring case), not on the stop list (`hacktoberfest`, `hacktoberfest` followed by a year, `open-source`, `opensource`, `good-first-issue`). Ranked: topics already in `tags.md`, then topics another note in the journal carries in its `topics` or `tags`, then the rest; GitHub's (alphabetical) order within each group. A registry package has no topics, so `[]`.
+   - `tags.md`: each of these tags that the list doesn't have is appended to it as ``- `<tag>` ``, after the note is written, with the file's own line endings; the rest of the file stays byte for byte. A journal without `tags.md` gets one with a `# Tags` heading and just these tags; a journal this save creates gets the starter list first (section 3). stderr says `Added to tags.md: <tags>`.
    - `packages`: from the manifests at the repository root only: `package.json` `name` (skipped when `"private": true`), `pyproject.toml` `[project]` `name`, `Cargo.toml` `[package]` `name`. Known limitation (v0.1): the name is recorded whether or not the package is published on its registry.
    - One skill line per `SKILL.md`, named after the folder that holds it.
    - The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable. It is never printed or logged.
@@ -65,9 +66,10 @@ $ magpie note pdfkit --alternative puppeteer
   ~/.magpie/notes/npm--pdfkit.md
 ```
 
-`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": []}`
+`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": [], "tags_md_added": []}`
 
 - `alternatives_added` and `alternatives_present` list the `--alternative` targets as given: those written, and those already there. Both are `[]` without the flag. Added in 0.2; an addition, not a breaking change.
+- `tags_md_added` lists the new note's tags that were appended to `tags.md` (step 3). Added in 0.2; an addition.
 
 ### `magpie import <file>`
 
@@ -86,9 +88,12 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 - Other lines are ignored. A line that can't be parsed or resolved is reported as `failed` and skipped; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts).
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
 - An item whose note already exists is handled as in `note`, step 2. A `verdict:` for a note that already has a Verdict makes that line `failed`. `use:`, `avoid:` and unlabelled text for an existing note are ignored with a warning on that line, because those sections are human-owned (schema rule 2).
+- A new repository note's tags come from its topics as in `note`, step 3, and new tags are appended to `tags.md` the same way. A later item ranks against the tags and notes that earlier items added, also in a dry run, so each tag is appended once. Before the summary, stderr says `Added 3 tags to tags.md: llm, rag, pdf` (`Would add` in a dry run).
 - Exit 0 if every item succeeded or was skipped as unchanged; 1 if any item failed.
 
-`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null, "warnings": []}], "created": 4, "updated": 1, "failed": 0}`
+`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null, "warnings": []}], "created": 4, "updated": 1, "failed": 0, "tags_md_added": []}`
+
+- `tags_md_added`: the tags appended to `tags.md`, in order (in a dry run, those that would be). Added in 0.2; an addition.
 
 ### `magpie search <query>`
 
@@ -216,7 +221,7 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 {"journal": "personal", "tags": ["testing", "pdf", "agent-skills"], "exists": true}
 ```
 
-**Adding tags to the list** ("From GitHub topics" in the local app, `POST /api/tags` with `{"journal", "add": ["<tag>", …]}`). Each tag must already be lowercase kebab-case (GitHub topics are); otherwise nothing is written and the answer is 400. Tags the list has are ignored; the others are appended to the end of `tags.md`, in order, as ``- `<tag>` ``, with the file's own line endings. Nothing else in the file changes. A journal without `tags.md` answers 404: "Create tag list" comes first. The answer is the Tag list document. Like "Create tag list", this happens only on the user's click (schema rule 5).
+**Adding tags to the list** ("From GitHub topics" in the local app, `POST /api/tags` with `{"journal", "add": ["<tag>", …]}`). Each tag must already be lowercase kebab-case (GitHub topics are); otherwise nothing is written and the answer is 400. Tags the list has are ignored; the others are appended to the end of `tags.md`, in order, as ``- `<tag>` ``, with the file's own line endings. Nothing else in the file changes. A journal without `tags.md` answers 404: "Create tag list" comes first. The answer is the Tag list document. Like "Create tag list", this happens only on the user's click (schema rule 5). A new note's tags are appended by the same code when it is saved (`note`, step 3).
 
 **Note list.** The notes in one journal, after the filters, sorted by `name`. Each item is a summary; the full note is the Note document.
 
@@ -295,13 +300,14 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 ```json
 {"id": "pkg:github/microsoft/playwright-cli", "journal": "personal", "path": "/home/ana/.magpie/notes/github--microsoft--playwright-cli.md",
  "exists": false, "verdict": null, "name": "microsoft/playwright-cli", "url": "https://github.com/microsoft/playwright-cli",
- "what_it_does": "...", "language": "TypeScript", "license": "Apache-2.0", "topics": ["playwright"],
- "kind": "cli", "tags": ["testing"], "packages": ["pkg:npm/%40playwright/cli"], "skills": ["playwright-cli"],
+ "what_it_does": "...", "language": "TypeScript", "license": "Apache-2.0", "topics": ["playwright"], "topic_tags": ["playwright"],
+ "kind": "cli", "tags": ["playwright"], "packages": ["pkg:npm/%40playwright/cli"], "skills": ["playwright-cli"],
  "warnings": []}
 ```
 
 - `exists` is true when the journal already has a note for that PURL (schema rule 6); `verdict` is then that note's Verdict, or `""` when it is empty, so the app can say "This note already has a Verdict" before the person writes one.
-- `what_it_does`, `kind` and `tags` are the drafts `note` would write (step 3 above). Without metadata (a registry name, or offline), the metadata fields are `null` or empty, and `warnings` says why.
+- `what_it_does`, `kind` and `tags` are the drafts `note` would write (step 3 above).
+- `topic_tags`: every topic that could become a tag, in the ranking of step 3, not cut at 8 ([decision 0030](decisions/0030-github-topics-become-tags.md)). The app's "From GitHub topics" chips are these, without the tags chosen so far, at most 8. Added in 0.2. Without metadata (a registry name, or offline), the metadata fields are `null` or empty, and `warnings` says why.
 - For a note that exists, the fields show the note as `note <target>` would leave it (tool-owned fields refreshed). The preview runs the same steps as `note` without writing: a GitHub repository that doesn't exist, or a token GitHub rejects, is a failure, as for `note`.
 
 ## 3. The two journals

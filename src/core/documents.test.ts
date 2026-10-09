@@ -512,6 +512,7 @@ test("Note preview of a GitHub URL: the drafts magpie note would write, and noth
     language: fm.language,
     license: fm.license,
     topics: fm.topics,
+    topic_tags: ["playwright"],
     kind: fm.kind,
     tags: fm.tags,
     packages: fm.packages,
@@ -537,7 +538,7 @@ test("Note preview without metadata: registry name, null metadata fields", async
   assert.deepEqual(r.document, {
     id: "pkg:npm/left-pad", journal: "personal", path: s.note("npm--left-pad.md"), exists: false, verdict: null,
     name: "left-pad", url: "https://www.npmjs.com/package/left-pad", what_it_does: null, language: null, license: null,
-    topics: [], kind: "other", tags: [], packages: [], skills: [], warnings: [],
+    topics: [], topic_tags: [], kind: "other", tags: [], packages: [], skills: [], warnings: [],
   });
 });
 

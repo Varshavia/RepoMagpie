@@ -148,10 +148,11 @@ export interface NoteEntry {
   path: string;
   id: string | undefined; // undefined when the frontmatter has no readable id
   packages: string[];
+  carries: string[]; // its topics and tags, for ranking another note's topics (decision 0030)
   text?: string; // set by a dry run: the text that would have been written
 }
 
-// Every note in <journal>/notes/ with its id and packages.
+// Every note in <journal>/notes/ with its id, packages, topics and tags.
 export function listNotes(journal: string): NoteEntry[] {
   const folder = join(journal, "notes");
   if (!isDirectory(folder)) return [];
@@ -161,9 +162,17 @@ export function listNotes(journal: string): NoteEntry[] {
     .map((name) => {
       const path = join(folder, name);
       const { frontmatter } = readNote(readFileSync(path, "utf8"));
-      const packages = Array.isArray(frontmatter.packages) ? frontmatter.packages.filter((p): p is string => typeof p === "string") : [];
-      return { path, id: typeof frontmatter.id === "string" ? frontmatter.id : undefined, packages };
+      return { path, id: typeof frontmatter.id === "string" ? frontmatter.id : undefined, packages: texts(frontmatter.packages), carries: carried(frontmatter) };
     });
+}
+
+// A note's topics and tags.
+export function carried(frontmatter: Record<string, unknown>): string[] {
+  return [...new Set([...texts(frontmatter.topics), ...texts(frontmatter.tags)])];
+}
+
+function texts(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 // The note whose id or packages has this PURL (schema rule 6).
@@ -177,6 +186,21 @@ export function parseTagList(text: string): string[] {
     .split(/\r?\n/)
     .map((line) => line.match(/^\s*[-*]\s+`?([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:\s|$)/)?.[1])
     .filter((tag): tag is string => tag !== undefined);
+}
+
+// Appends the tags that tags.md doesn't list yet, in order, as "- `tag`", with the file's own line
+// endings; the rest of the file stays byte for byte. Without tags.md, writes one with a "# Tags"
+// heading and just these tags (decision 0030). Returns the tags appended; throws if it can't write.
+export function appendTags(journal: string, tags: readonly string[]): string[] {
+  const file = join(journal, "tags.md");
+  const text = existsSync(file) ? readFileSync(file, "utf8") : null;
+  const listed = text === null ? [] : parseTagList(text);
+  const added = [...new Set(tags)].filter((tag) => !listed.includes(tag));
+  if (!added.length) return [];
+  const eol = text?.includes("\r\n") ? "\r\n" : "\n";
+  const start = text === null ? `# Tags${eol}${eol}` : text === "" || text.endsWith("\n") ? text : text + eol;
+  writeFileSync(file, start + added.map((tag) => `- \`${tag}\`${eol}`).join(""));
+  return added;
 }
 
 // The journal's tag list, <journal>/tags.md; empty when there is none.

@@ -2,8 +2,9 @@
 // to an existing one that never overwrites human-owned content (schema rule 2).
 // Pure: text in, text out. The caller finds the existing note, fetches metadata and writes the file.
 import { PackageURL } from "packageurl-js";
-import { draftKind, draftTags, type RepoMetadata } from "./github.ts";
+import { draftKind, type RepoMetadata } from "./github.ts";
 import { readNote, type SectionName } from "./note.ts";
+import { topicTags, type KnownTags } from "./topic-tags.ts";
 import { appendSkillLine, renderNote, setToolFields, setVerdict } from "./write.ts";
 
 export interface CaptureInput {
@@ -16,12 +17,14 @@ export interface CaptureInput {
   myNotes?: string; // import's unlabelled text
   metadata: RepoMetadata | null; // GitHub metadata; null when not fetched or the fetch failed
   today: string; // YYYY-MM-DD
-  tagList: string[];
+  known: KnownTags; // for ranking the topics that become a new note's tags (decision 0030)
+  tags?: string[]; // a new note's tags as the user chose them in Add's preview, in place of the draft
 }
 
 export interface Capture {
   result: "created" | "updated" | "unchanged" | "failed";
   text: string | null; // the text to write; null when nothing is written
+  tags: string[]; // the tags a created note was written with; none otherwise
   name: string | null;
   status: "inbox" | "reviewed" | null;
   error: string | null;
@@ -30,7 +33,7 @@ export interface Capture {
 
 export function captureNote(existing: string | null, input: CaptureInput): Capture {
   if (input.verdict !== undefined && /[\r\n]/.test(input.verdict.trim())) {
-    return { result: "failed", text: null, name: null, status: null, error: "The Verdict must be one line of text.", warnings: [] };
+    return { result: "failed", text: null, tags: [], name: null, status: null, error: "The Verdict must be one line of text.", warnings: [] };
   }
   return existing === null ? create(input) : update(existing, input);
 }
@@ -42,6 +45,7 @@ function create(input: CaptureInput): Capture {
   const skill = skillName(input.skillPath);
   if (skill && !skills.includes(skill)) skills.push(skill);
   const drafts: SectionName[] = ["What it does", "Use when", "Avoid when"];
+  const tags = input.tags ?? (m ? topicTags(m.topics, input.purl, input.known) : []);
   const text = renderNote({
     id: input.purl,
     name,
@@ -52,7 +56,7 @@ function create(input: CaptureInput): Capture {
     packages: m?.packages ?? undefined,
     explored: input.today,
     kind: m ? draftKind(m) : "other",
-    tags: m ? draftTags(m.topics, input.tagList) : [],
+    tags,
     verdict: input.verdict,
     whatItDoes: m?.description ?? undefined,
     useWhen: input.useWhen,
@@ -61,19 +65,20 @@ function create(input: CaptureInput): Capture {
     skills,
     drafts,
   });
-  return { result: "created", text, name, status: readNote(text).status, error: null, warnings: [] };
+  return { result: "created", text, tags, name, status: readNote(text).status, error: null, warnings: [] };
 }
 
 function update(existing: string, input: CaptureInput): Capture {
   const before = readNote(existing);
   const name = typeof before.frontmatter.name === "string" ? before.frontmatter.name : null;
-  const failed = (error: string): Capture => ({ result: "failed", text: null, name, status: before.status, error, warnings: [] });
+  const failed = (error: string): Capture => ({ result: "failed", text: null, tags: [], name, status: before.status, error, warnings: [] });
   if (input.verdict?.trim() && before.verdict) return failed("This note already has a Verdict; edit the file to change it.");
 
   const warnings: string[] = [];
   if (input.useWhen?.length || input.avoidWhen?.length || input.myNotes?.trim()) {
     warnings.push("The note already exists, so its use:, avoid: and unlabelled text were ignored; those sections are yours to edit.");
   }
+  if (input.tags) warnings.push("The note already exists, so its tags were not changed; edit them in the note.");
   let text = existing;
   const m = input.metadata;
   if (m) {
@@ -100,7 +105,7 @@ function update(existing: string, input: CaptureInput): Capture {
     text = written.text;
   }
   const changed = text !== existing;
-  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)] };
+  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)] };
 }
 
 // The name people know a subject by: owner/repo for GitHub (with the case typed in a URL),

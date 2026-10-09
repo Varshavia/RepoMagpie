@@ -18,7 +18,7 @@ const PLAYWRIGHT: RepoMetadata = {
   bin: true,
 };
 
-const input = (over: Partial<CaptureInput>): CaptureInput => ({ purl: "pkg:npm/pdfkit", source: "pdfkit", metadata: null, today: "2026-10-04", tagList: [], ...over });
+const input = (over: Partial<CaptureInput>): CaptureInput => ({ purl: "pkg:npm/pdfkit", source: "pdfkit", metadata: null, today: "2026-10-04", known: { tagList: [], shared: new Set() }, ...over });
 
 const valid = (text: string, purl: string) => assert.deepEqual(validate(readNote(text), { fileName: fileNameFor(purl) }), []);
 
@@ -60,7 +60,7 @@ test("registry URLs and display names per type", () => {
 });
 
 test("a GitHub repository with metadata: tool-owned fields, drafts and skill lines", () => {
-  const c = captureNote(null, input({ purl: "pkg:github/microsoft/playwright-cli", source: "https://github.com/microsoft/playwright-cli", metadata: PLAYWRIGHT, tagList: ["testing", "design"] }));
+  const c = captureNote(null, input({ purl: "pkg:github/microsoft/playwright-cli", source: "https://github.com/microsoft/playwright-cli", metadata: PLAYWRIGHT, known: { tagList: ["testing", "design"], shared: new Set() } }));
   assert.equal(c.result, "created");
   const note = readNote(c.text ?? "");
   assert.deepEqual(
@@ -75,7 +75,7 @@ test("a GitHub repository with metadata: tool-owned fields, drafts and skill lin
       packages: ["pkg:npm/%40playwright/cli"],
       explored: "2026-10-04",
       kind: "cli",
-      tags: ["testing"],
+      tags: ["testing", "playwright"],
       tried: false,
       rating: null,
       status: "inbox",
@@ -87,6 +87,15 @@ test("a GitHub repository with metadata: tool-owned fields, drafts and skill lin
   assert.equal(note.sections.find((s) => s.name === "Use when")?.body.trim(), "");
   assert.match(c.text ?? "", /- `dev` —\n- `playwright-cli` —\n/);
   valid(c.text ?? "", "pkg:github/microsoft/playwright-cli");
+});
+
+test("tags given for a new note (Add's preview, after removing one) replace the draft; Capture reports the tags written", () => {
+  const base = { purl: "pkg:github/microsoft/playwright-cli", source: "https://github.com/microsoft/playwright-cli", metadata: PLAYWRIGHT };
+  const drafted = captureNote(null, input(base));
+  assert.deepEqual(drafted.tags, ["playwright", "testing"]);
+  const chosen = captureNote(null, input({ ...base, tags: ["testing"] }));
+  assert.deepEqual(readNote(chosen.text ?? "").frontmatter.tags, ["testing"]);
+  assert.deepEqual(chosen.tags, ["testing"]);
 });
 
 test("a GitHub repository without metadata (network failed): name and URL keep the case typed", () => {

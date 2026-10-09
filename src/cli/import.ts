@@ -52,6 +52,8 @@ export async function importCommand(file: string, options: ImportOptions, io: Io
     for (const warning of r.warnings) io.err(`line ${r.line}: warning: ${warning}\n`);
     if (r.error) io.err(`line ${r.line}: ${r.error}\n`);
   }
+  const added = run.document.tags_md_added;
+  if (added.length) io.err(`${options.dryRun ? "Would add" : "Added"} ${added.length} ${added.length === 1 ? "tag" : "tags"} to tags.md: ${added.join(", ")}\n`);
   if (options.dryRun) io.err("Dry run: nothing was written.\n");
   io.err(`${count("created")} created, ${count("updated")} updated, ${count("unchanged")} unchanged, ${count("failed")} failed.\n`);
   return exitCode(run.outcome);

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { draftKind, draftTags, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
+import { draftKind, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
 
 // Recorded GET responses (src/core/fixtures/github/); no test touches the network.
 function recorded(name: string): Record<string, unknown> {
@@ -329,10 +329,4 @@ test("draftKind on the recorded repositories", async () => {
     kinds.push(draftKind(r.metadata));
   }
   assert.deepEqual(kinds, ["skill-pack", "cli", "awesome-list"]);
-});
-
-test("draftTags keeps only topics already in the tag list, sorted", () => {
-  assert.deepEqual(draftTags(["testing", "playwright", "design", "testing"], ["design", "frontend", "testing"]), ["design", "testing"]);
-  assert.deepEqual(draftTags(["playwright"], ["testing"]), []);
-  assert.deepEqual(draftTags(["testing"], []), []);
 });

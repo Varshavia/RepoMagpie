@@ -5,6 +5,7 @@ import { dirname, join, parse } from "node:path";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { fileURLToPath } from "node:url";
 import {
+  appendTags,
   configPath,
   createJournal,
   journalTagList,
@@ -220,7 +221,12 @@ test("listNotes reads every note's id and packages; noteFor matches either", () 
 test("listNotes on a journal without notes/ is empty; unreadable frontmatter gives an entry without id", () => {
   assert.deepEqual(listNotes(fixture({})), []);
   const journal = fixture({ "notes/npm--broken.md": "---\nid: [\n---\n" });
-  assert.deepEqual(listNotes(journal), [{ path: join(journal, "notes", "npm--broken.md"), id: undefined, packages: [] }]);
+  assert.deepEqual(listNotes(journal), [{ path: join(journal, "notes", "npm--broken.md"), id: undefined, packages: [], carries: [] }]);
+});
+
+test("listNotes: each note carries its topics and tags, once each", () => {
+  const journal = fixture({ "notes/npm--x.md": "---\nid: pkg:npm/x\ntopics: [llm, rag]\ntags: [rag, pdf, 3]\n---\n" });
+  assert.deepEqual(listNotes(journal)[0].carries, ["llm", "rag", "pdf"]);
 });
 
 // The tag list: one "- `tag`" line per tag, optionally followed by " — meaning"
@@ -281,6 +287,33 @@ test("the starter tag list has exactly the example vault's ten tag lines", () =>
   assert.deepEqual(tagLines(STARTER_TAGS), tagLines(example));
   assert.equal(parseTagList(STARTER_TAGS).length, 10);
   assert.doesNotMatch(STARTER_TAGS, /\]\(/); // no links that would break inside a user's journal
+});
+
+// appendTags (decision 0030): the append that "From GitHub topics" and new notes share.
+test("appendTags appends the tags the list doesn't have, in order, once each, with the file's line endings; the rest stays byte for byte", () => {
+  const before = "# Tags\r\n\r\n- `pdf` — PDFs\r\nnot a tag line\r\n";
+  const journal = fixture({ "tags.md": before });
+  assert.deepEqual(appendTags(journal, ["pdf", "llm", "rag", "llm"]), ["llm", "rag"]);
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), `${before}- \`llm\`\r\n- \`rag\`\r\n`);
+  assert.deepEqual(appendTags(journal, ["rag"]), []);
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), `${before}- \`llm\`\r\n- \`rag\`\r\n`);
+});
+
+test("appendTags: a file without a final line break gets one first; an empty file stays without one", () => {
+  const journal = fixture({ "tags.md": "- `pdf`" });
+  appendTags(journal, ["llm"]);
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), "- `pdf`\n- `llm`\n");
+  const empty = fixture({ "tags.md": "" });
+  appendTags(empty, ["llm"]);
+  assert.equal(readFileSync(join(empty, "tags.md"), "utf8"), "- `llm`\n");
+});
+
+test("appendTags without tags.md writes one with a # Tags heading and just these tags; nothing to add writes nothing", () => {
+  const journal = fixture({ "notes/": null });
+  assert.deepEqual(appendTags(journal, []), []);
+  assert.equal(existsSync(join(journal, "tags.md")), false);
+  assert.deepEqual(appendTags(journal, ["llm", "rag"]), ["llm", "rag"]);
+  assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), "# Tags\n\n- `llm`\n- `rag`\n");
 });
 
 test("journalTagList: tags.md if there is one; the starter list for a journal not created yet; otherwise none", () => {

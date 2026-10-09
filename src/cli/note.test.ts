@@ -34,7 +34,7 @@ test("--json prints exactly the spec's document and nothing on stderr", async ()
   const r = await magpie(box, ["note", "pdfkit", "ok", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [] });
 });
 
 test("a second Verdict is refused: exit 1, the path is printed, the file is unchanged", async () => {
@@ -53,7 +53,7 @@ test("text for an existing note with an empty Verdict writes it", async () => {
   await magpie(box, ["note", "pdfkit"]);
   const r = await magpie(box, ["note", "pdfkit", "later verdict", "--json"]);
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [] });
   valid(box.note("npm--pdfkit.md"));
 });
 
@@ -84,20 +84,68 @@ test("a GitHub URL creates a note from GitHub's metadata, with tags from tags.md
   valid(path);
 });
 
-test("the first note in a new journal writes the starter tag list and drafts tags from it", async () => {
-  const box = sandbox();
+// The playwright-cli fixture with other topics.
+function withTopics(topics: string[]): Fetch {
   const responses = recorded("microsoft--playwright-cli");
   const repo = responses["/repos/microsoft/playwright-cli"] as object;
-  const fetch = fakeFetch({ ...responses, "/repos/microsoft/playwright-cli": { ...repo, topics: ["playwright", "testing"] } });
-  const r = await magpie(box, ["note", PLAYWRIGHT_URL], { fetch });
+  return fakeFetch({ ...responses, "/repos/microsoft/playwright-cli": { ...repo, topics } });
+}
+
+test("the first note in a new journal writes the starter tag list, then appends its topics that the list doesn't have", async () => {
+  const box = sandbox();
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL], { fetch: withTopics(["playwright", "testing"]) });
   assert.equal(r.code, 0, r.err);
-  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), STARTER_TAGS);
-  assert.deepEqual(readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter.tags, ["testing"]);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), `${STARTER_TAGS}- \`playwright\`\n`);
+  assert.deepEqual(readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter.tags, ["testing", "playwright"]);
+  assert.match(r.err, /^Added to tags\.md: playwright$/m);
 });
 
-test("an existing tags.md is never overwritten", async () => {
+// Decision 0030: topics become tags at creation.
+test("topics become tags: ranked (tags.md, then other notes, then the rest), at most 8, without the repository's name or the stop list", async () => {
+  const tagsMd = "# My tags\r\n\r\n- `pdf` — PDFs\r\nfree text\r\n- `llm`"; // CRLF, no final line break
+  const other = "---\nid: pkg:npm/x\nname: x\ntopics: [vector]\ntags: [rag]\n---\n";
+  const box = sandbox({ "journal/tags.md": tagsMd, "journal/notes/npm--x.md": other });
+  const topics = ["a1", "a2", "a3", "a4", "a5", "a6", "a7", "hacktoberfest", "llm", "open-source", "pdf", "playwright-cli", "rag", "vector"];
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL, "--json"], { fetch: withTopics(topics) });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter.tags, ["llm", "pdf", "rag", "vector", "a1", "a2", "a3", "a4"]);
+  assert.deepEqual(JSON.parse(r.out).tags_md_added, ["rag", "vector", "a1", "a2", "a3", "a4"]);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), `${tagsMd}\r\n- \`rag\`\r\n- \`vector\`\r\n- \`a1\`\r\n- \`a2\`\r\n- \`a3\`\r\n- \`a4\`\r\n`);
+  assert.equal(readFileSync(box.note("npm--x.md"), "utf8"), other);
+});
+
+test("a topic already in tags.md isn't appended again; tags.md stays byte for byte", async () => {
+  const box = sandbox({ "journal/tags.md": "- `testing` — tests\n- `playwright`\n" });
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL, "--json"], { fetch: withTopics(["playwright", "testing"]) });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(JSON.parse(r.out).tags_md_added, []);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `testing` — tests\n- `playwright`\n");
+  assert.deepEqual(readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter.tags, ["playwright", "testing"]);
+});
+
+test("a journal with notes but no tags.md gets one holding just the new tags", async () => {
+  const box = sandbox({ "journal/notes/": null });
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL], { fetch: withTopics(["playwright", "testing"]) });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "# Tags\n\n- `playwright`\n- `testing`\n");
+});
+
+test("a registry package gets no tags, and an existing tags.md is never overwritten", async () => {
   const box = sandbox({ "journal/tags.md": "- `mine`\n" });
   await magpie(box, ["note", "pkg:npm/pdfkit"]);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `mine`\n");
+  assert.deepEqual(readNote(readFileSync(box.note("npm--pdfkit.md"), "utf8")).frontmatter.tags, []);
+});
+
+test("an existing note's tags are never changed by its topics", async () => {
+  const box = sandbox({ "journal/tags.md": "- `mine`\n" });
+  await magpie(box, ["note", PLAYWRIGHT_URL], { fetch: withTopics(["mine"]) });
+  const path = box.note("github--microsoft--playwright-cli.md");
+  const r = await magpie(box, ["note", PLAYWRIGHT_URL, "--json"], { fetch: withTopics(["mine", "newer", "topics"]) });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(readNote(readFileSync(path, "utf8")).frontmatter.tags, ["mine"]);
+  assert.deepEqual(readNote(readFileSync(path, "utf8")).frontmatter.topics, ["mine", "newer", "topics"]);
+  assert.deepEqual(JSON.parse(r.out).tags_md_added, []);
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `mine`\n");
 });
 
@@ -358,7 +406,7 @@ test("--alternative on a new note: written with it; a target without a note is w
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(JSON.parse(r.out), {
     id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [],
-    alternatives_added: ["puppeteer"], alternatives_present: [],
+    alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [],
   });
   assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[puppeteer]]"]);
   valid(box.note("npm--pdfkit.md"));

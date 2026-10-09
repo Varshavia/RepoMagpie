@@ -159,19 +159,44 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
     [{ target: "pkg:npm/pdfkit", text: "second verdict", to: "personal" }, ["note", "pkg:npm/pdfkit", "second verdict"], null],
     [{ target: "https://example.com/an-article", to: "personal" }, ["note", "https://example.com/an-article"], null],
   ];
+  const tagsMd = join(box.journal, "tags.md");
+  const tagsBefore = readFileSync(tagsMd, "utf8");
   for (const [body, argv, file] of cases) {
     const expected = await cli(box, argv, fetch);
     const written = file ? readFileSync(box.note(file), "utf8") : null;
+    const tagsWritten = readFileSync(tagsMd, "utf8");
     if (file) rmSync(box.note(file));
+    writeFileSync(tagsMd, tagsBefore);
     assert.deepEqual(parsed(await http.write("POST", "/api/note", body)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, JSON.stringify(body));
+    assert.equal(readFileSync(tagsMd, "utf8"), tagsWritten);
     if (file) {
       assert.equal(readFileSync(box.note(file), "utf8"), written);
       rmSync(box.note(file)); // the next case starts without it
     }
+    writeFileSync(tagsMd, tagsBefore);
   }
-  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }]) {
+  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }, { target: "pkg:npm/x", tags: "pdf" }, { target: "pkg:npm/x", tags: ["Not A Tag"] }]) {
     assert.equal((await http.write("POST", "/api/note", body)).status, 400, JSON.stringify(body));
   }
+});
+
+// Decision 0030: Add's preview shows the tags the save will write; the user can remove one first.
+test("POST /api/note with tags writes those tags for a new note, appending the new ones to tags.md; an existing note keeps its tags", async (t) => {
+  const { box, http } = await start(t);
+  const target = "https://github.com/microsoft/playwright-cli";
+  const r = parsed(await http.write("POST", "/api/note", { target, to: "personal", tags: ["testing", "browsers"] }));
+  assert.equal(r.status, 200);
+  assert.deepEqual((r.document as { tags_md_added: string[] }).tags_md_added, ["browsers"]);
+  const path = box.note("github--microsoft--playwright-cli.md");
+  const before = readFileSync(path, "utf8");
+  assert.match(before, /^tags: \[testing, browsers\]$/m);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `browsers`\n");
+
+  const again = parsed(await http.write("POST", "/api/note", { target: "pkg:npm/pdfkit", to: "personal", tags: ["other"] }));
+  assert.equal(again.status, 200);
+  assert.match((again.document as { warnings: string[] }).warnings.join(" "), /already exists, so its tags were not changed/);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), PDFKIT);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n- `browsers`\n");
 });
 
 test("POST /api/import returns exactly magpie import --json", async (t) => {
@@ -185,7 +210,7 @@ test("POST /api/import returns exactly magpie import --json", async (t) => {
   rmSync(box.note("npm--chalk.md"));
   assert.deepEqual(parsed(await http.write("POST", "/api/import", { text, to: "personal" })), { status: 422, document: real.document });
   assert.equal(readFileSync(box.note("npm--chalk.md"), "utf8"), written);
-  assert.deepEqual(parsed(await http.write("POST", "/api/import", { text: "nothing here", to: "project" })), { status: 200, document: { items: [], created: 0, updated: 0, failed: 0 } });
+  assert.deepEqual(parsed(await http.write("POST", "/api/import", { text: "nothing here", to: "project" })), { status: 200, document: { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [] } });
   for (const body of [{ to: "personal" }, { text: "", to: "x" }, { text: "", dry_run: "yes" }]) assert.equal((await http.write("POST", "/api/import", body)).status, 400);
 });
 
@@ -195,9 +220,16 @@ test("POST /api/note/preview returns the Note preview document and writes nothin
   assert.equal(r.status, 200);
   assert.deepEqual({ ...(r.document as object) }, {
     id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), exists: true, verdict: "avoid: async streams painful; use puppeteer",
-    name: "pdfkit", url: null, what_it_does: "A PDF library.", language: null, license: null, topics: [], kind: "library", tags: ["pdf"], packages: [], skills: [], warnings: [],
+    name: "pdfkit", url: null, what_it_does: "A PDF library.", language: null, license: null, topics: [], topic_tags: [], kind: "library", tags: ["pdf"], packages: [], skills: [], warnings: [],
   });
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), PDFKIT);
+  // A GitHub repository: the tags its save would write, and every topic that could become a tag, ranked.
+  const github = parsed(await http.write("POST", "/api/note/preview", { target: "https://github.com/microsoft/playwright-cli", to: "personal" }));
+  assert.equal(github.status, 200);
+  const doc = github.document as { exists: boolean; tags: string[]; topic_tags: string[] };
+  assert.deepEqual([doc.exists, doc.tags, doc.topic_tags], [false, ["playwright"], ["playwright"]]);
+  assert.equal(existsSync(box.note("github--microsoft--playwright-cli.md")), false);
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
   assert.equal((await http.write("POST", "/api/note/preview", { target: "https://github.com/nobody/nothing", to: "personal" })).status, 422);
   assert.equal((await http.write("POST", "/api/note/preview", { target: "not a name" })).status, 400);
 });

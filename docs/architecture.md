@@ -111,7 +111,7 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 2. **URL only, fetch from GitHub:** description, language, license, topics and the file list (no README). Detect `SKILL.md` files and root manifests. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
 3. **No note yet:** write a new note with:
    - the user's text, as the Verdict (note schema, rule 7);
-   - for a URL: tool-owned fields, drafts of `kind`, `tags` (topics already in `tags.md`) and "What it does" (the GitHub description) ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
+   - for a URL: tool-owned fields, drafts of `kind`, `tags` (up to 8 topics, ranked in `core/topic-tags.ts`; new ones appended to `tags.md`, [decision 0030](decisions/0030-github-topics-become-tags.md)) and "What it does" (the GitHub description) ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
    - defaults: `tried: false`, and `status` per note schema rule 1 (`reviewed` once the user gave a Verdict, otherwise `inbox`).
 4. **Note exists:** append skill lines for skills not listed yet, and refresh tool-owned fields. Write the Verdict only if it is empty; never overwrite one ([spec](spec.md), section 2). Never change other human-owned fields or sections (note schema, rule 2).
 5. **Search index:** marked stale; the next command that needs it rebuilds it.

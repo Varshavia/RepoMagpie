@@ -8,6 +8,8 @@ import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
 import { parseImport } from "./import.ts";
 import {
+  appendTags,
+  carried,
   createJournal,
   findManifests,
   findProjectJournal,
@@ -24,6 +26,7 @@ import {
 import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
 import type { Outcome } from "./outcome.ts";
+import type { KnownTags } from "./topic-tags.ts";
 import { alternativeLinks, targetResolver } from "./wikilinks.ts";
 import { addAlternatives } from "./write.ts";
 
@@ -66,6 +69,7 @@ export interface Item {
   avoidWhen?: string[];
   myNotes?: string;
   alternatives?: string[]; // note's --alternative targets, as the user gave them (decision 0029)
+  tags?: string[]; // a new note's tags as chosen in Add's preview, in place of the drafted ones
 }
 
 export interface ItemResult {
@@ -79,18 +83,27 @@ export interface ItemResult {
   notices: string[]; // things done on the way, such as creating the project journal
   text: string | null; // the note's text after this item (written, or what a dry run would write); null when failed
   alternatives: { added: string[]; present: string[] }; // the --alternative targets, as given
+  tagsMdAdded: string[]; // the new note's tags appended to tags.md (or, in a dry run, that would be)
+}
+
+// What ranks a new note's topics (decision 0030): the tag list, and the topics and tags of every
+// other note in the journal.
+export function knownTags(notes: NoteEntry[], tagList: readonly string[], path: string | null): KnownTags {
+  return { tagList, shared: new Set(notes.filter((note) => note.path !== path).flatMap((note) => note.carries)) };
 }
 
 // Creates or updates the note for one item. `notes` is the journal's note list; a new note is
-// added to it, so a later item can find it. With `dryRun`, nothing is written: the text that
-// would have been written is kept in `notes`, so later items see the same state as a real run.
-export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, context: Context, dryRun = false): Promise<ItemResult> {
+// added to it, so a later item can find it. `tagList` is the journal's tag list; a new note's tags
+// that it lacks are appended to tags.md and to it. With `dryRun`, nothing is written: the text that
+// would have been written is kept in `notes`, and `tagList` grows the same way, so later items see
+// the same state as a real run.
+export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, context: Context, dryRun = false, tagList = journalTagList(journal.path)): Promise<ItemResult> {
   const entry = noteFor(notes, item.purl);
   const path = entry?.path ?? join(journal.path, "notes", fileNameFor(item.purl));
   const warnings: string[] = [];
   const notices: string[] = [];
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
-    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] } });
+    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [] });
 
   const atPath = notes.find((note) => note.path === path);
   if (!entry && (atPath || existsSync(path))) {
@@ -112,7 +125,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     }
   }
 
-  const capture = captureNote(existing, { ...item, metadata, today: context.today(), tagList: journalTagList(journal.path) });
+  const capture = captureNote(existing, { ...item, metadata, today: context.today(), known: knownTags(notes, tagList, path) });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
 
@@ -132,9 +145,9 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   }
   const result = capture.result === "unchanged" && text !== null ? "updated" : capture.result;
 
+  let tagsMdAdded: string[] = [];
   if (text !== null && dryRun) {
-    if (entry) entry.text = text;
-    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], text });
+    tagsMdAdded = [...new Set(capture.tags)].filter((tag) => !tagList.includes(tag));
   } else if (text !== null) {
     try {
       if (createJournal(journal.path, journal.scope) && journal.scope === "project") notices.push(`Created the project journal: ${journal.path}`);
@@ -142,7 +155,17 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     } catch (error) {
       return fail(`Couldn't write ${path}: ${(error as Error).message}`, null);
     }
-    if (!entry) notes.push({ path, id: item.purl, packages: metadata?.packages ?? [] });
+    try {
+      tagsMdAdded = appendTags(journal.path, capture.tags);
+    } catch (error) {
+      warnings.push(`Couldn't add the note's tags to tags.md: ${(error as Error).message}`);
+    }
+  }
+  tagList.push(...tagsMdAdded);
+  if (text !== null) {
+    const carries = carried(readNote(text).frontmatter);
+    if (entry) Object.assign(entry, { carries }, dryRun ? { text } : {});
+    else notes.push({ path, id: item.purl, packages: metadata?.packages ?? [], carries, ...(dryRun ? { text } : {}) });
   }
   return {
     id: entry?.id ?? item.purl,
@@ -155,6 +178,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     notices,
     text: text ?? existing,
     alternatives,
+    tagsMdAdded,
   };
 }
 
@@ -232,6 +256,7 @@ export interface NoteRequest {
   type?: PackageType;
   to: Journal["scope"];
   alternatives?: string[]; // --alternative, repeatable
+  tags?: string[]; // Add's preview: the new note's tags, as the user left them
 }
 
 // The --json document of magpie note (spec §2).
@@ -244,6 +269,7 @@ export interface NoteJson {
   warnings: string[];
   alternatives_added: string[];
   alternatives_present: string[];
+  tags_md_added: string[];
   error?: string;
 }
 
@@ -261,7 +287,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], error },
+    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error },
   });
   if (journal.error) return stop(journal.error, "failed");
   const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
@@ -273,7 +299,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
 
-  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives };
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, tags: request.tags };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
     id: saved.id,
@@ -284,6 +310,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     warnings: [...journal.warnings, ...saved.notices, ...saved.warnings],
     alternatives_added: saved.alternatives.added,
     alternatives_present: saved.alternatives.present,
+    tags_md_added: saved.tagsMdAdded,
   };
   if (saved.error !== null) document.error = saved.error;
   return { outcome: saved.error === null ? "ok" : "failed", document, journal, saved };
@@ -310,6 +337,7 @@ export interface ImportJson {
   created: number;
   updated: number;
   failed: number;
+  tags_md_added: string[]; // the new notes' tags appended to tags.md, in order
   error?: string;
 }
 
@@ -322,7 +350,7 @@ export interface ImportRun {
 }
 
 export function importFailure(error: string): ImportJson {
-  return { items: [], created: 0, updated: 0, failed: 0, error };
+  return { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], error };
 }
 
 // magpie import: one item per "- " line. One bad line never stops the rest; import never prompts.
@@ -331,6 +359,8 @@ export async function runImport(request: ImportRequest, context: Context): Promi
   if (journal.error) return { outcome: "failed", document: importFailure(journal.error), journal, results: [], notices: [] };
 
   const notes = listNotes(journal.path);
+  const tagList = journalTagList(journal.path);
+  const tagsMdAdded: string[] = [];
   const manifests = findManifests(context.cwd);
   const notices = new Set<string>();
   const results: LineResult[] = [];
@@ -351,7 +381,8 @@ export async function runImport(request: ImportRequest, context: Context): Promi
       continue;
     }
     const { useWhen, avoidWhen, verdict, myNotes } = item;
-    const saved = await saveItem(journal, notes, { purl: resolution.purl, skillPath: resolution.skillPath, source: item.target, verdict, useWhen, avoidWhen, myNotes }, context, request.dryRun);
+    const saved = await saveItem(journal, notes, { purl: resolution.purl, skillPath: resolution.skillPath, source: item.target, verdict, useWhen, avoidWhen, myNotes }, context, request.dryRun, tagList);
+    tagsMdAdded.push(...saved.tagsMdAdded);
     for (const notice of saved.notices) notices.add(notice);
     results.push({ line: item.line, target: item.target, id: saved.id, result: saved.result, error: saved.error, warnings: saved.warnings });
   }
@@ -362,6 +393,7 @@ export async function runImport(request: ImportRequest, context: Context): Promi
     created: count("created"),
     updated: count("updated"),
     failed: count("failed"),
+    tags_md_added: tagsMdAdded,
   };
   return { outcome: count("failed") ? "failed" : "ok", document, journal, results, notices: [...notices] };
 }
