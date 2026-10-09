@@ -30,12 +30,12 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 | `url` | no | string | tool | Canonical URL: the GitHub repository or the registry page |
 | `language` | no | string | tool | Primary language from GitHub |
 | `license` | no | string | tool | An SPDX identifier, `mixed` if licensing differs per skill or file, or `unknown` if none was found ([decision 0020](decisions/0020-unknown-license.md)) |
-| `topics` | no | list | tool | Raw GitHub topics; the source for tag suggestions |
+| `topics` | no | list | tool | Raw GitHub topics; the source for drafted tags and tag suggestions ([decision 0030](decisions/0030-github-topics-become-tags.md)) |
 | `packages` | no | list of PURLs | tool | Packages this subject publishes, e.g. `["pkg:npm/%40playwright/cli"]`. Recall matches them |
 | `explored` | yes | date | tool | Date the note was created (YYYY-MM-DD); set once, never refreshed |
 | `adopted` | no | date | tool | Project journal only: the date `magpie adopt` copied this note from the personal journal ([spec](spec.md)) |
 | `kind` | yes | enum | human (tool drafts at creation) | See below |
-| `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the journal's tag list |
+| `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the journal's tag list. Drafted from a repository's GitHub topics (rule 5) |
 | `tried` | yes | bool | human (default `false`) | Have you actually run it? |
 | `rating` | no | 1–5 | human | Leave empty until tried |
 | `status` | yes | enum | human (tool sets it at creation) | `inbox` or `reviewed`; see rule 1 |
@@ -93,11 +93,14 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
 2. **Ownership.**
    - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
    - **Human-owned:** `kind`, `tags`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `magpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
-   - **At creation only**, the tool may write drafts of `kind`, `tags` (from topics), "What it does" and "Use when". It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
+   - The tool writes `tags` after creation only when you ask: an edit in the local app, or "Add GitHub topics as tags" (`magpie tags --from-topics`), which adds topics until the note has 8 tags and never removes or reorders one ([decision 0030](decisions/0030-github-topics-become-tags.md)). Either is a human edit.
+   - **At creation only**, the tool may write drafts of `kind`, `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
    - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines.
 3. **Drafts.** A drafted section starts with the line `<!-- magpie:draft -->`. AI may draft only "What it does" and "Use when". "Avoid when" may also be a draft when it comes from the user's own `avoid:` text in `magpie import` (rule 7). The Verdict is never a draft. Deleting the marker accepts the draft. Search, suggest and recall label draft text as a draft.
 4. **Notable skills.** The tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
 5. **Tags** come from the journal's tag list (`<journal>/tags.md`), so the same idea isn't spelled three ways. Across the two journals, tags match by name. The tag list has one list line per tag, optionally with its meaning: ``- `testing` — tests and end-to-end checks``. Other lines are ignored. A new journal starts with a starter list of ten tags ([spec](spec.md), section 3); edit it freely. A journal with notes but no `tags.md` gets the starter list only when you ask for it ("Create tag list" in the local app).
+   - **GitHub topics become tags** ([decision 0030](decisions/0030-github-topics-become-tags.md)). When a note for a GitHub repository is created, its topics become its tags: only valid tags, not the repository's own name, not a topic on the stop list (`hacktoberfest`, `hacktoberfest` with a year, `open-source`, `opensource`, `good-first-issue`), at most 8. Topics already in `tags.md` come first, then topics another note in the journal also carries (in its `topics` or `tags`), then the rest; within each group, GitHub's (alphabetical) order. "Add GitHub topics as tags" uses the same rule for existing notes.
+   - Each of these tags not yet in `tags.md` is appended to it as ``- `<tag>` `` in the same save. A journal without `tags.md` gets one with a `# Tags` heading and just those tags. Clicking a "From GitHub topics" chip appends its tag the same way.
 6. **One note per subject.** A PURL appears in at most one note per journal, as its `id` or in its `packages`. A repository note that lists `pkg:npm/pdfkit` is the note for that package too.
 7. **User input.**
    - `magpie note <name-or-url> "text"`: the text is the Verdict (human-written).

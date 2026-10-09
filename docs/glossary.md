@@ -52,11 +52,11 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **`SKILL.md`** | The file that defines a skill. RepoMagpie detects these files in a repository, and ships its own `SKILL.md` that teaches agents to use `magpie` (roadmap v0.1). |
 | **status** | The frontmatter field with the review state of a note: `inbox` or `reviewed`. |
 | **suggest** | Planned (v0.1): `magpie suggest` shows notes from both journals that fit a project, from its manifests and README or a free-text description, verdict first. In v0.1 magpie narrows candidates by keyword and tags, and the coding agent makes the final choice. See [ideas](ideas.md), idea 4. |
-| **tag** | A lowercase, kebab-case label in a note's `tags` field, chosen by the user from the tag list. |
+| **tag** | A lowercase, kebab-case label in a note's `tags` field, from the tag list. Drafted from a repository's GitHub topics at creation; the user keeps or removes them ([decision 0030](decisions/0030-github-topics-become-tags.md)). |
 | **tag list** | The single shared list of allowed tags, in `<vault>/tags.md`. |
 | **the tool** | RepoMagpie's own code (`magpie` and the core it calls), as opposed to the user. Used in *tool-owned* and *the tool may draft*. |
 | **tool-owned** | A field the tool fills and may refresh: `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, and `explored` and `adopted` (both set once). |
-| **topic** | A label the repository's owner set on GitHub. Stored raw in `topics`; the tool uses topics to suggest tags. A topic is not a tag. |
+| **topic** | A label the repository's owner set on GitHub. Stored raw in `topics`; the tool drafts up to 8 tags from them and offers the rest as suggestions ([decision 0030](decisions/0030-github-topics-become-tags.md)). A topic is not a tag. |
 | **typed relation** | A link between two notes with a meaning, stored in a human-owned frontmatter field: `alternatives` (accepted, v0.2 part 1, [decision 0027](decisions/0027-alternatives-active.md)) or `works_with` (proposed, [decision 0007](decisions/0007-typed-relations-in-frontmatter.md)). One side is enough: a note that lists B as an alternative makes the two alternatives of each other. See [ideas](ideas.md), idea 10. |
 | **unresolved link** | A link whose target is no note in the journal (`missing`), or the name of several notes (`ambiguous`). Allowed: it can name a subject you have no note on yet ([decision 0027](decisions/0027-alternatives-active.md)). |
 | **"Use when" / "Avoid when"** | Two body sections: concrete situations where the subject fits, and where it hurt or doesn't fit, one per bullet. "Use when" may start as an AI draft; both are human-owned ([note schema](note-schema.md)). They replace "When it's useful" from schema v0. |

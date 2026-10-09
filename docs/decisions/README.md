@@ -38,3 +38,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
 | 0028 | [The graph page](0028-the-graph-page.md) | accepted |
 | 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
+| 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted |
