@@ -11,7 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups.
+  Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups; the topics-as-tags follow-up is built on `feat/topic-tags`.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -287,6 +287,19 @@ Follow-up, watch (the maintainer, 2026-10-08):
   - Read the file times in parallel (`fs.promises.stat` through libuv's thread pool) instead of 2,000 synchronous `statSync` calls.
   - Compare the cache's signature file by file instead of `JSON.stringify` of both, and make the shape check cheaper (one pass, no closures).
   - A smaller recall cache: keep only the fields the hook reads, and the alternatives already resolved, so a run parses and resolves less.
+
+### Follow-up: topics become tags, a better kind guess (`feat/topic-tags`)
+From the maintainer's first day of real use (2026-10-09): ten GitHub repositories gave 4 tags in total, and 9 of 20 notes were `other`. Decision: [0030](decisions/0030-github-topics-become-tags.md).
+- [x] Decision 0030, and note-schema rules 2 and 5.
+- [x] At creation (`magpie note`, `magpie import`, Add), a repository's GitHub topics become its tags: ranked (in `tags.md`, then carried by other notes, then the rest), without its own name or the stop list, at most 8; new tags are appended to `tags.md`. Add's preview shows them, each removable.
+- [x] "Add GitHub topics as tags" for existing notes: `magpie tags --from-topics`, `POST /api/tags/from-topics` and a button in All notes; a dry run first, never a tag removed or reordered, a second run adds nothing.
+- [x] A better kind guess: `app`, `platform`, `framework`, `library` and `template`; a skill pack by its name, a topic, or 3 or more skill folders outside hidden folders. Recorded on 13 real repositories (`src/core/fixtures/kinds.json`).
+- [x] The sidebar shows the 15 tags with the most notes, then "Show all N tags".
+
+**Done when:** a new GitHub repository note arrives with up to 8 tags from its topics; one action tags the existing notes, and a second run adds nothing; coolify and browser-use are no longer guessed as skill packs, and dify isn't `other` (langflow is a `library`, supabase stays `other`: accepted in 0030); the sidebar stays usable with hundreds of tags; all checks pass. (Met on `feat/topic-tags`, 2026-10-09, Windows dev machine, Node 24.13: 896 tests (894 pass, 2 skipped), 147 hook tests and 66 end-to-end flows. The dev machine was loaded that day: the local benchmarks ran 2–4× slower than at `0.2.0-beta.2`, and the graph's 2,000-note timing missed its 2 s in 4 of 8 runs. CI's report shows no regression: the graph's warm first frame 2,153 and 2,325 ms on this branch, 1,618–2,436 ms over `main`'s last five runs; every benchmark equal or faster than on `main`.)
+
+Follow-up, later (the maintainer, 2026-10-09):
+- [ ] Tag synonyms: topics give near-duplicate tags (`llm` and `llms`, `no-code` and `nocode`, `web-scraping`, `webscraping` and `web-scraper`, `self-hosted` and `self-hosting`). Decide whether magpie merges or suggests one spelling; renaming and merging tags are out of scope until then.
 
 ## v0.3 Trust
 - [ ] `magpie init`, if it missed v0.1.
