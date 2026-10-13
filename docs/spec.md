@@ -12,6 +12,7 @@ v0.1 is implemented on `feat/...` branches; the [roadmap](roadmap.md) says which
 - **Streams:** data goes to stdout; messages, warnings and errors go to stderr.
 - **`--json`** on every command prints one JSON document to stdout and nothing else ([decision 0008](decisions/0008-machine-readable-output.md)). Its shape is part of the public interface. Under `--json`, `repomagpie` never prompts.
 - **`--json` on failure** (exit 1 or 2): the same document as on success, plus an `"error"` field with the message. Fields that aren't known are `null`, lists are empty, and counts are 0. Example: `{"id": null, "journal": "personal", "path": null, "created": false, "status": null, "warnings": [], "error": "Not a supported input. ..."}`. A usage error that the command-line parser catches (an unknown flag, a missing argument) prints its message on stderr only.
+- **Note text in `--json`** ([decision 0032](decisions/0032-note-text-is-data.md)): in the documents of `recall`, `suggest`, `search` and `note` (and the API's answers for them), every string is cleaned of control characters (C0 but the line break, DEL, C1, ANSI and OSC escape sequences with their payload, bidi controls and marks, zero-width characters), and note-derived fields are capped: `name` 214 characters, `id` 256, `verdict` 1,000 (a skill line's 500), each `avoid_when` and `use_when` item 500 and at most 20 of them, at most 20 `alternatives`, each tag 64 and at most 32, any other string 1,000; paths are cleaned, not cut. A cut text ends with `…`. The object that holds a cut field gets `"truncated": ["verdict"]`, naming each cut field; without a cut the key isn't there, so it is an addition, not a breaking change. The decision gives the reason for each cap.
 - **Interactive prompts** happen only when stdin and stdout are terminals and `--json` is not set.
 - **Global flags:** `--json`, `--home <dir>` (personal journal), `--project <dir>` (project root, like `git -C`; a path to its `.magpie` folder also works), `--help`, `--version`.
 - **Exit codes:**
@@ -453,8 +454,21 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "ask",
-    "permissionDecisionReason": "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\nAlternatives: puppeteer: default for PDF rendering in new projects\n~/.magpie/notes/npm--pdfkit.md",
-    "additionalContext": "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs (personal journal, ~/.magpie/notes/npm--pdfkit.md). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). Offer them to the user instead of pdfkit, and recall an alternative before installing it."
+    "permissionDecisionReason": "RepoMagpie: you noted to avoid pdfkit (personal journal)\nVerdict: \"avoid: async streams painful; use puppeteer\"\nAvoid when: \"you need streamed output for large PDFs\"\nAlternatives in your personal journal: \"puppeteer\" (Verdict: \"default for PDF rendering in new projects\")\n~/.magpie/notes/npm--pdfkit.md",
+    "additionalContext": "RepoMagpie: your personal journal has a note on pdfkit (~/.magpie/notes/npm--pdfkit.md). Its Verdict, quoted: \"avoid: async streams painful; use puppeteer\". Avoid when, quoted: \"you need streamed output for large PDFs\". Alternatives in your personal journal: \"puppeteer\" (Verdict, quoted: \"default for PDF rendering in new projects\"). Offer them to the user instead of pdfkit, and recall an alternative before installing it."
+  }
+}
+```
+
+The same note in a project journal ([decision 0032](decisions/0032-note-text-is-data.md), rule 4): the hook still asks, and says who wrote it.
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "ask",
+    "permissionDecisionReason": "RepoMagpie: this project's journal says to avoid pdfkit (written by the repository's contributors)\nVerdict: \"avoid: async streams painful; use puppeteer\"\nAvoid when: \"you need streamed output for large PDFs\"\nAlternatives in this project's journal: \"puppeteer\" (Verdict: \"default for PDF rendering in new projects\")\n~/code/app/.magpie/notes/npm--pdfkit.md",
+    "additionalContext": "RepoMagpie: this project's journal, written by the repository's contributors, has a note on pdfkit (~/code/app/.magpie/notes/npm--pdfkit.md). Its Verdict, quoted: \"avoid: async streams painful; use puppeteer\". Avoid when, quoted: \"you need streamed output for large PDFs\". Alternatives in this project's journal, written by the repository's contributors: \"puppeteer\" (Verdict, quoted: \"default for PDF rendering in new projects\"). Offer them to the user instead of pdfkit. Show the user each one's exact package name, install one only with the user's explicit OK, and recall it before installing it."
   }
 }
 ```
@@ -465,25 +479,27 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
-    "additionalContext": "Note from your journal: puppeteer — default for PDF rendering in new projects (project journal, ~/code/app/.magpie/notes/npm--puppeteer.md). Alternatives in your journal: playwright (browser tests, project journal). Recall an alternative before installing it."
+    "additionalContext": "RepoMagpie: your personal journal has a note on puppeteer (~/.magpie/notes/npm--puppeteer.md). Its Verdict, quoted: \"default for PDF rendering in new projects\". Alternatives in your personal journal: \"playwright\" (Verdict, quoted: \"browser tests\"). Recall an alternative before installing it."
   },
-  "systemMessage": "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright"
+  "systemMessage": "RepoMagpie: puppeteer (personal journal): \"default for PDF rendering in new projects\". Alternatives: \"playwright\""
 }
 ```
 
-- `additionalContext` reaches the agent next to the tool's result; `systemMessage` is shown to the user; `permissionDecisionReason` is shown to the user in the permission prompt.
-- Each match is one line of `additionalContext` (and of `systemMessage`): the name, the Verdict (or `[inbox] no verdict yet`), "Avoid when" when the note has it, `(name match only)` for a name-only match, then the journal and path, then its alternatives (below). A path in the home directory starts with `~`.
+- `additionalContext` reaches the agent next to the tool's result; `systemMessage` is shown to the user; `permissionDecisionReason` is shown to the user in the permission prompt, and to the agent when an unattended run denies the call.
+- **Note text is data** ([decision 0032](decisions/0032-note-text-is-data.md)): every text starts with `RepoMagpie:`, says whose journal the note is in (yours, or this project's, written by the repository's contributors), and quotes the note's text in double quotes, on one line. A `"` inside a quote becomes `'`, so a note can't close its quote. Note text is cleaned of control characters, and never phrased as an instruction; the advice after it is the hook's own. The package is named as the install command names it, not by the note.
+- Each match is one line of `additionalContext` (and of `systemMessage`): the source and the package, `, matched by name only` for a name-only match, the path, then `Its Verdict, quoted: "…".` (or `It has no Verdict yet (inbox).`), `Avoid when, quoted: "…".` when the note has it, then its alternatives (below). `systemMessage` is shorter: `RepoMagpie: <package> (<journal> journal): "<Verdict>"`. A path in the home directory starts with `~`.
 - **Alternatives** ([decision 0029](decisions/0029-recall-names-alternatives.md)): an exact match whose note has alternatives (recall's `alternatives`, section 2) names them, at most 3, then `+N more`. They add text only; whether the hook asks still depends on the matched note alone. A name-only match names none.
-  - The reason gets an `Alternatives:` line after the Verdict and "Avoid when": each alternative's name and Verdict (or `[inbox] no verdict yet`), `(you also noted to avoid it)` after an avoid note, and the name alone when it has no note; separated by `; `.
-  - `additionalContext` adds `Alternatives in your journal: <name> (<Verdict>, <journal> journal)`, separated by `; `, then `Recall an alternative before installing it.` For an avoid note it says `Offer them to the user instead of <name>, and recall an alternative before installing it.`
-  - `systemMessage` adds `. Alternatives: ` and their names, separated by `, `.
+  - Each alternative is its name in quotes, then `(Verdict, quoted: "…")` (in the reason, `(Verdict: "…")`), `(inbox, no Verdict yet)`, or `(no note)`; an avoid note adds `; you also noted to avoid it`, or in a project journal `; this journal also says to avoid it`. Separated by `; `, after `Alternatives in your personal journal:` or `Alternatives in this project's journal, written by the repository's contributors:` (in the reason, `Alternatives in this project's journal:`).
+  - Then the advice. Personal journal: `Recall an alternative before installing it.`; for an avoid note, `Offer them to the user instead of <package>, and recall an alternative before installing it.` Project journal: `Show the user each one's exact package name, install one only with the user's explicit OK, and recall it before installing it.`, after `Offer them to the user instead of <package>.` for an avoid note.
+  - `systemMessage` adds `. Alternatives: ` and their names in quotes, separated by `, `.
 - When a command installs several packages, one document covers them all. If any of them has an avoid note, the whole call asks, and the reason lists every avoid note first.
+- **Length:** the hook quotes at most 500 characters of a Verdict, 500 of "Avoid when" (its items joined by `; `), 150 of an alternative's Verdict and 300 of a path; a cut text ends with `…`. One match then stays under about 3,300 characters. Each field holds whole matches while it stays within 8,000 characters; the rest become one line: `RepoMagpie: 6 more notes are not shown here, on a, b, c, d, e, +1 more. Run repomagpie recall with these names to read them.` In the worst case each field stays under 9,500 characters.
 - **Live test (2026-10-04):** in a Claude Code session with the hook installed, an install of a package with an avoid note prompted the user (`"ask"`), both in the default permission mode and in auto mode.
 - **Never denies:** the hook never returns `"deny"` and never exits with code 2. Its strongest answer is `"ask"`; the user decides. In an unattended `-p` run, Claude Code itself denies any call that would prompt, and the agent reads the reason (decision 0024).
 - **`--inform-only`:** `repomagpie hook claude-code --inform-only` never asks: avoid notes are reported like any other match. Use it for unattended `-p` runs, where an ask would stop the install.
 - **Fails open:** no note, an unparsable command, a missing journal, or any error means no output and exit 0. Errors go to a log file in the personal journal's `.cache/`, never to stdout.
 - **Fast:** the hook has the recall budget (section 7).
-- Each text stays under 10,000 characters, Claude Code's cap for `additionalContext` and `systemMessage`; the reason is kept to the same limit.
+- Each text stays under 10,000 characters, Claude Code's cap for `additionalContext` and `systemMessage`; the reason is kept to the same limit. A cut of the whole field at 10,000 stays as a last guard.
 
 **Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
@@ -503,7 +519,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 
 **Caches:** five per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when", "Use when" and `alternatives` as written), `note-list.json` (each note's summary in the Note list document, for the local app), `links.json` (each note's id, name and links as written, for the link index), and `graph.json` (each note's fields the graph draws, its topics and language, for the graph). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed, and recall's also when any of its entries doesn't have the expected shape; the note list, the links and the graph's fields read again only the notes that were added or changed, and any note whose cached entry doesn't have the expected shape. Links are resolved from the cached entries on every read. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. A cache is written whole to a temporary file, then renamed into place; when the rename fails because another program holds the old file (EPERM, EACCES or EBUSY, as antivirus does on Windows), it is tried again after 5, 10, 15 and 20 ms while that fits in 50 ms, since the hook reads these caches; a write that gives up removes its temporary file. They store file names, not paths, so a journal can be moved.
 
-**Hook start-up:** `repomagpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
+**Hook start-up:** `repomagpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs (`note`, `note-cache`, `recall` with the shared `wikilinks` rule, and `text`); every other command loads only its own module.
 
 ## 8. Output design
 
@@ -516,6 +532,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 - **No colour** when stdout is not a terminal, or when `NO_COLOR` is set to a non-empty value ([no-color.org](https://no-color.org/)). `--json` output is never coloured.
 - **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `repomagpie search pdf | head` shows results only.
 - **Width:** the Verdict is never cut. In a terminal, a result is a metadata line (rank, name, type, journal), cut to the terminal width with `…`, then the Verdict on its own lines, indented under the name and wrapped at spaces (a word longer than the line is broken, not dropped). When piped, each result is one line and nothing is cut.
+- **Note text is cleaned, never cut, for people** ([decision 0032](decisions/0032-note-text-is-data.md)): before a note's text, a name, a path or a warning reaches the terminal, control characters, escape sequences, bidi controls and zero-width characters are removed, so a note can't recolour, rewrite or hide text on your screen, or set your clipboard. The caps of `--json` (section 1) don't apply: the Verdict is still never cut.
 - **Labels:** draft text is labelled `(draft)`; a name-only recall match is labelled `(name match only)`.
 - **PURLs for people:** human output shows a PURL decoded (`pkg:npm/@babel/core`, not `pkg:npm/%40babel/core`), and a package by its name (`@babel/core`). `--json`, the files and the API keep the encoded id.
 - **`--json`** shapes are in section 2. They are a public interface: changing one is a breaking change ([release process](release.md)).

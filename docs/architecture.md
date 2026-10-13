@@ -40,6 +40,8 @@ src/
                note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links)
                wikilinks: the [[wikilink]] syntax, the alternatives field and how a target resolves; shared by
                links and recall, so the hook doesn't load the link index (decision 0029)
+               text: note text is data (decision 0032): cleaning control characters, the caps of agent-facing
+               fields and `truncated`, quoting; no imports, so the hook loads it; the MCP server will use it too
                links: [[wikilinks]] and alternatives, resolved within a journal; the link index (decision 0026)
                graph: the graph's nodes and edges (tags, links, alternatives, similarity, missing notes) (decision 0028)
                search-index: one journal's index and its cache (MiniSearch)

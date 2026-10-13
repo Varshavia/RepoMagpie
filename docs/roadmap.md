@@ -216,7 +216,7 @@ Before the launch work (`fix/pre-launch`):
 Before the tester round and the launch: the command name, note text from other people, and the supply chain. Decisions: [0031](decisions/0031-the-command-is-repomagpie.md), [0032](decisions/0032-note-text-is-data.md), [0033](decisions/0033-releases-staged-from-ci.md).
 - [x] Decisions 0031 (the command is `repomagpie`), 0032 (note text is data) and 0033 (releases are staged from CI).
 - [x] The command name: `bin` has `repomagpie` and the short alias; every machine-facing string and doc uses `repomagpie`; the `RepoMagpie:` and `repomagpie:` prefixes; a check that no doc tells someone to run the alias (`npm run check:commands`); tests against a packed tarball.
-- [ ] The text module: control characters stripped, agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
+- [x] The text module: control characters stripped, agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
 - [ ] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
 - [ ] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
 - [ ] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
