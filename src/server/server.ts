@@ -125,7 +125,10 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
         return json(res, 413, { error: "The request body is over 1 MB." });
       }
       const bytes = await readBody(req);
-      if (!bytes) return json(res, 413, { error: "The request body is over 1 MB." });
+      if (!bytes) {
+        res.setHeader("Connection", "close");
+        return json(res, 413, { error: "The request body is over 1 MB." });
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(bytes.toString("utf8"));
@@ -205,15 +208,25 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return Array.isArray(value) ? undefined : value;
 }
 
-// The whole body, or null when it is over 1 MB. An oversized body is still read to its end (and
-// dropped), so the client gets the 413 instead of a reset connection.
+// The whole body, or null as soon as more than 1 MB has arrived, with or without Content-Length
+// (red-team R7): the 413 goes out then. Up to DRAIN more bytes are read and dropped, so a client that
+// sent a little too much still gets the answer instead of a reset connection; a sender that goes on
+// is cut off there.
+const DRAIN = 1024 * 1024;
 function readBody(req: IncomingMessage): Promise<Buffer | null> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
+    let over = false;
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size <= MAX_BODY) chunks.push(chunk);
+      else if (!over) {
+        over = true;
+        chunks.length = 0;
+        resolve(null);
+      }
+      if (size > MAX_BODY + DRAIN) req.destroy();
     });
     req.on("end", () => resolve(size > MAX_BODY ? null : Buffer.concat(chunks)));
     req.on("error", reject);
