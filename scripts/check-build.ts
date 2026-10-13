@@ -33,6 +33,14 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
 ];
 
+// What the package may ship: npm's own files, the licences, and the built CLI and app.
+const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt"];
+const SHIPPED = [
+  ...REQUIRED.map((file) => new RegExp(`^${file.replace(/[.]/g, "\\.")}$`)),
+  /^dist\/cli\/[A-Za-z0-9_-]+\.js$/,
+  /^dist\/ui\/[A-Za-z0-9_.-]+\.(js|css|svg)$/,
+];
+
 let failed = 0;
 try {
   mkdirSync(join(root, ".git"));
@@ -69,12 +77,21 @@ function checkPackage(dir: string): number {
   const npm = ["--offline", "--no-audit", "--no-fund", "--no-update-notifier", "--cache", join(dir, "cache")];
   const packed = shell("npm", ["pack", "--json", "--pack-destination", dir], repo);
   if (packed.status !== 0) return report(false, "npm pack", packed.stderr);
-  const tarball = join(dir, (JSON.parse(packed.stdout) as { filename: string }[])[0].filename);
+  const [pack] = JSON.parse(packed.stdout) as { filename: string; files: { path: string }[] }[];
+  const tarball = join(dir, pack.filename);
+  // Only the allowlisted files ship: no tests, fixtures, sources, .worklog or .scratch. And the
+  // package has no runtime dependencies (decision 0025).
+  const shipped = pack.files.map((file) => file.path.replace(/\\/g, "/"));
+  const unexpected = shipped.filter((file) => !SHIPPED.some((allowed) => allowed.test(file)));
+  const missing = REQUIRED.filter((file) => !shipped.includes(file));
+  const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+  const dependencies = Object.keys(pkg.dependencies ?? {});
+  let failures = report(!unexpected.length && !missing.length && !dependencies.length, `npm pack ships only the allowlisted files (${shipped.length}), no runtime dependencies`,
+    [...unexpected.map((f) => `not allowed: ${f}`), ...missing.map((f) => `missing: ${f}`), ...dependencies.map((d) => `runtime dependency: ${d}`)].join("\n  "));
   const prefix = join(dir, "prefix");
   const install = shell("npm", ["install", "--global", "--prefix", prefix, ...npm, tarball]);
   if (install.status !== 0) return report(false, "npm install of the tarball (offline)", install.stderr);
   const version = (JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string }).version;
-  let failures = 0;
   for (const name of ["repomagpie", "magpie"]) {
     const run = shell(windows ? join(prefix, `${name}.cmd`) : join(prefix, "bin", name), ["--version"]);
     failures += report(run.status === 0 && run.stdout.trim() === version, `${name} --version from the installed tarball`, run.stdout + run.stderr);
