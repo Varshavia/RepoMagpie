@@ -34,6 +34,32 @@ const PLAYWRIGHT = "pkg:github/microsoft/playwright-cli";
 const KARPATHY = "pkg:github/multica-ai/andrej-karpathy-skills";
 const AWESOME = "pkg:github/voltagent/awesome-design-md";
 
+// --- GitHub fields are cleaned before they reach a note (decision 0032, rule 8) ---
+
+test("a hostile repository's fields are cleaned of control, bidi and zero-width characters; a URL that isn't https is replaced", async () => {
+  const c = (...codes: number[]) => String.fromCodePoint(...codes);
+  const ESC = c(0x1b);
+  const responses = {
+    "/repos/acme/widget": {
+      full_name: `acme/wid${c(0x200b)}get`,
+      html_url: "javascript:void(0)",
+      description: `Charts ${ESC}]52;c;ZWNobyBwd25lZA==${c(0x07)}for ${c(0x202e)}apps${ESC}[31m`,
+      language: `Type${c(0x7f)}Script`,
+      license: { spdx_id: `MIT${c(0x9b)}` },
+      topics: ["charts", `cl${c(0x200d)}i`],
+      default_branch: "main",
+    },
+    "/repos/acme/widget/git/trees/main?recursive=1": { tree: [{ path: `skills/ev${ESC}[2Jil/SKILL.md`, type: "blob" }] },
+  };
+  const r = await fetchRepository("pkg:github/acme/widget", { fetch: fakeFetch(responses) });
+  assert.ok(r.ok);
+  const { name, url, description, language, license, topics, skills } = r.metadata;
+  assert.deepEqual({ name, url, description, language, license, topics, skills }, {
+    name: "acme/widget", url: "https://github.com/acme/widget", description: "Charts for apps", language: "TypeScript", license: "MIT",
+    topics: ["charts", "cli"], skills: ["evil"],
+  });
+});
+
 // --- metadata from recorded responses ---
 
 test("playwright-cli: metadata, skills by folder name, package and bin from the root package.json", async () => {

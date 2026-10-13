@@ -2,6 +2,7 @@
 // fetch, so tests run on recorded responses. No printing. The token is sent only in the
 // Authorization header and never appears in a message.
 import { resolveTarget, type Manifest, type PackageType } from "./identity.ts";
+import { clean } from "./text.ts";
 import { packageVersion } from "./version.ts";
 
 export type Fetch = typeof globalThis.fetch;
@@ -55,14 +56,18 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     default_branch: string;
     is_template?: boolean;
   };
-  const spdx = info.license?.spdx_id;
+  // The owner wrote these (decision 0032, rule 8): cleaned of control characters before any reaches a
+  // note, and a URL that isn't https is replaced by the repository's own.
+  const text = (value: unknown) => (typeof value === "string" ? clean(value).trim() : "");
+  const spdx = text(info.license?.spdx_id);
+  const htmlUrl = text(info.html_url);
   const metadata: RepoMetadata = {
-    name: info.full_name,
-    url: info.html_url,
-    description: info.description || null,
-    language: info.language ?? null,
+    name: text(info.full_name) || slug,
+    url: /^https:\/\//.test(htmlUrl) ? htmlUrl : `https://github.com/${slug}`,
+    description: text(info.description) || null,
+    language: text(info.language) || null,
     license: spdx && spdx !== "NOASSERTION" ? spdx : "unknown",
-    topics: info.topics ?? [],
+    topics: (info.topics ?? []).map(text).filter(Boolean),
     skills: null,
     skillFolders: null,
     template: info.is_template === true,
@@ -81,7 +86,7 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
   const listing = JSON.parse(tree.text) as { truncated?: boolean; tree?: { path: string; type: string }[] };
   const files = (listing.tree ?? []).filter((entry) => entry.type === "blob").map((entry) => entry.path);
   if (listing.truncated) warnings.push(`GitHub's file list for ${info.full_name} was cut short; some skills may be missing.`);
-  metadata.skills = skillNames(files, info.full_name);
+  metadata.skills = skillNames(files, info.full_name).map(text).filter(Boolean);
   metadata.skillFolders = countSkillFolders(files);
   metadata.plugin = files.includes(".claude-plugin/plugin.json") || files.includes(".claude-plugin/marketplace.json");
 
