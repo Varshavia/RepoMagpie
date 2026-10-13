@@ -9,7 +9,7 @@ import type { Outcome } from "./outcome.ts";
 import { alternativeForAgent, alternativesOfFile, isAvoid, loadRecallEntries, matchForAgent, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
 import { projectFirst, type JournalSource } from "./search.ts";
 import { loadIndex, type SearchDoc } from "./search-index.ts";
-import { CAPS, forAgent } from "./text.ts";
+import { CAPS, clean, forAgent } from "./text.ts";
 
 export interface SuggestRequest {
   description?: string; // instead of the project's manifests and README
@@ -62,11 +62,20 @@ export function suggestForAgent(document: SuggestJson): SuggestJson {
     id: CAPS.id, name: CAPS.name, verdict: CAPS.verdict, path: Infinity,
     tags: { each: CAPS.tag, count: CAPS.tags }, alternatives: { each: CAPS.other, count: CAPS.alternatives },
   }));
-  return { ...document, candidates, in_use_avoid: document.in_use_avoid.map(matchForAgent) };
+  return forAgent({ ...document, candidates, in_use_avoid: document.in_use_avoid.map(matchForAgent) }, {});
 }
 
 export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
-  const project = readProject(place.cwd, place.home);
+  // A cloned repository's manifests and README are written by strangers, as notes are (decision
+  // 0032): cleaned before anything uses them, so no escape sequence or its payload becomes a
+  // keyword, and no dependency's name reaches the why line or the JSON as written.
+  const read = readProject(place.cwd, place.home);
+  const project = {
+    ...read,
+    dependencies: read.dependencies.map((d) => ({ ...d, name: clean(d.name) })),
+    keywords: read.keywords.map((k) => clean(k)),
+    texts: read.texts.map((t) => clean(t, true)),
+  };
   const source = request.description === undefined ? "manifests" : "description";
   const keywords = keywordsOf(source === "description"
     ? [request.description ?? ""]

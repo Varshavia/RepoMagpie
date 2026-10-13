@@ -66,6 +66,23 @@ test("suggest --json caps candidates and in_use_avoid the same way", async () =>
   for (const text of strings(document)) assert.doesNotMatch(text, HOSTILE, text.slice(0, 80));
 });
 
+// A cloned repository's manifests are written by strangers too: a dependency's name reaches
+// why.dependencies as written. The keywords themselves are only letters and digits.
+test("suggest: a hostile dependency name in the project's package.json is cleaned in why.dependencies and the why line", async () => {
+  const dependency = `pdf-${c(0x202e)}render${ESC}]52;c;ZWNobyBwd25lZA==${c(0x07)}`;
+  const box = sandbox({
+    "journal/notes/npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib", verdict: "pdf render", tags: ["pdf"] }),
+    "project/package.json": JSON.stringify({ dependencies: { [dependency]: "*" } }),
+  });
+  const document = JSON.parse((await magpie(box, ["suggest", "--json"])).out);
+  assert.deepEqual(document.keywords, ["pdf", "render"]);
+  assert.deepEqual(document.candidates[0].why.dependencies, ["pdf-render"]);
+  for (const text of strings(document)) assert.doesNotMatch(text, HOSTILE, text.slice(0, 80));
+  const human = await magpie(box, ["suggest"], { env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
+  assert.match(human.out, /Why: dependency pdf-render/);
+  assert.doesNotMatch(human.out.replace(/\n/g, ""), HOSTILE);
+});
+
 test("an honest note's --json has no truncated key", async () => {
   const box = sandbox({ "journal/notes/npm--chalk.md": note({ id: "pkg:npm/chalk", verdict: "colours" }) });
   const { matches } = JSON.parse((await magpie(box, ["recall", "chalk", "--json"])).out);

@@ -98,7 +98,7 @@ export interface SearchRun {
 export function searchForAgent(document: SearchRun["document"]): SearchRun["document"] {
   const results = document.results.map((r) =>
     forAgent(r, { id: CAPS.id, name: CAPS.name, skill: CAPS.name, verdict: r.type === "skill" ? CAPS.skill : CAPS.verdict, path: Infinity }));
-  return { ...document, results };
+  return forAgent({ ...document, results }, {});
 }
 
 export function runSearch(request: SearchRequest, place: Place): SearchRun {
