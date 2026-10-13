@@ -54,6 +54,6 @@ test("resultWord: what will happen in a dry run, what happened otherwise", () =>
 
 test("summary counts every result, unchanged included", () => {
   const items = [{ result: "created" }, { result: "created" }, { result: "unchanged" }, { result: "failed" }] as const;
-  assert.equal(summary([...items], true), "magpie wrote nothing yet: 2 to create, 0 to update, 1 unchanged, 1 failing.");
+  assert.equal(summary([...items], true), "RepoMagpie wrote nothing yet: 2 to create, 0 to update, 1 unchanged, 1 failing.");
   assert.equal(summary([...items], false), "2 created, 0 updated, 1 unchanged, 1 failed.");
 });

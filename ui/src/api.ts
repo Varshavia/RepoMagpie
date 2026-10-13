@@ -18,7 +18,7 @@ export type PackageType = "npm" | "pypi" | "cargo";
 
 const TOKEN = document.querySelector<HTMLMetaElement>('meta[name="magpie-token"]')?.content ?? "";
 
-export const UNREACHABLE = "Can't reach magpie ui. Start it again in a terminal with magpie ui, then open the new URL it prints.";
+export const UNREACHABLE = "Can't reach repomagpie ui. Start it again in a terminal with repomagpie ui, then open the new URL it prints.";
 
 // A failed request: the HTTP status (0 when the server can't be reached) and the endpoint's document,
 // which for most failures is the success shape plus "error" (spec §1).
@@ -41,7 +41,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const document = (await response.json().catch(() => null)) as { error?: string } | null;
   if (!response.ok) {
-    const message = response.status === 401 ? "This page's session ended. Open the URL magpie ui printed in the terminal." : document?.error ?? `The server answered ${response.status}.`;
+    const message = response.status === 401 ? "This page's session ended. Open the URL repomagpie ui printed in the terminal." : document?.error ?? `The server answered ${response.status}.`;
     throw new ApiError(response.status, document, message);
   }
   return document as T;

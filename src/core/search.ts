@@ -95,7 +95,7 @@ export interface SearchRun {
 export function runSearch(request: SearchRequest, place: Place): SearchRun {
   const { query } = request;
   if (!query.trim()) {
-    return { outcome: "usage", document: { query, results: [], error: "Give a search query, for example: magpie search pdf" }, total: 0, warnings: [] };
+    return { outcome: "usage", document: { query, results: [], error: "Give a search query, for example: repomagpie search pdf" }, total: 0, warnings: [] };
   }
   const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
   const project = findProjectJournal({ cwd: place.cwd, home: place.home, personalJournal: personal.path, flag: place.projectFlag });

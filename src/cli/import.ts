@@ -19,7 +19,7 @@ export async function importCommand(file: string, options: ImportOptions, io: Io
   const print = (document: object) => io.out(`${JSON.stringify(document)}\n`);
   const stop = (error: string) => {
     if (json) print(importFailure(error));
-    else io.err(`magpie import: ${error}\n`);
+    else io.err(`repomagpie import: ${error}\n`);
     return 1;
   };
 

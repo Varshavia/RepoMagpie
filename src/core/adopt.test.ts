@@ -163,7 +163,7 @@ test("no note in the personal journal: exit 1, nothing written", async () => {
   const p = place({ "journal/notes/npm--pdfkit.md": PDFKIT, "project/package.json": "{}" });
   const run = await runAdopt({ target: "chalk" }, p.context);
   assert.equal(run.outcome, "failed");
-  assert.deepEqual(run.document, { id: null, from: null, to: null, install: null, install_choices: [], error: "Your personal journal has no note for pkg:npm/chalk. Write one first with magpie note pkg:npm/chalk." });
+  assert.deepEqual(run.document, { id: null, from: null, to: null, install: null, install_choices: [], error: "Your personal journal has no note for pkg:npm/chalk. Write one first with repomagpie note pkg:npm/chalk." });
   assert.equal(existsSync(join(p.project, ".magpie")), false);
 });
 

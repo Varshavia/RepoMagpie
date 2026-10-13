@@ -68,7 +68,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
   const candidates = items.filter((i) => i.kind === "candidate").length;
   const avoid = items.length - candidates;
   const source = description === undefined
-    ? projectRoot ? `From the manifests and README in ${projectRoot}.` : "From the manifests and README where magpie ui started."
+    ? projectRoot ? `From the manifests and README in ${projectRoot}.` : "From the manifests and README where repomagpie ui started."
     : "From your description.";
 
   return (

@@ -34,7 +34,7 @@ test("--inform-only never asks", async () => {
   const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
   const r = await magpie(box, ["hook", "claude-code", "--inform-only"], { stdin: async () => input("npm i pdfkit", box.project) });
   assert.equal(JSON.parse(r.out).hookSpecificOutput.permissionDecision, undefined);
-  assert.match(JSON.parse(r.out).systemMessage, /^magpie: pdfkit/);
+  assert.match(JSON.parse(r.out).systemMessage, /^RepoMagpie: pdfkit/);
 });
 
 test("nothing to say, or bad input: nothing on stdout or stderr, exit 0", async () => {
@@ -75,7 +75,7 @@ test("--help prints the settings snippet and the --inform-only advice", async ()
   const r = await magpie(box, ["hook", "claude-code", "--help"]);
   assert.equal(r.code, 0);
   assert.match(r.out, /"matcher": "Bash\|PowerShell"/);
-  assert.match(r.out, /"command": "magpie hook claude-code"/);
+  assert.match(r.out, /"command": "repomagpie hook claude-code"/);
   assert.match(r.out, /--inform-only/);
   assert.match(r.out, /never edits/);
 });

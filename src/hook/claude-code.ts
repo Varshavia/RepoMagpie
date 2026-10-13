@@ -57,15 +57,15 @@ export function hookOutput(input: string, ctx: HookContext): string | null {
   if (asking.length) {
     const others = matches.filter((m) => !asking.includes(m));
     const reason = [
-      ...asking.map((m) => [`magpie: you noted to avoid ${m.name} (${m.journal} journal)`, `Verdict: ${verdict(m)}`,
+      ...asking.map((m) => [`RepoMagpie: you noted to avoid ${m.name} (${m.journal} journal)`, `Verdict: ${verdict(m)}`,
         ...(m.avoid_when.length ? [`Avoid when: ${m.avoid_when.join("; ")}`] : []), ...alternativesReason(m), path(m)].join("\n")),
-      ...others.map((m) => [`magpie: note on ${m.name} (${m.journal} journal)`, `Verdict: ${verdict(m)}`, ...alternativesReason(m), path(m)].join("\n")),
+      ...others.map((m) => [`RepoMagpie: note on ${m.name} (${m.journal} journal)`, `Verdict: ${verdict(m)}`, ...alternativesReason(m), path(m)].join("\n")),
     ].join("\n\n");
     return JSON.stringify({
       hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: cap(reason), additionalContext: context },
     });
   }
-  const message = (m: RecallMatch) => `magpie: ${line(m)}${alternatives(m).length ? `. Alternatives: ${few(alternatives(m), (a) => a.name, ", ")}` : ""}`;
+  const message = (m: RecallMatch) => `RepoMagpie: ${line(m)}${alternatives(m).length ? `. Alternatives: ${few(alternatives(m), (a) => a.name, ", ")}` : ""}`;
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: context },
     systemMessage: cap(matches.map(message).join("\n")),

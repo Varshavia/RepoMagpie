@@ -312,7 +312,7 @@ test("an unknown path gets 404, a wrong method 405, and a bug 500 without intern
   mkdirSync(join(box.journal, "notes", "folder.md")); // a folder where a note should be: reading it throws
   const bug = await http.get("/api/notes?journal=personal");
   assert.equal(bug.status, 500);
-  assert.deepEqual(JSON.parse(bug.body), { error: "Something went wrong in magpie. The terminal running magpie ui shows the details." });
+  assert.deepEqual(JSON.parse(bug.body), { error: "Something went wrong in RepoMagpie. The terminal running repomagpie ui shows the details." });
   assert.doesNotMatch(bug.body, /EISDIR|folder\.md|at /);
   assert.match(logged.join("\n"), /EISDIR/);
 });

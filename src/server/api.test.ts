@@ -385,7 +385,7 @@ test("POST /api/open says so when the editor can't be started", async (t) => {
 
 test("without a built app, the page says how to build it, and the API still works", async (t) => {
   const { http } = await start(t, { assets: fileURLToPath(new URL("./fixtures/no-such-folder/", import.meta.url)) });
-  assert.deepEqual(parsed(await http.get("/")), { status: 404, document: { error: "The app isn't built. Run npm run build, then start magpie ui again." } });
+  assert.deepEqual(parsed(await http.get("/")), { status: 404, document: { error: "The app isn't built. Run npm run build, then start repomagpie ui again." } });
   assert.equal((await http.get("/assets/index.js")).status, 404);
   assert.equal((await http.get("/api/notes?journal=personal")).status, 200);
 });

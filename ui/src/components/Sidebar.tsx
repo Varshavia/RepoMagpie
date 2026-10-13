@@ -45,7 +45,7 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
     <nav className="sidebar" aria-label="Journals and screens" inert={inert}>
       <div className="brand">
         <span className="brand-mark" aria-hidden="true" />
-        <span className="brand-name">magpie</span>
+        <span className="brand-name">RepoMagpie</span>
       </div>
 
       <div className="segmented" role="radiogroup" aria-label="Journal">
@@ -60,7 +60,7 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
           aria-label="Project"
           disabled={!hasProject}
           onClick={() => onJournal("project")}
-          title={hasProject ? "Project journal" : "No project journal: start magpie ui inside a project"}
+          title={hasProject ? "Project journal" : "No project journal: start repomagpie ui inside a project"}
         >
           <Icon name="users" size={14} />
           <span className="label">Project</span>

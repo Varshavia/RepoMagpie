@@ -509,7 +509,7 @@ export function App() {
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>{`Your inbox is empty. Add a repository here, or from the palette (${MOD}+K).`}</EmptyState>
           ) : (
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>
-              No notes in this journal yet. Add one here, or run <code>magpie note</code> in a terminal.
+              No notes in this journal yet. Add one here, or run <code>repomagpie note</code> in a terminal.
             </EmptyState>
           )}
         </section>
@@ -630,7 +630,7 @@ export function App() {
       {connection === "lost" ? (
         <div className="banner-strip" role="alert">
           <Icon name="warning" />
-          <span className="text">Lost the connection to magpie ui. Your notes are safe on disk. Start magpie ui again, then open the URL it prints.</span>
+          <span className="text">Lost the connection to repomagpie ui. Your notes are safe on disk. Start repomagpie ui again, then open the URL it prints.</span>
         </div>
       ) : null}
       <Sidebar

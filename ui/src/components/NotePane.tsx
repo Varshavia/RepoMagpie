@@ -160,7 +160,7 @@ export function NotePane(props: NotePaneProps) {
   if (loadError) {
     return (
       <Shell onBack={onBack}>
-        <EmptyState center>{`Couldn't open this note. ${loadError} Choose another note, or check the terminal running magpie ui.`}</EmptyState>
+        <EmptyState center>{`Couldn't open this note. ${loadError} Choose another note, or check the terminal running repomagpie ui.`}</EmptyState>
       </Shell>
     );
   }
@@ -382,7 +382,7 @@ export function NotePane(props: NotePaneProps) {
           {adopting?.step === "confirm" ? (
             <div className="adopt-panel" role="group" aria-label="Adopt to project">
               <p>
-                Copy this note into the project journal, with today's date as <code translate="no">adopted</code>. magpie names the install command; it installs nothing.
+                Copy this note into the project journal, with today's date as <code translate="no">adopted</code>. RepoMagpie names the install command; it installs nothing.
               </p>
               <p>The project journal is committed with the code; anyone who can read this repository can read this note.</p>
               {adopting.error ? <FieldError>{adopting.error}</FieldError> : null}
@@ -411,7 +411,7 @@ export function NotePane(props: NotePaneProps) {
                       </button>
                     </p>
                   ))}
-                  <p className="field-help">Run it yourself when you are ready; magpie never installs anything.</p>
+                  <p className="field-help">Run it yourself when you are ready; RepoMagpie never installs anything.</p>
                 </>
               ) : (
                 <p className="field-help">No install command for a GitHub repository.</p>

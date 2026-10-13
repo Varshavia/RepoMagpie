@@ -39,7 +39,7 @@ export function RecallPage({ home, onOpenNote, onAdd, onSearch }: { home: string
     <div className="page">
       <h1 className="page-title">Check a package</h1>
       <p className="page-lede">
-        What your journals say before an install: the same lookup as <code>magpie recall</code>, and what the Claude Code hook would show.
+        What your journals say before an install: the same lookup as <code>repomagpie recall</code>, and what the Claude Code hook would show.
       </p>
 
       <form

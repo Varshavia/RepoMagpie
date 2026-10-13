@@ -45,11 +45,20 @@ test("--help lists note, import, search, recall and hook, and every v0.1 command
   }
 });
 
+// Decision 0031: the command is repomagpie; help names the alias once.
+test("--help names the command repomagpie and says once that magpie is a short alias", async () => {
+  const r = await magpie("--help");
+  assert.match(r.out, /^Usage: repomagpie \[options\] \[command\]$/m);
+  assert.equal(r.out.match(/short alias/g)?.length, 1);
+  assert.match(r.out, /^magpie works as a short alias when no other magpie command is on your PATH\.$/m);
+  assert.match((await magpie("note", "--help")).out, /^Usage: repomagpie note /m);
+});
+
 test("a v0.1 command not built yet says so and exits 1", async () => {
   const r = await magpie("init");
   assert.equal(r.code, 1);
   assert.equal(r.out, "");
-  assert.match(r.err, /magpie init: not implemented yet/);
+  assert.equal(r.err, "repomagpie init: not implemented yet\n");
 });
 
 test("a choice outside --to's list is a usage error (exit 2)", async () => {

@@ -47,7 +47,7 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   if (!resolved.ok) return stop(resolved.error, "usage");
   const source = noteFor(listNotes(personal.path), resolved.purl);
   const readable = readablePurl(resolved.purl);
-  if (!source?.id) return stop(`Your personal journal has no note for ${readable}. Write one first with magpie note ${readable}.`, "failed");
+  if (!source?.id) return stop(`Your personal journal has no note for ${readable}. Write one first with repomagpie note ${readable}.`, "failed");
 
   const project = locateJournal("project", context);
   if (project.error) return stop(project.error, "failed", { id: source.id, from: source.path });

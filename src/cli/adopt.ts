@@ -20,7 +20,7 @@ export async function adoptCommand(target: string, options: AdoptOptions, io: Io
   }
   for (const warning of run.warnings) io.err(`warning: ${warning}\n`);
   if (run.document.error) {
-    io.err(`magpie adopt: ${run.document.error}\n`);
+    io.err(`repomagpie adopt: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
   for (const notice of run.notices) io.err(`${notice}\n`);

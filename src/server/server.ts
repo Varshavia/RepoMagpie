@@ -35,7 +35,7 @@ const MAX_BODY = 1024 * 1024;
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // dist/ui/ from both src/server/ (run from source) and dist/cli/ (the bundle, the package).
 const DEFAULT_ASSETS = fileURLToPath(new URL("../../dist/ui/", import.meta.url));
-const NOT_BUILT = "The app isn't built. Run npm run build, then start magpie ui again.";
+const NOT_BUILT = "The app isn't built. Run npm run build, then start repomagpie ui again.";
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -45,7 +45,7 @@ const TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
 };
 const TOKEN_META = '<meta name="magpie-token" content="">';
-const BUG = "Something went wrong in magpie. The terminal running magpie ui shows the details.";
+const BUG = "Something went wrong in RepoMagpie. The terminal running repomagpie ui shows the details.";
 
 export async function startServer(options: ServerOptions): Promise<UiServer> {
   const token = randomBytes(32).toString("hex");
@@ -78,12 +78,12 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     }
     // The token in the opening URL is exchanged once for the cookie, and leaves the address bar.
     if (path === "/" && method === "GET" && query.has("token")) {
-      if (!isToken(query.get("token") ?? undefined)) return json(res, 401, { error: "Wrong session token. Open the URL magpie ui printed." });
+      if (!isToken(query.get("token") ?? undefined)) return json(res, 401, { error: "Wrong session token. Open the URL repomagpie ui printed." });
       res.writeHead(303, { Location: "/", "Set-Cookie": `${cookieName()}=${token}; HttpOnly; SameSite=Strict; Path=/` });
       res.end();
       return;
     }
-    if (!hasSession(req)) return json(res, 401, { error: "No session. Open the URL magpie ui printed; it holds the session token." });
+    if (!hasSession(req)) return json(res, 401, { error: "No session. Open the URL repomagpie ui printed; it holds the session token." });
 
     if (path === "/" || path.startsWith("/assets/")) {
       const file = path === "/" ? assets.get("index.html") : assets.get(path.slice("/assets/".length));
@@ -135,7 +135,7 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
 
   const server = createServer((req, res) => {
     handle(req, res).catch((error: Error) => {
-      options.log(`magpie ui: ${req.method} ${(req.url ?? "").split("?")[0]} failed: ${error.stack ?? error.message}`);
+      options.log(`repomagpie ui: ${req.method} ${(req.url ?? "").split("?")[0]} failed: ${error.stack ?? error.message}`);
       if (!res.headersSent) json(res, 500, { error: BUG });
       else res.end();
     });

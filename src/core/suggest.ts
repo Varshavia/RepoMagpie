@@ -66,8 +66,8 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   const run = (outcome: Outcome, total = 0, inUseNames: string[] = []): SuggestRun => ({ outcome, document, total, in_use_names: inUseNames, warnings: personal.warnings });
   if (!keywords.length) {
     document.error = source === "description"
-      ? "The description has no words to look for. Name what the project does, for example: magpie suggest \"a TypeScript CLI with tests\""
-      : `Nothing to go on in ${project.folder}: no package.json, pyproject.toml, Cargo.toml or README. Describe the project instead: magpie suggest "a TypeScript CLI with tests"`;
+      ? "The description has no words to look for. Name what the project does, for example: repomagpie suggest \"a TypeScript CLI with tests\""
+      : `Nothing to go on in ${project.folder}: no package.json, pyproject.toml, Cargo.toml or README. Describe the project instead: repomagpie suggest "a TypeScript CLI with tests"`;
     return run("usage");
   }
 

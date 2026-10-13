@@ -19,7 +19,7 @@ export async function searchCommand(query: string, options: SearchOptions, io: I
     return exitCode(run.outcome);
   }
   if (run.document.error) {
-    io.err(`magpie search: ${run.document.error}\n`);
+    io.err(`repomagpie search: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
   const { results } = run.document;

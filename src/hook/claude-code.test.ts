@@ -43,7 +43,7 @@ test("an exact avoid note asks: the note is the reason, and the agent gets it as
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: `magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\n${path}`,
+      permissionDecisionReason: `RepoMagpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\nAvoid when: you need streamed output for large PDFs\n${path}`,
       additionalContext: `Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs (personal journal, ${path})`,
     },
   });
@@ -57,7 +57,7 @@ test("any other match informs only: context for the agent, a message for the use
       hookEventName: "PreToolUse",
       additionalContext: `Note from your journal: puppeteer — default for PDF rendering in new projects (project journal, ${path})`,
     },
-    systemMessage: "magpie: puppeteer — default for PDF rendering in new projects",
+    systemMessage: "RepoMagpie: puppeteer — default for PDF rendering in new projects",
   });
 });
 
@@ -65,7 +65,7 @@ test("an avoid note found only by name informs, labelled; it never asks", () => 
   const w = world({ "journal/notes/pypi--pdfkit.md": note({ id: "pkg:pypi/pdfkit", verdict: "avoid: unmaintained" }) });
   const out = w.run("npm i pdfkit");
   assert.equal(out.hookSpecificOutput.permissionDecision, undefined);
-  assert.equal(out.systemMessage, "magpie: pdfkit — avoid: unmaintained (name match only)");
+  assert.equal(out.systemMessage, "RepoMagpie: pdfkit — avoid: unmaintained (name match only)");
 });
 
 test("--inform-only never asks, also for an exact avoid note", () => {
@@ -73,7 +73,7 @@ test("--inform-only never asks, also for an exact avoid note", () => {
   const out = w.run("npm install pdfkit", { informOnly: true });
   assert.equal(out.hookSpecificOutput.permissionDecision, undefined);
   assert.equal(out.hookSpecificOutput.permissionDecisionReason, undefined);
-  assert.match(out.systemMessage, /^magpie: pdfkit — avoid: async streams painful; use puppeteer\. Avoid when: /);
+  assert.match(out.systemMessage, /^RepoMagpie: pdfkit — avoid: async streams painful; use puppeteer\. Avoid when: /);
 });
 
 test("several packages: one document; any avoid note makes the call ask, avoid notes first in the reason", () => {
@@ -81,9 +81,9 @@ test("several packages: one document; any avoid note makes the call ask, avoid n
   const out = w.run("npm i puppeteer chalk && npm i pdfkit");
   assert.equal(out.hookSpecificOutput.permissionDecision, "ask");
   const reason: string = out.hookSpecificOutput.permissionDecisionReason;
-  assert.ok(reason.startsWith("magpie: you noted to avoid pdfkit"), reason);
-  assert.match(reason, /\n\nmagpie: note on puppeteer \(personal journal\)\nVerdict: default for PDF rendering in new projects\n/);
-  assert.match(reason, /\n\nmagpie: note on chalk \(personal journal\)\nVerdict: \[inbox\] no verdict yet\n/);
+  assert.ok(reason.startsWith("RepoMagpie: you noted to avoid pdfkit"), reason);
+  assert.match(reason, /\n\nRepoMagpie: note on puppeteer \(personal journal\)\nVerdict: default for PDF rendering in new projects\n/);
+  assert.match(reason, /\n\nRepoMagpie: note on chalk \(personal journal\)\nVerdict: \[inbox\] no verdict yet\n/);
   assert.equal(out.hookSpecificOutput.additionalContext.split("\n").length, 3);
   assert.equal(out.systemMessage, undefined);
   assert.ok(!JSON.stringify(out).includes("deny"));
@@ -92,7 +92,7 @@ test("several packages: one document; any avoid note makes the call ask, avoid n
 test("the project journal is found from the hook input's cwd", () => {
   const w = world({ "elsewhere/.git/": "", "elsewhere/.magpie/notes/npm--puppeteer.md": PUPPETEER });
   assert.equal(w.run("npm i puppeteer"), null); // from <root>/project: no project journal
-  assert.match(w.run("npm i puppeteer", { cwd: join(w.root, "elsewhere") }).systemMessage, /^magpie: puppeteer/);
+  assert.match(w.run("npm i puppeteer", { cwd: join(w.root, "elsewhere") }).systemMessage, /^RepoMagpie: puppeteer/);
 });
 
 test("silent (null) when there is nothing to say: no install, no note, another tool, bad input", () => {
@@ -127,7 +127,7 @@ test("ask with one alternative: the reason names it with its Verdict; the contex
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
+      permissionDecisionReason: "RepoMagpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
         `Avoid when: you need streamed output for large PDFs\nAlternatives: puppeteer: default for PDF rendering in new projects\n${path}`,
       additionalContext: "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs " +
         `(personal journal, ${path}). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). ` +
@@ -146,7 +146,7 @@ test("ask with five alternatives: 3, then +2 more; an inbox, an avoid and an unr
   });
   const path = notePath(w, "npm--pdfkit.md");
   const out = w.run("npm i pdfkit");
-  assert.equal(out.hookSpecificOutput.permissionDecisionReason, "magpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
+  assert.equal(out.hookSpecificOutput.permissionDecisionReason, "RepoMagpie: you noted to avoid pdfkit (personal journal)\nVerdict: avoid: async streams painful; use puppeteer\n" +
     "Avoid when: you need streamed output for large PDFs\n" +
     "Alternatives: playwright: browser tests; puppeteer: default for PDF rendering in new projects; pdf-lib: [inbox] no verdict yet; +2 more\n" + path);
   assert.equal(out.hookSpecificOutput.additionalContext, "Note from your journal: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs " +
@@ -175,7 +175,7 @@ test("inform with an alternative: the context names it and says to recall it; th
       additionalContext: `Note from your journal: puppeteer — default for PDF rendering in new projects (personal journal, ${path}). ` +
         "Alternatives in your journal: playwright (browser tests, personal journal). Recall an alternative before installing it.",
     },
-    systemMessage: "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
+    systemMessage: "RepoMagpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
   });
 });
 
@@ -188,7 +188,7 @@ test("an alternative that is an avoid note, from the other side: named and marke
       additionalContext: `Note from your journal: puppeteer — default for PDF rendering in new projects (personal journal, ${path}). ` +
         "Alternatives in your journal: pdfkit (avoid: async streams painful; use puppeteer, personal journal; you also noted to avoid it). Recall an alternative before installing it.",
     },
-    systemMessage: "magpie: puppeteer — default for PDF rendering in new projects. Alternatives: pdfkit",
+    systemMessage: "RepoMagpie: puppeteer — default for PDF rendering in new projects. Alternatives: pdfkit",
   });
 });
 
@@ -202,7 +202,7 @@ test("--inform-only with alternatives: no decision; the context still says to of
         `(personal journal, ${path}). Alternatives in your journal: puppeteer (default for PDF rendering in new projects, personal journal). ` +
         "Offer them to the user instead of pdfkit, and recall an alternative before installing it.",
     },
-    systemMessage: "magpie: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs. Alternatives: puppeteer",
+    systemMessage: "RepoMagpie: pdfkit — avoid: async streams painful; use puppeteer. Avoid when: you need streamed output for large PDFs. Alternatives: puppeteer",
   });
 });
 
@@ -221,14 +221,14 @@ test("a multi-package install where only one package has alternatives: only its 
           "Alternatives in your journal: playwright (browser tests, personal journal). Recall an alternative before installing it.",
       ].join("\n"),
     },
-    systemMessage: "magpie: chalk — colours\nmagpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
+    systemMessage: "RepoMagpie: chalk — colours\nRepoMagpie: puppeteer — default for PDF rendering in new projects. Alternatives: playwright",
   });
 });
 
 test("a name-only match lists no alternatives", () => {
   const w = world({ "journal/notes/pypi--pdfkit.md": withAlternatives(note({ id: "pkg:pypi/pdfkit", verdict: "fine" }), ["[[weasyprint]]"]) });
   const out = w.run("npm i pdfkit");
-  assert.equal(out.systemMessage, "magpie: pdfkit — fine (name match only)");
+  assert.equal(out.systemMessage, "RepoMagpie: pdfkit — fine (name match only)");
   assert.ok(!out.hookSpecificOutput.additionalContext.includes("Alternatives"));
 });
 

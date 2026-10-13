@@ -40,7 +40,7 @@ export async function suggestCommand(description: string | undefined, options: S
   }
   for (const warning of run.warnings) io.err(`warning: ${warning}\n`);
   if (run.document.error) {
-    io.err(`magpie suggest: ${run.document.error}\n`);
+    io.err(`repomagpie suggest: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
 

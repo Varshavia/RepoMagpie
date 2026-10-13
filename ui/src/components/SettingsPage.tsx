@@ -20,7 +20,7 @@ export function SettingsPage({ settings, error, theme, onTheme, onKeys }: Props)
     <div className="page">
       <h1 className="page-title">Settings</h1>
       <p className="page-lede">
-        The journals and settings this <code>magpie ui</code> uses. To change a journal, start <code>magpie ui</code> with <code>--home</code> or <code>--project</code>, or set <code>MAGPIE_HOME</code>.
+        The journals and settings this <code>repomagpie ui</code> uses. To change a journal, start <code>repomagpie ui</code> with <code>--home</code> or <code>--project</code>, or set <code>MAGPIE_HOME</code>.
       </p>
 
       <section className="page-section" aria-labelledby="settings-journals">
@@ -42,7 +42,7 @@ export function SettingsPage({ settings, error, theme, onTheme, onKeys }: Props)
                   {settings.journals.project.exists ? null : <span className="field-help"> (created by the first note saved to it)</span>}
                 </>
               ) : (
-                "None: magpie ui was not started inside a project."
+                "None: repomagpie ui was not started inside a project."
               )}
             </dd>
             <dt>GitHub token</dt>

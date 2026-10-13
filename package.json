@@ -22,6 +22,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
+    "repomagpie": "dist/cli/main.js",
     "magpie": "dist/cli/main.js"
   },
   "files": [
@@ -41,6 +42,7 @@
     "test:e2e": "playwright test -c ui/playwright.config.ts",
     "bench": "npm run build && node scripts/bench-search.ts && node scripts/bench-suggest.ts && node scripts/bench-recall.ts && node scripts/bench-links.ts && node scripts/bench-graph.ts && node scripts/bench-note.ts",
     "check:links": "node scripts/check-links.ts",
+    "check:commands": "node scripts/check-commands.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

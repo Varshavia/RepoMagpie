@@ -40,12 +40,13 @@ const NOT_YET = [
   { usage: "init", summary: "draft notes from this project's manifests" },
 ];
 
-// Runs magpie with the given arguments and returns the exit code (spec section 1).
+// Runs repomagpie with the given arguments and returns the exit code (spec section 1).
 export async function run(argv: string[], io: Io): Promise<number> {
   let code = 0;
-  const program = new Command("magpie")
+  const program = new Command("repomagpie")
     .description("Remembers what you and your team learned about every dependency.")
     .version(packageVersion())
+    .addHelpText("after", "\nmagpie works as a short alias when no other magpie command is on your PATH.")
     .option("--json", "print one JSON document on stdout")
     .option("--home <dir>", "the personal journal")
     .option("--project <dir>", "the project root (like git -C), or its .magpie folder")
@@ -148,7 +149,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
   for (const { usage, summary } of NOT_YET) {
     const name = usage.split(" ")[0];
     program.command(usage).description(`[not implemented yet] ${summary}`).action(() => {
-      io.err(`magpie ${name}: not implemented yet\n`);
+      io.err(`repomagpie ${name}: not implemented yet\n`);
       code = 1;
     });
   }

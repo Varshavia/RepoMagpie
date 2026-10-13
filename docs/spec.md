@@ -1,14 +1,16 @@
 # Spec (v0.1)
 
-What `magpie` v0.1 does, command by command. It turns the [roadmap](roadmap.md)'s step 2 decisions (0015–0020) into behaviour that can be built and tested. The note format is in the [note schema](note-schema.md); terms are in the [glossary](glossary.md).
+What `repomagpie` v0.1 does, command by command. It turns the [roadmap](roadmap.md)'s step 2 decisions (0015–0020) into behaviour that can be built and tested. The note format is in the [note schema](note-schema.md); terms are in the [glossary](glossary.md).
 
 v0.1 is implemented on `feat/...` branches; the [roadmap](roadmap.md) says which commands exist ([decision 0012](decisions/0012-branch-workflow.md)).
 
 ## 1. Conventions
 
-- **Command name:** `magpie`. The npm package is `repomagpie`; its single `bin` entry is `magpie`, so `npx repomagpie` runs it ([npx docs](https://docs.npmjs.com/cli/v11/commands/npx)) ([decision 0015](decisions/0015-typescript-on-node.md)).
+- **Command name:** `repomagpie`, the name of the npm package too ([decision 0031](decisions/0031-the-command-is-repomagpie.md)). Its `bin` has two entries for the same file: `repomagpie` and `magpie`. `magpie` works as a short alias when no other `magpie` is on `PATH`; everything a machine runs (the hook entry, the skill, hints) uses `repomagpie`. <!-- check:commands allow -->
+  With two bins, `npx repomagpie` runs the one named like the package ([npx docs](https://docs.npmjs.com/cli/v11/commands/npx)); `npm run check:build` checks it against a packed tarball.
+- **Message prefixes:** CLI messages on stderr start with the command (`repomagpie note: …`); the hook's texts start with `RepoMagpie:` (section 6).
 - **Streams:** data goes to stdout; messages, warnings and errors go to stderr.
-- **`--json`** on every command prints one JSON document to stdout and nothing else ([decision 0008](decisions/0008-machine-readable-output.md)). Its shape is part of the public interface. Under `--json`, `magpie` never prompts.
+- **`--json`** on every command prints one JSON document to stdout and nothing else ([decision 0008](decisions/0008-machine-readable-output.md)). Its shape is part of the public interface. Under `--json`, `repomagpie` never prompts.
 - **`--json` on failure** (exit 1 or 2): the same document as on success, plus an `"error"` field with the message. Fields that aren't known are `null`, lists are empty, and counts are 0. Example: `{"id": null, "journal": "personal", "path": null, "created": false, "status": null, "warnings": [], "error": "Not a supported input. ..."}`. A usage error that the command-line parser catches (an unknown flag, a missing argument) prints its message on stderr only.
 - **Interactive prompts** happen only when stdin and stdout are terminals and `--json` is not set.
 - **Global flags:** `--json`, `--home <dir>` (personal journal), `--project <dir>` (project root, like `git -C`; a path to its `.magpie` folder also works), `--help`, `--version`.
@@ -22,7 +24,7 @@ v0.1 is implemented on `feat/...` branches; the [roadmap](roadmap.md) says which
 
 ## 2. Commands
 
-### `magpie note <name-or-url> ["text"]`
+### `repomagpie note <name-or-url> ["text"]`
 
 Captures a verdict in one line, or creates a note from a URL.
 
@@ -72,10 +74,10 @@ Behaviour:
    - A note can't be its own alternative: exit 1, nothing written.
 
 ```
-$ magpie note pdfkit "avoid: async streams painful; use puppeteer"
+$ repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
 ✔ Saved to your personal journal: pdfkit
   ~/.magpie/notes/npm--pdfkit.md
-$ magpie note pdfkit --alternative puppeteer
+$ repomagpie note pdfkit --alternative puppeteer
 ✔ Updated in your personal journal: pdfkit
   ~/.magpie/notes/npm--pdfkit.md
 ```
@@ -85,7 +87,7 @@ $ magpie note pdfkit --alternative puppeteer
 - `alternatives_added` and `alternatives_present` list the `--alternative` targets as given: those written, and those already there. Both are `[]` without the flag. Added in 0.2; an addition, not a breaking change.
 - `tags_md_added` lists the new note's tags that were appended to `tags.md` (step 3). Added in 0.2; an addition.
 
-### `magpie import <file>`
+### `repomagpie import <file>`
 
 The bulk form of `note`. Each line that starts with `- ` is one item:
 
@@ -109,7 +111,7 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - `tags_md_added`: the tags appended to `tags.md`, in order (in a dry run, those that would be). Added in 0.2; an addition.
 
-### `magpie tags --from-topics`
+### `repomagpie tags --from-topics`
 
 "Add GitHub topics as tags" for the notes a journal already has ([decision 0030](decisions/0030-github-topics-become-tags.md)). The user runs it on purpose, so it is a human edit (schema rule 2).
 
@@ -126,7 +128,7 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - `notes`: only the notes that get tags, by file name. `skipped`: the notes left unchanged, with why. `tags_md_added`: the tags appended to `tags.md`, in order. With `--dry-run`, what would be.
 
-### `magpie search <query>`
+### `repomagpie search <query>`
 
 Keyword search across both journals.
 
@@ -140,7 +142,7 @@ Keyword search across both journals.
 
 `--json`: `{"query": "...", "results": [{"id": "...", "journal": "project", "type": "note|skill", "skill": null, "name": "...", "verdict": "...", "status": "reviewed", "score": 3.2, "path": "..."}]}`
 
-### `magpie suggest ["description"]`
+### `repomagpie suggest ["description"]`
 
 Shows what the user already has that fits a project.
 
@@ -159,7 +161,7 @@ Shows what the user already has that fits a project.
 - `verdict` is `null` for a note without one, as in `search`. `in_use_avoid` items have the shape of `recall --json` matches, with `query` the dependency's name.
 - `alternatives`, on every candidate and every `in_use_avoid` item: the note's alternatives in the shape and order of `recall --json` ([decision 0029](decisions/0029-recall-names-alternatives.md)), `[]` when none. Added in 0.2; an addition, not a breaking change.
 
-### `magpie adopt <name>`
+### `repomagpie adopt <name>`
 
 Copies a note from the personal journal into the project journal and prints the install command, unless the note's Verdict says to avoid the package (step 5). It never installs anything.
 
@@ -184,7 +186,7 @@ Output: the copy's path and `Install with: <command>` on stdout; for several pac
 
 `--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander", "install_choices": []}`. `id` is the note's own. `install` is the one command, or `null` when there is none, several, or the Verdict says to avoid; `install_choices` lists the commands when there are several, and is `[]` otherwise.
 
-### `magpie recall <package>...`
+### `repomagpie recall <package>...`
 
 Looks up notes for packages before an install. Used directly, by agents in skill mode, and by the hook (section 6).
 
@@ -200,21 +202,21 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 - `drafts` names which of `avoid_when` and `use_when` are still drafts (schema rule 3); `[]` when none.
 - `alternatives` ([decision 0029](decisions/0029-recall-names-alternatives.md)): every alternative of the matched note, `[]` when none. They come from the `alternatives` field on both sides: the targets in the note's own field, and every note in the same journal that lists it. Targets resolve within the note's journal as links do (file stem, then a unique name). Each is listed once, never the note itself. `name` is the note's name, or the target as written when it has no note; then `id`, `verdict`, `status` and `path` are `null`, and `reason` is `missing` (no such note) or `ambiguous` (several notes have that name), as for a link in the Note document ("Shared JSON documents", below). A resolved alternative has no `reason`. `avoid` is `true` when the alternative is itself an avoid note (section 6). Order: reviewed alternatives that aren't avoid notes, then inbox ones, then avoid ones, then those without a note; ties by name. Added in 0.2; an addition, not a breaking change.
 
-### `magpie init` (if time allows in v0.1; otherwise v0.3)
+### `repomagpie init` (if time allows in v0.1; otherwise v0.3)
 
 Reads the project's manifests and creates a draft note, without a Verdict (`status: inbox`), for each direct dependency that has no note yet ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)). It writes to the project journal by default (`--to personal` to change that).
 
 - **Offline by default:** without flags, `init` makes no network calls; notes get `id`, `name` and `packages` from the manifests only.
 - **`--fetch`:** also fetch each dependency's repository metadata, as `note <url>` does. If the network fails, the note is written without metadata and a warning goes to stderr.
 
-### `magpie hook claude-code`
+### `repomagpie hook claude-code`
 
 Internal: the command the Claude Code hook runs (section 6). Not meant to be typed by people.
 
 - Flag: `--inform-only` (never ask; for unattended `-p` runs). `--help` prints the settings snippet.
 - Always exits 0, even for a usage error such as a mistyped flag: exit 2 from a `PreToolUse` hook would block the tool call.
 
-### `magpie ui`
+### `repomagpie ui`
 
 Starts the local app: a server on `127.0.0.1` that serves the app and a JSON API over the same core ([decision 0021](decisions/0021-local-ui-server.md)). Full behaviour, security rules and endpoints: [UI](ui.md).
 
@@ -234,7 +236,7 @@ Starts the local app: a server on `127.0.0.1` that serves the app and a JSON API
 
 Documents that the local app's API returns and no v0.1 command prints yet ([decision 0023](decisions/0023-api-is-the-json-contract.md)). Like the `--json` documents above, they are a public interface, and a future command that shows the same data prints the same document. Keys are snake_case; dates are `YYYY-MM-DD` strings; a failure adds `"error"` as in section 1.
 
-**Settings.** The home directory, the journals in use, and whether a GitHub token is set. The token's value never appears. The app uses `home` to show paths under it with `~`, as `magpie recall` prints them.
+**Settings.** The home directory, the journals in use, and whether a GitHub token is set. The token's value never appears. The app uses `home` to show paths under it with `~`, as `repomagpie recall` prints them.
 
 ```json
 {"version": "0.1.0",
@@ -320,13 +322,13 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 
 **Editing a note.** The app's edit of one note ([decision 0023](decisions/0023-api-is-the-json-contract.md)) is `{"journal", "id", "version", "verdict"?, "sections"?, "fields"?, "accept_drafts"?}`. All edits are applied, or none:
 - `version` must be the file's current version (`sha256:<hex>` of its bytes); otherwise nothing is written, and the answer is the Note document as the file is now, plus `"error"`.
-- `verdict`: one line. It fills an empty Verdict as `magpie note` does (comments in the section stay); otherwise it replaces the section's body. `""` clears it. `status` follows: `reviewed` with a Verdict, `inbox` without.
+- `verdict`: one line. It fills an empty Verdict as `repomagpie note` does (comments in the section stay); otherwise it replaces the section's body. `""` clears it. `status` follows: `reviewed` with a Verdict, `inbox` without.
 - `sections`: `{"<section name>": "<body>"}` for the schema's sections except the Verdict. The body replaces the section's body, without blank lines around it, followed by one blank line before the next section. A drafted section loses its draft marker (schema rule 3), unless the body is unchanged. A missing section is inserted before the next section in schema order, or, with no later section, after the file's last line (adding a line break and a blank line only where they are missing); an empty body for a missing section writes nothing. A body can't hold a `## ` heading outside a code block.
 - `fields`: `kind` (one of the schema's kinds), `tags` (lowercase kebab-case), `tried` (true or false), `rating` (1 to 5, or `null`), `alternatives` (the whole list, in order: link targets such as `["npm--puppeteer", "wkhtmltopdf"]`, without `[[ ]]`, `|` or `#`, or single wikilinks such as `"[[zod|Zod]]"`). Each requested entry is matched to the note's entry with the same target, ignoring case, and that entry stays exactly as written: its label, quotes and a comment on its line. Only what is added or removed changes. A removed entry goes with its line (a block list) or its comma (a flow list); a new one is written as `"[[<target>]]"`, or a wikilink as given, at its place in the list. An entry with no target (`"[[]]"`) can't be named, so it stays. Changing the order is refused. When nothing is left, the key and its lines go. A block list stays a block list. Any other key, `status` and the tool-owned fields included, is refused.
 - `accept_drafts`: section names whose draft marker is removed; the text stays.
 - The answer is the Note document after the edit. Everything outside the edited parts stays byte for byte.
 
-**Note preview.** What `magpie note <target>` would write, without writing anything. For a GitHub URL it fetches the metadata, read-only.
+**Note preview.** What `repomagpie note <target>` would write, without writing anything. For a GitHub URL it fetches the metadata, read-only.
 
 ```json
 {"id": "pkg:github/microsoft/playwright-cli", "journal": "personal", "path": "/home/ana/.magpie/notes/github--microsoft--playwright-cli.md",
@@ -356,11 +358,11 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
   .gitignore      project journal only; contains ".cache/"
 ```
 
-**Creating a journal:** `magpie` creates a journal when it writes the first note into it: the `notes/` folder, a `.gitignore` for a project journal, and a starter `tags.md` with ten tags (the same as `examples/vault/tags.md`) when there is no `tags.md` yet. Existing files are never overwritten, and a journal that already has `notes/` doesn't get a `tags.md` again. Tags for that first note are drafted from the starter list.
+**Creating a journal:** `repomagpie` creates a journal when it writes the first note into it: the `notes/` folder, a `.gitignore` for a project journal, and a starter `tags.md` with ten tags (the same as `examples/vault/tags.md`) when there is no `tags.md` yet. Existing files are never overwritten, and a journal that already has `notes/` doesn't get a `tags.md` again. Tags for that first note are drafted from the starter list.
 
-**A journal without `tags.md`:** `magpie` never adds one on its own to a journal that has `notes/`. In the local app, "Create tag list" writes the starter list on the user's click ([UI](ui.md), section 7). That is a human action, like editing `tags.md` by hand (schema rule 5); it never overwrites an existing `tags.md`.
+**A journal without `tags.md`:** `repomagpie` never adds one on its own to a journal that has `notes/`. In the local app, "Create tag list" writes the starter list on the user's click ([UI](ui.md), section 7). That is a human action, like editing `tags.md` by hand (schema rule 5); it never overwrites an existing `tags.md`.
 
-**Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `magpie` warns and uses the default.
+**Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `repomagpie` warns and uses the default.
 
 **Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise walk up from the working directory and take the first `.magpie/` folder. Stop at the git root (a folder containing `.git`), the home directory, or the filesystem root; the home directory itself is not searched. The walk for the project root (where `--to project` creates `.magpie/`) stops at the home directory too, so a git repository at home (dotfiles) never makes home the project root.
 
@@ -420,13 +422,13 @@ Checked against the [Claude Code hooks reference](https://code.claude.com/docs/e
   "hooks": {
     "PreToolUse": [
       { "matcher": "Bash|PowerShell",
-        "hooks": [ { "type": "command", "command": "magpie hook claude-code" } ] }
+        "hooks": [ { "type": "command", "command": "repomagpie hook claude-code" } ] }
     ]
   }
 }
 ```
 
-**Input** (stdin): Claude Code's JSON; `magpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand.
+**Input** (stdin): Claude Code's JSON; `repomagpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand.
 
 **Detecting installs.** The command line is split the way git-guard does it ([`.claude/hooks/git-guard.mjs`](../.claude/hooks/git-guard.mjs)): chained commands (`&&`, `||`, `;`, pipes), quotes, line continuations, prefixes such as `sudo` or `env`, and nested shells. Recognised installs:
 
@@ -478,12 +480,12 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 - When a command installs several packages, one document covers them all. If any of them has an avoid note, the whole call asks, and the reason lists every avoid note first.
 - **Live test (2026-10-04):** in a Claude Code session with the hook installed, an install of a package with an avoid note prompted the user (`"ask"`), both in the default permission mode and in auto mode.
 - **Never denies:** the hook never returns `"deny"` and never exits with code 2. Its strongest answer is `"ask"`; the user decides. In an unattended `-p` run, Claude Code itself denies any call that would prompt, and the agent reads the reason (decision 0024).
-- **`--inform-only`:** `magpie hook claude-code --inform-only` never asks: avoid notes are reported like any other match. Use it for unattended `-p` runs, where an ask would stop the install.
+- **`--inform-only`:** `repomagpie hook claude-code --inform-only` never asks: avoid notes are reported like any other match. Use it for unattended `-p` runs, where an ask would stop the install.
 - **Fails open:** no note, an unparsable command, a missing journal, or any error means no output and exit 0. Errors go to a log file in the personal journal's `.cache/`, never to stdout.
 - **Fast:** the hook has the recall budget (section 7).
 - Each text stays under 10,000 characters, Claude Code's cap for `additionalContext` and `systemMessage`; the reason is kept to the same limit.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 
@@ -501,18 +503,18 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 
 **Caches:** five per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when", "Use when" and `alternatives` as written), `note-list.json` (each note's summary in the Note list document, for the local app), `links.json` (each note's id, name and links as written, for the link index), and `graph.json` (each note's fields the graph draws, its topics and language, for the graph). Each records every note file's modification time and size. The first two are rebuilt when a note is added, removed or changed, and recall's also when any of its entries doesn't have the expected shape; the note list, the links and the graph's fields read again only the notes that were added or changed, and any note whose cached entry doesn't have the expected shape. Links are resolved from the cached entries on every read. All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. A cache is written whole to a temporary file, then renamed into place; when the rename fails because another program holds the old file (EPERM, EACCES or EBUSY, as antivirus does on Windows), it is tried again after 5, 10, 15 and 20 ms while that fits in 50 ms, since the hook reads these caches; a write that gives up removes its temporary file. They store file names, not paths, so a journal can be moved.
 
-**Hook start-up:** `magpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
+**Hook start-up:** `repomagpie hook claude-code` (with no flag, or `--inform-only` only) loads only what the hook needs; every other command loads only its own module.
 
 ## 8. Output design
 
-`magpie` follows the [Command Line Interface Guidelines](https://clig.dev/) and the writing style in CLAUDE.md: short sentences, active voice, no marketing adjectives.
+`repomagpie` follows the [Command Line Interface Guidelines](https://clig.dev/) and the writing style in CLAUDE.md: short sentences, active voice, no marketing adjectives.
 
 **Rules**
 - **Verdict first.** Every result leads with the Verdict. A note without one says so: `[inbox] no verdict yet`.
-- **Recall card:** name, Verdict, "Avoid when", "Alternatives", then "Use when". At most about 6 lines by default, plus up to 3 more for alternatives; `--full` shows every section and every alternative. Each alternative is its name and Verdict (`puppeteer: default for PDF rendering`), `[inbox] no verdict yet` for an inbox note, `(you also noted to avoid it)` after an avoid note, and the name alone when it has no note. In a terminal each alternative has its own line, aligned under the first; at most 3, then `+N more (magpie recall <package> --full)`. Piped, they share one line, separated by `; `.
+- **Recall card:** name, Verdict, "Avoid when", "Alternatives", then "Use when". At most about 6 lines by default, plus up to 3 more for alternatives; `--full` shows every section and every alternative. Each alternative is its name and Verdict (`puppeteer: default for PDF rendering`), `[inbox] no verdict yet` for an inbox note, `(you also noted to avoid it)` after an avoid note, and the name alone when it has no note. In a terminal each alternative has its own line, aligned under the first; at most 3, then `+N more (repomagpie recall <package> --full)`. Piped, they share one line, separated by `; `.
 - **Colour only carries meaning:** the "Avoid when" label and the `[inbox]` status. Every coloured item also has a text label, so nothing depends on colour alone.
 - **No colour** when stdout is not a terminal, or when `NO_COLOR` is set to a non-empty value ([no-color.org](https://no-color.org/)). `--json` output is never coloured.
-- **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `magpie search pdf | head` shows results only.
+- **Streams:** data on stdout; hints, counts and warnings on stderr. Piping `repomagpie search pdf | head` shows results only.
 - **Width:** the Verdict is never cut. In a terminal, a result is a metadata line (rank, name, type, journal), cut to the terminal width with `…`, then the Verdict on its own lines, indented under the name and wrapped at spaces (a word longer than the line is broken, not dropped). When piped, each result is one line and nothing is cut.
 - **Labels:** draft text is labelled `(draft)`; a name-only recall match is labelled `(name match only)`.
 - **PURLs for people:** human output shows a PURL decoded (`pkg:npm/@babel/core`, not `pkg:npm/%40babel/core`), and a package by its name (`@babel/core`). `--json`, the files and the API keep the encoded id.
@@ -523,7 +525,7 @@ An **avoid note** (its Verdict starts with the word "avoid", in any case, or its
 Recall card, exact match:
 
 ```
-$ magpie recall pdfkit
+$ repomagpie recall pdfkit
 pdfkit · npm · personal journal
   Verdict       avoid: async streams painful; use puppeteer
   Avoid when    you need streamed output for large PDFs
@@ -535,32 +537,32 @@ pdfkit · npm · personal journal
 Several alternatives in a terminal:
 
 ```
-$ magpie recall pdfkit
+$ repomagpie recall pdfkit
 pdfkit · npm · personal journal
   Verdict       avoid: async streams painful; use puppeteer
   Avoid when    you need streamed output for large PDFs
   Alternatives  puppeteer: default for PDF rendering in new projects
                 pdf-lib: [inbox] no verdict yet
                 jspdf: avoid: tiny API (you also noted to avoid it)
-                +1 more (magpie recall pdfkit --full)
+                +1 more (repomagpie recall pdfkit --full)
   ~/.magpie/notes/npm--pdfkit.md
 ```
 
 The same, piped:
 
 ```
-$ magpie recall pdfkit | cat
+$ repomagpie recall pdfkit | cat
 pdfkit · npm · personal journal
   Verdict       avoid: async streams painful; use puppeteer
   Avoid when    you need streamed output for large PDFs
-  Alternatives  puppeteer: default for PDF rendering in new projects; pdf-lib: [inbox] no verdict yet; jspdf: avoid: tiny API (you also noted to avoid it); +1 more (magpie recall pdfkit --full)
+  Alternatives  puppeteer: default for PDF rendering in new projects; pdf-lib: [inbox] no verdict yet; jspdf: avoid: tiny API (you also noted to avoid it); +1 more (repomagpie recall pdfkit --full)
   ~/.magpie/notes/npm--pdfkit.md
 ```
 
 Search results in a terminal:
 
 ```
-$ magpie search pdf
+$ repomagpie search pdf
 1  pdfkit     npm  personal
    Verdict: avoid: async streams painful; use puppeteer
 2  puppeteer  npm  project
@@ -572,7 +574,7 @@ $ magpie search pdf
 Piped, one line per result:
 
 ```
-$ magpie search pdf | cat
+$ repomagpie search pdf | cat
 1  pdfkit     npm  personal  Verdict: avoid: async streams painful; use puppeteer
 2  puppeteer  npm  project   Verdict: default for PDF rendering in new projects
 3  pdf-lib    npm  personal  [inbox] no verdict yet
@@ -581,7 +583,7 @@ $ magpie search pdf | cat
 Suggest list, piped (the hint goes to stderr; in a terminal, the why and Instead lines follow the Verdict on their own lines):
 
 ```
-$ magpie suggest "a TypeScript CLI with tests" | cat
+$ repomagpie suggest "a TypeScript CLI with tests" | cat
 1  commander  npm  project   Verdict: our CLI parser  Why: matched cli
 2  commander  npm  personal  Verdict: fine for small CLIs  Why: matched cli
 3  tsx        npm  personal  [inbox] no verdict yet  Why: matched typescript
@@ -596,7 +598,7 @@ Already in use, you noted to avoid:
 ### Runtime and packaging ([decision 0015](decisions/0015-typescript-on-node.md))
 
 - **TypeScript on Node.js.** `engines.node` is `>=22.12.0`, the floor commander 15 requires; CI runs the tests on Node 22, 24 and 26, on Linux and Windows.
-- **ESM only:** `"type": "module"`. The published package contains compiled JavaScript and one `bin` entry, `magpie`.
+- **ESM only:** `"type": "module"`. The published package contains compiled JavaScript and two `bin` entries for the same file: `repomagpie`, and the alias `magpie` ([decision 0031](decisions/0031-the-command-is-repomagpie.md)). <!-- check:commands allow -->
 - **Source under type stripping:** contributors run the `.ts` source directly on Node 22.18.0 or later. `tsconfig.json` follows the [Node.js recommendation](https://nodejs.org/api/typescript.html): `module: nodenext`, `target: esnext`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`. In practice: no enums or namespaces, types imported with `import type`, and file extensions in every import.
 - **Build:** for publishing only, Vite bundles the CLI and its libraries into `dist/cli/`: `main.js` and the chunks it loads on demand, with the libraries' licences in `THIRD-PARTY-LICENSES.md` ([decision 0025](decisions/0025-bundle-the-cli.md)). `tsc` only typechecks; tests run on the source. `npm run check:build` checks that the bundle answers as the source does.
 - **Tests:** `node:test`, with fixture journals and no network, as for git-guard.
@@ -626,10 +628,10 @@ Alternatives considered:
 
 ### Round-trip safety
 
-`magpie` edits files people wrote, so:
+`repomagpie` edits files people wrote, so:
 - Frontmatter is edited through the `yaml` Document API, changing only tool-owned keys. The `yaml` docs warn that comment handling "is not completely stable, in particular for trailing comments" ([yaml docs](https://eemeli.org/yaml/)); round-trip tests on fixture notes with comments must pass before release.
 - The body is never re-serialised: appending a skill line is a text insertion.
-- If a file can't be parsed, `magpie` leaves it untouched and warns.
+- If a file can't be parsed, `repomagpie` leaves it untouched and warns.
 
 ## 10. Out of scope for v0.1
 

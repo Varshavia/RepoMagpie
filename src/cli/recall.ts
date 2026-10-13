@@ -66,7 +66,7 @@ function alternativeLines(m: RecallMatch, options: CardOptions, head: string, wi
   if (!m.alternatives.length) return [];
   const shown = options.full ? m.alternatives : m.alternatives.slice(0, 3);
   const items = shown.map((a) => alternativeText(a, options.color));
-  if (shown.length < m.alternatives.length) items.push(`+${m.alternatives.length - shown.length} more (magpie recall ${m.query} --full)`);
+  if (shown.length < m.alternatives.length) items.push(`+${m.alternatives.length - shown.length} more (repomagpie recall ${m.query} --full)`);
   if (options.piped) return [`  ${head}${items.join("; ")}`];
   return [`  ${head}${items[0]}`, ...items.slice(1).map((item) => `  ${" ".repeat(width)}${item}`)];
 }

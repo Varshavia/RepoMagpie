@@ -148,7 +148,7 @@ test("connection lost", async ({ page, magpie }) => {
   await magpie.open(page);
   await expect(page.getByRole("listbox", { name: "Inbox" })).toBeVisible();
   await magpie.server.stop();
-  await expect(page.getByText("Lost the connection to magpie ui.")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Lost the connection to repomagpie ui.")).toBeVisible({ timeout: 10_000 });
   await shoot(page, "12-connection-lost");
 });
 

@@ -41,6 +41,6 @@ export function resultWord(result: Result, dryRun: boolean): string {
 export function summary(items: { result: Result }[], dryRun: boolean): string {
   const n = (r: Result) => items.filter((i) => i.result === r).length;
   return dryRun
-    ? `magpie wrote nothing yet: ${n("created")} to create, ${n("updated")} to update, ${n("unchanged")} unchanged, ${n("failed")} failing.`
+    ? `RepoMagpie wrote nothing yet: ${n("created")} to create, ${n("updated")} to update, ${n("unchanged")} unchanged, ${n("failed")} failing.`
     : `${n("created")} created, ${n("updated")} updated, ${n("unchanged")} unchanged, ${n("failed")} failed.`;
 }

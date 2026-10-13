@@ -429,7 +429,7 @@ test("import: check the lines (nothing written), then import them", async ({ pag
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await page.getByLabel("Lines").fill("- pkg:npm/left-pad — verdict: avoid; use padStart\n- pkg:pypi/requests — use: HTTP in scripts\n- not a package!");
   await page.getByRole("button", { name: "Check lines" }).click();
-  await expect(page.getByText("magpie wrote nothing yet: 2 to create, 0 to update, 0 unchanged, 1 failing.")).toBeVisible();
+  await expect(page.getByText("RepoMagpie wrote nothing yet: 2 to create, 0 to update, 0 unchanged, 1 failing.")).toBeVisible();
   expect(existsSync(magpie.note("npm--left-pad.md"))).toBe(false);
   await page.getByRole("button", { name: "Import 3 lines" }).click();
   await expect(page.getByText("2 created, 0 updated, 0 unchanged, 1 failed.")).toBeVisible();
@@ -449,7 +449,7 @@ test("import: a list copied out of a chat is read leniently; without items, the 
   await lines.fill("\\- pkg:npm/left-pad — verdict: fine\n* pkg:npm/chalk\n+ pkg:pypi/requests");
   await expect(page.getByText("3 items.")).toBeVisible();
   await page.getByRole("button", { name: "Check lines" }).click();
-  await expect(page.getByText("magpie wrote nothing yet: 3 to create, 0 to update, 0 unchanged, 0 failing.")).toBeVisible();
+  await expect(page.getByText("RepoMagpie wrote nothing yet: 3 to create, 0 to update, 0 unchanged, 0 failing.")).toBeVisible();
   await expect(page.getByRole("cell", { name: "pkg:npm/left-pad" })).toBeVisible();
 });
 

@@ -14,7 +14,7 @@ export interface TagsOptions extends GlobalOptions {
 
 export function tagsCommand(options: TagsOptions, io: Io): number {
   if (!options.fromTopics) {
-    io.err("magpie tags: say what to do. For now there is one action: magpie tags --from-topics [--dry-run]\n");
+    io.err("repomagpie tags: say what to do. For now there is one action: repomagpie tags --from-topics [--dry-run]\n");
     return 2;
   }
   const run = tagsFromTopics({ journal: options.journal, dryRun: Boolean(options.dryRun) }, contextOf(io, options));
@@ -25,7 +25,7 @@ export function tagsCommand(options: TagsOptions, io: Io): number {
   }
   for (const note of document.notes) io.out(`${readablePurl(note.id)}: + ${note.added.join(", ")}\n`);
   for (const skipped of document.skipped) io.err(`skipped ${skipped.path}: ${skipped.reason}\n`);
-  if (document.error) io.err(`magpie tags: ${document.error}\n`);
+  if (document.error) io.err(`repomagpie tags: ${document.error}\n`);
   if (document.notes.length) {
     const tags = document.notes.reduce((sum, note) => sum + note.added.length, 0);
     const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;

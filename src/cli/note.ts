@@ -23,7 +23,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
 
   const { journal, saved: r } = run;
   if (!r) {
-    io.err(`magpie note: ${run.document.error}\n`);
+    io.err(`repomagpie note: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
   for (const warning of [...journal.warnings, ...r.warnings]) io.err(`warning: ${warning}\n`);
@@ -34,7 +34,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
   if (r.result === "created") io.err(`✔ Saved to ${where}: ${name}\n`);
   else if (r.result === "updated") io.err(`✔ Updated in ${where}: ${name}\n`);
   else if (r.result === "unchanged") io.err(`Already in ${where}: ${name}\n`);
-  else io.err(`magpie note: ${r.error}\n`);
+  else io.err(`repomagpie note: ${r.error}\n`);
   if (r.tagsMdAdded.length) io.err(`Added to tags.md: ${r.tagsMdAdded.join(", ")}\n`);
   if (r.path) io.out(`${r.path}\n`);
   return exitCode(run.outcome);
