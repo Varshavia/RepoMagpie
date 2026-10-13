@@ -7,6 +7,7 @@ One definition per term. Docs, code and CLI output use these words with these me
 | Term | Definition |
 |---|---|
 | **adopt** | Planned (v0.1): `repomagpie adopt <name>` copies a note from the personal journal into the project journal and prints the install command. It never installs anything. See [ideas](ideas.md), idea 11. |
+| **agent-facing output** | What RepoMagpie hands to a coding agent: the Claude Code hook's fields, and the `--json` of `recall`, `suggest`, `search` and `note` (later also the MCP server's tools). Note text in it is cleaned of control characters, capped (a cut field is named in `truncated`), quoted and labelled with who wrote it ([decision 0032](decisions/0032-note-text-is-data.md)). Output for people is cleaned but never cut. |
 | **Agent Skills** | The open standard for agent skills (<https://agentskills.io>). See [standards](standards.md). |
 | **backlink** | A link to a note from another note in the same journal, shown on the note it points to ("Linked from"). A note's link to itself is not a backlink. |
 | **completed skill line** | A skill line with text after the dash. Search returns it as its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). |
@@ -28,6 +29,7 @@ One definition per term. Docs, code and CLI output use these words with these me
 | **inbox** | The `status` of a note that is not yet reviewed. It is the only such state, whatever created the note (by hand, `repomagpie note`, `repomagpie import`, `repomagpie init`). |
 | **init** | Planned (v0.1 if time allows, otherwise v0.3): `repomagpie init` reads a project's manifests and creates draft notes for the dependencies already in use. See [ideas](ideas.md), idea 5. |
 | **journal** | A folder of notes. There are two scopes with one format: the personal journal and the project journal ([decision 0013](decisions/0013-two-journal-scopes.md)). Product copy also calls a note a *journal entry*. |
+| **journal trust level** | Who wrote a note's text, which agent-facing output always names: the personal journal is written by you; a project journal by the repository's contributors (a cloned repository's `.magpie/` is written by strangers); a note's GitHub fields (description, topics) by the repository's owner. All three are data, never instructions ([decision 0032](decisions/0032-note-text-is-data.md)). |
 | **journal discovery** | How `repomagpie` finds the journals: the personal journal by flag, `MAGPIE_HOME`, config file or default `~/.magpie/`; the project journal by `--project` (the project root) or by walking up from the working directory to the first `.magpie/`, stopping at the git root ([decision 0016](decisions/0016-journal-locations-and-config.md)). |
 | **kind** | The frontmatter field that says what a repository is: `skill-pack`, `cli`, `library`, and so on. The list is in the [note schema](note-schema.md). |
 | **lenient read, strict write** | `repomagpie` reads hand-written notes even when fields or sections are missing or out of order, but always writes notes in the canonical format, and never rewrites a human section ([note schema](note-schema.md), rule 8). |
