@@ -24,8 +24,9 @@ How RepoMagpie versions, records and ships releases. What each release contains 
 | Draft changelog entries under Unreleased during normal work | agent |
 | Draft release notes, on request | agent |
 | Create tags, on `main` only | maintainer, by hand |
+| Stage the version on npm (package `repomagpie`) | the release workflow, on the tag ([decision 0033](decisions/0033-releases-staged-from-ci.md)) |
+| Approve the staged version on npmjs.com, with 2FA | maintainer, by hand |
 | Create GitHub releases | maintainer, by hand |
-| Publish to npm (package `repomagpie`) | maintainer, by hand |
 
 Agents can't tag, release or publish: git-guard and the deny list block those commands ([CLAUDE.md](../CLAUDE.md), section 1).
 
@@ -64,24 +65,34 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `node dist/cli/main.js --version` | it prints the new version |
 | `npm pack --dry-run` | the package is `repomagpie@X.Y.Z` and lists `LICENSE`, `dist/cli/THIRD-PARTY-LICENSES.md`, `dist/ui/THIRD-PARTY-LICENSES.md` and `dist/ui/icons-LICENSE.txt`; no runtime dependencies |
 
-### 3. Ship (maintainer, by hand)
+### 3. Ship (maintainer; CI stages)
+
+Releases are staged from CI and approved by the maintainer ([decision 0033](decisions/0033-releases-staged-from-ci.md)). Nothing becomes installable until the approval.
 
 1. Commit the release branch, push it, and open a pull request to `main`.
 2. Merge it once CI is green ("Rebase and merge" or a merge commit, not squash).
 3. Tag the merge on `main`: `git switch main`, `git pull`, `git tag v0.2.0-beta.2`, `git push origin v0.2.0-beta.2`.
-4. Publish from that commit: `npm ci`, `npm login`, then `npm publish --tag beta` (its `prepublishOnly` script builds `dist/` first). A final release uses `npm publish`.
-5. Approve the staged package on npmjs.com, so the version goes live.
-6. Check the dist-tags: `npm view repomagpie dist-tags` shows `beta` on the new version (`latest` on a final release). `--tag beta` leaves `latest` where it was. Until there is a final release, `latest` can follow the betas, so a plain `npm install -g repomagpie` gets the new one: `npm dist-tag add repomagpie@0.2.0-beta.2 latest`.
-7. Create the GitHub release from the drafted notes: `gh release create v0.2.0-beta.2 --prerelease --title "RepoMagpie 0.2.0-beta.2" --notes-file <notes>`.
-8. Install it and check the version: `npm install -g repomagpie@beta`, then `repomagpie --version` prints `0.2.0-beta.2`.
+4. The tag starts `.github/workflows/release.yml`. Its first job:
+   - refuses a tag that isn't `v` plus `package.json`'s version, or whose commit isn't on `main`'s history (`scripts/release-check.ts`);
+   - runs every check in step 2 except the benchmarks, and the end-to-end tests;
+   - refuses a version npm already has, and lists what the package will hold (`npm pack --dry-run`).
+
+   Its second job, the only one with `id-token: write`, builds and runs `npm stage publish --tag beta` (`--tag latest` for a final version) through trusted publishing: no token, provenance included. One run per tag at a time; a run is never cancelled halfway.
+5. **Approve:** on npmjs.com, open the package's staged versions, check that the staged one is `0.2.0-beta.2` from the expected workflow run, and approve it with 2FA. (`npm stage list repomagpie` and `npm stage approve <stage-id>` do the same from a terminal logged in with 2FA.)
+6. **Check what was released:** `npm view repomagpie@0.2.0-beta.2 version dist.tarball` answers, and `npm view repomagpie dist-tags` shows `beta` on it (`latest` on a final release). `--tag beta` leaves `latest` where it was. Until there is a final release, `latest` can follow the betas: `npm dist-tag add repomagpie@0.2.0-beta.2 latest` (with 2FA).
+7. **Check the provenance:** the version's page on npmjs.com shows "Built and signed on GitHub Actions", linked to this repository, the tagged commit and the `release.yml` run. `npm audit signatures` in a project that installed it checks the same signatures.
+8. Create the GitHub release from the drafted notes: `gh release create v0.2.0-beta.2 --prerelease --title "RepoMagpie 0.2.0-beta.2" --notes-file <notes>`.
+9. Install the exact version and check it: `npm install -g repomagpie@0.2.0-beta.2`, then `repomagpie --version` prints `0.2.0-beta.2`.
+
+**If the release workflow can't stage** (an npm or GitHub outage, not a red check: fix that and tag again with a new version): from the tagged commit, `npm ci`, `npm run build`, `npm login`, then `npm stage publish --tag beta` with 2FA, and approve as in step 5. That version has no provenance; the release notes say so.
+
+**Setting up trusted publishing** (once, when the first release from CI is ready; an unused trusted publisher expires after 2 days): on npmjs.com, the package's settings, "Trusted publishing", GitHub Actions: owner `Varshavia`, repository `RepoMagpie`, workflow file `release.yml`, no environment; under "Allowed actions", leave `npm publish` off, so the publisher can only stage. After the first release from CI, set "Publishing access" to "Require two-factor authentication and disallow tokens".
+
+**What can't be tested before the first real run:** the OIDC exchange, staging, the approval and the provenance. The dry path is tested: the tag check (`scripts/release-check.test.ts`), the workflow's shape (`scripts/workflows.test.ts`), and every check and `npm pack` the first job runs, which CI runs on every pull request.
 
 ## Before the public launch
 
 A `v0.1.0-beta.N` pre-release goes to early testers before v0.1 is announced. It is the first contact with users, and it tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)).
-
-## Later decisions
-
-- Release automation, for example a GitHub Action on tag push.
 
 ## Open questions
 

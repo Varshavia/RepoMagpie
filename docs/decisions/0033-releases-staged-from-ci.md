@@ -17,10 +17,10 @@ Both were checked against npm's documentation on 2026-10-13.
 ## Decision
 - **CI stages, the maintainer approves.** `.github/workflows/release.yml` runs when the maintainer pushes a `v*` tag. It:
   1. runs the full checks;
-  2. fails unless the tag equals `v` plus the `version` in `package.json`;
+  2. fails unless the tag equals `v` plus the `version` in `package.json`, and unless the tag's commit is on `main`'s history (release tags are created on `main` only, [0012](0012-branch-workflow.md)); a version npm already has fails too;
   3. runs `npm stage publish` through trusted publishing, with `--tag beta` for a prerelease (a version with `-`) and `latest` otherwise.
 
-  The maintainer then approves the staged version on npmjs.com with 2FA, as today.
+  The maintainer then approves the staged version on npmjs.com with 2FA, as today. Runs for the same tag share a concurrency group and are never cancelled halfway, so two runs can't both stage.
 - **The publishing job** runs on a GitHub-hosted runner, with npm CLI 11.15.0 or later and Node 22.14 or later, pinned in the workflow. Only that job gets `id-token: write`. It uses no dependency cache: a poisoned cache must not reach a release.
 - **The trusted publisher** on npmjs.com names this repository and `release.yml`, and allows `npm stage publish` only, not `npm publish`.
 - **After the first release from CI,** the package is set to "Require two-factor authentication and disallow tokens". Trusted publishing doesn't use tokens, so CI keeps working.
