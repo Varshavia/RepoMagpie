@@ -12,6 +12,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
   Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups; the topics-as-tags follow-up is built on `feat/topic-tags`.
+  Also now: pre-launch hardening on `feat/hardening` (the command name, note text from other people, releases from CI), before the tester round.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -210,6 +211,22 @@ Before the launch work (`fix/pre-launch`):
 - [x] `magpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched). Candidates under a fifth of the best score are left out; prefix matching only, no fuzzy ([spec](spec.md), section 5). On RepoMagpie itself, with the example vault: 5 candidates instead of 8, open-lakehouse out, playwright-cli first through `@playwright/test`.
 - [x] Startup time of the hook and `magpie recall` on Windows; consider bundling `dist/` into one file. Bundled with Vite into `dist/cli/`, an entry and chunks loaded on demand ([decision 0025](decisions/0025-bundle-the-cli.md)). Windows dev machine, 2,000 notes, median: recall 154 → 113 ms; the hook 152 → 108 ms with a note, 110 → 64 ms without an install.
 - [x] Fresh screenshots of every screen, dark and light, on a journal of real-looking notes, for the final design review (`SCREENS=1`, `ui/e2e/screens.spec.ts`).
+
+### Pre-launch hardening (`feat/hardening`)
+Before the tester round and the launch: the command name, note text from other people, and the supply chain. Decisions: [0031](decisions/0031-the-command-is-repomagpie.md), [0032](decisions/0032-note-text-is-data.md), [0033](decisions/0033-releases-staged-from-ci.md).
+- [x] Decisions 0031 (the command is `repomagpie`), 0032 (note text is data) and 0033 (releases are staged from CI).
+- [ ] The command name: `bin` has `repomagpie` and the alias `magpie`; every machine-facing string and doc uses `repomagpie`; the `RepoMagpie:` and `repomagpie:` prefixes; a check that docs never tell someone to run `magpie …`; tests against a packed tarball.
+- [ ] The text module: control characters stripped, agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
+- [ ] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
+- [ ] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
+- [ ] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
+- [ ] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, and a check of what `npm pack` ships.
+- [ ] The release workflow (`release.yml`): checks, the tag against the version, `npm stage publish` through trusted publishing; `docs/release.md` rewritten.
+- [ ] Socket's alerts fixed or explained; `SECURITY.md` and the README name the official channels.
+
+**Done when:** a machine always runs `repomagpie`, `magpie` still works, and the skill is named `repomagpie`; the hostile tests pass (no control characters reach an agent or a terminal; agent-facing text is capped, quoted and labelled; links are never followed; huge files and alias bombs are bounded; app links are `http(s)` only); recall and the hook stay under 150 ms, and the hook's chunk imports only `note`, `note-cache`, `recall` and the text module; CI is least-privilege and pinned, with Dependabot and a green macOS job; `release.yml` is ready; every Socket alert is fixed or explained; all checks and end-to-end tests pass.
+
+Follow-ups from the red-team pass: none yet.
 
 ### Launch
 See [marketing.md](marketing.md).
