@@ -104,11 +104,11 @@ test("R7: the Host, cookie, Origin and token checks come before any of the body 
   }
 });
 
-test("R7: a body without Content-Length is cut off once 1 MB has arrived, not at the timeout", async (t) => {
+test("R7: a body without Content-Length is kept to 1 MB and cut off at 2 MB, not at the timeout", async (t) => {
   const server = await start(t);
   const port = server.port;
   const r = await floodingWrite(port, authed(port, server.token, { "transfer-encoding": "chunked" }));
-  // The 413 goes out first; a busy client may see the cut connection before it reads it.
+  // A sender that goes on past the 1 MB of grace is cut off; it may not read the 413 first.
   assert.ok(r.status === 413 || r.status === null, String(r.status));
   assert.ok(r.ms < 5000, `${r.ms} ms`);
   assert.ok(r.sent < 8 * 1024 * 1024, `${r.sent} bytes sent before the server closed`);

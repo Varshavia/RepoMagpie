@@ -119,11 +119,11 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
         return json(res, 415, { error: "Writes accept Content-Type: application/json only." });
       }
-      // A body announced as too big is refused before it is read (red-team R7). Node drops the rest
-      // of a body a little too big, so the client reads the 413; one far too big is cut off.
-      const declared = Number(req.headers["content-length"]);
-      if (declared > MAX_BODY) {
-        if (declared > MAX_BODY + DRAIN) res.on("finish", () => req.destroy());
+      // A body announced as far too big is refused before it is read, then cut off (red-team R7). One
+      // a little too big is read to its end first (readBody keeps none of it past 1 MB): answering
+      // while a client still sends makes some systems (macOS) reset the connection, and lose the 413.
+      if (Number(req.headers["content-length"]) > MAX_BODY + DRAIN) {
+        res.on("finish", () => req.destroy());
         return json(res, 413, { error: "The request body is over 1 MB." });
       }
       const bytes = await readBody(req);
@@ -207,25 +207,23 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return Array.isArray(value) ? undefined : value;
 }
 
-// The whole body, or null as soon as more than 1 MB has arrived, with or without Content-Length
-// (red-team R7): the 413 goes out then. Up to DRAIN more bytes are read and dropped, so a client that
-// sent a little too much still gets the answer instead of a reset connection; a sender that goes on
-// is cut off there.
+// The whole body, or null when it is over 1 MB, with or without Content-Length (red-team R7). Past
+// 1 MB nothing more is kept. A body a little too big (up to DRAIN more) is read to its end and
+// dropped, so its client gets the 413 instead of a reset connection; past that the connection is
+// cut off at once, so a sender that goes on can't hold it until the request timeout.
 const DRAIN = 1024 * 1024;
 function readBody(req: IncomingMessage): Promise<Buffer | null> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    let over = false;
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size <= MAX_BODY) chunks.push(chunk);
-      else if (!over) {
-        over = true;
-        chunks.length = 0;
+      else chunks.length = 0;
+      if (size > MAX_BODY + DRAIN) {
         resolve(null);
+        req.destroy();
       }
-      if (size > MAX_BODY + DRAIN) req.destroy();
     });
     req.on("end", () => resolve(size > MAX_BODY ? null : Buffer.concat(chunks)));
     req.on("error", reject);
