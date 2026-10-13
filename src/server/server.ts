@@ -119,16 +119,15 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
         return json(res, 415, { error: "Writes accept Content-Type: application/json only." });
       }
-      // A body announced as too big is refused before it is read (red-team R7).
-      if (Number(req.headers["content-length"]) > MAX_BODY) {
-        res.setHeader("Connection", "close");
+      // A body announced as too big is refused before it is read (red-team R7). Node drops the rest
+      // of a body a little too big, so the client reads the 413; one far too big is cut off.
+      const declared = Number(req.headers["content-length"]);
+      if (declared > MAX_BODY) {
+        if (declared > MAX_BODY + DRAIN) res.on("finish", () => req.destroy());
         return json(res, 413, { error: "The request body is over 1 MB." });
       }
       const bytes = await readBody(req);
-      if (!bytes) {
-        res.setHeader("Connection", "close");
-        return json(res, 413, { error: "The request body is over 1 MB." });
-      }
+      if (!bytes) return json(res, 413, { error: "The request body is over 1 MB." });
       let parsed: unknown;
       try {
         parsed = JSON.parse(bytes.toString("utf8"));
