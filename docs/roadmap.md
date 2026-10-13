@@ -217,10 +217,10 @@ Before the tester round and the launch: the command name, note text from other p
 - [x] Decisions 0031 (the command is `repomagpie`), 0032 (note text is data) and 0033 (releases are staged from CI).
 - [x] The command name: `bin` has `repomagpie` and the short alias; every machine-facing string and doc uses `repomagpie`; the `RepoMagpie:` and `repomagpie:` prefixes; a check that no doc tells someone to run the alias (`npm run check:commands`); tests against a packed tarball.
 - [x] The text module: control characters stripped, agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
-- [ ] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
+- [x] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
 - [ ] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
 - [ ] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
-- [ ] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, and a check of what `npm pack` ships.
+- [ ] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, a check of what `npm pack` ships, and a check script that fails when a source file holds bidi controls or zero-width characters.
 - [ ] The release workflow (`release.yml`): checks, the tag against the version, `npm stage publish` through trusted publishing; `docs/release.md` rewritten.
 - [ ] Socket's alerts fixed or explained; `SECURITY.md` and the README name the official channels.
 

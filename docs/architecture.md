@@ -37,7 +37,9 @@ src/
   core/        journals: discovery and config (decision 0016)
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
-               note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links)
+               note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links);
+               the file rules of decision 0032: every listing of notes skips links and files over 256 KB,
+               and every write into a journal checks the path first (assertWritable)
                wikilinks: the [[wikilink]] syntax, the alternatives field and how a target resolves; shared by
                links and recall, so the hook doesn't load the link index (decision 0029)
                text: note text is data (decision 0032): cleaning control characters, the caps of agent-facing
