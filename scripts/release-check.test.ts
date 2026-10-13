@@ -29,6 +29,11 @@ test("a tag whose commit isn't on main's history is refused", () => {
   assert.deepEqual(r, { ok: false, error: "The tag v0.2.0-beta.3 points to a commit that isn't on main's history. Release tags are created on main only (decision 0012)." });
 });
 
+test("a shallow clone is refused before the history check, which would give a wrong answer", () => {
+  const r = releaseCheck({ tag: "v0.2.0-beta.3", version: "0.2.0-beta.3", isOnMain: onMain, isShallow: () => true });
+  assert.deepEqual(r, { ok: false, error: "The checkout is shallow, so main's history can't be checked. Check out with fetch-depth: 0." });
+});
+
 test("a version that isn't semver is refused", () => {
   const r = releaseCheck({ tag: "vlatest", version: "latest", isOnMain: onMain });
   assert.equal(r.ok, false);

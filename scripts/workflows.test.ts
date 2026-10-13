@@ -59,12 +59,42 @@ test("no event data reaches a shell, and the release uses no dependency cache", 
   }
 });
 
+const release = () => workflows.find((w) => w.file === "release.yml")?.flow as Workflow & { jobs: Record<string, Job & { outputs?: Record<string, string>; needs?: string }> };
+
+test("the job with id-token runs no third-party code: it stages the tarball the first job packed, after checking its SHA-256", () => {
+  const { stage, verify } = release().jobs;
+  const runs = stage.steps.map((s) => s.run ?? "");
+  const uses = stage.steps.map((s) => s.uses ?? "").filter(Boolean);
+  assert.ok(!uses.some((u) => u.startsWith("actions/checkout@")), "no checkout: no repository code");
+  assert.deepEqual(uses.map((u) => u.split("@")[0]).sort(), ["actions/download-artifact", "actions/setup-node"]);
+  for (const run of runs) {
+    assert.doesNotMatch(run, /npm (ci|run|test|pack|exec)\b|npx /, run);
+    if (/npm (install|i)\b/.test(run)) assert.match(run, /--ignore-scripts/, run);
+  }
+  assert.ok(runs.some((r) => /sha256sum --check/.test(r)), "the tarball's SHA-256 is checked");
+  assert.ok(runs.some((r) => /^npm stage publish "\.\/\$TARBALL" --tag "\$DIST_TAG" --ignore-scripts$/m.test(r)), "stages that tarball");
+  assert.equal(stage.needs, "verify");
+  assert.deepEqual(Object.keys(verify.outputs ?? {}).sort(), ["dist-tag", "sha256", "tarball"]);
+  const verifyRuns = verify.steps.map((s) => s.run ?? "").join("\n");
+  assert.match(verifyRuns, /npm pack/);
+  assert.match(verifyRuns, /sha256sum/);
+  assert.ok(verify.steps.some((s) => s.uses?.startsWith("actions/upload-artifact@")), "the tarball is uploaded");
+});
+
+test("the tag check has main's history: the first job's checkout isn't shallow", () => {
+  const { verify } = release().jobs;
+  const checkout = verify.steps.findIndex((s) => s.uses?.startsWith("actions/checkout@"));
+  const check = verify.steps.findIndex((s) => s.run?.startsWith("node scripts/release-check.ts"));
+  assert.ok(checkout !== -1 && checkout < check);
+  assert.equal(verify.steps[checkout].with?.["fetch-depth"], 0, "fetch-depth: 0 fetches every branch's history, main's included");
+});
+
 test("the release runs on v* tags, one run per tag at a time, never cancelled halfway", () => {
   const release = workflows.find((w) => w.file === "release.yml")?.flow as Workflow & { concurrency: { group: string; "cancel-in-progress": boolean } };
   assert.deepEqual(release.on, { push: { tags: ["v*"] } });
   assert.deepEqual(release.concurrency, { group: "release-${{ github.ref }}", "cancel-in-progress": false });
   const runs = Object.values(release.jobs).flatMap((job) => job.steps.map((s) => s.run ?? ""));
   assert.ok(runs.some((r) => r.startsWith("node scripts/release-check.ts")), "the tag check");
-  assert.ok(runs.some((r) => r.startsWith('npm stage publish --tag "$DIST_TAG"')), "stage, not publish");
+  assert.ok(runs.some((r) => r.includes("npm stage publish")), "stage, not publish");
   assert.ok(!runs.some((r) => /npm publish/.test(r)), "never npm publish");
 });
