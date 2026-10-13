@@ -2,7 +2,7 @@
 import { exitCode } from "../core/outcome.ts";
 import { runNote, type Journal } from "../core/save.ts";
 import type { PackageType } from "../core/identity.ts";
-import { contextOf, type GlobalOptions } from "./context.ts";
+import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface NoteOptions extends GlobalOptions {
@@ -11,7 +11,8 @@ export interface NoteOptions extends GlobalOptions {
   alternative?: string[];
 }
 
-export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, io: Io): Promise<number> {
+export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, terminal: Io): Promise<number> {
+  const io = plainIo(terminal);
   const json = Boolean(options.json);
   const ask = io.interactive && !json ? io.ask : undefined;
   const request = { target, text, type: options.type, to: options.to, alternatives: options.alternative };

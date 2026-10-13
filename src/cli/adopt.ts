@@ -3,14 +3,15 @@
 import { runAdopt } from "../core/adopt.ts";
 import type { PackageType } from "../core/identity.ts";
 import { exitCode } from "../core/outcome.ts";
-import { contextOf, type GlobalOptions } from "./context.ts";
+import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface AdoptOptions extends GlobalOptions {
   type?: PackageType;
 }
 
-export async function adoptCommand(target: string, options: AdoptOptions, io: Io): Promise<number> {
+export async function adoptCommand(target: string, options: AdoptOptions, terminal: Io): Promise<number> {
+  const io = plainIo(terminal);
   const json = Boolean(options.json);
   const ask = io.interactive && !json ? io.ask : undefined;
   const run = await runAdopt({ target, type: options.type }, contextOf(io, options), ask);

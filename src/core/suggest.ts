@@ -6,9 +6,10 @@ import { join } from "node:path";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { readProject } from "./manifests.ts";
 import type { Outcome } from "./outcome.ts";
-import { alternativesOfFile, isAvoid, loadRecallEntries, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
+import { alternativeForAgent, alternativesOfFile, isAvoid, loadRecallEntries, matchForAgent, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
 import { projectFirst, type JournalSource } from "./search.ts";
 import { loadIndex, type SearchDoc } from "./search-index.ts";
+import { CAPS, forAgent } from "./text.ts";
 
 export interface SuggestRequest {
   description?: string; // instead of the project's manifests and README
@@ -52,6 +53,16 @@ export interface SuggestRun {
   total: number; // candidates before the limit
   in_use_names: string[]; // the names of the in_use_avoid notes, in the same order, for people
   warnings: string[];
+}
+
+// The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
+// API alike; people get the document as read. Candidates' alternatives are capped as recall's.
+export function suggestForAgent(document: SuggestJson): SuggestJson {
+  const candidates = document.candidates.map((c) => forAgent({ ...c, alternatives: c.alternatives.map(alternativeForAgent) }, {
+    id: CAPS.id, name: CAPS.name, verdict: CAPS.verdict, path: Infinity,
+    tags: { each: CAPS.tag, count: CAPS.tags }, alternatives: { each: CAPS.other, count: CAPS.alternatives },
+  }));
+  return { ...document, candidates, in_use_avoid: document.in_use_avoid.map(matchForAgent) };
 }
 
 export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {

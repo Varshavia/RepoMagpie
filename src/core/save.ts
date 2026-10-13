@@ -26,6 +26,7 @@ import {
 import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
 import type { Outcome } from "./outcome.ts";
+import { CAPS, forAgent } from "./text.ts";
 import type { KnownTags } from "./topic-tags.ts";
 import { alternativeLinks, targetResolver } from "./wikilinks.ts";
 import { addAlternatives } from "./write.ts";
@@ -287,7 +288,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error },
+    document: noteForAgent({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error }),
   });
   if (journal.error) return stop(journal.error, "failed");
   const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
@@ -313,8 +314,13 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     tags_md_added: saved.tagsMdAdded,
   };
   if (saved.error !== null) document.error = saved.error;
-  return { outcome: saved.error === null ? "ok" : "failed", document, journal, saved };
+  return { outcome: saved.error === null ? "ok" : "failed", document: noteForAgent(document), journal, saved };
 }
+
+// The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
+// API alike: names, paths and warnings can carry a note's or GitHub's text. People get `saved`.
+const noteForAgent = (document: NoteJson): NoteJson =>
+  forAgent(document, { id: CAPS.id, path: Infinity, warnings: { each: CAPS.other, count: Infinity }, tags_md_added: { each: CAPS.tag, count: CAPS.tags } });
 
 export interface ImportRequest {
   text: string; // the import file's contents

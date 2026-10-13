@@ -1,4 +1,5 @@
 // Result rows for people (spec §8), shared by search and suggest: metadata cells, then the Verdict.
+import { clean } from "../core/text.ts";
 import type { Io } from "./program.ts";
 
 export const INBOX = "[inbox]";
@@ -6,8 +7,11 @@ export const INBOX = "[inbox]";
 // Each row is its metadata cells (rank, name, type, journal), then the Verdict line, then optional
 // more lines (suggest's why). Piped: one line per result, nothing cut. In a terminal: the metadata
 // line is cut to its width, and the Verdict and the lines after it follow on their own lines,
-// indented under the name and wrapped, never cut; [inbox] is coloured unless NO_COLOR is set.
-export function renderRows(rows: string[][], io: Io, after: string[][] = []): string[] {
+// indented under the name and wrapped, never cut; [inbox] is coloured unless NO_COLOR is set. Every
+// cell is cleaned of control characters first (decision 0032, rule 1), never capped.
+export function renderRows(dirtyRows: string[][], io: Io, dirtyAfter: string[][] = []): string[] {
+  const rows = dirtyRows.map((row) => row.map((cell) => clean(cell)));
+  const after = dirtyAfter.map((lines) => lines.map((line) => clean(line)));
   const cells = rows[0]?.length ? rows[0].length - 1 : 0;
   const widths = Array.from({ length: cells }, (_, column) => Math.max(...rows.map((row) => row[column].length)));
   const metadata = (row: string[]) => row.slice(0, cells).map((cell, column) => cell.padEnd(widths[column])).join("  ");

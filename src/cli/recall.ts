@@ -4,6 +4,7 @@ import { sep } from "node:path";
 import type { PackageType } from "../core/identity.ts";
 import { DRAFT_MARKER, readNote } from "../core/note.ts";
 import { runRecall, type Alternative, type RecallMatch } from "../core/recall.ts";
+import { clean, cleanAll } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
@@ -18,11 +19,12 @@ export async function recallCommand(queries: string[], options: RecallOptions, i
     io.out(`${JSON.stringify(document)}\n`);
     return 0;
   }
-  for (const warning of warnings) io.err(`warning: ${warning}\n`);
+  for (const warning of warnings) io.err(`warning: ${clean(warning)}\n`);
   const color = io.columns !== undefined && !io.env.NO_COLOR;
-  const cards = results.flatMap((r) => r.matches).map((m) => card(m, { home: io.home, color, full: Boolean(options.full), piped: io.columns === undefined }));
+  // Note text reaches the terminal cleaned, never cut: the Verdict is never cut (decision 0032).
+  const cards = results.flatMap((r) => r.matches).map((m) => card(cleanAll(m), { home: io.home, color, full: Boolean(options.full), piped: io.columns === undefined }));
   if (cards.length) io.out(`${cards.join("\n\n")}\n`);
-  for (const r of results) if (!r.matches.length) io.err(`No note for ${r.query}.\n`);
+  for (const r of results) if (!r.matches.length) io.err(`No note for ${clean(r.query)}.\n`);
   return 0;
 }
 
@@ -90,11 +92,11 @@ function fullSections(m: RecallMatch, options: CardOptions): string[] {
   const { color } = options;
   const width = 16;
   const blocks = readNote(text).sections.map((section) => {
-    const body = section.body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    const body = section.body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/).map((line) => clean(line).trim()).filter(Boolean)
       .map((line) => line.replace(/^[-*+]\s+/, ""));
     if (section.name === "Verdict" && !body.length) body.push(`${paint(color, 33, "[inbox]")} no verdict yet`);
     if (!body.length) return { name: section.name, lines: [] };
-    const name = section.heading;
+    const name = clean(section.heading);
     const head = `  ${paint(color && name === "Avoid when", 31, name)}${" ".repeat(Math.max(width - name.length, 1))}${section.draft ? "(draft) " : ""}`;
     return { name: section.name, lines: [head + body[0], ...body.slice(1).map((line) => `  ${" ".repeat(Math.max(width, name.length + 1))}${line}`)] };
   });

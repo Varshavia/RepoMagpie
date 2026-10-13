@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import type { Outcome } from "./outcome.ts";
 import { loadIndex, type JournalIndex, type SearchDoc } from "./search-index.ts";
+import { CAPS, forAgent } from "./text.ts";
 
 export interface JournalSource {
   scope: "personal" | "project";
@@ -92,6 +93,14 @@ export interface SearchRun {
 
 // magpie search: both journals (or one), the project journal never being the personal journal's
 // folder nor the home directory's own .magpie (spec §3).
+// The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
+// API alike; people get the results as read. A skill result's Verdict is its skill line.
+export function searchForAgent(document: SearchRun["document"]): SearchRun["document"] {
+  const results = document.results.map((r) =>
+    forAgent(r, { id: CAPS.id, name: CAPS.name, skill: CAPS.name, verdict: r.type === "skill" ? CAPS.skill : CAPS.verdict, path: Infinity }));
+  return { ...document, results };
+}
+
 export function runSearch(request: SearchRequest, place: Place): SearchRun {
   const { query } = request;
   if (!query.trim()) {

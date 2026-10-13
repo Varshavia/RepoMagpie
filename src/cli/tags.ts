@@ -3,7 +3,7 @@ import { readablePurl } from "../core/identity.ts";
 import { exitCode } from "../core/outcome.ts";
 import type { Journal } from "../core/save.ts";
 import { tagsFromTopics } from "../core/tags-from-topics.ts";
-import { contextOf, type GlobalOptions } from "./context.ts";
+import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface TagsOptions extends GlobalOptions {
@@ -12,7 +12,8 @@ export interface TagsOptions extends GlobalOptions {
   dryRun?: boolean;
 }
 
-export function tagsCommand(options: TagsOptions, io: Io): number {
+export function tagsCommand(options: TagsOptions, terminal: Io): number {
+  const io = plainIo(terminal);
   if (!options.fromTopics) {
     io.err("repomagpie tags: say what to do. For now there is one action: repomagpie tags --from-topics [--dry-run]\n");
     return 2;

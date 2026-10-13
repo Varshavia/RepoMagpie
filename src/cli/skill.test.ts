@@ -248,7 +248,8 @@ function specShapes(): Map<string, unknown> {
   for (const [command, json] of raw) {
     const text = lists(json).replace(/\[<a match as in recall --json>\]/g, JSON.stringify(recall.matches))
       .replace(/\[<alternatives as in recall --json>\]/g, JSON.stringify(recall.matches[0].alternatives));
-    shapes.set(command, { ...parse(command, text), error: null }); // spec §1: a failure adds "error"
+    // spec §1: a failure adds "error"; a cut field adds "truncated" (decision 0032)
+    shapes.set(command, { ...parse(command, text), error: null, truncated: [] });
   }
   return shapes;
 }
