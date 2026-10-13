@@ -220,7 +220,7 @@ Before the tester round and the launch: the command name, note text from other p
 - [x] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
 - [x] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
 - [x] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
-- [ ] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, a check of what `npm pack` ships, and a check script that fails when a source file holds bidi controls or zero-width characters.
+- [x] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, a check of what `npm pack` ships, and a check script that fails when a source file holds bidi controls or zero-width characters.
 - [ ] The release workflow (`release.yml`): checks, the tag against the version, `npm stage publish` through trusted publishing; `docs/release.md` rewritten.
 - [ ] Socket's alerts fixed or explained; `SECURITY.md` and the README name the official channels.
 

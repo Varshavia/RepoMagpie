@@ -112,7 +112,7 @@ $env:GITHUB_TOKEN = gh auth token
 
 ## Platforms
 
-- Node.js 22.12 or later. CI runs on Linux and Windows, with Node 22, 24 and 26. macOS isn't tested yet.
+- Node.js 22.12 or later. CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
 - The hook works in Claude Code. Other agents use the skill.
 - The package has no runtime dependencies.
 

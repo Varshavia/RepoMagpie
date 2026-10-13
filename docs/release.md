@@ -58,6 +58,7 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `npm run check:bundle` | the app is under 200 kB gzipped |
 | `npm run check:links` | 0 broken links |
 | `npm run check:commands` | no doc tells someone to run the alias |
+| `npm run check:characters` | no file holds a bidi control or a zero-width character |
 | `PLAYWRIGHT_BROWSERS_PATH="$PWD/.scratch/ms-playwright" npm run test:e2e` | no flow fails; the graph's 2,000-note timing is under 2 s |
 | `npm run bench` | every command within its budget (spec §7) |
 | `node dist/cli/main.js --version` | it prints the new version |

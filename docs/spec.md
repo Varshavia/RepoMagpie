@@ -625,7 +625,7 @@ Already in use, you noted to avoid:
 
 ### Runtime and packaging ([decision 0015](decisions/0015-typescript-on-node.md))
 
-- **TypeScript on Node.js.** `engines.node` is `>=22.12.0`, the floor commander 15 requires; CI runs the tests on Node 22, 24 and 26, on Linux and Windows.
+- **TypeScript on Node.js.** `engines.node` is `>=22.12.0`, the floor commander 15 requires; CI runs the tests on Node 22, 24 and 26, on Linux, Windows and macOS.
 - **ESM only:** `"type": "module"`. The published package contains compiled JavaScript and two `bin` entries for the same file: `repomagpie`, and the alias `magpie` ([decision 0031](decisions/0031-the-command-is-repomagpie.md)). <!-- check:commands allow -->
 - **Source under type stripping:** contributors run the `.ts` source directly on Node 22.18.0 or later. `tsconfig.json` follows the [Node.js recommendation](https://nodejs.org/api/typescript.html): `module: nodenext`, `target: esnext`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`. In practice: no enums or namespaces, types imported with `import type`, and file extensions in every import.
 - **Build:** for publishing only, Vite bundles the CLI and its libraries into `dist/cli/`: `main.js` and the chunks it loads on demand, with the libraries' licences in `THIRD-PARTY-LICENSES.md` ([decision 0025](decisions/0025-bundle-the-cli.md)). `tsc` only typechecks; tests run on the source. `npm run check:build` checks that the bundle answers as the source does.

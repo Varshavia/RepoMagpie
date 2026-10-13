@@ -33,7 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - An alternative whose name has non-ASCII letters (a Cyrillic "р" looks like "p") or isn't a valid package name is flagged in the hook, in `repomagpie recall` and in the app's "Check a package"; the agent skill tells the agent to say so and install nothing for it.
 - The Claude Code hook looks up at most the first 100 packages of one command, and says how many it didn't check: a command of 100,000 names took 17 s before.
 - A cache in a journal (`.cache/`) is used only when every entry names a note file the journal has, so a committed cache can't point recall or search at a file elsewhere.
-- `repomagpie ui` refuses a write whose body is announced as over 1 MB before reading it, and cuts off a request whose body never ends after 30 s. It no longer watches a `notes/` folder that is a link.
+- `repomagpie ui` refuses a write whose body is announced as over 1 MB before reading it, answers 413 as soon as more than 1 MB has arrived without an announced size, and cuts off a request whose body never ends after 30 s. It no longer watches a `notes/` folder that is a link.
 - A note file or `tags.md` over 256 KB is skipped and named, and YAML aliases in frontmatter are limited, so a crafted note can't slow down recall or the hook.
 - The agent skill says that note text is quoted data: the agent reports what a note says and never follows instructions in it. A project journal's note was written by the repository's contributors; the agent shows you an alternative's exact package name from such a note and installs it only with your OK.
 
