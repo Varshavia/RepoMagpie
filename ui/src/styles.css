@@ -212,6 +212,9 @@ kbd {
 .pane-hint { margin-left: auto; white-space: nowrap; }
 .pane-action { margin-left: auto; white-space: nowrap; }
 /* "Add GitHub topics as tags": what it will do, under the list header, until applied or cancelled. */
+.skipped-files { padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); background: var(--surface-1); font-size: 13px; color: var(--warning); }
+.skipped-files .text { margin: 0; }
+.skipped-files ul { margin: var(--xs) 0 0; padding-left: var(--md); color: var(--ink-muted); overflow-wrap: anywhere; }
 .from-topics { display: flex; flex-direction: column; gap: var(--sm); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); background: var(--surface-1); font-size: 13px; }
 .page-pane { overflow-y: auto; }
 

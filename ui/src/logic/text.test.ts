@@ -1,7 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findLinks } from "../../../src/core/links.ts";
-import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline } from "./text.ts";
+import { editableBody, externalHref, firstEntries, homePath, isBlank, parseBody, parseInline } from "./text.ts";
+
+// Decision 0032, rule 7: a URL from a note is a link only for http and https.
+test("externalHref: http and https only; javascript:, data:, vbscript:, file: and the unparsable give none", () => {
+  assert.equal(externalHref("https://github.com/microsoft/playwright-cli"), "https://github.com/microsoft/playwright-cli");
+  assert.equal(externalHref("http://example.invalid/x"), "http://example.invalid/x");
+  assert.equal(externalHref("  https://example.invalid/  "), "https://example.invalid/");
+  for (const url of ["javascript:void(0)", "JavaScript:void(0)", " javascript:void(0)", "data:text/html,<b>x</b>", "vbscript:msgbox", "file:///etc/passwd", "//example.invalid/x", "example.invalid", ""]) {
+    assert.equal(externalHref(url), null, url);
+  }
+});
 
 // How the app shows a section's Markdown body: bullets, lines, code spans and links. No HTML is
 // ever built from note text; these are plain data for React to render.

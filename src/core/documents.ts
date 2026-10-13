@@ -114,6 +114,7 @@ export interface NoteListJson {
   journal: Scope;
   count: number;
   notes: NoteSummary[];
+  skipped: string[]; // the files left out, and why: links and files over 256 KB (decision 0032)
   error?: string;
 }
 
@@ -125,11 +126,12 @@ export interface NoteFilters {
 
 export function noteListDocument(scope: Scope, filters: NoteFilters, place: Place): Result<NoteListJson> {
   const journal = locateJournal(scope, place);
-  if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], error: journal.error } };
-  const notes = summaries(journal.path)
+  if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], skipped: [], error: journal.error } };
+  const { notes: all, skipped } = summaries(journal.path);
+  const notes = all
     .filter((n) => (!filters.status || n.status === filters.status) && (!filters.kind || n.kind === filters.kind) && (filters.tags ?? []).every((tag) => n.tags.includes(tag)))
     .sort((a, b) => compare((a.name ?? a.file).toLowerCase(), (b.name ?? b.file).toLowerCase()) || compare(a.file, b.file));
-  return { outcome: "ok", document: { journal: scope, count: notes.length, notes } };
+  return { outcome: "ok", document: { journal: scope, count: notes.length, notes, skipped } };
 }
 
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
@@ -137,9 +139,9 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 const NOTE_LIST_CACHE = "note-list.json";
 const NOTE_LIST_VERSION = 1;
 
-function summaries(journal: string): NoteSummary[] {
-  const { files, data } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
-  return files.map((file) => data[file]);
+function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
+  const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
+  return { notes: files.map((file) => data[file]), skipped };
 }
 
 // Whether a cached value has a summary's shape (a damaged cache is read again from the note).

@@ -69,15 +69,20 @@ export function takeSkipped(): string[] {
 
 // The note files of a journal that may be read, sorted, and their signature. A notes/ folder that
 // is a link gives none; a note that is a link or over the size limit is left out. Both are skipped
-// for the report.
-export function noteSignature(journal: string): { files: string[]; signature: Signature } {
+// for the report, and listed in `skipped` for the local app.
+export function noteSignature(journal: string): { files: string[]; signature: Signature; skipped: string[] } {
   const folder = join(journal, "notes");
   const files: string[] = [];
   const signature: Signature = {};
+  const skipped: string[] = [];
+  const left = (problem: PathProblem) => {
+    skip(problem);
+    skipped.push(problem.message);
+  };
   const problem = journalPathProblem(journal, folder, false);
   if (problem) {
-    skip(problem);
-    return { files, signature };
+    left(problem);
+    return { files, signature, skipped };
   }
   let names: string[];
   try {
@@ -93,14 +98,14 @@ export function noteSignature(journal: string): { files: string[]; signature: Si
     } catch {
       continue; // gone since the folder was read
     }
-    if (stats.isSymbolicLink()) skip(linkProblem(path));
-    else if (stats.isFile() && stats.size > NOTE_SIZE_LIMIT) skip(sizeProblem(path));
+    if (stats.isSymbolicLink()) left(linkProblem(path));
+    else if (stats.isFile() && stats.size > NOTE_SIZE_LIMIT) left(sizeProblem(path));
     else if (stats.isFile()) {
       files.push(name);
       signature[name] = [stats.mtimeMs, stats.size];
     }
   }
-  return { files, signature };
+  return { files, signature, skipped };
 }
 
 // A cache file's path, unless it or the cache folder is a link: then that cache is neither read nor
@@ -158,8 +163,8 @@ export function readCacheEntries(journal: string, name: string, version: number)
 // a full re-read. `derive` gets the file's name and path; the result is stored as JSON. `valid`, when
 // given, checks a cached entry's shape; one that fails is derived again, so a damaged cache can't break
 // the caller.
-export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, path: string) => T, valid?: (entry: unknown) => boolean): { files: string[]; data: Record<string, T> } {
-  const { files, signature } = noteSignature(journal);
+export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, path: string) => T, valid?: (entry: unknown) => boolean): { files: string[]; data: Record<string, T>; skipped: string[] } {
+  const { files, signature, skipped } = noteSignature(journal);
   const cached = readCacheEntries(journal, name, version);
   const data: Record<string, T> = {};
   let changed = !cached || Object.keys(cached.files).length !== files.length;
@@ -173,7 +178,7 @@ export function noteEntries<T>(journal: string, name: string, version: number, d
     }
   }
   if (changed && files.length) writeCache(journal, name, version, signature, data);
-  return { files, data };
+  return { files, data, skipped };
 }
 
 // Shape checks for the `valid` argument of noteEntries.

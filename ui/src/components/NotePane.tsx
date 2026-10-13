@@ -8,7 +8,7 @@ import { Icon } from "../icons.tsx";
 import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
-import { editableBody, firstEntries, homePath, isBlank, parseBody, parseInline, type Block, type Inline } from "../logic/text.ts";
+import { editableBody, externalHref, firstEntries, homePath, isBlank, parseBody, parseInline, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, plainClick, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
@@ -353,8 +353,8 @@ export function NotePane(props: NotePaneProps) {
           ) : null}
           <Chips kind={text("kind")} license={text("license")} language={text("language")} packages={list("packages")} tags={list("tags")} />
           <div className="actions">
-            {url && /^https:\/\//.test(url) ? (
-              <a className="button secondary" href={url} target="_blank" rel="noreferrer">
+            {url && externalHref(url) ? (
+              <a className="button secondary" href={externalHref(url) ?? undefined} target="_blank" rel="noreferrer">
                 <Icon name="external" />
                 Open repository
               </a>
@@ -837,8 +837,8 @@ function Inlines({ parts }: { parts: Inline[] }) {
           <code key={i}>{p.text}</code>
         ) : p.kind === "wikilink" ? (
           <WikiLink key={i} target={p.target} text={p.text} />
-        ) : p.kind === "link" ? (
-          <a key={i} href={p.href} target="_blank" rel="noreferrer">
+        ) : p.kind === "link" && externalHref(p.href) ? (
+          <a key={i} href={externalHref(p.href) ?? undefined} target="_blank" rel="noreferrer">
             {p.text}
           </a>
         ) : (

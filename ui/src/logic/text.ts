@@ -18,6 +18,17 @@ const FENCE = /^(```|~~~)/;
 // bare link.
 const INLINE = /(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)|\[\[([^[\]\n]*)\]\]|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)/g;
 
+// A URL from a note as a link's target (decision 0032, rule 7): only http and https. Anything else
+// (javascript:, data:, vbscript:, file:, or what doesn't parse) gives null, and stays text.
+export function externalHref(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseBody(body: string): Block[] {
   const blocks: Block[] = [];
   let current = null as Block | null;

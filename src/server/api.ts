@@ -91,7 +91,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
     "/api/notes": {
       GET: ({ query }) => {
         const journal = scope(query.get("journal"));
-        const empty = { journal, count: 0, notes: [] };
+        const empty = { journal, count: 0, notes: [], skipped: [] };
         if (!journal) return bad(empty, JOURNAL);
         const status = query.get("status") ?? undefined;
         if (status !== undefined && status !== "inbox" && status !== "reviewed") return bad(empty, "status must be inbox or reviewed.");
