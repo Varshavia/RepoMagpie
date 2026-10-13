@@ -4,7 +4,7 @@
 // Pure functions on text; no file system, no printing.
 import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
 import { alternativeLinks, findLinks } from "./links.ts";
-import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, type SectionName } from "./note.ts";
+import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, YAML_LIMITS, type SectionName } from "./note.ts";
 
 export type ToolField = "id" | "name" | "url" | "language" | "license" | "topics" | "packages" | "explored" | "adopted";
 const TOOL_FIELDS: readonly string[] = ["id", "name", "url", "language", "license", "topics", "packages", "explored", "adopted"];
@@ -376,7 +376,12 @@ function editFrontmatter(text: string, values: Record<string, unknown>, toolOnly
   if (doc.errors.length || (doc.contents !== null && !isMap(doc.contents))) {
     return untouched(text, "The frontmatter can't be read; the note was left unchanged.");
   }
-  const current = (doc.toJS() ?? {}) as Record<string, unknown>;
+  let current: Record<string, unknown>;
+  try {
+    current = (doc.toJS(YAML_LIMITS) ?? {}) as Record<string, unknown>;
+  } catch {
+    return untouched(text, "The frontmatter can't be read; the note was left unchanged."); // too many aliases
+  }
   const pairs = isMap(doc.contents) ? (doc.contents.items as Pair[]) : [];
   const edits: { at: number; to: number; insert: string }[] = [];
   const added: string[] = [];

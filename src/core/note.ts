@@ -13,6 +13,10 @@ export const DRAFT_MARKER = "<!-- magpie:draft -->";
 const DRAFTABLE: readonly string[] = ["What it does", "Use when", "Avoid when"];
 const REQUIRED = ["id", "name", "explored", "kind", "tags", "tried", "status"];
 
+// Every YAML parse keeps the yaml library's alias limit (its default, set here on purpose): a few
+// lines of anchors and aliases can't expand into millions of nodes (decision 0032, rule 6).
+export const YAML_LIMITS = { maxAliasCount: 100 };
+
 export interface Section {
   heading: string; // as written
   name: SectionName | null; // canonical name, or null for an unknown section
@@ -37,7 +41,7 @@ export interface Problem {
 
 // Lenient read: missing frontmatter, fields or sections are allowed; unknown sections are kept.
 export function readNote(text: string): Note {
-  const lines = text.replace(/^﻿/, "").replace(/\r\n/g, "\n").split("\n");
+  const lines = (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).replace(/\r\n/g, "\n").split("\n"); // without a byte-order mark
   const warnings: string[] = [];
   let frontmatter: Record<string, unknown> = {};
   let hasFrontmatter = false;
@@ -49,7 +53,7 @@ export function readNote(text: string): Note {
       hasFrontmatter = true;
       start = end + 1;
       try {
-        const parsed: unknown = parseYaml(lines.slice(1, end).join("\n"));
+        const parsed: unknown = parseYaml(lines.slice(1, end).join("\n"), YAML_LIMITS);
         if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) frontmatter = parsed as Record<string, unknown>;
         else if (parsed !== null) warnings.push("The frontmatter is not a set of fields.");
       } catch (error) {

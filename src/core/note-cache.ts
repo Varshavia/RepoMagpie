@@ -2,32 +2,135 @@
 // every note file has the modification time and size recorded with it; rebuildable and safe to
 // delete. A cache that can't be read is rebuilt; one that can't be written only costs time.
 // Stores file names, not paths, so a journal can be moved. Never prints.
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+// Also the file rules of decision 0032 (rules 5 and 6), here because every read of a journal's notes
+// lists them through noteSignature: a link inside a journal is never followed nor written through,
+// and a note file over 256 KB is skipped. What was skipped is kept for the command to report once.
+import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 export type Signature = Record<string, [number, number]>; // note file name → [mtimeMs, size]
 
-// The note files of a journal, sorted, and their signature.
+// The largest note file or tags.md read, in bytes. The example vault's largest note is 1.5 KB; a
+// note with pages of "My notes" is a few dozen KB.
+export const NOTE_SIZE_LIMIT = 256 * 1024;
+
+// A path in a journal that can't be read or written, and why, in a sentence that names it.
+export interface PathProblem {
+  path: string;
+  message: string;
+}
+export const linkProblem = (path: string): PathProblem =>
+  ({ path, message: `${path} is a link (a symbolic link or junction); RepoMagpie never follows a link inside a journal` });
+const sizeProblem = (path: string): PathProblem => ({ path, message: `${path} is over 256 KB` });
+
+// Why a path inside a journal can't be read or written: a link (a symbolic link or a junction)
+// anywhere below the journal's folder, a path outside it, or, with `sizeLimit`, a file over
+// NOTE_SIZE_LIMIT. The journal's folder itself may be a link the user made. Null when it can be
+// used; a path that doesn't exist yet is fine, since there is nothing to follow.
+export function journalPathProblem(journal: string, path: string, sizeLimit = true): PathProblem | null {
+  const rel = relative(journal, path);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return { path, message: `${path} is outside the journal ${journal}` };
+  let at = journal;
+  for (const part of rel.split(sep)) {
+    at = join(at, part);
+    let stats;
+    try {
+      stats = lstatSync(at);
+    } catch {
+      return null;
+    }
+    if (stats.isSymbolicLink()) return linkProblem(at);
+    if (sizeLimit && at === join(journal, rel) && stats.isFile() && stats.size > NOTE_SIZE_LIMIT) return sizeProblem(at);
+  }
+  return null;
+}
+
+// Throws before a write into a journal that would go through a link, or replace a file over the
+// size limit (decision 0032, rules 5 and 6): the error names the path and why.
+export function assertWritable(journal: string, path: string, sizeLimit = true): void {
+  const problem = journalPathProblem(journal, path, sizeLimit);
+  if (problem) throw new Error(`Won't write ${path}: ${problem.message}.`);
+}
+
+// What was skipped in this process, by path, and what has been reported already.
+const skipped = new Map<string, string>();
+const reported = new Set<string>();
+
+export function skip(problem: PathProblem): void {
+  skipped.set(problem.path, problem.message);
+}
+
+// The problems skipped since the last call, each reported once per process.
+export function takeSkipped(): string[] {
+  const fresh = [...skipped].filter(([path]) => !reported.has(path));
+  for (const [path] of fresh) reported.add(path);
+  return fresh.map(([, message]) => message);
+}
+
+// The note files of a journal that may be read, sorted, and their signature. A notes/ folder that
+// is a link gives none; a note that is a link or over the size limit is left out. Both are skipped
+// for the report.
 export function noteSignature(journal: string): { files: string[]; signature: Signature } {
   const folder = join(journal, "notes");
-  let files: string[];
-  try {
-    files = readdirSync(folder).filter((name) => name.endsWith(".md")).sort();
-  } catch {
-    files = [];
-  }
+  const files: string[] = [];
   const signature: Signature = {};
-  for (const file of files) {
-    const { mtimeMs, size } = statSync(join(folder, file));
-    signature[file] = [mtimeMs, size];
+  const problem = journalPathProblem(journal, folder, false);
+  if (problem) {
+    skip(problem);
+    return { files, signature };
+  }
+  let names: string[];
+  try {
+    names = readdirSync(folder).filter((name) => name.endsWith(".md")).sort();
+  } catch {
+    names = [];
+  }
+  for (const name of names) {
+    const path = join(folder, name);
+    let stats;
+    try {
+      stats = lstatSync(path);
+    } catch {
+      continue; // gone since the folder was read
+    }
+    if (stats.isSymbolicLink()) skip(linkProblem(path));
+    else if (stats.isFile() && stats.size > NOTE_SIZE_LIMIT) skip(sizeProblem(path));
+    else if (stats.isFile()) {
+      files.push(name);
+      signature[name] = [stats.mtimeMs, stats.size];
+    }
   }
   return { files, signature };
 }
 
+// A cache file's path, unless it or the cache folder is a link: then that cache is neither read nor
+// written, which only costs time.
+function cacheFile(journal: string, name: string): string | null {
+  const file = join(journal, ".cache", name);
+  const problem = journalPathProblem(journal, file, false);
+  if (problem) skip(problem);
+  return problem ? null : file;
+}
+
+// A journal file other than a note (tags.md) when it can be read: not a link, not over the size
+// limit, and there. Otherwise null, and a link or an oversized file is skipped for the report.
+export function readableJournalFile(journal: string, path: string): string | null {
+  const problem = journalPathProblem(journal, path);
+  if (problem) skip(problem);
+  if (problem) return null;
+  try {
+    return lstatSync(path).isFile() ? path : null;
+  } catch {
+    return null;
+  }
+}
+
 // The cached data, when the cache file exists, has this version and matches the signature.
 export function readCache(journal: string, name: string, version: number, signature: Signature): unknown {
+  const file = cacheFile(journal, name);
+  if (!file) return undefined;
   try {
-    const cached = JSON.parse(readFileSync(join(journal, ".cache", name), "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
+    const cached = JSON.parse(readFileSync(file, "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
     if (cached?.version === version && JSON.stringify(cached.files) === JSON.stringify(signature)) return cached.data;
   } catch {
     // No cache, or one that can't be read.
@@ -38,8 +141,10 @@ export function readCache(journal: string, name: string, version: number, signat
 // The cached signature and per-file data, whatever the notes are now, for a cache whose entries are
 // reused file by file (the note list). Undefined when there is none, or it can't be read.
 export function readCacheEntries(journal: string, name: string, version: number): { files: Signature; data: Record<string, unknown> } | undefined {
+  const file = cacheFile(journal, name);
+  if (!file) return undefined;
   try {
-    const cached = JSON.parse(readFileSync(join(journal, ".cache", name), "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
+    const cached = JSON.parse(readFileSync(file, "utf8")) as { version?: number; files?: unknown; data?: unknown } | null;
     const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
     if (cached?.version === version && isObject(cached.files) && isObject(cached.data)) return { files: cached.files as Signature, data: cached.data };
   } catch {
@@ -87,7 +192,8 @@ const RENAME_WAITS = [5, 10, 15, 20];
 const RENAME_BUDGET = 50; // ms
 
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
-  const file = join(journal, ".cache", name);
+  const file = cacheFile(journal, name);
+  if (!file) return;
   const temporary = `${file}.${process.pid}.tmp`;
   try {
     mkdirSync(join(journal, ".cache"), { recursive: true });

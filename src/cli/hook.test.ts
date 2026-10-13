@@ -46,12 +46,17 @@ test("nothing to say, or bad input: nothing on stdout or stderr, exit 0", async 
 });
 
 test("fails open: an error prints nothing, exits 0, and goes to the personal journal's .cache/hook-errors.log", async () => {
-  // A folder named like a note can't be read as one.
-  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--broken.md/": null });
-  const r = await magpie(box, ["hook", "claude-code"], { stdin: async () => input("npm i pdfkit", box.project) });
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const r = await magpie(box, ["hook", "claude-code"], { stdin: async () => { throw new Error("stdin broke"); } });
   assert.deepEqual([r.code, r.out, r.err], [0, "", ""]);
   const log = readFileSync(join(box.journal, ".cache", "hook-errors.log"), "utf8");
-  assert.match(log, /^\d{4}-\d\d-\d\dT[\d:.]+Z /);
+  assert.match(log, /^\d{4}-\d\d-\d\dT[\d:.]+Z Error: stdin broke/);
+});
+
+test("a folder named like a note is not a note: the hook answers for the real ones", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--broken.md/": null });
+  const r = await magpie(box, ["hook", "claude-code"], { stdin: async () => input("npm i pdfkit", box.project) });
+  assert.equal(JSON.parse(r.out).hookSpecificOutput.permissionDecision, "ask");
 });
 
 test("an error with no personal journal logs nowhere and creates nothing", async () => {

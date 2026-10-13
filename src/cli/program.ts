@@ -35,6 +35,8 @@ export interface Io {
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
 }
 
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "recall", "suggest", "adopt"]);
+
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
   { usage: "init", summary: "draft notes from this project's manifests" },
@@ -156,6 +158,9 @@ export async function run(argv: string[], io: Io): Promise<number> {
 
   try {
     await program.parseAsync(argv, { from: "user" });
+    // What a journal command skipped (decision 0032). The hook logs it instead; quick commands such
+    // as --version load nothing for it.
+    if (JOURNAL_COMMANDS.has(argv[0])) (await import("./context.ts")).reportSkipped(io);
   } catch (error) {
     if (!(error instanceof CommanderError)) throw error;
     if (error.code === "commander.version" || error.code === "commander.helpDisplayed") return 0;
