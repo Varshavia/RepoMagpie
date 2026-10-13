@@ -81,7 +81,11 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
 export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean } {
   const { files, signature } = noteSignature(journal);
   const cached = readCache(journal, RECALL_CACHE, CACHE_VERSION, signature);
-  if (Array.isArray(cached) && cached.every(isRecallEntry)) return { entries: cached as RecallEntry[], rebuilt: false };
+  // Every entry must also name a note file the listing has: a cache a repository committed can't
+  // send recall to a file elsewhere (decision 0032).
+  if (Array.isArray(cached) && cached.every((e) => isRecallEntry(e) && Object.hasOwn(signature, (e as RecallEntry).file))) {
+    return { entries: cached as RecallEntry[], rebuilt: false };
+  }
   const entries = files.flatMap((file) => entryOf(readFileSync(join(journal, "notes", file), "utf8"), file) ?? []);
   if (files.length) writeCache(journal, RECALL_CACHE, CACHE_VERSION, signature, entries);
   return { entries, rebuilt: true };

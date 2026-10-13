@@ -2,10 +2,16 @@
 // descriptions in its manifests (package.json, pyproject.toml, Cargo.toml), and the README's first
 // heading and paragraph. Manifests are found as note finds them (journals.ts findManifestFolder).
 // TOML is read line by line, enough for these keys; no TOML library. Reads files; never prints.
-import { readdirSync, readFileSync } from "node:fs";
+// A cloned repository's files are written by strangers, as its notes are (decision 0032): a file
+// that is a link is never read, a manifest over 1 MB is skipped, and only a README's start is read.
+import { closeSync, lstatSync, openSync, readdirSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { normalizePackage, type Manifest, type PackageType } from "./identity.ts";
 import { findManifestFolder, findProjectRoot } from "./journals.ts";
+import { skip } from "./note-cache.ts";
+
+const MANIFEST_SIZE_LIMIT = 1024 * 1024; // the largest real package.json is a few dozen KB
+const README_START = 64 * 1024; // enough for the first heading and paragraph
 
 export interface Dependency {
   type: PackageType;
@@ -41,12 +47,8 @@ export function readProject(cwd: string, home: string): ProjectText {
   const texts: string[] = [];
   for (const manifest of manifests) {
     const { type, parse } = PARSERS[manifest];
-    let text: string;
-    try {
-      text = readFileSync(join(folder, manifest), "utf8");
-    } catch {
-      continue;
-    }
+    const text = projectFile(join(folder, manifest), MANIFEST_SIZE_LIMIT);
+    if (text === null) continue;
     const read = parse(text);
     for (const name of read.dependencies) {
       if (!dependencies.some((d) => d.type === type && d.name === name)) dependencies.push({ type, name });
@@ -55,11 +57,43 @@ export function readProject(cwd: string, home: string): ProjectText {
     if (read.description) texts.push(read.description);
   }
   const readme = readmeFile(folder);
-  if (readme) {
-    const intro = readmeIntro(readFileSync(join(folder, readme), "utf8"));
-    if (intro) texts.push(intro);
-  }
+  const start = readme ? projectFile(join(folder, readme), Infinity, README_START) : null;
+  const intro = start ? readmeIntro(start) : "";
+  if (intro) texts.push(intro);
   return { folder, manifests, dependencies, keywords, texts };
+}
+
+// A project file's text, or null: when it can't be read, when it is a link (never followed), or
+// when it is over `limit` bytes (both skipped for the report). With `first`, only that many bytes
+// from its start are read, whatever its size.
+function projectFile(path: string, limit: number, first = Infinity): string | null {
+  let stats;
+  try {
+    stats = lstatSync(path);
+  } catch {
+    return null;
+  }
+  if (stats.isSymbolicLink()) {
+    skip({ path, message: `${path} is a link (a symbolic link or junction); RepoMagpie never follows a link in a project's files` });
+    return null;
+  }
+  if (!stats.isFile()) return null;
+  if (stats.size > limit) {
+    skip({ path, message: `${path} is over ${limit / 1024 / 1024} MB` });
+    return null;
+  }
+  try {
+    if (stats.size <= first) return readFileSync(path, "utf8");
+    const fd = openSync(path, "r");
+    try {
+      const buffer = Buffer.alloc(first);
+      return buffer.subarray(0, readSync(fd, buffer, 0, first, 0)).toString("utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
 }
 
 export function parsePackageJson(text: string): ManifestText {
@@ -174,7 +208,14 @@ function tomlTables(text: string): Map<string, [string, string][]> {
     const pair = line.match(/^("[^"]*"|'[^']*'|[A-Za-z0-9_.-]+)\s*=\s*(.*)$/);
     if (!pair) continue;
     let value = pair[2];
-    while (depth(value) > 0 && i + 1 < lines.length) value += ` ${withoutComment(lines[++i]).trim()}`;
+    // Counted line by line, not over the joined value again: an array left open by a stranger's
+    // file would otherwise take time growing with the square of its length.
+    let open = depth(value);
+    while (open > 0 && i + 1 < lines.length) {
+      const next = withoutComment(lines[++i]).trim();
+      value += ` ${next}`;
+      open += depth(next);
+    }
     current.push([pair[1].replace(/^["']|["']$/g, ""), value]);
   }
   return tables;

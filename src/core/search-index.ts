@@ -83,7 +83,12 @@ export function noteDocuments(text: string, file: string): SearchDoc[] {
 export function loadIndex(journal: string): { index: JournalIndex; rebuilt: boolean } {
   const { files, signature } = noteSignature(journal);
   const cached = readCache(journal, CACHE_FILE, CACHE_VERSION, signature);
-  if (cached !== undefined) {
+  // Every document must name a note file the listing has: a cache a repository committed can't send
+  // a result's path to a file elsewhere (decision 0032).
+  const stored = (cached as { storedFields?: unknown } | undefined)?.storedFields;
+  const listed = stored !== null && typeof stored === "object" &&
+    Object.values(stored).every((fields) => typeof fields?.file === "string" && Object.hasOwn(signature, fields.file));
+  if (cached !== undefined && listed) {
     try {
       return { index: MiniSearch.loadJS(cached as Parameters<typeof MiniSearch.loadJS>[0], INDEX_OPTIONS) as JournalIndex, rebuilt: false };
     } catch {
