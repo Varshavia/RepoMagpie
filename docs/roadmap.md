@@ -219,14 +219,20 @@ Before the tester round and the launch: the command name, note text from other p
 - [x] The text module: control characters stripped, agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
 - [x] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
 - [x] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
-- [ ] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
+- [x] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
 - [ ] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, a check of what `npm pack` ships, and a check script that fails when a source file holds bidi controls or zero-width characters.
 - [ ] The release workflow (`release.yml`): checks, the tag against the version, `npm stage publish` through trusted publishing; `docs/release.md` rewritten.
 - [ ] Socket's alerts fixed or explained; `SECURITY.md` and the README name the official channels.
 
 **Done when:** a machine always runs `repomagpie`, the short alias still works, and the skill is named `repomagpie`; the hostile tests pass (no control characters reach an agent or a terminal; agent-facing text is capped, quoted and labelled; links are never followed; huge files and alias bombs are bounded; app links are `http(s)` only); recall and the hook stay under 150 ms, and the hook's chunk imports only `note`, `note-cache`, `recall` and the text module; CI is least-privilege and pinned, with Dependabot and a green macOS job; `release.yml` is ready; every Socket alert is fixed or explained; all checks and end-to-end tests pass.
 
-Follow-ups from the red-team pass: none yet.
+Follow-ups from the red-team pass (2026-10-13; the fixed findings are tests in `src/core/red-team.test.ts`, `src/server/red-team.test.ts` and `ui/e2e/hostile.spec.ts`):
+- [ ] Low: the note view's alternative chips don't show the "non-ASCII letters" flag that the hook, recall's card and "Check a package" show.
+- [ ] Low: the opening URL with `?token=` can stay in the browser's history. The token is valid for that run only, and the address bar drops it at once.
+
+Accepted, not scheduled:
+- Look-alike names in plain ASCII (`pupeteer` for `puppeteer`) can't be told from real ones without asking the registry. The hook and the skill ask the user to confirm the exact name of a project journal's alternative (decision 0032, rule 4).
+- A hard link inside a journal can't be told from a note. A clone can't contain one (git doesn't create hard links), so only the user can make one.
 
 ### Launch
 See [marketing.md](marketing.md).
