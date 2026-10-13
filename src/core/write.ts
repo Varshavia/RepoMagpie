@@ -501,7 +501,7 @@ function untouched(text: string, warning: string): EditResult {
 
 // The frontmatter's text lies between `start` and `end` (the start of the closing --- line).
 function frontmatterBounds(text: string): { start: number; end: number; eol: string } | null {
-  const offset = text.startsWith("﻿") ? 1 : 0;
+  const offset = text.charCodeAt(0) === 0xfeff ? 1 : 0; // a byte-order mark
   const opening = /^---[ \t]*(\r?\n)/.exec(text.slice(offset));
   if (!opening) return null;
   const start = offset + opening[0].length;

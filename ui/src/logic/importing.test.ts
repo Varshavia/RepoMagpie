@@ -22,7 +22,7 @@ test("lineTarget: the target on that line, without the dash and the parts", () =
 // The app can't bundle core, so it mirrors core's item rule; these keep the two equal.
 const LENIENT = [
   TEXT,
-  "﻿* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
+  String.fromCharCode(0xfeff) + "* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
   "",
   " \n\t\n",
   "\n\n1. pdfkit — verdict: ok",

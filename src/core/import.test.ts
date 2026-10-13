@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { noItemsHint, parseImport } from "./import.ts";
 
+const BOM = String.fromCharCode(0xfeff); // a byte-order mark, built so this file holds none
+
 // The import line format (spec §2): - <url-or-name> — verdict: ... | use: ... | avoid: ...
 
 test("a full line: target, then labelled parts", () => {
@@ -47,14 +49,14 @@ test("items may start with '* ', '+ ' or an escaped '\\- '", () => {
 });
 
 test("a UTF-8 BOM is ignored; a non-breaking space after the marker counts as a space", () => {
-  const items = parseImport("﻿- pdfkit — verdict: ok\n- chalk — verdict: fine\n");
+  const items = parseImport(BOM + "- pdfkit — verdict: ok\n- chalk — verdict: fine\n");
   assert.deepEqual(items.map((i) => [i.line, i.target, i.verdict]), [[1, "pdfkit", "ok"], [2, "chalk", "fine"]]);
 });
 
 test("no items: the hint says what the first line with text starts with", () => {
   const rule = 'Each item is a line that starts with "- ".';
   assert.equal(noItemsHint("\n\n1. pdfkit — verdict: ok\n- later"), `${rule} Line 3 starts with "1.".`);
-  assert.equal(noItemsHint("﻿• pdfkit\n"), `${rule} Line 1 starts with "•".`);
+  assert.equal(noItemsHint(`${BOM}• pdfkit\n`), `${rule} Line 1 starts with "•".`);
   assert.equal(noItemsHint("  - pdfkit\n"), `${rule} Line 1 starts with spaces, then "-".`);
   assert.equal(noItemsHint("-pdfkit — verdict: ok"), `${rule} Line 1 starts with "-pdfkit".`);
   assert.equal(noItemsHint("https://github.com/microsoft/playwright-cli"), `${rule} Line 1 starts with "https://github.com/m…".`);

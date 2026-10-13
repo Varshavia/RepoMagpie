@@ -17,7 +17,7 @@ export interface ImportItem {
 export const ITEM_MARKER = /^(?:\\?-|\*|\+)[  ]/;
 
 // The lines of an import text, without a UTF-8 BOM.
-const lines = (text: string) => text.replace(/^﻿/, "").split(/\r?\n/);
+const lines = (text: string) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).split(/\r?\n/); // without a byte-order mark
 
 export function parseImport(text: string): ImportItem[] {
   const items: ImportItem[] = [];
