@@ -1,0 +1,87 @@
+# Releases from CI (decision 0033): when the maintainer pushes a v* tag, run the full checks, check
+# the tag, then stage the package on npm through trusted publishing (OIDC, no token). Nothing becomes
+# installable here: the maintainer approves the staged version on npmjs.com with 2FA
+# (docs/release.md). Actions are pinned to a commit SHA; the comment gives the version.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# One run per tag at a time, never cancelled halfway: a second push of the same tag waits, and then
+# npm refuses a version it already has.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Checks, the tag and the package
+    runs-on: ubuntu-latest
+    outputs:
+      dist-tag: ${{ steps.tag.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # main's history, for the check that the tag's commit is on it
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: The tag is v plus package.json's version, and its commit is on main's history
+        id: tag
+        run: node scripts/release-check.ts "$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run test:hooks
+      - run: npm run build
+      - run: npm run check:build
+      - run: npm run check:bundle
+      - run: npm run check:links
+      - run: npm run check:commands
+      - run: npm run check:characters
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: The version isn't on npm yet
+        run: |
+          VERSION="${TAG#v}"
+          if npm view "repomagpie@$VERSION" version > /dev/null 2>&1; then
+            echo "repomagpie@$VERSION is already on npm."
+            exit 1
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+      - name: What the package will hold
+        run: npm pack --dry-run
+
+  stage:
+    name: Stage on npm (trusted publishing)
+    needs: verify
+    runs-on: ubuntu-latest # trusted publishing needs a GitHub-hosted runner
+    permissions:
+      contents: read
+      id-token: write # only this job: the OIDC token npm exchanges for a short-lived publish right
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No dependency cache in a release job: a poisoned cache must not reach a release.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24 # trusted publishing needs Node 22.14 or later
+          registry-url: https://registry.npmjs.org
+      - name: npm 11.21.0 (npm stage needs 11.15.0 or later; trusted publishing 11.5.1)
+        run: npm install --global npm@11.21.0
+      - run: npm ci
+      - run: npm run build
+      - name: Stage the package; provenance comes with trusted publishing
+        run: npm stage publish --tag "$DIST_TAG"
+        env:
+          DIST_TAG: ${{ needs.verify.outputs.dist-tag }}
