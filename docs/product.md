@@ -8,11 +8,11 @@ There is no desktop app and no remote server. RepoMagpie has six surfaces:
 
 | Surface | What it is | Release |
 |---|---|---|
-| CLI | `magpie`, the primary interface | v0.1 |
-| Local app | `magpie ui`: an Obsidian-inspired app in the browser, served from your machine on `127.0.0.1` ([UI](ui.md), [decision 0021](decisions/0021-local-ui-server.md)) | v0.1 |
+| CLI | `repomagpie`, the primary interface | v0.1 |
+| Local app | `repomagpie ui`: an Obsidian-inspired app in the browser, served from your machine on `127.0.0.1` ([UI](ui.md), [decision 0021](decisions/0021-local-ui-server.md)) | v0.1 |
 | Agent layer | RepoMagpie's `SKILL.md`, plus a hook for proactive recall (Claude Code first) | v0.1 |
 | Journals | A personal journal and project journals: Markdown files, used in Obsidian or any editor | v0.1 |
-| Nest | A static site of public notes, built by `magpie publish` | v0.4 |
+| Nest | A static site of public notes, built by `repomagpie publish` | v0.4 |
 | Graph | A page in the local app: notes, tags and the links between them ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) | v0.2 |
 
 ### CLI
@@ -20,29 +20,29 @@ There is no desktop app and no remote server. RepoMagpie has six surfaces:
 The current output, in a project whose `package.json` depends on pdfkit (2026-10-06; paths shortened, the GitHub URL from the spec's format):
 
 ```
-$ magpie note pdfkit "avoid: async streams painful; use puppeteer"
+$ repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
 ✔ Saved to your personal journal: pdfkit
 ~/.magpie/notes/npm--pdfkit.md
 
-$ magpie note https://github.com/microsoft/playwright-cli "let my agent test a web UI end to end"
+$ repomagpie note https://github.com/microsoft/playwright-cli "let my agent test a web UI end to end"
 ✔ Saved to your personal journal: microsoft/playwright-cli
 ~/.magpie/notes/github--microsoft--playwright-cli.md
 
-$ magpie suggest "a TypeScript CLI with tests"
+$ repomagpie suggest "a TypeScript CLI with tests"
 1  commander  npm  personal  Verdict: fine for small CLIs
 
 Already in use, you noted to avoid:
   pdfkit  npm  personal  Verdict: avoid: async streams painful; use puppeteer
 1 candidate. Your coding agent picks the fit.
 
-$ magpie adopt commander
+$ repomagpie adopt commander
 Created the project journal: ~/code/app/.magpie
 ✔ Copied to the project journal: commander
 ~/code/app/.magpie/notes/npm--commander.md
 Install with: npm install commander
 The project journal is committed with the code; anyone who can read this repository can read this note.
 
-$ magpie search pdf
+$ repomagpie search pdf
 1  puppeteer  npm  personal  Verdict: default for PDF rendering in new projects
 2  pdfkit     npm  personal  Verdict: avoid: async streams painful; use puppeteer
 ```
@@ -62,7 +62,7 @@ Every command also offers a machine-readable mode, for example `--json`, for age
 
   > Note from your journal: left-pad 2/5 — 'abandoned, use String.prototype.padStart'.
 
-- Recall has two modes. **Hook mode** runs from an agent hook, in clients that support hooks; v0.1 ships it for Claude Code. **Skill mode** relies on `SKILL.md` telling the agent to run `magpie recall <package>` first; it is best effort and works in any client that supports skills. Hook support differs per client: see [ideas, idea 1](ideas.md#1-proactive-recall).
+- Recall has two modes. **Hook mode** runs from an agent hook, in clients that support hooks; v0.1 ships it for Claude Code. **Skill mode** relies on `SKILL.md` telling the agent to run `repomagpie recall <package>` first; it is best effort and works in any client that supports skills. Hook support differs per client: see [ideas, idea 1](ideas.md#1-proactive-recall).
 
 ### Journals
 
@@ -85,7 +85,7 @@ Journals are fully usable without Obsidian. Obsidian extras only add comfort. No
 
 ### Nest
 
-A static site built by `magpie publish`. It contains public notes only (`public: true`, default `false`): a searchable list and a `/uses` view. It can be hosted on GitHub Pages. See [ideas, idea 3](ideas.md#3-nests-and-follow).
+A static site built by `repomagpie publish`. It contains public notes only (`public: true`, default `false`): a searchable list and a `/uses` view. It can be hosted on GitHub Pages. See [ideas, idea 3](ideas.md#3-nests-and-follow).
 
 ### Graph
 
@@ -110,7 +110,7 @@ The graph is a working view: it shows what you have, how it groups by tag, and w
 | Level | What | Release |
 |---|---|---|
 | 1 | A preconfigured Obsidian graph for the example vault. No code. | not scheduled |
-| 2 | `magpie graph`: a self-contained, interactive HTML file with typed edges and status encoding. | not scheduled |
+| 2 | `repomagpie graph`: a self-contained, interactive HTML file with typed edges and status encoding. | not scheduled |
 | 3 | The graph embedded in nest pages. | not scheduled |
 
 The status was "marketing only": graph views are often admired but rarely used, so ours had to earn its place by (a) showing status at a glance (drift, inbox, gaps) and (b) being a visual people can share.

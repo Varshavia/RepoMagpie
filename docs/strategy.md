@@ -89,9 +89,9 @@ Every existing tool judges a package against global data: CVEs, malware database
 ## 6. Solution
 
 ### The core loop
-1. **Capture in one line.** `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ten seconds, no template to fill.
+1. **Capture in one line.** `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ten seconds, no template to fill.
 2. **Recall at install.** When the agent runs `npm install pdfkit`, a hook shows the verdict to the agent and the user. It never denies: an avoid note asks the user to confirm; other notes only inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
-3. **Cold start from your manifests.** `magpie init` reads `package.json`, `pyproject.toml` and `Cargo.toml` and creates draft notes for the dependencies you already use. The journal is never empty, and it starts from real decisions instead of stars.
+3. **Cold start from your manifests.** `repomagpie init` reads `package.json`, `pyproject.toml` and `Cargo.toml` and creates draft notes for the dependencies you already use. The journal is never empty, and it starts from real decisions instead of stars.
 
 ### Two journal scopes, one format
 - **Personal journal:** a folder outside any repo, for everything you've learned.
@@ -115,7 +115,7 @@ Synthetic interview S1 (not evidence) suggested tool notes with a one-line **dec
 |---|---|---|---|
 | 1 | Proactive recall | **Core, v0.1** | The empty square in §5 D |
 | 8 | Team journal | **Core, v0.1** (as the project journal) | Git gives sharing for free; strongest pain in industry reports (§2); supported by desk research (§10, Q4) |
-| 5 | Gap detection | **v0.1** (as `magpie init` and `magpie gaps`) | Solves the empty-journal problem from real manifests |
+| 5 | Gap detection | **v0.1** (as `repomagpie init` and `repomagpie gaps`) | Solves the empty-journal problem from real manifests |
 | 2 | Vet and drift | **Reduced, v0.2** | Record your review and the reviewed commit; integrate existing scanners and lockfiles; no own scanner |
 | 4 | Context-aware suggest | v0.3 | Useful once journals have content |
 | 3 | Nests and follow | v0.3 | Needs users first |
@@ -178,8 +178,8 @@ RepoMagpie is MIT open source and stays that way. There is no revenue plan for 2
 |---|---|---|
 | 1 | Approve this strategy; close step 1.5 with desk research ([decision 0014](decisions/0014-step-1-5-desk-research.md)); update vision, ideas, competitors and roadmap | `docs/strategy` |
 | 2 | Step 2: tech stack (leaning TypeScript, published to npm), spec for `note`, `recall`, `init`, `search` | `docs/spec` |
-| 3–4 | `magpie note`, `magpie search` (keyword), journal format, project journal | `feat/core` |
-| 4–5 | `magpie recall` and the Claude Code hook; `magpie init` from manifests | `feat/recall`, `feat/init` |
+| 3–4 | `repomagpie note`, `repomagpie search` (keyword), journal format, project journal | `feat/core` |
+| 4–5 | `repomagpie recall` and the Claude Code hook; `repomagpie init` from manifests | `feat/recall`, `feat/init` |
 | 6 | `v0.1.0-beta.1` to early testers; demo GIF of the "pdfkit moment"; README rewrite | `release/v0.1` |
 
 New interview questions (ask the original eight first, then these, then it's fine to show the one-liner and record the reaction):
@@ -219,7 +219,7 @@ The maintainer approved §14 with these additions. Where they differ from §6, �
 ### A. Personal journal is first-class
 The personal journal is equal to the project journal. It holds anything the user explored and judged (repositories, skills, tools), not only the dependencies they use. It is private by default. Search, suggest and recall all work across both journals.
 
-### B. `magpie import <file>`
+### B. `repomagpie import <file>`
 Generic bulk add. One line per item:
 
 ```
@@ -228,13 +228,13 @@ Generic bulk add. One line per item:
 
 The free text after the URL becomes the draft Verdict, Use when and Avoid when.
 
-### C. `magpie suggest`
+### C. `repomagpie suggest`
 When the user starts or works on a project, magpie shows what they already have that fits.
 - **Input:** the project's manifests and README, or a free-text description ("a TypeScript CLI with tests").
 - **Output:** matching notes from both journals, Verdict first.
 - **In v0.1, no embeddings:** magpie narrows the candidates by keyword and tags, and the coding agent makes the semantic choice, guided by `SKILL.md`.
 
-### D. `magpie adopt <name>`
+### D. `repomagpie adopt <name>`
 Copies a note from the personal journal into the project's `.magpie/` and prints the install command. It never installs anything itself.
 
 ### E. Final v0.1 scope

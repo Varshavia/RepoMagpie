@@ -47,7 +47,7 @@ Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on th
 
 ## Adjacent
 
-- **[`vercel skills`](https://vercel.com/docs/cli/skills)** detects a project's framework and notable `package.json` dependencies and recommends skills from Vercel's catalog. It suggests from a public catalog; `magpie suggest` suggests from your own journals.
+- **[`vercel skills`](https://vercel.com/docs/cli/skills)** detects a project's framework and notable `package.json` dependencies and recommends skills from Vercel's catalog. It suggests from a public catalog; `repomagpie suggest` suggests from your own journals.
 - **skills.sh and the `skills` CLI** (Vercel): a public directory and installer for agent skills. It solves *install*, not *remember why*.
 - **Awesome lists**, for example VoltAgent's: curated by someone else, not by you.
 

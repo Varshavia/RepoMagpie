@@ -304,7 +304,7 @@ components:
 
 # RepoMagpie design system
 
-This file describes how RepoMagpie looks and reads: the local app (`magpie ui`), and later the landing page, the social preview and the demo GIF. It follows the [DESIGN.md format](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) (version `alpha` on 2026-10-04): tokens above, reasons below. Only the format's stable core is used: the token groups and the section order. How the app uses it: [docs/ui.md](docs/ui.md); why this stack: [decision 0022](docs/decisions/0022-frontend-stack.md).
+This file describes how RepoMagpie looks and reads: the local app (`repomagpie ui`), and later the landing page, the social preview and the demo GIF. It follows the [DESIGN.md format](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) (version `alpha` on 2026-10-04): tokens above, reasons below. Only the format's stable core is used: the token groups and the section order. How the app uses it: [docs/ui.md](docs/ui.md); why this stack: [decision 0022](docs/decisions/0022-frontend-stack.md).
 
 ## Overview
 

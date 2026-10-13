@@ -63,6 +63,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:links
+      - name: No doc tells someone to run the magpie alias (decision 0031)
+        run: npm run check:commands
       - run: npm run build
       - name: Search benchmark (report only)
         run: node scripts/bench-search.ts --report-only

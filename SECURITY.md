@@ -12,7 +12,7 @@ Don't open a public issue. The maintainer replies in the private advisory.
 
 ## Scope
 
-- The `magpie` CLI (not released yet).
+- The `repomagpie` CLI (not released yet).
 - The agent hook scripts in [`.claude/hooks/`](.claude/hooks/).
 
 Vulnerabilities in third-party repositories or skills that notes describe are out of scope. Report those to their maintainers.

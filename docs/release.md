@@ -14,7 +14,7 @@ How RepoMagpie versions, records and ships releases. What each release contains 
 [`CHANGELOG.md`](../CHANGELOG.md) follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 - New entries go under `## [Unreleased]`, grouped as Added, Changed, Deprecated, Removed, Fixed and Security.
-- An entry describes a user-visible change in one line, for example: `Added: magpie import reads one note per line from a file.`
+- An entry describes a user-visible change in one line, for example: `Added: repomagpie import reads one note per line from a file.`
 - Docs-only changes don't need entries.
 
 ## Who does what
@@ -54,9 +54,10 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `npm run typecheck` | no errors |
 | `npm run test:hooks` | no test fails |
 | `npm run build` | exit 0 |
-| `npm run check:build` | the built CLI gives the same output as the source (exit 0) |
+| `npm run check:build` | the built CLI gives the same output as the source, and the packed package runs as `repomagpie`, as its alias and through `npx` (exit 0) |
 | `npm run check:bundle` | the app is under 200 kB gzipped |
 | `npm run check:links` | 0 broken links |
+| `npm run check:commands` | no doc tells someone to run the alias |
 | `PLAYWRIGHT_BROWSERS_PATH="$PWD/.scratch/ms-playwright" npm run test:e2e` | no flow fails; the graph's 2,000-note timing is under 2 s |
 | `npm run bench` | every command within its budget (spec §7) |
 | `node dist/cli/main.js --version` | it prints the new version |
@@ -71,7 +72,7 @@ Run from the repository root, in this order. Every command must pass; report eac
 5. Approve the staged package on npmjs.com, so the version goes live.
 6. Check the dist-tags: `npm view repomagpie dist-tags` shows `beta` on the new version (`latest` on a final release). `--tag beta` leaves `latest` where it was. Until there is a final release, `latest` can follow the betas, so a plain `npm install -g repomagpie` gets the new one: `npm dist-tag add repomagpie@0.2.0-beta.2 latest`.
 7. Create the GitHub release from the drafted notes: `gh release create v0.2.0-beta.2 --prerelease --title "RepoMagpie 0.2.0-beta.2" --notes-file <notes>`.
-8. Install it and check the version: `npm install -g repomagpie@beta`, then `magpie --version` prints `0.2.0-beta.2`.
+8. Install it and check the version: `npm install -g repomagpie@beta`, then `repomagpie --version` prints `0.2.0-beta.2`.
 
 ## Before the public launch
 

@@ -8,16 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `magpie tags --from-topics` adds GitHub topics as tags to the notes you already have, until each has 8 tags. It never removes or reorders a tag, keeps the rest of each file exactly as it was, and adds the new tags to `tags.md`. `--dry-run` shows what it would do; a second run adds nothing. A note that can't be read is skipped and named. `--journal project` tags the project journal; `--json` lists each note's added tags.
-- "Add GitHub topics as tags" in All notes in `magpie ui`: the first click says what will happen ("Adds up to 8 tags to 17 notes, and 41 new tags to your tag list."), a second applies it.
+- `repomagpie tags --from-topics` adds GitHub topics as tags to the notes you already have, until each has 8 tags. It never removes or reorders a tag, keeps the rest of each file exactly as it was, and adds the new tags to `tags.md`. `--dry-run` shows what it would do; a second run adds nothing. A note that can't be read is skipped and named. `--journal project` tags the project journal; `--json` lists each note's added tags.
+- "Add GitHub topics as tags" in All notes in `repomagpie ui`: the first click says what will happen ("Adds up to 8 tags to 17 notes, and 41 new tags to your tag list."), a second applies it.
 
 ### Changed
 
-- A new note for a GitHub repository gets up to 8 tags from its GitHub topics, through `magpie note`, `magpie import` and Add in `magpie ui`. Topics already in `tags.md` come first, then topics your other notes carry, then the rest. The repository's own name and topics such as `hacktoberfest` and `open-source` are skipped. Before, a topic became a tag only if `tags.md` already listed it. Tags stay yours: remove the ones you don't want.
+- The command is now `repomagpie`. `magpie` still works as a short alias for the same program, so existing hook entries keep working. Other tools also install a `magpie` command, and then `PATH` decides which one runs; the hook entry, the agent skill and every hint now use `repomagpie`. Change your hook entry to `repomagpie hook claude-code`. Messages on stderr start with `repomagpie:`, and the hook's with `RepoMagpie:`. <!-- check:commands allow -->
+- A new note for a GitHub repository gets up to 8 tags from its GitHub topics, through `repomagpie note`, `repomagpie import` and Add in `repomagpie ui`. Topics already in `tags.md` come first, then topics your other notes carry, then the rest. The repository's own name and topics such as `hacktoberfest` and `open-source` are skipped. Before, a topic became a tag only if `tags.md` already listed it. Tags stay yours: remove the ones you don't want.
 - A better kind guess for a new GitHub repository note. It now also guesses `app`, `platform`, `framework`, `library` and `template`, from the repository's topics, GitHub's template flag and the packages it publishes. A single `SKILL.md` no longer makes a repository a skill pack: that takes `skill` in its name, a topic such as `agent-skills`, or 3 or more skill folders outside hidden folders such as `.claude/`. Existing notes keep their kind.
-- New tags are added to the end of `tags.md` when the note is saved; the rest of the file stays exactly as it was. A journal without `tags.md` gets one. `magpie note` and `magpie import` say which tags they added, and `--json` lists them in `tags_md_added`.
-- The sidebar in `magpie ui` shows the 15 tags with the most notes, then "Show all N tags", which expands the list in place and collapses it again.
-- Add's preview in `magpie ui` shows the tags the save will write, each with a remove button. A "From GitHub topics" chip adds a tag to the preview, and `tags.md` changes only when you save. The note view's chips skip the same topics as new notes do, such as `hacktoberfest`.
+- New tags are added to the end of `tags.md` when the note is saved; the rest of the file stays exactly as it was. A journal without `tags.md` gets one. `repomagpie note` and `repomagpie import` say which tags they added, and `--json` lists them in `tags_md_added`.
+- The sidebar in `repomagpie ui` shows the 15 tags with the most notes, then "Show all N tags", which expands the list in place and collapses it again.
+- Add's preview in `repomagpie ui` shows the tags the save will write, each with a remove button. A "From GitHub topics" chip adds a tag to the preview, and `tags.md` changes only when you save. The note view's chips skip the same topics as new notes do, such as `hacktoberfest`.
 
 ## [0.2.0-beta.2] - 2026-10-08
 
