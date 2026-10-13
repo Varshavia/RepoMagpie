@@ -70,6 +70,16 @@ export function quote(text: string): string {
   return `"${clean(text).replace(DOUBLE_QUOTES, "'")}"`;
 }
 
+// Why a name, as written in a note, can't be the package it seems (decision 0032): letters outside
+// ASCII, which npm, PyPI and crates.io never allow and which can look like ASCII ones (a Cyrillic
+// "р" in "рuppeteer"); or, for a name without a note (`bare`), characters no registry name has.
+// Null when neither.
+const PACKAGE_NAME = /^(@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/;
+export function nameConcern(name: string, bare: boolean): "non-ascii" | "invalid" | null {
+  if ([...name].some((ch) => ch.charCodeAt(0) > 0x7e)) return "non-ascii";
+  return bare && !PACKAGE_NAME.test(name) ? "invalid" : null;
+}
+
 // How one field of an agent-facing document is capped: a string's cap, or a list's caps per item
 // and on its length. Lists of objects are only cut to `count`: the caller caps their fields.
 export type Rule = number | { each: number; count: number };

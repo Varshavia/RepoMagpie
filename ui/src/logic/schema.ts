@@ -29,6 +29,13 @@ export function isStopTopic(topic: string): boolean {
   return /^(hacktoberfest(\d{4})?|open-source|opensource|good-first-issue)$/.test(topic);
 }
 
+// A name that can't be the package it seems (decision 0032; core's nameConcern in src/core/text.ts):
+// letters outside ASCII, which can look like ASCII ones; or, without a note, no valid package name.
+export function nameConcern(name: string, bare: boolean): "non-ascii" | "invalid" | null {
+  if ([...name].some((ch) => ch.charCodeAt(0) > 0x7e)) return "non-ascii";
+  return bare && !/^(@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/.test(name) ? "invalid" : null;
+}
+
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
 export function isAvoid(match: { verdict: string | null; avoid_when: string[] }): boolean {
   return verdictSaysAvoid(match.verdict) || match.avoid_when.length > 0;

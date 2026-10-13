@@ -4,7 +4,11 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { hookWouldAsk, packageLabel } from "../logic/schema.ts";
+import { hookWouldAsk, nameConcern, packageLabel } from "../logic/schema.ts";
+
+// A name that can't be the package it seems, said in words (decision 0032), as recall's card says it.
+const concernLabel = (concern: ReturnType<typeof nameConcern>) =>
+  concern === "non-ascii" ? " (non-ASCII letters)" : concern === "invalid" ? " (not a valid package name)" : null;
 import { homePath } from "../logic/text.ts";
 import { MOD } from "../platform.ts";
 import { AlternativeName, FieldError } from "./common.tsx";
@@ -142,6 +146,7 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
             {match.alternatives.map((a, i) => (
               <li key={`${a.name} ${i}`}>
                 <AlternativeName alternative={a} onOpen={onOpenNote} onAdd={onAdd} onSearch={onSearch} />
+                {concernLabel(nameConcern(a.name, a.path === null))}
                 {a.id ? `: ${a.verdict ?? "[inbox] no verdict yet"}${a.avoid ? " (you also noted to avoid it)" : ""}` : null}
               </li>
             ))}

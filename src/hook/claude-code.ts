@@ -6,7 +6,7 @@ import { sep } from "node:path";
 import { detectInstalls } from "../core/install-detect.ts";
 import type { Env } from "../core/journals.ts";
 import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
-import { CAPS, clean, cut, quote } from "../core/text.ts";
+import { CAPS, clean, cut, nameConcern, quote } from "../core/text.ts";
 
 export interface HookContext {
   env: Env;
@@ -25,6 +25,9 @@ const CAP = 10_000; // Claude Code's limit for additionalContext and systemMessa
 const HOOK_CAPS = { verdict: 500, avoidWhen: 500, alternativeVerdict: 150, path: 300 };
 const PACK = 8_000;
 const MORE_NAMES = 5;
+// The packages one command may have looked up. Real installs name a few; a command of 100,000 names
+// (1.8 MB) took 17 s on a 2,000-note journal, while Claude Code waits. The rest are named as unchecked.
+const LOOKUPS = 100;
 
 export function hookOutput(input: string, ctx: HookContext): string | null {
   let call: { tool_name?: unknown; tool_input?: { command?: unknown }; cwd?: unknown } | null;
@@ -41,22 +44,26 @@ export function hookOutput(input: string, ctx: HookContext): string | null {
   const cwd = typeof call?.cwd === "string" ? call.cwd : ctx.cwd;
   const { sources } = openRecallSources({ home: ctx.home, env: ctx.env, cwd, homeFlag: ctx.homeFlag, projectFlag: ctx.projectFlag });
   const seen = new Set<string>();
-  const matches = installs.flatMap((install) => recall(sources, install.name, [install.type])).filter((m) => !seen.has(m.path) && seen.add(m.path));
-  if (!matches.length) return null;
+  const matches = installs.slice(0, LOOKUPS).flatMap((install) => recall(sources, install.name, [install.type])).filter((m) => !seen.has(m.path) && seen.add(m.path));
+  const unchecked = installs.length > LOOKUPS
+    ? `RepoMagpie: this command installs ${installs.length.toLocaleString("en-US")} packages; only the first ${LOOKUPS} were looked up in your journals.`
+    : null;
+  if (!matches.length && !unchecked) return null;
+  const withUnchecked = (text: string, separator: string) => [text, unchecked].filter(Boolean).join(separator);
 
   const texts = { home: ctx.home };
   const asking = ctx.informOnly ? [] : matches.filter((m) => m.confidence === "exact" && isAvoid(m));
-  const context = pack(matches.map((m) => ({ name: packageName(m), text: contextLine(m, texts) })), "\n");
+  const context = withUnchecked(pack(matches.map((m) => ({ name: packageName(m), text: contextLine(m, texts) })), "\n"), "\n");
   if (asking.length) {
     const ordered = [...asking, ...matches.filter((m) => !asking.includes(m))];
     const reason = pack(ordered.map((m) => ({ name: packageName(m), text: reasonBlock(m, asking.includes(m), texts) })), "\n\n");
     return JSON.stringify({
-      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: reason, additionalContext: context },
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: withUnchecked(reason, "\n\n"), additionalContext: context },
     });
   }
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: context },
-    systemMessage: pack(matches.map((m) => ({ name: packageName(m), text: message(m) })), "\n"),
+    systemMessage: withUnchecked(pack(matches.map((m) => ({ name: packageName(m), text: message(m) })), "\n"), "\n"),
   });
 }
 
@@ -88,13 +95,16 @@ function contextLine(m: RecallMatch, texts: { home: string }): string {
   return `${line} ${isAvoid(m) ? `Offer them to the user instead of ${name}. ${show}` : show}`;
 }
 
-// One alternative, its name quoted: its Verdict quoted, or why it has none; and an avoid mark.
+// One alternative, its name quoted: its Verdict quoted, or why it has none; an avoid mark; and a
+// name that can't be the package it seems (non-ASCII letters, or no valid package name).
 function alternativeText(a: Alternative, m: RecallMatch, label: string): string {
   const name = quoted(a.name, CAPS.name);
-  if (a.path === null) return `${name} (no note)`;
+  const concern = nameConcern(a.name, a.path === null);
+  const flag = concern === "non-ascii" ? "; its name has non-ASCII letters, which can look like others" : concern === "invalid" ? "; its name isn't a valid package name" : "";
+  if (a.path === null) return `${name} (no note${flag})`;
   const about = a.verdict === null ? "inbox, no Verdict yet" : `${label}: ${quoted(a.verdict, HOOK_CAPS.alternativeVerdict)}`;
   const avoid = a.avoid ? (personal(m) ? "; you also noted to avoid it" : "; this journal also says to avoid it") : "";
-  return `${name} (${about}${avoid})`;
+  return `${name} (${about}${avoid}${flag})`;
 }
 
 // One match in the permission prompt's reason, for the user (and for the agent when a -p run
