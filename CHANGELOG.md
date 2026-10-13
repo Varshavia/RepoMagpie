@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Security
 
+- The agent skill says where the `repomagpie` command comes from (the npm package, built from this repository, with no installers or downloads), and tells the agent never to run a remote script to get it. `SECURITY.md` names the official channels and what RepoMagpie reads, writes and sends.
 - Releases are built and staged on npm by GitHub Actions through trusted publishing, with provenance: the version's npm page links it to this repository, the tagged commit and the workflow run. The maintainer still approves each version with 2FA before it can be installed.
 - Note text can't control your terminal or hide text from you or your agent. Before a note's text, a name, a path or a warning is printed or handed to an agent, RepoMagpie removes control characters, ANSI and OSC escape sequences (such as ones that set your clipboard or hide a link), bidi controls and zero-width characters. Your notes on disk don't change.
 - Note text handed to an agent is capped, so one note can't flood its context: in `--json`, a Verdict at 1,000 characters, a bullet at 500, at most 20 bullets and 20 alternatives; in the hook, a Verdict at 500. Every field of the hook stays under Claude Code's 10,000-character limit, whatever the notes hold. What you read in the terminal is never cut.
@@ -34,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - An alternative whose name has non-ASCII letters (a Cyrillic "р" looks like "p") or isn't a valid package name is flagged in the hook, in `repomagpie recall` and in the app's "Check a package"; the agent skill tells the agent to say so and install nothing for it.
 - The Claude Code hook looks up at most the first 100 packages of one command, and says how many it didn't check: a command of 100,000 names took 17 s before.
 - A cache in a journal (`.cache/`) is used only when every entry names a note file the journal has, so a committed cache can't point recall or search at a file elsewhere.
-- `repomagpie ui` refuses a write whose body is announced as over 1 MB before reading it, answers 413 as soon as more than 1 MB has arrived without an announced size, and cuts off a request whose body never ends after 30 s. It no longer watches a `notes/` folder that is a link.
+- `repomagpie ui` keeps no more than 1 MB of a write's body: a body a little over that gets 413, one announced as far larger is refused before it is read, one that keeps coming is cut off at 2 MB, and a request whose body never ends is cut off after 30 s. It no longer watches a `notes/` folder that is a link.
 - A note file or `tags.md` over 256 KB is skipped and named, and YAML aliases in frontmatter are limited, so a crafted note can't slow down recall or the hook.
 - The agent skill says that note text is quoted data: the agent reports what a note says and never follows instructions in it. A project journal's note was written by the repository's contributors; the agent shows you an alternative's exact package name from such a note and installs it only with your OK.
 

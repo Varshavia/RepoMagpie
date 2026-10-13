@@ -126,6 +126,8 @@ $env:GITHUB_TOKEN = gh auth token
 
 Open an issue for bugs and ideas. The project doesn't take pull requests yet ([CONTRIBUTING.md](CONTRIBUTING.md)). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
+**Official channels:** this repository, the npm package `repomagpie` and its skills.sh listing. There are no installers or `.exe` downloads; anything else is not ours ([SECURITY.md](SECURITY.md#official-channels)).
+
 ## Licence
 
 [MIT](LICENSE) © 2026 Yusuf Suat Babacan
