@@ -56,6 +56,17 @@ Every rule here is required and has a test on `feat/ui-server` (section 11).
 
 The page gets the token for the `X-Magpie-Token` header from a `<meta>` tag in the HTML, which the server adds only for requests that already carry the session cookie. Other origins can't read that page.
 
+**Note text in the app** ([decision 0032](decisions/0032-note-text-is-data.md), rules 5, 7 and 8). A note may come from a cloned repository's project journal, and its GitHub fields from the repository's owner:
+
+| Rule | Why | Test |
+|---|---|---|
+| **Note text is never HTML.** The app has no `dangerouslySetInnerHTML`, no `innerHTML` and no Markdown-to-HTML library: a section's body is parsed into plain data (`ui/src/logic/text.ts`) and React renders it as text; the graph draws labels on a canvas | `<script>` or `<img onerror>` in a note shows as text and never runs | A Verdict with HTML in it shows the text, and the note view has no `img`, `script` or `b` element (e2e) |
+| **Links from notes are `http:` and `https:` only** (`externalHref`): the `url` field ("Open repository") and Markdown links in a section. Anything else (`javascript:`, `data:`, `vbscript:`, `file:`) stays text; a `homepage` field is never shown | A link can't run script or open a local file | `javascript:`, `data:` and `vbscript:` in `url`, `homepage` and a body link render as text; every `href` in the note view is `http(s)` or an in-app `#` link (e2e, and a unit test) |
+| **Skipped files are shown.** Links inside a journal and notes over 256 KB are never read or written (spec §3); All notes names them above the list ("Skipped 1 file in this journal") | Nothing goes missing without a word, and the user can find a hostile link | A note that links to a file outside the journal shows as skipped, and its text doesn't appear (e2e) |
+| **GitHub fields are cleaned at write time:** control, bidi and zero-width characters are removed from the name, description, language, licence, topics and skill names before they reach a note; a repository URL that isn't `https` is replaced by `https://github.com/<owner>/<repo>`. RepoMagpie doesn't store a homepage | What the owner wrote can't hide text or control a terminal later | A hostile repository's fields come back clean (`src/core/github.test.ts`) |
+
+The Content-Security-Policy above stays as it is: it would also block an inline script, but these rules don't rely on it.
+
 ## 4. Live updates
 
 The server watches both journals' `notes/` folders. When a note changes on disk (edited in Obsidian, another editor, or the CLI), it tells the app over Server-Sent Events (`GET /api/events`), and the app refreshes what it shows. A change to any note in a journal also re-reads the open note of that journal, so its links and "Linked from" follow; if the note's own file is unchanged, nothing else in the view changes.

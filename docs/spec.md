@@ -265,8 +265,11 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
             "tags": ["pdf"], "status": "reviewed", "verdict": "avoid: async streams painful; use puppeteer",
             "tried": true, "rating": 2, "explored": "2026-10-03", "read_only": false},
            {"id": null, "file": "npm--broken.md", "name": null, "kind": null, "tags": [], "status": "inbox",
-            "verdict": "", "tried": false, "rating": null, "explored": null, "read_only": true}]}
+            "verdict": "", "tried": false, "rating": null, "explored": null, "read_only": true}],
+ "skipped": []}
 ```
+
+`skipped` names the files the journal's listing left out, one sentence each: `notes/` or a note that is a link, and a note over 256 KB (section 3, "Links and size"); `[]` when none. The app shows them above the list. Added in 0.2; an addition, not a breaking change.
 
 **Graph.** One journal's notes, the tags they carry and the connections between them, for the graph page ([decision 0028](decisions/0028-the-graph-page.md); the rules are in the [product](product.md#graph-model) graph model). Built from the notes on every read; nothing is written but the caches (section 7).
 
