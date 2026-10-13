@@ -20,6 +20,7 @@ export interface ServerOptions {
   log: (line: string) => void; // details of unexpected errors, for the terminal
   assets?: string; // the app's folder; default dist/ui/ (npm run build)
   live?: LiveOptions & { keepAliveMs?: number };
+  requestTimeoutMs?: number; // a request whose body never ends is cut off after this; default 30 s
 }
 
 export interface UiServer {
@@ -118,6 +119,11 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
         return json(res, 415, { error: "Writes accept Content-Type: application/json only." });
       }
+      // A body announced as too big is refused before it is read (red-team R7).
+      if (Number(req.headers["content-length"]) > MAX_BODY) {
+        res.setHeader("Connection", "close");
+        return json(res, 413, { error: "The request body is over 1 MB." });
+      }
       const bytes = await readBody(req);
       if (!bytes) return json(res, 413, { error: "The request body is over 1 MB." });
       let parsed: unknown;
@@ -133,7 +139,10 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     json(res, reply.status, reply.document);
   }
 
-  const server = createServer((req, res) => {
+  // A body that never ends is cut off after 30 s, not Node's 5 minutes; Node checks every second
+  // (red-team R7).
+  const requestTimeout = options.requestTimeoutMs ?? 30_000;
+  const server = createServer({ requestTimeout, connectionsCheckingInterval: Math.min(1000, requestTimeout) }, (req, res) => {
     handle(req, res).catch((error: Error) => {
       options.log(`repomagpie ui: ${req.method} ${(req.url ?? "").split("?")[0]} failed: ${error.stack ?? error.message}`);
       if (!res.headersSent) json(res, 500, { error: BUG });
