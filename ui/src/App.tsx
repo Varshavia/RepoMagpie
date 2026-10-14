@@ -23,7 +23,7 @@ import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
 import { addTarget, noteHash, parseNoteHash } from "./logic/links.ts";
-import { homePath } from "./logic/text.ts";
+import { homePath, visible } from "./logic/text.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
@@ -673,7 +673,7 @@ function SkippedFiles({ skipped }: { skipped: string[] }) {
       <ul>
         {skipped.map((problem) => (
           <li key={problem} className="mono">
-            {problem}
+            {visible(problem)}
           </li>
         ))}
       </ul>

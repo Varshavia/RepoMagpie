@@ -8,7 +8,7 @@ import { Icon } from "../icons.tsx";
 import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
-import { editableBody, externalHref, firstEntries, homePath, isBlank, parseBody, parseInline, type Block, type Inline } from "../logic/text.ts";
+import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, visible, type Block, type Inline } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, plainClick, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
@@ -175,7 +175,7 @@ export function NotePane(props: NotePaneProps) {
   const fm = note.frontmatter;
   const text = (key: string) => (typeof fm[key] === "string" ? (fm[key] as string) : null);
   const list = (key: string) => (Array.isArray(fm[key]) ? (fm[key] as unknown[]).filter((v): v is string => typeof v === "string") : []);
-  const name = text("name") ?? note.file ?? "Note";
+  const name = visible(text("name") ?? note.file ?? "Note");
   const url = text("url");
   const tried = triedLine(formOf(note));
   const patch = patchFor(note, form);
@@ -344,7 +344,7 @@ export function NotePane(props: NotePaneProps) {
           {note.id ? (
             <p className="note-purl">
               <span className="mono" translate="no">
-                {readablePurl(note.id)}
+                {visible(readablePurl(note.id))}
               </span>
               <button type="button" className="button ghost icon-button" onClick={copyPurl} aria-label="Copy PURL" title="Copy PURL">
                 <Icon name="copy" />
@@ -450,7 +450,12 @@ export function NotePane(props: NotePaneProps) {
                 </button>
               }
             >
-              {note.warnings.join(" ") || "This note can't be read, so it is read-only here."}
+              {visible(note.warnings.join(" ")) || "This note can't be read, so it is read-only here."}
+            </Banner>
+          ) : null}
+          {hasHidden([note.file, note.frontmatter, note.verdict, note.sections, note.skills]) ? (
+            <Banner tone="warning">
+              This note contains hidden or control characters. They show here as markers such as &lt;U+202E&gt;, so the text reads as it is stored; the editor keeps them as written.
             </Banner>
           ) : null}
         </div>
@@ -553,7 +558,7 @@ export function NotePane(props: NotePaneProps) {
             <section className="section" key={label} aria-labelledby={`section-${slug(label)}`}>
               <div className="section-head">
                 <h3 className={label === "Avoid when" && !isBlank(s.body) ? "section-label avoid" : "section-label"} id={`section-${slug(label)}`}>
-                  {label}
+                  {visible(label)}
                 </h3>
                 {s.draft ? <DraftBadge /> : null}
                 {canEdit && !isEditing ? (
@@ -564,7 +569,7 @@ export function NotePane(props: NotePaneProps) {
                         Accept
                       </button>
                     ) : null}
-                    <button type="button" className="button ghost" onClick={() => setSection({ name: label, text: editableBody(s.body) })} aria-label={`Edit ${label}`}>
+                    <button type="button" className="button ghost" onClick={() => setSection({ name: label, text: editableBody(s.body) })} aria-label={`Edit ${visible(label)}`}>
                       <Icon name="pencil" />
                       Edit
                     </button>
@@ -615,8 +620,8 @@ export function NotePane(props: NotePaneProps) {
               <ul className="backlinks">
                 {linkedFrom.map((g) => (
                   <li key={g.id}>
-                    <NoteLink id={g.id}>{g.name ?? readablePurl(g.id)}</NoteLink>
-                    <span className="backlink-places">{g.places.join(", ")}</span>
+                    <NoteLink id={g.id}>{visible(g.name ?? readablePurl(g.id))}</NoteLink>
+                    <span className="backlink-places">{visible(g.places.join(", "))}</span>
                   </li>
                 ))}
               </ul>
@@ -629,10 +634,10 @@ export function NotePane(props: NotePaneProps) {
         <footer className="note-foot">
           {note.path ? (
             <span className="mono" translate="no">
-              {homePath(note.path, home)}
+              {visible(homePath(note.path, home))}
             </span>
           ) : null}
-          {text("explored") ? <span>Explored {text("explored")}</span> : null}
+          {text("explored") ? <span>Explored {visible(text("explored") ?? "")}</span> : null}
         </footer>
       </article>
       </Links.Provider>
@@ -658,24 +663,24 @@ function Chips({ kind, license, language, packages, tags }: { kind: string | nul
   if (!kind && !license && !language && !packages.length && !tags.length) return null;
   return (
     <ul className="chips" aria-label="Details">
-      {kind ? <li className="chip">{kind}</li> : null}
+      {kind ? <li className="chip">{visible(kind)}</li> : null}
       {license ? (
         <li className="chip meta" title="Licence">
-          {license === "unknown" ? "licence unknown" : license}
+          {license === "unknown" ? "licence unknown" : visible(license)}
         </li>
       ) : null}
-      {language ? <li className="chip meta" title="Language">{language}</li> : null}
+      {language ? <li className="chip meta" title="Language">{visible(language)}</li> : null}
       {packages.map((p) => {
         const { type, name } = packageLabel(p);
         return (
-          <li className="chip meta" key={p} title={type ? `${type} package` : "Package"} translate="no">
-            {name}
+          <li className="chip meta" key={p} title={type ? `${visible(type)} package` : "Package"} translate="no">
+            {visible(name)}
           </li>
         );
       })}
       {tags.map((t) => (
         <li key={t}>
-          <span className="chip tag">{t}</span>
+          <span className="chip tag">{visible(t)}</span>
         </li>
       ))}
     </ul>
@@ -741,9 +746,9 @@ function Skills({ skills }: { skills: { name: string; text: string }[] }) {
           {described.map((s) => (
             <li key={s.name}>
               <span className="mono" translate="no">
-                {s.name}
+                {visible(s.name)}
               </span>
-              <span>{s.text}</span>
+              <span>{visible(s.text)}</span>
             </li>
           ))}
         </ul>
@@ -758,7 +763,7 @@ function Skills({ skills }: { skills: { name: string; text: string }[] }) {
             <ul className="chips skill-names">
               {rest.map((s) => (
                 <li key={s.name} className="chip meta">
-                  {s.name}
+                  {visible(s.name)}
                 </li>
               ))}
             </ul>
@@ -834,15 +839,15 @@ function Inlines({ parts }: { parts: Inline[] }) {
     <>
       {parts.map((p, i) =>
         p.kind === "code" ? (
-          <code key={i}>{p.text}</code>
+          <code key={i}>{visible(p.text)}</code>
         ) : p.kind === "wikilink" ? (
           <WikiLink key={i} target={p.target} text={p.text} />
         ) : p.kind === "link" && externalHref(p.href) ? (
           <a key={i} href={externalHref(p.href) ?? undefined} target="_blank" rel="noreferrer">
-            {p.text}
+            {visible(p.text)}
           </a>
         ) : (
-          <Fragment key={i}>{p.text}</Fragment>
+          <Fragment key={i}>{visible(p.text)}</Fragment>
         ),
       )}
     </>
@@ -856,7 +861,7 @@ function Inlines({ parts }: { parts: Inline[] }) {
 function WikiLink({ target, text }: { target: string; text: string }) {
   const context = useContext(Links);
   const link = context ? linkFor(context.links, target) : null;
-  if (!context || !link) return <>{text}</>;
+  if (!context || !link) return <>{visible(text)}</>;
   const { id } = link;
   if (id) {
     return (
@@ -869,15 +874,15 @@ function WikiLink({ target, text }: { target: string; text: string }) {
           context.open(id);
         }}
       >
-        <span translate="no">{linkText(link)}</span>
+        <span translate="no">{visible(linkText(link))}</span>
       </a>
     );
   }
-  const why = unresolvedTitle(link);
+  const why = visible(unresolvedTitle(link));
   const ambiguous = link.reason === "ambiguous";
   return (
     <button type="button" className="wikilink unresolved" title={why} onClick={() => (ambiguous ? context.search(link.target) : context.add(link.target))}>
-      <span translate="no">{linkText(link)}</span>
+      <span translate="no">{visible(linkText(link))}</span>
       <span className="visually-hidden">{` (${why}. ${ambiguous ? "Search for it" : "Add it"}.)`}</span>
     </button>
   );

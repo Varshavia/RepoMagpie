@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findLinks } from "../../../src/core/links.ts";
-import { editableBody, externalHref, firstEntries, homePath, isBlank, parseBody, parseInline } from "./text.ts";
+import { clean } from "../../../src/core/text.ts";
+import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, visible } from "./text.ts";
 
 // Decision 0032, rule 7: a URL from a note is a link only for http and https.
 test("externalHref: http and https only; javascript:, data:, vbscript:, file: and the unparsable give none", () => {
@@ -112,4 +113,32 @@ test("homePath: a path under the home directory starts with ~; others, and the h
   assert.equal(homePath("/srv/journal/notes/a.md", "/home/ana"), "/srv/journal/notes/a.md");
   assert.equal(homePath("/home/ana", "/home/ana"), "/home/ana");
   assert.equal(homePath("/home/ana/a.md", null), "/home/ana/a.md");
+});
+
+// Decision 0032, rule 1, in the app: read views show each hidden character as a visible marker.
+const ch = (code: number) => String.fromCharCode(code);
+const marker = (hex: string) => `<U+${hex}>`;
+
+test("visible: control, bidi and zero-width characters become markers in place; text, tabs and line breaks stay", () => {
+  assert.equal(visible(`see ${ch(0x202e)}txt.exe${ch(0x202c)}`), `see ${marker("202E")}txt.exe${marker("202C")}`);
+  assert.equal(visible(`${ch(0x1b)}[2J and ${ch(0x07)}`), `${marker("001B")}[2J and ${marker("0007")}`);
+  assert.equal(visible(`a${ch(0x200b)}b${ch(0xfeff)}`), `a${marker("200B")}b${marker("FEFF")}`);
+  const plain = `a\tb\nc\r\nd caf${ch(0xe9)} ${ch(0x0440)}ad`;
+  assert.equal(visible(plain), plain);
+});
+
+test("visible marks exactly the characters core's clean marks, with the same markers (decision 0032, rule 1)", () => {
+  const whitespace = [0x09, 0x0a, 0x0d, 0x2028, 0x2029]; // core turns these into spaces or line breaks
+  for (let code = 0; code <= 0xffff; code++) {
+    if (code >= 0xd800 && code <= 0xdfff) continue; // lone surrogates aren't characters
+    const c = ch(code);
+    assert.equal(visible(c), whitespace.includes(code) ? c : clean(c), `U+${code.toString(16)}`);
+  }
+});
+
+test("hasHidden: any string in a value, however deep", () => {
+  assert.equal(hasHidden({ verdict: "fine", sections: [{ body: "plain" }], tags: ["a"] }), false);
+  assert.equal(hasHidden({ verdict: "fine", sections: [{ body: `x${ch(0x2066)}y` }] }), true);
+  assert.equal(hasHidden(["a", ["b", `c${ch(0x00)}`]]), true);
+  assert.equal(hasHidden({ n: 1, b: true, z: null }), false);
 });

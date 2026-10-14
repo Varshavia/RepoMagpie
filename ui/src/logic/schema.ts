@@ -36,6 +36,12 @@ export function nameConcern(name: string, bare: boolean): "non-ascii" | "invalid
   return bare && !/^(@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/.test(name) ? "invalid" : null;
 }
 
+// The concern in words, after the name, as recall's card says it; null when there is none.
+export function concernLabel(name: string, bare: boolean): string | null {
+  const concern = nameConcern(name, bare);
+  return concern === "non-ascii" ? " (non-ASCII letters)" : concern === "invalid" ? " (not a valid package name)" : null;
+}
+
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
 export function isAvoid(match: { verdict: string | null; avoid_when: string[] }): boolean {
   return verdictSaysAvoid(match.verdict) || match.avoid_when.length > 0;

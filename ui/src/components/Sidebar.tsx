@@ -5,6 +5,7 @@ import { memo, useState } from "react";
 import type { Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { shownTags, SIDEBAR_TAGS, type Counts, type TagListState } from "../logic/notes.ts";
+import { visible } from "../logic/text.ts";
 import type { View } from "../view.ts";
 
 interface Props {
@@ -84,7 +85,7 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
           {counts.kinds.map((k) => (
             <button key={k.name} type="button" className="nav-item" aria-current={is("kind", k.name) ? "page" : undefined} onClick={() => onView({ page: "kind", value: k.name })}>
               <Icon name="cube" />
-              <span className="label">{k.name}</span>
+              <span className="label">{visible(k.name)}</span>
               <span className="count">{k.count}</span>
             </button>
           ))}
@@ -108,7 +109,7 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
           {shownTags(tags, allTags, view.page === "tag" ? view.value : null).map((t) => (
             <button key={t.name} type="button" className="nav-item" aria-current={is("tag", t.name) ? "page" : undefined} onClick={() => onView({ page: "tag", value: t.name })}>
               <Icon name="tag" />
-              <span className="label">{t.name}</span>
+              <span className="label">{visible(t.name)}</span>
               <span className="count">{t.count}</span>
             </button>
           ))}

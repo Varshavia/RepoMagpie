@@ -4,12 +4,8 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { hookWouldAsk, nameConcern, packageLabel } from "../logic/schema.ts";
-
-// A name that can't be the package it seems, said in words (decision 0032), as recall's card says it.
-const concernLabel = (concern: ReturnType<typeof nameConcern>) =>
-  concern === "non-ascii" ? " (non-ASCII letters)" : concern === "invalid" ? " (not a valid package name)" : null;
-import { homePath } from "../logic/text.ts";
+import { concernLabel, hookWouldAsk, packageLabel } from "../logic/schema.ts";
+import { homePath, visible } from "../logic/text.ts";
 import { MOD } from "../platform.ts";
 import { AlternativeName, FieldError } from "./common.tsx";
 import { TypeChoice } from "./fields.tsx";
@@ -117,9 +113,9 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
   const { type, name } = packageLabel(match.id);
   const draft = (list: "use_when" | "avoid_when") => (match.drafts as string[]).includes(list);
   return (
-    <article className={ask ? "recall-card ask" : "recall-card"} aria-label={name}>
+    <article className={ask ? "recall-card ask" : "recall-card"} aria-label={visible(name)}>
       <p>
-        <strong>{name}</strong>
+        <strong>{visible(name)}</strong>
         <span className="field-help">{` · ${type} · ${match.journal} journal${match.confidence === "name-only" ? " · name match only" : ""}`}</span>
       </p>
       <p className={ask ? "hook-line ask" : "hook-line"}>
@@ -128,14 +124,14 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
       </p>
       <div className="recall-line">
         <span className="section-label">Verdict</span>
-        <span>{match.verdict ?? "[inbox] no verdict yet"}</span>
+        <span>{match.verdict === null ? "[inbox] no verdict yet" : visible(match.verdict)}</span>
       </div>
       {match.avoid_when.length ? (
         <div className="recall-line">
           <span className="section-label avoid">Avoid when</span>
           <span>
             {draft("avoid_when") ? "(draft) " : ""}
-            {match.avoid_when.join("; ")}
+            {visible(match.avoid_when.join("; "))}
           </span>
         </div>
       ) : null}
@@ -146,8 +142,8 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
             {match.alternatives.map((a, i) => (
               <li key={`${a.name} ${i}`}>
                 <AlternativeName alternative={a} onOpen={onOpenNote} onAdd={onAdd} onSearch={onSearch} />
-                {concernLabel(nameConcern(a.name, a.path === null))}
-                {a.id ? `: ${a.verdict ?? "[inbox] no verdict yet"}${a.avoid ? " (you also noted to avoid it)" : ""}` : null}
+                {concernLabel(a.name, a.path === null)}
+                {a.id ? `: ${a.verdict === null ? "[inbox] no verdict yet" : visible(a.verdict)}${a.avoid ? " (you also noted to avoid it)" : ""}` : null}
               </li>
             ))}
           </ul>
@@ -158,11 +154,11 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
           <span className="section-label">Use when</span>
           <span>
             {draft("use_when") ? "(draft) " : ""}
-            {match.use_when.join("; ")}
+            {visible(match.use_when.join("; "))}
           </span>
         </div>
       ) : null}
-      <p className="mono field-help">{homePath(match.path, home)}</p>
+      <p className="mono field-help">{visible(homePath(match.path, home))}</p>
     </article>
   );
 }

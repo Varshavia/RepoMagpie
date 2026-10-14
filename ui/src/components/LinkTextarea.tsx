@@ -4,6 +4,7 @@
 // aria-activedescendant; a status line tells screen readers when it opens and how to use it.
 import { useEffect, useId, useRef, useState, type Ref, type TextareaHTMLAttributes } from "react";
 import { insertLink, linkCandidates, linkQuery, type LinkNote } from "../logic/links.ts";
+import { visible } from "../logic/text.ts";
 
 interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> {
   value: string;
@@ -103,10 +104,10 @@ export function LinkTextarea({ value, onValueChange, notes, self, textareaRef, o
               onClick={() => choose(note)}
             >
               <span className="label" translate="no">
-                {note.name ?? note.file.replace(/\.md$/, "")}
+                {visible(note.name ?? note.file.replace(/\.md$/, ""))}
               </span>
               <span className="detail mono" translate="no">
-                {note.file.replace(/\.md$/, "")}
+                {visible(note.file.replace(/\.md$/, ""))}
               </span>
             </li>
           ))}

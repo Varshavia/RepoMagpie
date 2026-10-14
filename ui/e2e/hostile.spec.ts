@@ -54,6 +54,79 @@ test("a Verdict with HTML in it shows the text, not markup", async ({ page, magp
   await expect(page).not.toHaveTitle("pwned");
 });
 
+// Hidden characters (decision 0032, rule 1, in the app): read views show each control, bidi or
+// zero-width character as a visible marker, never raw and never dropped; the note warns; the editor
+// keeps the raw text. Every special character is built from its code point.
+const ch = (code: number) => String.fromCharCode(code);
+const marker = (code: number) => `<U+${code.toString(16).toUpperCase().padStart(4, "0")}>`;
+const RAW = new RegExp(`[${ch(0x00)}-${ch(0x08)}${ch(0x0b)}${ch(0x0c)}${ch(0x0e)}-${ch(0x1f)}${ch(0x7f)}-${ch(0x9f)}${ch(0x200b)}-${ch(0x200f)}${ch(0x202a)}-${ch(0x202e)}${ch(0x2066)}-${ch(0x2069)}${ch(0xfeff)}]`);
+const HIDDEN_NOTE = `---
+id: pkg:npm/hidden
+name: "hid${ch(0x200b)}den"
+explored: 2026-10-04
+kind: library
+tags: []
+tried: false
+alternatives: ["[[${ch(0x0440)}ad-left]]", "[[pad kit]]"]
+status: reviewed
+---
+
+## Verdict
+avoid: see ${ch(0x202e)}txt.exe${ch(0x202c)} now ${ch(0x1b)}[2J and ${ch(0x07)}
+
+## My notes
+plain${ch(0x200b)}text
+`;
+const SHOWN_VERDICT = `avoid: see ${marker(0x202e)}txt.exe${marker(0x202c)} now ${marker(0x1b)}[2J and ${marker(0x07)}`;
+
+test("hidden characters: the note view shows markers in order, warns above the sections, and the editor keeps the raw text", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  const row = page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "txt.exe" });
+  await expect(row).toContainText(`hid${marker(0x200b)}den`); // the list preview
+  await expect(row).toContainText(SHOWN_VERDICT);
+  expect(await row.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+  await row.click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await expect(pane.getByRole("heading", { level: 2 })).toHaveText(`hid${marker(0x200b)}den`);
+  const warning = pane.getByText("This note contains hidden or control characters");
+  await expect(warning).toBeVisible();
+  await expect(pane).toContainText(SHOWN_VERDICT); // "txt.exe" stays in order
+  await expect(pane).toContainText(`plain${marker(0x200b)}text`);
+  expect(await pane.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+
+  await pane.getByRole("button", { name: "Edit My notes" }).click();
+  await expect(warning).toBeVisible(); // still there while editing
+  expect(await pane.getByRole("textbox", { name: "My notes" }).inputValue()).toBe(`plain${ch(0x200b)}text`); // the raw text
+});
+
+test("hidden characters: search results and Check a package show the markers too", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  await page.getByRole("searchbox", { name: "Search both journals" }).fill("hidden");
+  const results = page.getByRole("listbox", { name: "Search results" });
+  await expect(results).toContainText(SHOWN_VERDICT);
+  expect(await results.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+  await page.getByRole("button", { name: "Check a package" }).click();
+  await page.getByLabel("Packages").fill("hidden");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const card = page.locator("article").filter({ hasText: "txt.exe" });
+  await expect(card).toContainText(SHOWN_VERDICT);
+  expect(await card.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+});
+
+test("the note view's alternative chips flag look-alike and invalid names, as Check a package does", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "txt.exe" }).click();
+  const chip = (name: string) => page.locator('section[aria-label="Note"] .alternatives .chips li').filter({ hasText: name });
+  await expect(chip(`${ch(0x0440)}ad-left`)).toContainText("(non-ASCII letters)");
+  await expect(chip("pad kit")).toContainText("(not a valid package name)");
+});
+
 // Red-team R6 (a web page): the session token never leaves the app through a link.
 test("R6: after the first load the token isn't in the address bar; pages send no Referer; note links open with noreferrer", async ({ page, magpie }) => {
   writeFileSync(magpie.note("npm--hostile.md"), HOSTILE);
