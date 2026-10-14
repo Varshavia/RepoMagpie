@@ -1,12 +1,15 @@
 # Dependency updates as pull requests, weekly. The maintainer reviews and merges each one; every new
 # library still needs approval (CLAUDE.md, section 9). Dev dependencies come as one grouped pull
-# request; the package has no runtime dependencies (decision 0025).
+# request; the package has no runtime dependencies (decision 0025). A release is proposed only once
+# it is 7 days old (cooldown): a compromised release is usually found and pulled within days.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       dev-dependencies:
         dependency-type: development
@@ -14,3 +17,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7

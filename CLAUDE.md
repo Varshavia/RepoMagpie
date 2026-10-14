@@ -80,7 +80,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | Path | What it is |
 |---|---|
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
-| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) and `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests). |
+| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) and `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), the coding agents' config formats (`agents.md`), research, `decisions/` (decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
