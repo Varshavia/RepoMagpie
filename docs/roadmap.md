@@ -11,8 +11,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 ## Now / Next / Later
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
-  Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups; the topics-as-tags follow-up is built on `feat/topic-tags`.
-  Also now: pre-launch hardening on `feat/hardening` (the command name, note text from other people, releases from CI), before the tester round.
+  Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups. The topics-as-tags follow-up and the pre-launch hardening (the command name, note text from other people, releases from CI) are merged and released in `0.2.0-beta.3` (2026-10-14), the first version staged from CI; next is the tester round.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
