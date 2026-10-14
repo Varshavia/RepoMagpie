@@ -11,6 +11,8 @@ import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
 import type { McpCommandOptions } from "./mcp.ts";
 import type { NoteOptions } from "./note.ts";
+import type { Terminal } from "./prompt.ts";
+import type { SetupOptions } from "./setup.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
 import type { SuggestOptions } from "./suggest.ts";
@@ -36,6 +38,8 @@ export interface Io {
   stdin?: () => Promise<string>; // all of standard input (the hook reads Claude Code's JSON from it)
   openExternal?: (target: string) => Promise<void>; // opens a URL or file in the default app (magpie ui); default: the platform's command
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
+  terminal?: Terminal; // setup's prompts read keys here; default: stdin, drawn on stderr
+  self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
 }
 
 const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt"]);
@@ -151,6 +155,18 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--no-open", "don't open the browser; only print the URL")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./ui.ts")).uiCommand(command.optsWithGlobals<UiOptions>(), io);
+    });
+
+  program
+    .command("setup")
+    .description("set up RepoMagpie's MCP server in your coding agents: a plan, a question, then the changes, each file backed up first")
+    .option("--yes", "apply the plan without asking")
+    .option("--dry-run", "show the plan; change nothing")
+    .option("--agents <list>", "only these agents, comma-separated: claude-code, codex, cursor, gemini, vscode")
+    .option("--remove", "remove RepoMagpie's entries instead")
+    .option("--allow-write", "the MCP server also serves the note tool (setup asks when it can)")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./setup.ts")).setupCommand(command.optsWithGlobals<SetupOptions>(), io);
     });
 
   program
