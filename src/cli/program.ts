@@ -2,6 +2,7 @@ import { Command, CommanderError, InvalidArgumentError, Option } from "commander
 import type { Fetch } from "../core/github.ts";
 import type { AdoptOptions } from "./adopt.ts";
 import type { CatalogOptions } from "./catalog.ts";
+import type { GlobalOptions } from "./context.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
@@ -150,6 +151,13 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--no-open", "don't open the browser; only print the URL")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./ui.ts")).uiCommand(command.optsWithGlobals<UiOptions>(), io);
+    });
+
+  program
+    .command("doctor")
+    .description("show what is wired: commands on PATH, the skill, the hook, each agent's MCP server, the journals")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./doctor.ts")).doctorCommand(command.optsWithGlobals<GlobalOptions>(), io);
     });
 
   program
