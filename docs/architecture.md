@@ -63,11 +63,15 @@ src/
                documents: the shared JSON documents (Settings, Tag list, Note list, Note, Note preview) and editing a note
                edit: a person's edit of one note, checked and applied all or nothing; note versions (sha256)
                outcome: how a run ended, as an exit code (CLI) or an HTTP status (server)
+               agents: the coding agents setup and doctor know (decision 0035, docs/agents.md): their config
+               files, commands on PATH and the packages they run, reading JSON with comments and Codex's TOML
+               doctor: repomagpie doctor's report; read-only
   cli/         one module per command, loaded only when it runs; human and --json output
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
   mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
                rules, the server instructions; cli/mcp.ts serves it on stdio. The SDK is bundled into its
-               own chunk, which only repomagpie mcp loads
+               own chunk, which only repomagpie mcp loads. jitless.ts: zod generates no code;
+               sdk-shims.ts: the SDK's default validator in the build, without ajv
   server/      repomagpie ui, node:http only: server (security checks, routing, events stream), api (endpoints →
                core), live (fs.watch + signature check), open (the platform's open command)
 ui/            the local app (decision 0022): React and Vite, built into dist/ui/ (npm run build)

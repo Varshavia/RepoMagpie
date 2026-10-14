@@ -60,6 +60,19 @@ Socket's "URL strings" alert (low) on the npm package says it holds fragments of
 
 The app's Content-Security-Policy allows connections to its own origin only ([docs/ui.md](docs/ui.md#3-security)), so the browser side can't reach any of these hosts either; GitHub's API is called by the server.
 
+## Dynamic code in the package
+
+`repomagpie mcp` bundles the official MCP TypeScript SDK and zod, which it uses ([decision 0034](docs/decisions/0034-the-mcp-server.md)). A scanner such as Socket may flag `new Function` in its chunk (`dist/cli/mcp-*.js`). What it is, and why it never runs:
+
+| In the bundle | What it is | At runtime |
+|---|---|---|
+| `new Function("")` in zod's `allowsEval` | A probe: may this process generate code? | Never runs: `src/mcp/jitless.ts` turns on zod's `jitless` option before the SDK loads, and the probe is only asked when `jitless` is off |
+| `new F(…)` in zod's `Doc.compile` | zod's faster object parser, compiled from the schema | Never runs, for the same reason |
+
+- **No ajv.** The SDK's default JSON Schema validator for Node.js, ajv, compiles every schema into code with `new Function`. RepoMagpie passes the SDK the `@cfworker/json-schema` validator instead, which interprets a schema and generates no code, and the build leaves ajv out of the bundle.
+- **Only our own schemas.** The only schemas validated are the tools' own input and output schemas, written in `src/mcp/server.ts`, and the SDK's protocol messages. Tool arguments from an agent and note text are data checked against those schemas, never compiled.
+- **Proven, not assumed.** The tests and the benchmark start the server with Node's `--disallow-code-generation-from-strings`, under which any `eval` or `new Function` throws, and every tool works ([src/mcp/server.test.ts](src/mcp/server.test.ts), `scripts/bench-mcp.ts`). With the SDK's default validator, the same flag makes the first tool call fail with an `EvalError`.
+
 ## The local app
 
 `repomagpie ui` serves the app from your machine, on `127.0.0.1` only, until you stop it. Every request needs the session token from the URL it prints, exchanged once for an `HttpOnly`, `SameSite=Strict` cookie; every write also needs the token in a header and the app's own origin; the Host header must be the app's, against DNS rebinding. There are no CORS headers, a strict Content-Security-Policy, `Referrer-Policy: no-referrer`, a 1 MB limit on request bodies and a 30 s request timeout. No path from a request reaches the file system. The full list, with a test for each rule, is in [docs/ui.md](docs/ui.md#3-security).
