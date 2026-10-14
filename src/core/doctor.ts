@@ -5,6 +5,7 @@ import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSy
 import { isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
+import { NO_CODEGEN } from "./launch.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
 
@@ -32,7 +33,7 @@ export interface AgentReport {
   name: string;
   installed: boolean; // its config folder exists, or its command is on PATH
   config: string; // the file that holds its MCP entry
-  mcp: (McpEntry & { allow_write: boolean; node_found: boolean; entry: string | null; entry_found: boolean; version: string | null }) | null;
+  mcp: (McpEntry & { allow_write: boolean; code_generation_off: boolean; node_found: boolean; entry: string | null; entry_found: boolean; version: string | null }) | null;
   error?: string; // the file exists but can't be read
 }
 
@@ -116,6 +117,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
       mcp: {
         ...entry,
         allow_write: entry.args.includes("--allow-write"),
+        // node's flag before the script: the server can't run generated code (decision 0034).
+        code_generation_off: script !== null && entry.args.indexOf(NO_CODEGEN) >= 0 && entry.args.indexOf(NO_CODEGEN) < entry.args.indexOf(script),
         node_found: entry.command !== null && (isAbsolute(entry.command) ? isFile(entry.command) : onPath(entry.command, where).length > 0),
         entry: script,
         entry_found: script !== null && isFile(script),
@@ -130,6 +133,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
       const missing = !agent.mcp.node_found ? agent.mcp.command ?? "(no command)" : agent.mcp.entry ?? "(no entry file)";
       problems.push(`${agent.name}'s repomagpie MCP server starts ${missing}, which doesn't exist. Run repomagpie setup again.`);
     } else if (agent.mcp?.version && agent.mcp.version !== request.version) problems.push(`${agent.name}'s repomagpie MCP server runs version ${agent.mcp.version}; this is ${request.version}. Run repomagpie setup again.`);
+    else if (agent.mcp && !agent.mcp.code_generation_off) problems.push(`${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}. Run repomagpie setup again.`);
   }
 
   // The journals.

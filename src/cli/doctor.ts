@@ -67,6 +67,7 @@ function agentLine(a: AgentReport, tilde: (path: string) => string): string {
   const parts = [`${tilde(m.command ?? "(no command)")}${m.node_found ? "" : " (missing)"}`];
   if (m.entry) parts.push(`${tilde(m.entry)}${m.entry_found ? "" : " (missing)"}`);
   if (m.version) parts.push(`version ${m.version}`);
+  parts.push(m.code_generation_off ? "code generation off" : "code generation NOT off");
   if (m.allow_write) parts.push("note tool on");
   return `${a.installed ? "" : "not installed, but "}registered: ${parts.join(", ")}`;
 }

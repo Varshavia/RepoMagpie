@@ -103,15 +103,27 @@ test("MCP entries: a broken path is found; a good one shows its version and --al
   command(box, "repomagpie", { name: "repomagpie", version: "0.2.0" });
   const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
   box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: { command: join(box.root, "gone", "node.exe"), args: [entry, "mcp"] } } }));
-  box.write(join(box.home, ".gemini", "settings.json"), JSON.stringify({ theme: "x", mcpServers: { repomagpie: { command: process.execPath, args: [entry, "mcp", "--allow-write"], env: { GITHUB_TOKEN: "ghp_secret123" } } } }));
+  box.write(join(box.home, ".gemini", "settings.json"), JSON.stringify({ theme: "x", mcpServers: { repomagpie: { command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "mcp", "--allow-write"], env: { GITHUB_TOKEN: "ghp_secret123" } } } }));
   const report = runDoctor(box.request);
   const cursor = report.agents.find((a) => a.id === "cursor");
   const gemini = report.agents.find((a) => a.id === "gemini");
   assert.equal(cursor?.mcp?.node_found, false);
   assert.equal(cursor?.mcp?.entry_found, true);
   assert.ok(report.problems.some((p) => p.startsWith("Cursor's repomagpie MCP server starts") && p.endsWith("which doesn't exist. Run repomagpie setup again.")));
-  assert.deepEqual(gemini?.mcp, { command: process.execPath, args: [entry, "mcp", "--allow-write"], env_keys: ["GITHUB_TOKEN"], allow_write: true, node_found: true, entry: entry, entry_found: true, version: "0.2.0" });
+  assert.deepEqual(gemini?.mcp, { command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "mcp", "--allow-write"], env_keys: ["GITHUB_TOKEN"], allow_write: true, code_generation_off: true, node_found: true, entry: entry, entry_found: true, version: "0.2.0" });
+  assert.equal(cursor?.mcp?.code_generation_off, false);
+  assert.ok(!report.problems.some((p) => p.startsWith("Gemini CLI's")), "a good entry has nothing to do");
   assert.ok(!JSON.stringify(report).includes("ghp_secret123"));
+});
+
+test("an entry without node's code-generation flag, or with it after the script, is a to-do", () => {
+  const box = scratchHome();
+  command(box, "repomagpie", { name: "repomagpie", version: "0.2.0" });
+  const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
+  box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: { command: process.execPath, args: [entry, "--disallow-code-generation-from-strings", "mcp"] } } }));
+  const report = runDoctor(box.request);
+  assert.equal(report.agents.find((a) => a.id === "cursor")?.mcp?.code_generation_off, false);
+  assert.ok(report.problems.includes("Cursor's repomagpie MCP server doesn't start node with --disallow-code-generation-from-strings. Run repomagpie setup again."));
 });
 
 test("VS Code's JSON with comments and Codex's TOML are read; an unreadable file is named", () => {
