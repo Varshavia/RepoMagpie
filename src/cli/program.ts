@@ -8,6 +8,7 @@ import { packageVersion } from "../core/version.ts";
 import { HOOK_HELP } from "./hook-help.ts";
 import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
+import type { McpCommandOptions } from "./mcp.ts";
 import type { NoteOptions } from "./note.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
@@ -108,6 +109,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .addOption(new Option("--journal <journal>", "list one journal only").choices(["personal", "project"]))
     .option("--limit <n>", "show at most n notes, from 1 to 1000", catalogLimit, 100)
     .option("--cursor <cursor>", "the next page: next_cursor from the previous page")
+    .option("--full", "with --json: every field of each note, instead of compact rows")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./catalog.ts")).catalogCommand(command.optsWithGlobals<CatalogOptions>(), io);
     });
@@ -148,6 +150,14 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--no-open", "don't open the browser; only print the URL")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./ui.ts")).uiCommand(command.optsWithGlobals<UiOptions>(), io);
+    });
+
+  program
+    .command("mcp")
+    .description("an MCP server on stdio, for coding agents (started by the agent, not typed by people)")
+    .option("--allow-write", "also serve the note tool, which records the user's Verdict or alternative")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./mcp.ts")).mcpCommand(command.optsWithGlobals<McpCommandOptions>(), io);
     });
 
   program

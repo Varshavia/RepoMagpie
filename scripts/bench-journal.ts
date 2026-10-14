@@ -36,7 +36,8 @@ function topicsFor(i: number): string[] {
 // `topics: true` also gives each note topics and a language (the graph's similarity reads them).
 // `alternatives: true` gives one note in five 1 to 3 alternatives: another note by file stem, one by
 // name, and a subject without a note (recall reads them, from both sides).
-export function withJournal(name: string, body: (root: string, journal: string) => void, needsBuild = true, topics = false, alternatives = false): void {
+// An async body is awaited before the folder is deleted (the MCP benchmark talks to a server).
+export async function withJournal(name: string, body: (root: string, journal: string) => void | Promise<void>, needsBuild = true, topics = false, alternatives = false): Promise<void> {
   if (needsBuild && !existsSync(cli)) {
     console.error("No build found. Run npm run build first (npm run bench does).");
     process.exit(1);
@@ -73,7 +74,7 @@ export function withJournal(name: string, body: (root: string, journal: string) 
     }
     // One note over the 256 KB limit (decision 0032, rule 6): every read skips it, by its size alone.
     writeFileSync(join(journal, "notes", "npm--oversized.md"), renderNote({ id: "pkg:npm/oversized", name: "oversized", explored: "2026-10-04", kind: "library", tags: [] }) + "x".repeat(300 * 1024));
-    body(root, journal);
+    await body(root, journal);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

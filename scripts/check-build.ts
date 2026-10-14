@@ -6,7 +6,7 @@
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
 // runs the one named like the package, and fails when none is. Run npm run build first.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,6 +58,7 @@ try {
     console.log(`${same ? "same" : "DIFFERENT"}  repomagpie ${args.join(" ")}`);
     if (!same) console.log(`  built (exit ${b.status}): ${b.stdout.slice(0, 200)}${b.stderr.slice(0, 200)}\n  source (exit ${s.status}): ${s.stdout.slice(0, 200)}`);
   }
+  failed += checkInlinedLicenses();
   failed += checkPackage(join(root, "pack"));
 } finally {
   rmSync(root, { recursive: true, force: true });
@@ -103,6 +104,18 @@ function checkPackage(dir: string): number {
   const npx = shell("npx", ["--yes", ...npm, `./${basename(tarball)}`, "--version"]);
   failures += report(npx.status === 0 && npx.stdout.trim() === version, "npx <tarball> --version", `exit ${npx.status}: ${npx.stdout}${npx.stderr}`);
   return failures;
+}
+
+// The libraries the MCP SDK inlines in its own files (their pnpm paths are in its comments; the
+// bundle drops comments) each have a notice in the built THIRD-PARTY-LICENSES.md, at that version
+// (scripts/licenses-inlined.md). A newer SDK that inlines other versions fails here until updated.
+function checkInlinedLicenses(): number {
+  const sdk = fileURLToPath(new URL("../node_modules/@modelcontextprotocol/server/dist/", import.meta.url));
+  const files = readdirSync(sdk).filter((file) => file.endsWith(".mjs")).map((file) => readFileSync(join(sdk, file), "utf8")).join("\n");
+  const inlined = new Set([...files.matchAll(/node_modules\/\.pnpm\/((?:@[^/@]+\/)?[^/@]+)@(\d[^/_"' ]*)/g)].map((m) => `${m[1]} - ${m[2]}`));
+  const licenses = readFileSync(fileURLToPath(new URL("../dist/cli/THIRD-PARTY-LICENSES.md", import.meta.url)), "utf8");
+  const missing = [...inlined].filter((entry) => !licenses.includes(`## ${entry} (`));
+  return report(inlined.size > 0 && !missing.length, `a licence notice for each library the MCP SDK inlines (${inlined.size})`, `missing: ${missing.join(", ") || "none found"}`);
 }
 
 function report(ok: boolean, what: string, output: string): number {

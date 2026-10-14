@@ -1,5 +1,5 @@
 // repomagpie catalog (spec §2, §8): the human output of core's runCatalog.
-import { catalogForAgent, runCatalog, type CatalogRow } from "../core/catalog.ts";
+import { catalogForAgent, compactForAgent, runCatalog, type CatalogRow } from "../core/catalog.ts";
 import { exitCode } from "../core/outcome.ts";
 import type { JournalSource } from "../core/search.ts";
 import { clean } from "../core/text.ts";
@@ -13,12 +13,13 @@ export interface CatalogOptions extends GlobalOptions {
   journal?: JournalSource["scope"];
   limit: number;
   cursor?: string;
+  full?: boolean;
 }
 
 export async function catalogCommand(options: CatalogOptions, io: Io): Promise<number> {
   const run = runCatalog({ limit: options.limit, cursor: options.cursor, tags: options.tag, kind: options.kind, journal: options.journal }, contextOf(io, options));
   if (options.json) {
-    io.out(`${JSON.stringify(catalogForAgent(run.document))}\n`);
+    io.out(`${JSON.stringify(options.full ? catalogForAgent(run.document) : compactForAgent(run))}\n`);
     return exitCode(run.outcome);
   }
   if (run.document.error) {

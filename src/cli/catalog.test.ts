@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { catalogForAgent, runCatalog } from "../core/catalog.ts";
+import { catalogForAgent, compactForAgent, runCatalog } from "../core/catalog.ts";
 import { renderNote, type NewNote } from "../core/write.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
@@ -17,16 +17,24 @@ const FILES = {
   "project/.magpie/notes/npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", name: "puppeteer", tags: ["pdf"], verdict: "default for PDF rendering in new projects" }),
 };
 
-test("--json prints core's document for an agent, nothing on stderr", async () => {
+test("--json prints core's compact document for an agent; --full --json every field; nothing on stderr", async () => {
   const box = sandbox(FILES);
-  const r = await magpie(box, ["catalog", "--json"]);
-  assert.equal(r.code, 0);
-  assert.equal(r.err, "");
   const place = { home: box.home, env: { MAGPIE_HOME: box.journal }, cwd: box.project };
-  assert.equal(r.out, `${JSON.stringify(catalogForAgent(runCatalog({ limit: 100 }, place).document))}\n`);
-  const json = JSON.parse(r.out);
-  assert.equal(json.total, 4);
-  assert.deepEqual(json.notes.map((n: { name: string }) => n.name), ["mattpocock/skills", "pdf-lib", "pdfkit", "puppeteer"]);
+  const run = runCatalog({ limit: 100 }, place);
+  const compact = await magpie(box, ["catalog", "--json"]);
+  assert.equal(compact.code, 0);
+  assert.equal(compact.err, "");
+  assert.equal(compact.out, `${JSON.stringify(compactForAgent(run))}\n`);
+  assert.deepEqual(JSON.parse(compact.out).rows.map((r: string[]) => r[0]), ["mattpocock/skills", "pdf-lib", "pdfkit", "puppeteer"]);
+  const full = await magpie(box, ["catalog", "--full", "--json"]);
+  assert.equal(full.err, "");
+  assert.equal(full.out, `${JSON.stringify(catalogForAgent(run.document))}\n`);
+  assert.equal(JSON.parse(full.out).total, 4);
+});
+
+test("--full changes nothing for people", async () => {
+  const box = sandbox(FILES);
+  assert.equal((await magpie(box, ["catalog", "--full"])).out, (await magpie(box, ["catalog"])).out);
 });
 
 test("people get one row per note, Verdict first, as search shows them", async () => {
@@ -57,7 +65,7 @@ test("pages: the count and the next command on stderr; --cursor continues", asyn
 
 test("filters: --tag (repeatable), --kind and --journal", async () => {
   const box = sandbox(FILES);
-  const names = async (...flags: string[]) => JSON.parse((await magpie(box, ["catalog", ...flags, "--json"])).out).notes.map((n: { name: string }) => n.name);
+  const names = async (...flags: string[]) => JSON.parse((await magpie(box, ["catalog", ...flags, "--json"])).out).rows.map((r: string[]) => r[0]);
   assert.deepEqual(await names("--tag", "pdf"), ["pdf-lib", "pdfkit", "puppeteer"]);
   assert.deepEqual(await names("--tag", "pdf", "--tag", "workflow"), []);
   assert.deepEqual(await names("--kind", "skill-pack"), ["mattpocock/skills"]);
@@ -72,7 +80,8 @@ test("no notes: a short message on stderr, exit 0; --json gives an empty page", 
   assert.equal(r.err, "No notes.\n");
   const filtered = await magpie(sandbox(FILES), ["catalog", "--tag", "nothing"]);
   assert.equal(filtered.err, "No notes match these filters.\n");
-  assert.deepEqual(JSON.parse((await magpie(box, ["catalog", "--json"])).out), { notes: [], total: 0, next_cursor: null });
+  assert.deepEqual(JSON.parse((await magpie(box, ["catalog", "--json"])).out), { columns: ["name", "kind", "journal", "avoid", "summary", "verdict"], rows: [], total: 0, next_cursor: null });
+  assert.deepEqual(JSON.parse((await magpie(box, ["catalog", "--full", "--json"])).out), { notes: [], total: 0, next_cursor: null });
 });
 
 test("usage errors exit 2: a bad cursor (with --json: the document and its error), --limit out of 1–1000, an unknown --kind", async () => {
@@ -82,7 +91,7 @@ test("usage errors exit 2: a bad cursor (with --json: the document and its error
   assert.match(bad.err, /^repomagpie catalog: Not a cursor from repomagpie catalog\./);
   const json = await magpie(box, ["catalog", "--cursor", "nope", "--json"]);
   assert.equal(json.code, 2);
-  assert.deepEqual({ ...JSON.parse(json.out), error: "…" }, { notes: [], total: 0, next_cursor: null, error: "…" });
+  assert.deepEqual({ ...JSON.parse(json.out), error: "…" }, { columns: ["name", "kind", "journal", "avoid", "summary", "verdict"], rows: [], total: 0, next_cursor: null, error: "…" });
   for (const argv of [["catalog", "--limit", "0"], ["catalog", "--limit", "1001"], ["catalog", "--limit", "many"], ["catalog", "--kind", "gadget"]]) {
     assert.equal((await magpie(box, argv)).code, 2, argv.join(" "));
   }

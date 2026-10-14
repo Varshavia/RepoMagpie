@@ -4,7 +4,7 @@
 // on Windows is mostly loading many small files. The chunks sit next to main.js, so paths relative
 // to import.meta.url (../../package.json, ../../dist/ui/) hold as they do from src/. The licences
 // of the bundled libraries go to dist/cli/THIRD-PARTY-LICENSES.md.
-import { rmSync } from "node:fs";
+import { appendFileSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 
@@ -25,3 +25,6 @@ await build({
   },
   ssr: { noExternal: true, target: "node" },
 });
+// Libraries inlined in another package's own files are bundled without a package.json of their own,
+// so Vite can't list them: their notices are kept in scripts/licenses-inlined.md (decision 0034).
+appendFileSync(new URL("../dist/cli/THIRD-PARTY-LICENSES.md", import.meta.url), readFileSync(new URL("licenses-inlined.md", import.meta.url), "utf8"));
