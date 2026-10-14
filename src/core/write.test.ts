@@ -631,9 +631,10 @@ test("alternatives: reordering is refused (only adding and removing); nothing ch
 });
 
 test("alternatives: an empty list removes the key and its line; nothing else changes", () => {
-  const before = HAND_WRITTEN.replace("rating:\n", "rating:\n");
+  const before = HAND_WRITTEN;
   for (const written of ['alternatives: ["[[npm--puppeteer]]"]\n', 'alternatives: ["[[npm--puppeteer]]"]   # a comment\n', 'alternatives:\n  - "[[a]]"\n  - "[[b]]"\n', "alternatives: []\n", "alternatives:\n"]) {
     const text = before.replace("rating:\n", `rating:\n${written}`);
+    assert.notEqual(text, before, "the fixture has a rating line to write the key after");
     const r = setHumanFields(text, { alternatives: [] });
     assert.equal(r.text, before, JSON.stringify(written));
     assert.equal(r.changed, true);
