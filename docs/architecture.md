@@ -93,7 +93,8 @@ skills/
                SKILL.md, and references/json.md (the --json fields it reads); src/cli/skill.test.ts
                checks it against repomagpie --help and the spec's --json shapes
 scripts/       the test runner with the ~/.magpie canary, the CLI's build (build-cli.ts: Vite bundles src/cli/main.ts
-               into dist/cli/, decision 0025) and its check, benchmarks, the link check, the command-name check (decision 0031); not part of the package
+               into dist/cli/, decision 0025) and its check, benchmarks, the retrieval baseline (eval-retrieval.ts),
+               the link check, the command-name check (decision 0031); not part of the package
 ```
 
 Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's logic tests (`ui/src/logic/*.test.ts`) run in `npm test` too. Its end-to-end tests use `@playwright/test` against `repomagpie ui` on a journal in `.scratch/e2e/` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
