@@ -36,7 +36,7 @@ const AWESOME = "pkg:github/voltagent/awesome-design-md";
 
 // --- GitHub fields are cleaned before they reach a note (decision 0032, rule 8) ---
 
-test("a hostile repository's fields are cleaned of control, bidi and zero-width characters; a URL that isn't https is replaced", async () => {
+test("a hostile repository's control, bidi and zero-width characters reach a note as markers; a URL that isn't https is replaced", async () => {
   const c = (...codes: number[]) => String.fromCodePoint(...codes);
   const ESC = c(0x1b);
   const responses = {
@@ -55,8 +55,8 @@ test("a hostile repository's fields are cleaned of control, bidi and zero-width 
   assert.ok(r.ok);
   const { name, url, description, language, license, topics, skills } = r.metadata;
   assert.deepEqual({ name, url, description, language, license, topics, skills }, {
-    name: "acme/widget", url: "https://github.com/acme/widget", description: "Charts for apps", language: "TypeScript", license: "MIT",
-    topics: ["charts", "cli"], skills: ["evil"],
+    name: "acme/wid<U+200B>get", url: "https://github.com/acme/widget", description: "Charts <U+001B>]52;c;ZWNobyBwd25lZA==<U+0007>for <U+202E>apps<U+001B>[31m",
+    language: "Type<U+007F>Script", license: "MIT<U+009B>", topics: ["charts", "cl<U+200D>i"], skills: ["ev<U+001B>[2Jil"],
   });
 });
 

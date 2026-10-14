@@ -276,18 +276,16 @@ const HOSTILE_CHARACTERS = new RegExp(`[${c(0x00)}-${c(0x09)}${c(0x0b)}-${c(0x1f
 const fields = (out: { hookSpecificOutput: Record<string, string>; systemMessage?: string }) =>
   [out.hookSpecificOutput.permissionDecisionReason, out.hookSpecificOutput.additionalContext, out.systemMessage].filter((f): f is string => f !== undefined);
 
-test("control characters, escape sequences, bidi and zero-width characters never reach the hook's fields", () => {
+test("control characters, escape sequences, bidi and zero-width characters reach the hook's fields only as markers", () => {
   const verdict = `avoid: ${ESC}[31mred${ESC}[0m ${ESC}]52;c;ZWNobyBwd25lZA==${c(0x07)}${ESC}]8;;https://example.invalid${ESC}\\link${ESC}]8;;${ESC}\\ ${c(0x202e)}gnp.exe${c(0x202c)} zero${c(0x200b)}width`;
   const w = world({
     "journal/notes/npm--pdfkit.md": withAlternatives(note({ id: "pkg:npm/pdfkit", verdict, avoidWhen: [`always${c(0x9b)}2J`] }), [`[[pup${c(0x200d)}peteer]]`]),
   });
   for (const options of [{}, { informOnly: true }]) {
     const out = w.run("npm i pdfkit", options);
-    for (const field of fields(out)) {
-      assert.doesNotMatch(field.replace(/\n/g, ""), HOSTILE_CHARACTERS, field);
-      assert.ok(!field.includes("ZWNobyBwd25lZA=="), "the OSC 52 payload goes too");
-    }
-    assert.match(out.hookSpecificOutput.additionalContext, /Its Verdict, quoted: "avoid: red link gnp\.exe zerowidth"\./);
+    for (const field of fields(out)) assert.doesNotMatch(field.replace(/\n/g, ""), HOSTILE_CHARACTERS, field);
+    const shown = "avoid: <U+001B>[31mred<U+001B>[0m <U+001B>]52;c;ZWNobyBwd25lZA==<U+0007><U+001B>]8;;https://example.invalid<U+001B>\\link<U+001B>]8;;<U+001B>\\ <U+202E>gnp.exe<U+202C> zero<U+200B>width";
+    assert.ok(out.hookSpecificOutput.additionalContext.includes(`Its Verdict, quoted: "${shown}".`), out.hookSpecificOutput.additionalContext);
   }
 });
 

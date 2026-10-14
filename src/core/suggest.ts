@@ -67,8 +67,8 @@ export function suggestForAgent(document: SuggestJson): SuggestJson {
 
 export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   // A cloned repository's manifests and README are written by strangers, as notes are (decision
-  // 0032): cleaned before anything uses them, so no escape sequence or its payload becomes a
-  // keyword, and no dependency's name reaches the why line or the JSON as written.
+  // 0032): cleaned before anything uses them, so no dependency's name reaches the why line or the
+  // JSON as written.
   const read = readProject(place.cwd, place.home);
   const project = {
     ...read,
@@ -164,8 +164,9 @@ const COMMON_WORDS = new Set(("about after again before both does each end every
 
 // The keywords of some texts: lowercase words, each once, in order; no stop words, no common words,
 // no numbers. Package names split into their words (@types/node → node).
+// A hidden character's marker (decision 0032, rule 1) is a word break, not a word.
 export function keywordsOf(texts: string[]): string[] {
-  const words = texts.flatMap((text) => text.toLowerCase().split(/[^a-z0-9]+/));
+  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4}>/g, " ").split(/[^a-z0-9]+/));
   return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
 }
 
