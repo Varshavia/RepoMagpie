@@ -13,7 +13,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
   Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups. The topics-as-tags follow-up and the pre-launch hardening (the command name, note text from other people, releases from CI) are merged and released in `0.2.0-beta.3` (2026-10-14), the first version staged from CI; next is the tester round.
   Also now: [agents everywhere](#agents-everywhere-mcp-setup-and-doctor-featmcp-setup) (`feat/mcp-setup`): `repomagpie mcp`, `catalog`, `setup` and `doctor` ([decision 0034](decisions/0034-the-mcp-server.md), [decision 0035](decisions/0035-setup-and-doctor.md)).
-- **Next:** hook adapters for Codex, Gemini CLI and Cursor (researched in [agents](agents.md#hooks-what-an-adapter-could-do)). The v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
+- **Next:** hook adapters for Codex, Gemini CLI and Cursor (researched in [agents](agents.md#hooks-what-an-adapter-could-do)), and research for Antigravity CLI (MCP, skills and hooks), which replaced Gemini CLI for unpaid tiers on 2026-06-18 and which the maintainer uses. The v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
 | Part | Status |
@@ -326,11 +326,11 @@ Follow-up, later (the maintainer, 2026-10-09):
 ### Agents everywhere: MCP, setup and doctor (`feat/mcp-setup`)
 Any coding agent can ask "what do I have for X?" and check a package before installing it, without the user wiring anything by hand. RepoMagpie narrows candidates deterministically and offline and never calls a model; the agent makes the semantic choice. Decisions: [0034](decisions/0034-the-mcp-server.md) (the MCP server), [0035](decisions/0035-setup-and-doctor.md) (`setup` and `doctor`). Agent facts, with sources: [agents](agents.md).
 - [x] Decisions 0034 and 0035; [agents](agents.md): MCP registration, skills folders and hooks for 12 agents, with sources (checked 2026-10-14); the launch path (absolute `node` and entry file, never `PATH` or `npx`).
-- [ ] `repomagpie catalog`: the journal at a glance, one compact row per note, in pages; and the `search` and `suggest` flags MCP needs.
+- [x] `repomagpie catalog`: the journal at a glance, one compact row per note, in pages; and the `search` and `suggest` flags MCP needs (none: `search` has its filters, and MCP's `project` is the working folder of the call, which also moves where `suggest` reads the manifests). (2026-10-14, Windows dev machine: a 1,000-row page of 2,000 notes in 392 ms median, p95 436 ms; search 331 ms in the same run. `--json` is about 330 characters a row on generated notes and 400 on the example vault's: 100 notes about 33,000–40,000 characters, 800 notes about 265,000–320,000.)
 - [ ] `repomagpie mcp`: a stdio server for the 2025-11-25 and 2026-07-28 protocol revisions; `recall`, `search`, `suggest`, `catalog`, and `note` with `--allow-write`; each tool's document equal to the CLI's `--json`.
 - [ ] `repomagpie doctor`: what is wired, read-only, with `--json`.
 - [ ] `repomagpie setup`, part 1: detection, the plan, the prompts, MCP registration for Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code, backups, `--dry-run`, `--remove`.
-- [ ] `repomagpie setup`, part 2: the skill shipped in the package and installed; the Claude Code hook, with the old `magpie` entry migrated. <!-- check:commands allow -->
+- [ ] `repomagpie setup`, part 2: the skill shipped in the package and installed in `~/.agents/skills/` with a link from `~/.claude/skills/`, as `npx skills` lays it out; the Claude Code hook, with the old `magpie` entry migrated. <!-- check:commands allow -->
 - [ ] Retrieval baseline: recall@5 and recall@10 for `search` and `suggest` on about 20 needs over a fixture journal of public GitHub metadata (`npm run eval:retrieval`; not in CI).
 - [ ] Red-team pass for agent config files, MCP arguments and MCP outputs.
 - [ ] The skill, README, SECURITY.md and spec; the release check list.
@@ -355,7 +355,7 @@ Any coding agent can ask "what do I have for X?" and check a package before inst
 - [ ] `repomagpie today`: one optional daily find.
 - Moved: the MCP server is now [agents everywhere](#agents-everywhere-mcp-setup-and-doctor-featmcp-setup), for every agent ([decision 0034](decisions/0034-the-mcp-server.md)).
 - [ ] Recall for installs without package names (`npm install`, `pip install -r requirements.txt`): check the whole manifest. Ignored in v0.1 ([spec](spec.md), section 6).
-- [ ] Hook mode for clients other than Claude Code, as their hooks allow passing context on an allowed command ([ideas](ideas.md#hook-support-in-major-clients)). v0.1 uses skill mode there. Next for Codex, Gemini CLI and Cursor: their hooks, checked on 2026-10-14, are in [agents](agents.md#hooks-what-an-adapter-could-do).
+- [ ] Hook mode for clients other than Claude Code, as their hooks allow passing context on an allowed command ([ideas](ideas.md#hook-support-in-major-clients)). v0.1 uses skill mode there. Next for Codex, Gemini CLI and Cursor: their hooks, checked on 2026-10-14, are in [agents](agents.md#hooks-what-an-adapter-could-do). To research with them: Antigravity CLI.
 - [ ] *Obsidian extra (optional):* ready-made Dataview queries in `examples/vault/`.
 - [ ] The graph as an export: a standalone HTML file, and the graph in nest pages ([decision 0026](decisions/0026-the-app-is-the-workspace.md)).
 

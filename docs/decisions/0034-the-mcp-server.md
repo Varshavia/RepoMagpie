@@ -1,6 +1,6 @@
 # 0034 — The MCP server
 
-**Status:** accepted (2026-10-14). Supersedes the timing and the audience of the MCP server in [0002](0002-cli-first.md) ("added later … for clients without shell access") and [0010](0010-v0-1-scope.md) ("MCP server: later"), and the line in the [spec](../spec.md), section 10, that puts it out of scope. 0002's other decisions stand: the CLI stays the primary interface, and business logic stays in core. Builds on [0023](0023-api-is-the-json-contract.md) (one JSON contract) and [0032](0032-note-text-is-data.md) (note text is data).
+**Status:** accepted (2026-10-14); revised on its branch the same day: a tool's `project` is the folder the call runs in, so no CLI flag is added. Supersedes the timing and the audience of the MCP server in [0002](0002-cli-first.md) ("added later … for clients without shell access") and [0010](0010-v0-1-scope.md) ("MCP server: later"), and the line in the [spec](../spec.md), section 10, that puts it out of scope. 0002's other decisions stand: the CLI stays the primary interface, and business logic stays in core. Builds on [0023](0023-api-is-the-json-contract.md) (one JSON contract) and [0032](0032-note-text-is-data.md) (note text is data).
 
 ## Context
 The maintainer keeps one personal journal of 100 to 800 repositories and tools and uses it from every project. Any coding agent should be able to ask "what do I have for X?" and check a package before it installs it, without the user wiring anything by hand.
@@ -41,7 +41,7 @@ Two facts about the protocol, checked on 2026-10-14:
 
 - `tools/list` returns the tools in this order, always.
 - **`--allow-write`** is off by default. Without it, `note` is not listed at all, so an agent can't call it or see it. With it, `note` follows the rules of `repomagpie note`: the text is the user's words, never the agent's summary, and an existing Verdict is never replaced. `repomagpie setup` asks before it turns `--allow-write` on ([0035](0035-setup-and-doctor.md)).
-- Where MCP needs an input the CLI doesn't have yet (search's tag and kind filters, suggest's `need` with a `project`), the CLI gets the same flag, so the two stay equal.
+- Each tool input has a CLI form, so the two stay equal: `search`'s tag and kind filters are `--tag` and `--kind`; `suggest`'s `need` is its description argument; `catalog`'s are its flags; `project` is the folder the command runs in (below).
 
 ### One answer for every surface
 - Each tool returns **the same document as the CLI's `--json`** for the same input ([0023](0023-api-is-the-json-contract.md)), built in core and passed through the text module ([0032](0032-note-text-is-data.md)): markers for hidden and control characters, the caps and `truncated`, and the source of every note (`journal`).
@@ -64,7 +64,7 @@ Each description stays short: one sentence for what the tool does, one for when 
 - `note` carries `readOnlyHint: false`, `destructiveHint: false` (it adds, never replaces), `idempotentHint: false` and `openWorldHint: false`. It never fetches from GitHub: it records the user's words on a name or PURL, and a URL is refused with a hint to run `repomagpie note <url>` in a terminal.
 
 ### The project folder
-- A tool's `project` argument names the project root, as `--project` does. Without it, the server's working folder is the project, as for every command.
+- A tool's `project` argument is the folder the call runs in, as if the CLI ran there: the project journal is found from it, and `suggest` reads that project's manifests and README. Without it, the server's working folder. `--project` alone wouldn't do: it moves the project journal but not where `suggest` reads the manifests (a v0.3 item in the [roadmap](../roadmap.md)). So the CLI form of a call with `project` is the same command run in that folder, and no new flag is needed.
 - Roots are deprecated, so the server doesn't ask for them. It doesn't use Sampling, Elicitation, Logging, resources or prompts either.
 
 ### Limits
@@ -85,7 +85,7 @@ The `project` folder is then read under the same rules as `--project`: a `.magpi
 - Every agent in [agents](../agents.md) can query the journal through typed tools, with or without the skill, and with or without a shell.
 - The CLI, the API and MCP give one answer: a change to a `--json` shape is a breaking change for all three ([release process](../release.md)).
 - `repomagpie catalog` is a new command, for MCP and for the CLI.
-- `search` and `suggest` may gain flags so that MCP and the CLI stay equal; each is documented in the spec.
+- `search` and `suggest` need no new flag for MCP (checked while building `catalog`).
 - The SDK becomes a bundled dev dependency, in its own chunk. The published package keeps no runtime dependencies.
 - The skill stays: it guides the agent through the same rules, and it is how an agent with a shell but no MCP server finds RepoMagpie. When the MCP tools are available, the skill tells the agent to prefer them.
 - Hook adapters for Codex, Gemini CLI and Cursor are researched in [agents](../agents.md) and built in a later brief. MCP doesn't replace hooks: a hook runs before every install whether or not the agent remembers to; MCP needs the agent to call `recall`.

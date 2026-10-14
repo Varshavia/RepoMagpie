@@ -48,6 +48,8 @@ src/
                graph: the graph's nodes and edges (tags, links, alternatives, similarity, missing notes) (decision 0028)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
+               catalog: one compact row per note, in pages with a cursor, from the search index's stored
+               fields and recall's alternatives (decision 0034)
                install-detect: package installs in a shell command line
                recall: recall's matching rules, the journals it reads, its cache, each match's alternatives
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `repomagpie catalog` lists every note in one compact row: name, kind, tags, a one-line summary (the first "Use when" item, else "What it does"), the Verdict, status, journal and the names of its alternatives. It reads 100 notes at a time; the next page's command is on stderr, and `--json` gives `next_cursor`. `--tag`, `--kind` and `--journal` filter it. Use it to see what you have, or to let your coding agent read your whole journal and pick what fits.
+
 ## [0.2.0-beta.3] - 2026-10-14
 
 The fourth pre-release: the command is `repomagpie`, note text written by other people is handled as data, GitHub topics become tags, and the first version built and staged on npm by GitHub Actions, with provenance.
