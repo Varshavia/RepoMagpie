@@ -5,12 +5,13 @@ import { Fragment } from "react";
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import type { Scope, SearchResult } from "../api.ts";
 import type { SuggestItem } from "../logic/suggest.ts";
+import { visible } from "../logic/text.ts";
 import { AlternativeName, StatusBadge } from "./common.tsx";
 
 const typeOf = (id: string | null) => id?.match(/^pkg:([^/]+)/)?.[1] ?? "";
 
 export function NoteRow({ note, showInbox }: { note: NoteSummary; showInbox: boolean }) {
-  const name = note.name ?? note.file;
+  const name = visible(note.name ?? note.file);
   return (
     <>
       <span className="row-line">
@@ -18,9 +19,9 @@ export function NoteRow({ note, showInbox }: { note: NoteSummary; showInbox: boo
           {name}
         </span>
         {note.read_only ? <StatusBadge status={null} readOnly /> : showInbox && note.status === "inbox" ? <StatusBadge status="inbox" /> : null}
-        <span className="row-meta">{typeOf(note.id)}</span>
+        <span className="row-meta">{visible(typeOf(note.id))}</span>
       </span>
-      <span className="row-verdict">{note.read_only ? "can't be read; open it in an editor" : note.verdict || "no verdict yet"}</span>
+      <span className="row-verdict">{note.read_only ? "can't be read; open it in an editor" : visible(note.verdict) || "no verdict yet"}</span>
     </>
   );
 }
@@ -36,8 +37,8 @@ export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
   return (
     <>
       <span className="row-line">
-        <span className="row-name" title={item.name}>
-          {item.name}
+        <span className="row-name" title={visible(item.name)}>
+          {visible(item.name)}
         </span>
         {item.kind === "avoid" ? <span className="badge avoid">{item.nameOnly ? "In use, avoid (name match)" : "In use, avoid"}</span> : null}
         {item.status === "inbox" ? <StatusBadge status="inbox" /> : null}
@@ -45,8 +46,8 @@ export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
           {item.type} · {item.journal}
         </span>
       </span>
-      <span className="row-verdict">{item.verdict ?? "no verdict yet"}</span>
-      {item.why ? <span className="row-why" title={item.why}>{item.why}</span> : null}
+      <span className="row-verdict">{item.verdict === null ? "no verdict yet" : visible(item.verdict)}</span>
+      {item.why ? <span className="row-why" title={visible(item.why)}>{visible(item.why)}</span> : null}
       {item.instead.length ? (
         <span className="row-why">
           {"Instead: "}
@@ -64,14 +65,14 @@ export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
 }
 
 export function SearchRow({ result }: { result: SearchResult }) {
-  const verdict = result.type === "skill" ? result.verdict : result.verdict ?? "no verdict yet";
+  const verdict = result.verdict !== null ? visible(result.verdict) : result.type === "skill" ? null : "no verdict yet";
   return (
     <>
       <span className="row-line">
-        <span className="row-name" title={result.name}>
-          {result.name}
+        <span className="row-name" title={visible(result.name)}>
+          {visible(result.name)}
         </span>
-        {result.type === "skill" ? <span className="chip meta">{result.skill}</span> : null}
+        {result.type === "skill" ? <span className="chip meta">{visible(result.skill ?? "")}</span> : null}
         {result.status === "inbox" && result.type === "note" ? <StatusBadge status="inbox" /> : null}
         <span className="row-meta">
           {typeOf(result.id)} · {result.journal}

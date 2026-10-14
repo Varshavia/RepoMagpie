@@ -14,7 +14,9 @@ import {
   findManifests,
   findProjectJournal,
   findProjectRoot,
+  flagJournal,
   homeJournal,
+  isLink,
   journalTagList,
   listNotes,
   noteFor,
@@ -25,7 +27,9 @@ import {
 } from "./journals.ts";
 import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
+import { assertWritable, journalPathProblem, linkProblem } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
+import { CAPS, forAgent } from "./text.ts";
 import type { KnownTags } from "./topic-tags.ts";
 import { alternativeLinks, targetResolver } from "./wikilinks.ts";
 import { addAlternatives } from "./write.ts";
@@ -50,13 +54,15 @@ export function locateJournal(scope: Journal["scope"], place: Place): Journal {
   const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
   if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings, error: null };
   const found = findProjectJournal({ cwd: place.cwd, home: place.home, personalJournal: personal.path, flag: place.projectFlag });
-  const path = found ?? join(findProjectRoot(place.cwd, place.home), ".magpie");
+  const path = found ?? (place.projectFlag ? flagJournal(place.cwd, place.projectFlag) : join(findProjectRoot(place.cwd, place.home), ".magpie"));
   const hint = "Run this inside a project, or pass --project <dir>.";
   const error = samePath(path, personal.path) || samePath(dirname(path), personal.path)
     ? `${path} is your personal journal, so it can't be the project journal. ${hint}`
     : samePath(path, homeJournal(place.home))
       ? `${path} is reserved for the default personal journal, so it can't be the project journal. ${hint}`
-      : null;
+      : isLink(path)
+        ? `${linkProblem(path).message}, so it can't be the project journal (decision 0032).`
+        : null;
   return { path, scope, warnings: personal.warnings, error };
 }
 
@@ -105,6 +111,10 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
     ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [] });
 
+  // A link, or a file over the size limit, at the note's place or above it: never read nor written
+  // (decision 0032, rule 5). Listing left it out, so without this it would look like a free name.
+  const blocked = journalPathProblem(journal.path, path);
+  if (blocked) return fail(`Won't write ${path}: ${blocked.message}.`, null);
   const atPath = notes.find((note) => note.path === path);
   if (!entry && (atPath || existsSync(path))) {
     return fail(fileNameClash(item.purl, atPath?.id) ?? `${path} has no readable id, so it was left unchanged.`, path);
@@ -151,6 +161,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   } else if (text !== null) {
     try {
       if (createJournal(journal.path, journal.scope) && journal.scope === "project") notices.push(`Created the project journal: ${journal.path}`);
+      assertWritable(journal.path, path);
       writeFileSync(path, text);
     } catch (error) {
       return fail(`Couldn't write ${path}: ${(error as Error).message}`, null);
@@ -287,7 +298,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: { id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error },
+    document: noteForAgent({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error }),
   });
   if (journal.error) return stop(journal.error, "failed");
   const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
@@ -313,8 +324,13 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     tags_md_added: saved.tagsMdAdded,
   };
   if (saved.error !== null) document.error = saved.error;
-  return { outcome: saved.error === null ? "ok" : "failed", document, journal, saved };
+  return { outcome: saved.error === null ? "ok" : "failed", document: noteForAgent(document), journal, saved };
 }
+
+// The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
+// API alike: names, paths and warnings can carry a note's or GitHub's text. People get `saved`.
+const noteForAgent = (document: NoteJson): NoteJson =>
+  forAgent(document, { id: CAPS.id, path: Infinity, warnings: { each: CAPS.other, count: Infinity }, tags_md_added: { each: CAPS.tag, count: CAPS.tags } });
 
 export interface ImportRequest {
   text: string; // the import file's contents

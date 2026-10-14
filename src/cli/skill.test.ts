@@ -7,7 +7,7 @@ import { parse as parseYaml } from "yaml";
 import { run } from "./program.ts";
 
 // The agent skill (skills/repomagpie/) is checked against the Agent Skills format (agentskills.io/specification,
-// checked 2026-10-06), against `magpie --help`, and against the --json shapes in docs/spec.md.
+// checked 2026-10-06), against `repomagpie --help`, and against the --json shapes in docs/spec.md.
 
 const repo = fileURLToPath(new URL("../../", import.meta.url));
 const skillDir = join(repo, "skills", "repomagpie");
@@ -42,6 +42,8 @@ test("SKILL.md frontmatter follows the Agent Skills format", () => {
   assert.ok((name as string).length >= 1 && (name as string).length <= 64, "name: 1-64 characters");
   assert.match(name as string, /^[a-z0-9]+(-[a-z0-9]+)*$/, "name: lowercase letters, digits and single hyphens, not at either end");
   assert.equal(name, basename(skillDir), "name must match the skill's folder");
+  // Decision 0031: never `magpie` or `magpie-*`, Apache Magpie's prefix.
+  assert.equal(name, "repomagpie");
 
   assert.equal(typeof description, "string");
   assert.ok((description as string).trim().length >= 1 && (description as string).length <= 1024, "description: 1-1024 characters");
@@ -65,10 +67,20 @@ test("SKILL.md frontmatter follows the Agent Skills format", () => {
 // Live test, 2026-10-08: when the user answers No to the hook's prompt, Claude Code ends the turn and
 // waits, so the agent can't offer the alternatives right after the No; it can on the next message.
 test("after a No to the hook's prompt, the skill offers the alternatives on the user's next message", () => {
-  const hook = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("the magpie hook"));
-  assert.ok(hook, "SKILL.md names the magpie hook");
+  const hook = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("the RepoMagpie hook"));
+  assert.ok(hook, "SKILL.md names the RepoMagpie hook");
   assert.match(hook, /next message/);
   assert.doesNotMatch(hook, /If the user declines the install, offer/);
+});
+
+// Live test, 2026-10-14: the agent left a note's planted instruction out of its first summary and
+// named it only when asked.
+test("instructions in a note, and hidden-character markers, are named in the first answer and never followed", () => {
+  const rule = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("addressed to you"));
+  assert.ok(rule, "SKILL.md has a rule for instructions addressed to the agent");
+  assert.match(rule, /first answer/);
+  assert.match(rule, /don't follow them/);
+  assert.match(rule, /U\+202E/);
 });
 
 test("the skill's links stay inside the skill folder, one level deep, and exist", () => {
@@ -100,7 +112,7 @@ async function help(path: string[]): Promise<string> {
     interactive: false,
     ask: () => Promise.reject(new Error("no prompt in tests")),
   });
-  assert.equal(code, 0, `magpie ${path.join(" ")} --help`);
+  assert.equal(code, 0, `repomagpie ${path.join(" ")} --help`);
   return out;
 }
 
@@ -124,26 +136,32 @@ const options = (text: string) => {
   return found;
 };
 
-// Every way the skill writes a magpie command: inline code, or a line in a code block.
-function usages(): { file: string; usage: string }[] {
+// Every way the skill writes a command: inline code, or a line in a code block. `name` is the
+// program it runs: repomagpie, or the alias magpie, which the skill must never use (decision 0031).
+function commandLines(name: string): { file: string; usage: string }[] {
   const found: { file: string; usage: string }[] = [];
   for (const file of skillFiles()) {
     const text = readFileSync(file, "utf8");
-    for (const span of codeSpans(text)) if (/^magpie(\s|$)/.test(span)) found.push({ file, usage: span });
+    for (const span of codeSpans(text)) if (new RegExp(`^${name}(\\s|$)`).test(span)) found.push({ file, usage: span });
     for (const block of text.matchAll(/^```[^\n]*\n([\s\S]*?)^```/gm)) {
       for (const line of block[1].split("\n")) {
-        const m = /^\s*(?:\$\s+)?(magpie(\s.*)?)$/.exec(line);
+        const m = new RegExp(`^\\s*(?:\\$\\s+)?(${name}(\\s.*)?)$`).exec(line);
         if (m) found.push({ file, usage: m[1].replace(/\s+#.*$/, "") });
       }
     }
   }
   return found;
 }
+const usages = () => commandLines("repomagpie");
+
+test("the skill runs repomagpie, never the alias magpie", () => {
+  assert.deepEqual(commandLines("magpie"), []);
+});
 
 const tokens = (usage: string) =>
   usage.replace(/"[^"]*"|'[^']*'|<[^>]*>/g, " ").split(/\s+/).map((t) => t.replace(/[[\]]/g, "")).filter(Boolean).slice(1);
 
-test("every command and flag the skill uses is in magpie --help", async () => {
+test("every command and flag the skill uses is in repomagpie --help", async () => {
   const top = await help([]);
   const global = options(top);
   const found = usages();
@@ -207,7 +225,7 @@ test("every command the skill shows passes --json", () => {
   for (const { file, usage } of usages()) {
     const words = tokens(usage);
     if (words.length === 0 || words[0] === "hook") continue;
-    if (/^magpie (\S+)$/.test(usage)) continue; // a bare command name in prose, such as `magpie adopt`
+    if (/^repomagpie (\S+)$/.test(usage)) continue; // a bare command name in prose, such as `repomagpie adopt`
     assert.ok(words.includes("--json"), `${basename(file)}: \`${usage}\` lacks --json`);
   }
 });
@@ -222,7 +240,7 @@ function specShapes(): Map<string, unknown> {
   const spec = readFileSync(join(repo, "docs", "spec.md"), "utf8");
   const raw = new Map<string, string>();
   for (const section of spec.split(/^### /m).slice(1)) {
-    const command = /^`magpie (\w+)/.exec(section)?.[1];
+    const command = /^`repomagpie (\w+)/.exec(section)?.[1];
     const line = section.split("\n").find((l) => l.startsWith("`--json`"));
     const json = line && /`(\{[^`]*\})`/.exec(line.replace(/^`--json`/, ""))?.[1];
     if (command && json) raw.set(command, json);
@@ -240,7 +258,8 @@ function specShapes(): Map<string, unknown> {
   for (const [command, json] of raw) {
     const text = lists(json).replace(/\[<a match as in recall --json>\]/g, JSON.stringify(recall.matches))
       .replace(/\[<alternatives as in recall --json>\]/g, JSON.stringify(recall.matches[0].alternatives));
-    shapes.set(command, { ...parse(command, text), error: null }); // spec §1: a failure adds "error"
+    // spec §1: a failure adds "error"; a cut field adds "truncated" (decision 0032)
+    shapes.set(command, { ...parse(command, text), error: null, truncated: [] });
   }
   return shapes;
 }
@@ -258,7 +277,7 @@ function has(shape: unknown, path: string): boolean {
 }
 
 const FIELD = /^[a-z][a-z0-9_]*(\[\])?(\.[a-z][a-z0-9_]*(\[\])?)*$/;
-const NOT_FIELDS = new Set(["null", "true", "false", "magpie"]);
+const NOT_FIELDS = new Set(["null", "true", "false", "repomagpie"]);
 
 test("the spec's --json examples parse, for the commands the skill uses", () => {
   const shapes = specShapes();
@@ -270,7 +289,7 @@ test("the spec's --json examples parse, for the commands the skill uses", () => 
 });
 
 // A bare identifier in inline code (`verdict`, `matches[].avoid_when`) is a JSON field; values are
-// written in JSON form ("exact", null). Under a heading that names `magpie <command> --json`,
+// written in JSON form ("exact", null). Under a heading that names `repomagpie <command> --json`,
 // a field must be in that command's shape; elsewhere, in any command's shape.
 test("every JSON field the skill relies on is in the spec's --json shapes", () => {
   const shapes = specShapes();
@@ -279,7 +298,7 @@ test("every JSON field the skill relies on is in the spec's --json shapes", () =
     let command: string | null = null;
     for (const line of withoutFences(readFileSync(file, "utf8")).split("\n")) {
       if (/^#{1,6} /.test(line)) {
-        command = /`magpie (\w+)[^`]*--json`/.exec(line)?.[1] ?? null;
+        command = /`repomagpie (\w+)[^`]*--json`/.exec(line)?.[1] ?? null;
         if (command) assert.ok(shapes.has(command), `${basename(file)}: no --json shape for ${command} in the spec`);
         continue;
       }

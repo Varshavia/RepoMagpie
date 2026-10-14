@@ -33,7 +33,7 @@ The product's category moved:
 | 4 | Context-aware suggest | **Core** | v0.1 | Shows what you already have when a project starts |
 | 11 | Adopt | **Core** | v0.1 | Moves a note from your personal journal into a project |
 | 10 | Graph views | **In the app** | v0.2 (part 2) | The first user asks for it to work in ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
-| 5 | Gap detection | `magpie init`; `magpie gaps` | `init`: v0.1 if time allows, else v0.3; `gaps`: v0.3 | Fills an empty journal from real manifests |
+| 5 | Gap detection | `repomagpie init`; `repomagpie gaps` | `init`: v0.1 if time allows, else v0.3; `gaps`: v0.3 | Fills an empty journal from real manifests |
 | 2 | Vet and drift | **Reduced** | v0.3 | Record your review; integrate existing scanners and lockfiles; no own scanner |
 | 3 | Nests and follow | Planned | v0.4 | Needs users first |
 | 7 | `/uses` page generator | Planned | v0.4 | Marketing feature |
@@ -51,8 +51,8 @@ The product's category moved:
 
   Recall has two modes:
   - **Hook mode:** in clients that support hooks, a hook runs recall before every matching shell command. It runs whether or not the agent remembers to.
-  - **Skill mode:** RepoMagpie's `SKILL.md` tells the agent to run `magpie recall <package>` before installing. Best effort: it depends on the agent following the instruction, but works in any client that supports skills.
-- **Surfaces:** agent hook (hook mode), `SKILL.md` (skill mode), and `magpie recall <package>` on the CLI.
+  - **Skill mode:** RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Best effort: it depends on the agent following the instruction, but works in any client that supports skills.
+- **Surfaces:** agent hook (hook mode), `SKILL.md` (skill mode), and `repomagpie recall <package>` on the CLI.
 - **Schema impact:** a tool-owned `packages` field, a list of Package URLs (for example `["pkg:npm/%40playwright/cli", "pkg:pypi/playwright"]`, [decision 0017](decisions/0017-package-identity-purl.md)), detected from manifests such as `package.json`, `pyproject.toml` and `Cargo.toml`, so a package name maps to a note. How notes are identified is designed in the step 2 spec ([decision 0010](decisions/0010-v0-1-scope.md)).
 - **Target release:** v0.1, with hook mode for Claude Code at launch and skill mode elsewhere. This is the headline demo.
 - **Open questions:**
@@ -79,8 +79,8 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Problem:** Skills run with the user's shell permissions, and authors can change them after the user has reviewed them.
 - **Behaviour** (reduced, [decision 0011](decisions/0011-vet-and-drift-reduced.md)): RepoMagpie builds no scanner.
   - **Vet:** the user records their own review and the commit they reviewed in the note, and can link the output of existing scanners ([competitors](competitors.md), C).
-  - **Drift:** `magpie drift` lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
-- **Surfaces:** CLI (`magpie drift`, and a way to record a review).
+  - **Drift:** `repomagpie drift` lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
+- **Surfaces:** CLI (`repomagpie drift`, and a way to record a review).
 - **Schema impact:** a tool-owned `reviewed_commit` field (commit SHA). It joins the schema only when v0.3 work starts.
 - **Target release:** v0.3.
 - **Open questions:**
@@ -91,9 +91,9 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 - **Problem:** Stars show popularity, not *why* something is useful.
 - **Behaviour:**
-  - `magpie publish` builds a static "nest" site from notes marked public: a searchable list, the graph (idea 10) and a `/uses` view (idea 7). It can be hosted on GitHub Pages.
-  - `magpie follow <nest-url>` imports another user's public verdicts and "Use when" lines into your search results. They are clearly attributed and never mixed into your own notes.
-- **Surfaces:** CLI (`magpie publish`, `magpie follow`); the nest site; search results.
+  - `repomagpie publish` builds a static "nest" site from notes marked public: a searchable list, the graph (idea 10) and a `/uses` view (idea 7). It can be hosted on GitHub Pages.
+  - `repomagpie follow <nest-url>` imports another user's public verdicts and "Use when" lines into your search results. They are clearly attributed and never mixed into your own notes.
+- **Surfaces:** CLI (`repomagpie publish`, `repomagpie follow`); the nest site; search results.
 - **Schema impact:** a human-owned `public` field, `true` or `false`, default `false`. Private by default.
 - **Target release:** v0.4.
 - **Open questions:**
@@ -104,11 +104,11 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 4. Context-aware suggest
 
 - **Problem:** Starting or working on a project, you don't know which of your notes apply to it.
-- **Behaviour:** `magpie suggest` shows what you already have that fits the project.
+- **Behaviour:** `repomagpie suggest` shows what you already have that fits the project.
   - **Input:** the project's manifests and README, or a free-text description ("a TypeScript CLI with tests").
   - **Output:** matching notes from both journals, verdict first.
   - **In v0.1, no embeddings:** magpie narrows the candidates by keyword and tags, and the coding agent makes the semantic choice, guided by `SKILL.md`.
-- **Surfaces:** CLI (`magpie suggest`); `SKILL.md`; the local app ("Suggest for this project").
+- **Surfaces:** CLI (`repomagpie suggest`); `SKILL.md`; the local app ("Suggest for this project").
 - **Schema impact:** none planned.
 - **Target release:** v0.1.
 - **Open questions:**
@@ -119,9 +119,9 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 - **Problem:** A new journal is empty, and you can't see which tools you rely on but never wrote down.
 - **Behaviour:**
-  - `magpie init` reads a project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and creates draft notes for the dependencies already in use, so the journal starts from real decisions instead of stars.
-  - `magpie gaps` reports dependencies used in a project but missing from the journals, and tags or kinds with no reviewed notes.
-- **Surfaces:** CLI (`magpie init`, `magpie gaps`).
+  - `repomagpie init` reads a project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and creates draft notes for the dependencies already in use, so the journal starts from real decisions instead of stars.
+  - `repomagpie gaps` reports dependencies used in a project but missing from the journals, and tags or kinds with no reviewed notes.
+- **Surfaces:** CLI (`repomagpie init`, `repomagpie gaps`).
 - **Schema impact:** none planned; it reads the `packages` field (idea 1).
 - **Target release:** `init` in v0.1 if time allows, otherwise v0.3; `gaps` in v0.3.
 - **Open questions:**
@@ -163,8 +163,8 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 9. Daily find
 
 - **Problem:** Finding one repository worth exploring each day takes effort, so the habit breaks.
-- **Behaviour:** `magpie today` suggests one trending repository that matches the user's tags, and tracks an exploration streak. It stays optional and quiet: no nagging, no notifications by default.
-- **Surfaces:** CLI (`magpie today`).
+- **Behaviour:** `repomagpie today` suggests one trending repository that matches the user's tags, and tracks an exploration streak. It stays optional and quiet: no nagging, no notifications by default.
+- **Surfaces:** CLI (`repomagpie today`).
 - **Schema impact:** none planned.
 - **Target release:** later (not scheduled).
 - **Open questions:**
@@ -175,10 +175,10 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 - **Problem:** With hundreds of notes, you can't see what you have, how it groups, and what connects to what. You also can't see the state of your journal at a glance (inbox, drift, gaps).
 - **Behaviour:** A graph page in the local app ([decision 0026](decisions/0026-the-app-is-the-workspace.md)): every note is a node, tags are hub nodes, and `[[links]]` and `alternatives` are edges. Similarity computed from topics and language is an optional edge source, off by default, with at most 3 neighbours per note. Full specification: [product](product.md#graph-specification).
-- **Surfaces:** the local app (`magpie ui`). Later, as exports: a standalone HTML file and the graph in nest pages (idea 3).
+- **Surfaces:** the local app (`repomagpie ui`). Later, as exports: a standalone HTML file and the graph in nest pages (idea 3).
 - **Schema impact:** the human-owned `alternatives` field: a list of wikilinks, for example `alternatives: ["[[microsoft--playwright-mcp]]"]` ([decision 0027](decisions/0027-alternatives-active.md)). `works_with` stays proposed ([decision 0007](decisions/0007-typed-relations-in-frontmatter.md)).
 - **Target release:** v0.2. Part 1 (linked notes) stores the links and `alternatives` the graph draws; part 2 builds the graph page.
-- **History:** until 2026-10-07 the status was "marketing only, not scheduled": graph views would be built only as a shareable visual, if at all, in three levels (an Obsidian preset, a `magpie graph` HTML file, nest pages). That rested on secondhand desk research ([validation](validation.md), Q7). The first user then asked for the graph as a working view, and [decision 0026](decisions/0026-the-app-is-the-workspace.md) moved it into the app.
+- **History:** until 2026-10-07 the status was "marketing only, not scheduled": graph views would be built only as a shareable visual, if at all, in three levels (an Obsidian preset, a `repomagpie graph` HTML file, nest pages). That rested on secondhand desk research ([validation](validation.md), Q7). The first user then asked for the graph as a working view, and [decision 0026](decisions/0026-the-app-is-the-workspace.md) moved it into the app.
 - **Answered** ([decision 0028](decisions/0028-the-graph-page.md)):
   - Node size encodes the number of connections, on a log scale, not rating.
   - The graph page renders with sigma 3 and graphology.
@@ -186,8 +186,8 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 11. Adopt
 
 - **Problem:** What you learned in your personal journal doesn't reach the project, or your team, unless you copy it by hand.
-- **Behaviour:** `magpie adopt <name>` copies a note from the personal journal into the project's `.magpie/` and prints the install command. It never installs anything itself.
-- **Surfaces:** CLI (`magpie adopt`); the agent can run it through `SKILL.md`.
+- **Behaviour:** `repomagpie adopt <name>` copies a note from the personal journal into the project's `.magpie/` and prints the install command. It never installs anything itself.
+- **Surfaces:** CLI (`repomagpie adopt`); the agent can run it through `SKILL.md`.
 - **Schema impact:** none; both journals use the same format ([decision 0013](decisions/0013-two-journal-scopes.md)).
 - **Target release:** v0.1.
 - **Answered** ([spec](spec.md), section 2):

@@ -35,17 +35,20 @@ export interface Io {
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
 }
 
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "recall", "suggest", "adopt"]);
+
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
   { usage: "init", summary: "draft notes from this project's manifests" },
 ];
 
-// Runs magpie with the given arguments and returns the exit code (spec section 1).
+// Runs repomagpie with the given arguments and returns the exit code (spec section 1).
 export async function run(argv: string[], io: Io): Promise<number> {
   let code = 0;
-  const program = new Command("magpie")
+  const program = new Command("repomagpie")
     .description("Remembers what you and your team learned about every dependency.")
     .version(packageVersion())
+    .addHelpText("after", "\nmagpie works as a short alias when no other magpie command is on your PATH.")
     .option("--json", "print one JSON document on stdout")
     .option("--home <dir>", "the personal journal")
     .option("--project <dir>", "the project root (like git -C), or its .magpie folder")
@@ -148,13 +151,16 @@ export async function run(argv: string[], io: Io): Promise<number> {
   for (const { usage, summary } of NOT_YET) {
     const name = usage.split(" ")[0];
     program.command(usage).description(`[not implemented yet] ${summary}`).action(() => {
-      io.err(`magpie ${name}: not implemented yet\n`);
+      io.err(`repomagpie ${name}: not implemented yet\n`);
       code = 1;
     });
   }
 
   try {
     await program.parseAsync(argv, { from: "user" });
+    // What a journal command skipped (decision 0032). The hook logs it instead; quick commands such
+    // as --version load nothing for it.
+    if (JOURNAL_COMMANDS.has(argv[0])) (await import("./context.ts")).reportSkipped(io);
   } catch (error) {
     if (!(error instanceof CommanderError)) throw error;
     if (error.code === "commander.version" || error.code === "commander.helpDisplayed") return 0;

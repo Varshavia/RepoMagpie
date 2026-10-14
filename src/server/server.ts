@@ -20,6 +20,7 @@ export interface ServerOptions {
   log: (line: string) => void; // details of unexpected errors, for the terminal
   assets?: string; // the app's folder; default dist/ui/ (npm run build)
   live?: LiveOptions & { keepAliveMs?: number };
+  requestTimeoutMs?: number; // a request whose body never ends is cut off after this; default 30 s
 }
 
 export interface UiServer {
@@ -35,7 +36,7 @@ const MAX_BODY = 1024 * 1024;
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // dist/ui/ from both src/server/ (run from source) and dist/cli/ (the bundle, the package).
 const DEFAULT_ASSETS = fileURLToPath(new URL("../../dist/ui/", import.meta.url));
-const NOT_BUILT = "The app isn't built. Run npm run build, then start magpie ui again.";
+const NOT_BUILT = "The app isn't built. Run npm run build, then start repomagpie ui again.";
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -45,7 +46,7 @@ const TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
 };
 const TOKEN_META = '<meta name="magpie-token" content="">';
-const BUG = "Something went wrong in magpie. The terminal running magpie ui shows the details.";
+const BUG = "Something went wrong in RepoMagpie. The terminal running repomagpie ui shows the details.";
 
 export async function startServer(options: ServerOptions): Promise<UiServer> {
   const token = randomBytes(32).toString("hex");
@@ -78,12 +79,12 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     }
     // The token in the opening URL is exchanged once for the cookie, and leaves the address bar.
     if (path === "/" && method === "GET" && query.has("token")) {
-      if (!isToken(query.get("token") ?? undefined)) return json(res, 401, { error: "Wrong session token. Open the URL magpie ui printed." });
+      if (!isToken(query.get("token") ?? undefined)) return json(res, 401, { error: "Wrong session token. Open the URL repomagpie ui printed." });
       res.writeHead(303, { Location: "/", "Set-Cookie": `${cookieName()}=${token}; HttpOnly; SameSite=Strict; Path=/` });
       res.end();
       return;
     }
-    if (!hasSession(req)) return json(res, 401, { error: "No session. Open the URL magpie ui printed; it holds the session token." });
+    if (!hasSession(req)) return json(res, 401, { error: "No session. Open the URL repomagpie ui printed; it holds the session token." });
 
     if (path === "/" || path.startsWith("/assets/")) {
       const file = path === "/" ? assets.get("index.html") : assets.get(path.slice("/assets/".length));
@@ -118,6 +119,13 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
         return json(res, 415, { error: "Writes accept Content-Type: application/json only." });
       }
+      // A body announced as far too big is refused before it is read, then cut off (red-team R7). One
+      // a little too big is read to its end first (readBody keeps none of it past 1 MB): answering
+      // while a client still sends makes some systems (macOS) reset the connection, and lose the 413.
+      if (Number(req.headers["content-length"]) > MAX_BODY + DRAIN) {
+        res.on("finish", () => req.destroy());
+        return json(res, 413, { error: "The request body is over 1 MB." });
+      }
       const bytes = await readBody(req);
       if (!bytes) return json(res, 413, { error: "The request body is over 1 MB." });
       let parsed: unknown;
@@ -133,9 +141,12 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     json(res, reply.status, reply.document);
   }
 
-  const server = createServer((req, res) => {
+  // A body that never ends is cut off after 30 s, not Node's 5 minutes; Node checks every second
+  // (red-team R7).
+  const requestTimeout = options.requestTimeoutMs ?? 30_000;
+  const server = createServer({ requestTimeout, connectionsCheckingInterval: Math.min(1000, requestTimeout) }, (req, res) => {
     handle(req, res).catch((error: Error) => {
-      options.log(`magpie ui: ${req.method} ${(req.url ?? "").split("?")[0]} failed: ${error.stack ?? error.message}`);
+      options.log(`repomagpie ui: ${req.method} ${(req.url ?? "").split("?")[0]} failed: ${error.stack ?? error.message}`);
       if (!res.headersSent) json(res, 500, { error: BUG });
       else res.end();
     });
@@ -196,8 +207,11 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return Array.isArray(value) ? undefined : value;
 }
 
-// The whole body, or null when it is over 1 MB. An oversized body is still read to its end (and
-// dropped), so the client gets the 413 instead of a reset connection.
+// The whole body, or null when it is over 1 MB, with or without Content-Length (red-team R7). Past
+// 1 MB nothing more is kept. A body a little too big (up to DRAIN more) is read to its end and
+// dropped, so its client gets the 413 instead of a reset connection; past that the connection is
+// cut off at once, so a sender that goes on can't hold it until the request timeout.
+const DRAIN = 1024 * 1024;
 function readBody(req: IncomingMessage): Promise<Buffer | null> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -205,6 +219,11 @@ function readBody(req: IncomingMessage): Promise<Buffer | null> {
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size <= MAX_BODY) chunks.push(chunk);
+      else chunks.length = 0;
+      if (size > MAX_BODY + DRAIN) {
+        resolve(null);
+        req.destroy();
+      }
     });
     req.on("end", () => resolve(size > MAX_BODY ? null : Buffer.concat(chunks)));
     req.on("error", reject);

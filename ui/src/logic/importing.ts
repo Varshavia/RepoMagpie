@@ -8,7 +8,7 @@ type Result = "created" | "updated" | "unchanged" | "failed";
 // importing.test.ts keeps the two equal. An item starts with "- ", "* ", "+ " or "\- " at the left
 // margin; a non-breaking space counts as the space; a UTF-8 BOM is ignored.
 const ITEM_MARKER = /^(?:\\?-|\*|\+)[  ]/;
-const lines = (text: string) => text.replace(/^﻿/, "").split(/\r?\n/);
+const lines = (text: string) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).split(/\r?\n/); // without a byte-order mark
 
 export function countItems(text: string): number {
   return lines(text).filter((line) => ITEM_MARKER.test(line)).length;
@@ -41,6 +41,6 @@ export function resultWord(result: Result, dryRun: boolean): string {
 export function summary(items: { result: Result }[], dryRun: boolean): string {
   const n = (r: Result) => items.filter((i) => i.result === r).length;
   return dryRun
-    ? `magpie wrote nothing yet: ${n("created")} to create, ${n("updated")} to update, ${n("unchanged")} unchanged, ${n("failed")} failing.`
+    ? `RepoMagpie wrote nothing yet: ${n("created")} to create, ${n("updated")} to update, ${n("unchanged")} unchanged, ${n("failed")} failing.`
     : `${n("created")} created, ${n("updated")} updated, ${n("unchanged")} unchanged, ${n("failed")} failed.`;
 }

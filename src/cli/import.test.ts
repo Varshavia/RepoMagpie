@@ -212,7 +212,7 @@ test("a file that can't be read: exit 1; --json gives empty items, zero counts a
   assert.deepEqual({ ...json, error: typeof json.error }, { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], error: "string" });
   assert.match(json.error, /missing\.md/);
   const human = await magpie(box, ["import", "missing.md"]);
-  assert.match(human.err, /^magpie import: Can't read /m);
+  assert.match(human.err, /^repomagpie import: Can't read /m);
 });
 
 test("the personal-journal guard applies to import --to project", async () => {

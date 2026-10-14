@@ -1,6 +1,7 @@
 // magpie search <query> (spec §2, §5, §8): the human output of core's runSearch.
 import { exitCode } from "../core/outcome.ts";
-import { runSearch, type JournalSource, type SearchResult } from "../core/search.ts";
+import { runSearch, searchForAgent, type JournalSource, type SearchResult } from "../core/search.ts";
+import { clean } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 import { INBOX, purlType, renderRows } from "./results.ts";
@@ -15,15 +16,15 @@ export interface SearchOptions extends GlobalOptions {
 export async function searchCommand(query: string, options: SearchOptions, io: Io): Promise<number> {
   const run = runSearch({ query, tags: options.tag, kind: options.kind, journal: options.journal, limit: options.limit }, contextOf(io, options));
   if (options.json) {
-    io.out(`${JSON.stringify(run.document)}\n`);
+    io.out(`${JSON.stringify(searchForAgent(run.document))}\n`);
     return exitCode(run.outcome);
   }
   if (run.document.error) {
-    io.err(`magpie search: ${run.document.error}\n`);
+    io.err(`repomagpie search: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
   const { results } = run.document;
-  for (const warning of run.warnings) io.err(`warning: ${warning}\n`);
+  for (const warning of run.warnings) io.err(`warning: ${clean(warning)}\n`);
   if (!results.length) {
     io.err(`No matches for "${query}".\n`);
     return 0;

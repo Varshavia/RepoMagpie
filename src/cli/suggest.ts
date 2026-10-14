@@ -1,7 +1,8 @@
 // magpie suggest ["description"] (spec §2, §5, §8): the human output of core's runSuggest.
 import { exitCode } from "../core/outcome.ts";
 import type { JournalSource } from "../core/search.ts";
-import { runSuggest, type Candidate, type SuggestJson } from "../core/suggest.ts";
+import { runSuggest, suggestForAgent, type Candidate, type SuggestJson } from "../core/suggest.ts";
+import { clean } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 import { INBOX, purlType, renderRows } from "./results.ts";
@@ -35,12 +36,12 @@ function insteadLine(m: SuggestJson["in_use_avoid"][number]): string[] {
 export async function suggestCommand(description: string | undefined, options: SuggestOptions, io: Io): Promise<number> {
   const run = runSuggest({ description, limit: options.limit, journal: options.journal }, contextOf(io, options));
   if (options.json) {
-    io.out(`${JSON.stringify(run.document)}\n`);
+    io.out(`${JSON.stringify(suggestForAgent(run.document))}\n`);
     return exitCode(run.outcome);
   }
-  for (const warning of run.warnings) io.err(`warning: ${warning}\n`);
+  for (const warning of run.warnings) io.err(`warning: ${clean(warning)}\n`);
   if (run.document.error) {
-    io.err(`magpie suggest: ${run.document.error}\n`);
+    io.err(`repomagpie suggest: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
 

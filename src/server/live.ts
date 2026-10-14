@@ -5,6 +5,7 @@
 // watchers that never fire. If fs.watch throws or fails, the periodic check works alone.
 import { watch as fsWatch } from "node:fs";
 import { join } from "node:path";
+import { isLink } from "../core/journals.ts";
 import { noteSignature, type Signature } from "../core/note-cache.ts";
 
 export interface LiveOptions {
@@ -34,6 +35,8 @@ export function watchJournals(journals: Watched[], onChange: (scope: Watched["sc
 
     let watcher: ReturnType<typeof fsWatch> | null = null;
     try {
+      // A notes/ that is a link is never followed (decision 0032): no watcher; the listing skips it.
+      if (isLink(join(journal.path, "notes"))) throw new Error("notes/ is a link");
       // notes/ is flat, so no recursive watch is needed.
       watcher = (options.watch ?? fsWatch)(join(journal.path, "notes"), () => {
         clearTimeout(timer);

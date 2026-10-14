@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
@@ -19,7 +19,7 @@ const PDFKIT = "---\nid: pkg:npm/pdfkit\nname: pdfkit\nexplored: 2026-10-03\nkin
 // A note "Add GitHub topics as tags" would change (decision 0030).
 const WIDGET = "---\nid: pkg:github/acme/widget\nname: acme/widget\ntopics: [charts, cli]\nkind: other\ntags: []\ntried: false\nstatus: inbox\n---\n\n## Verdict\n";
 
-async function start(t: TestContext, env: Record<string, string> = {}) {
+async function start(t: TestContext, env: Record<string, string> = {}, today = () => "2026-10-04") {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--broken.md": "---\nid: [broken\n---\n",
@@ -31,7 +31,7 @@ async function start(t: TestContext, env: Record<string, string> = {}) {
   const opened: string[] = [];
   const logged: string[] = [];
   const server = await startServer({
-    context: { home: box.home, env: { MAGPIE_HOME: box.journal, ...env }, cwd: box.project, fetch: fakeFetch(recorded("microsoft--playwright-cli")), today: () => "2026-10-04" },
+    context: { home: box.home, env: { MAGPIE_HOME: box.journal, ...env }, cwd: box.project, fetch: fakeFetch(recorded("microsoft--playwright-cli")), today },
     open: async (target) => { opened.push(target); },
     log: (line) => { logged.push(line); },
     assets: APP,
@@ -297,7 +297,8 @@ test("GITHUB_TOKEN never reaches the browser: no response contains its value", a
 });
 
 test("an unknown path gets 404, a wrong method 405, and a bug 500 without internals", async (t) => {
-  const { http, box, logged } = await start(t);
+  // A bug: a part of the server's context that throws, with internals in its message.
+  const { http, logged } = await start(t, {}, () => { throw new Error("EISDIR: illegal operation on a directory, read folder.md"); });
   assert.equal((await http.get("/api/nothing")).status, 404);
   const wrong = await http.write("DELETE", "/api/note", {});
   assert.equal(wrong.status, 405);
@@ -309,10 +310,9 @@ test("an unknown path gets 404, a wrong method 405, and a bug 500 without intern
   const graphWrite = await http.write("POST", "/api/graph", { journal: "personal" });
   assert.equal(graphWrite.status, 405);
   assert.equal(graphWrite.headers.allow, "GET");
-  mkdirSync(join(box.journal, "notes", "folder.md")); // a folder where a note should be: reading it throws
-  const bug = await http.get("/api/notes?journal=personal");
+  const bug = await http.write("POST", "/api/note", { target: "pkg:npm/chalk", text: "colours" });
   assert.equal(bug.status, 500);
-  assert.deepEqual(JSON.parse(bug.body), { error: "Something went wrong in magpie. The terminal running magpie ui shows the details." });
+  assert.deepEqual(JSON.parse(bug.body), { error: "Something went wrong in RepoMagpie. The terminal running repomagpie ui shows the details." });
   assert.doesNotMatch(bug.body, /EISDIR|folder\.md|at /);
   assert.match(logged.join("\n"), /EISDIR/);
 });

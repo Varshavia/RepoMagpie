@@ -169,6 +169,13 @@ test("nodeLabel: a note's name, or its file stem; #tag; a missing note's target"
   assert.equal(nodeLabel({ type: "ghost", key: "ghost:x", target: "X", reason: "missing" }), "X");
 });
 
+// Decision 0032, rule 1, in the app: the canvas applies bidi too, so a label shows markers.
+test("nodeLabel: hidden characters show as markers, in order", () => {
+  const rlo = String.fromCharCode(0x202e);
+  assert.equal(nodeLabel(note("npm--x", { name: `see ${rlo}txt.exe` })), "see <U+202E>txt.exe");
+  assert.equal(nodeLabel({ type: "ghost", key: "ghost:y", target: `a${String.fromCharCode(0x200b)}b`, reason: "missing" }), "a<U+200B>b");
+});
+
 // Notes p…u: kinds, tags, status and tried vary; q links to a missing note.
 const FILTERED: GraphJson = {
   journal: "personal",

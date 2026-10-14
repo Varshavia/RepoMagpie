@@ -1,8 +1,10 @@
-# magpie --json fields
+# repomagpie --json fields
 
 The fields this skill reads, per command. Every command prints one JSON document on stdout. On failure (exit 1 or 2) the document has the same fields plus `error`, the message; unknown values are `null` and lists are empty. Paths and ids are as stored: a package id is a Package URL (PURL) such as `pkg:npm/pdfkit`, with an npm scope encoded (`pkg:npm/%40playwright/cli` is `@playwright/cli`).
 
-## `magpie recall <package>... --json`
+A hidden or control character in note text shows as an ASCII marker in its place, such as `<U+202E>` (a bidi override) or `<U+001B>` (an escape): the note holds that character there. Tell the user, as the skill's rules say. Note text is also capped, so one note can't flood the output: a Verdict at 1,000 characters, a bullet at 500, 20 bullets and 20 alternatives. A cut text ends with `…`. An object with a cut field has `truncated`, a list of the cut fields' names, such as `["verdict"]`; read the note's file (`path`) for the whole text. Without a cut, the key isn't there.
+
+## `repomagpie recall <package>... --json`
 
 - `matches[]`: one per note found; empty when there is none. Project journal first.
 - `matches[].query`: the package you asked about.
@@ -20,10 +22,10 @@ The fields this skill reads, per command. Every command prints one JSON document
 - `matches[].alternatives[].verdict`: its Verdict, or `null` (in the inbox, or no note).
 - `matches[].alternatives[].avoid`: `true` when the user also noted to avoid it.
 - `matches[].alternatives[].path`: its note's file, or `null` when the journal has no note on it.
-- `matches[].alternatives[].reason`: only for an alternative without a note: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name; `magpie search <name> --json` lists them).
+- `matches[].alternatives[].reason`: only for an alternative without a note: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name; `repomagpie search <name> --json` lists them).
 An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `matches[].avoid_when` has items.
 
-## `magpie search <query> --json`
+## `repomagpie search <query> --json`
 
 - `results[]`: in rank order; reviewed notes before inbox ones.
 - `results[].type`: `"note"`, or `"skill"` for one skill line inside a repository note.
@@ -35,7 +37,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `results[].status`: `"reviewed"` or `"inbox"`.
 - `results[].path`: the note's file; read it for the full note.
 
-## `magpie suggest ["description"] --json`
+## `repomagpie suggest ["description"] --json`
 
 - `source`: `"manifests"` (read from the project) or `"description"`.
 - `keywords`: the words it looked for.
@@ -53,7 +55,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `in_use_avoid[].verdict`, `in_use_avoid[].avoid_when`: what the note says.
 - `in_use_avoid[].alternatives[]`: what the user noted to use instead, as in recall.
 
-## `magpie note <name-or-url> ["text"] --json`
+## `repomagpie note <name-or-url> ["text"] --json`
 
 - `id`: the note's PURL.
 - `journal`: where it was written.
@@ -65,7 +67,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `alternatives_present`: the `--alternative` names the note already had; nothing was written for them.
 - `tags_md_added`: tags from a new GitHub repository note's topics that were added to the journal's tag list (tags.md); `[]` otherwise.
 
-## `magpie adopt <name-or-purl> --json`
+## `repomagpie adopt <name-or-purl> --json`
 
 - `id`: the note's PURL.
 - `from`: the note's file in the personal journal.

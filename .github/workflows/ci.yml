@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24, 26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,6 +63,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:links
+      - name: No doc tells someone to run the magpie alias (decision 0031)
+        run: npm run check:commands
+      - name: No file holds a bidi control or a zero-width character
+        run: npm run check:characters
       - run: npm run build
       - name: Search benchmark (report only)
         run: node scripts/bench-search.ts --report-only

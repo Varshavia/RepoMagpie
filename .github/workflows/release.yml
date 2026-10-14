@@ -1,0 +1,112 @@
+# Releases from CI (decision 0033): when the maintainer pushes a v* tag, run the full checks, check
+# the tag, then stage the package on npm through trusted publishing (OIDC, no token). Nothing becomes
+# installable here: the maintainer approves the staged version on npmjs.com with 2FA
+# (docs/release.md). Actions are pinned to a commit SHA; the comment gives the version.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# One run per tag at a time, never cancelled halfway: a second push of the same tag waits, and then
+# npm refuses a version it already has.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Checks, the tag and the package
+    runs-on: ubuntu-latest
+    outputs:
+      dist-tag: ${{ steps.tag.outputs.dist-tag }}
+      tarball: ${{ steps.pack.outputs.tarball }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # main's history, for the check that the tag's commit is on it
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: The tag is v plus package.json's version, and its commit is on main's history
+        id: tag
+        run: node scripts/release-check.ts "$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run test:hooks
+      - run: npm run build
+      - run: npm run check:build
+      - run: npm run check:bundle
+      - run: npm run check:links
+      - run: npm run check:commands
+      - run: npm run check:characters
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: The version isn't on npm yet
+        run: |
+          VERSION="${TAG#v}"
+          if npm view "repomagpie@$VERSION" version > /dev/null 2>&1; then
+            echo "repomagpie@$VERSION is already on npm."
+            exit 1
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+      # The package is packed once, here, from the build the checks above ran on. The stage job
+      # publishes exactly this file, checked by its SHA-256.
+      - name: Pack the package, and record its SHA-256
+        id: pack
+        run: |
+          mkdir release
+          TARBALL=$(npm pack --pack-destination release --json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8"))[0].filename')
+          SHA256=$(sha256sum "release/$TARBALL" | cut -d " " -f 1)
+          echo "$TARBALL $SHA256"
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: release/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  # The only job with id-token: write runs no code from the repository or its dependencies: no
+  # checkout, no npm ci, no build, no lifecycle scripts. It stages the tarball the first job packed.
+  stage:
+    name: Stage on npm (trusted publishing)
+    needs: verify
+    runs-on: ubuntu-latest # trusted publishing needs a GitHub-hosted runner
+    permissions:
+      contents: read
+      id-token: write # only this job: the OIDC token npm exchanges for a short-lived publish right
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: package
+      - name: The tarball is the one the first job packed
+        run: echo "$SHA256  $TARBALL" | sha256sum --check
+        env:
+          TARBALL: ${{ needs.verify.outputs.tarball }}
+          SHA256: ${{ needs.verify.outputs.sha256 }}
+      # No dependency cache in a release job: a poisoned cache must not reach a release.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24 # trusted publishing needs Node 22.14 or later
+          registry-url: https://registry.npmjs.org
+      - name: npm 11.21.0 (npm stage needs 11.15.0 or later; trusted publishing 11.5.1)
+        run: npm install --global --ignore-scripts npm@11.21.0
+      # A tarball runs no lifecycle scripts (npm runs them only for a folder); --ignore-scripts says
+      # so twice. Provenance comes with trusted publishing, as for a folder.
+      - name: Stage that tarball
+        run: npm stage publish "./$TARBALL" --tag "$DIST_TAG" --ignore-scripts
+        env:
+          TARBALL: ${{ needs.verify.outputs.tarball }}
+          DIST_TAG: ${{ needs.verify.outputs.dist-tag }}

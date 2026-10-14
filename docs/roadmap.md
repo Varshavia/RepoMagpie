@@ -12,6 +12,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 
 - **Now:** v0.1 Remember, built from the [spec](spec.md). Libraries and the Node floor are approved. The beta `0.1.0-beta.1` is out (2026-10-07). Remaining: the launch (recall, the UI server, the UI app, suggest, adopt, the agent skill and the pre-launch fixes are built; the logo, the social preview and the README landing page are done).
   Also now: v0.2 Connect, parts 1 to 3 are built, merged and released in beta: parts 1 (linked notes) and 2 (the graph page) in `0.2.0-beta.1`, part 3 (agent output) and its follow-ups in `0.2.0-beta.2` (both 2026-10-08). What is left for v0.2 is its open follow-ups; the topics-as-tags follow-up is built on `feat/topic-tags`.
+  Also now: pre-launch hardening on `feat/hardening` (the command name, note text from other people, releases from CI), before the tester round.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -120,40 +121,40 @@ The first public release: capture what you learned, find it again, and see it be
 
 **Done when:** every note in `examples/vault/` validates against the schema.
 
-### `magpie note <name-or-url> "text"`
-- [x] Capture a verdict in one line, for example `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. No template to fill.
+### `repomagpie note <name-or-url> "text"`
+- [x] Capture a verdict in one line, for example `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. No template to fill.
 - [x] Given a GitHub URL, fetch description, language, license, topics and the file list (no README), and keep the topics already in `tags.md` as tags ([spec](spec.md), section 2).
 - [x] Detect `SKILL.md` files and write one skill line per skill. A skill URL creates or updates the parent repository note ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 
 **Done when:** a note can be captured with one command in about ten seconds and validates against the schema; running it on every seed repository URL produces valid drafts; and it never overwrites human-owned fields or sections of an existing note.
 
-### `magpie import <file>`
-- [x] The bulk form of `magpie note`, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
+### `repomagpie import <file>`
+- [x] The bulk form of `repomagpie note`, one line per item: `- <url> — verdict: ... | use: ... | avoid: ...`.
 - [x] `verdict:` becomes the Verdict (the user's own words); `use:` and `avoid:` become draft Use when and Avoid when; other text goes to My notes.
 
 **Done when:** importing a file with one line per seed repository produces one valid note per line.
 
-### `magpie search`
+### `repomagpie search`
 - [x] Keyword search over frontmatter and text, across both journals.
 - [x] Each completed skill line is its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
 
 **Done when:** for a fixed set of 10 test questions, the expected note is in the top 3. (Met: `src/core/search-quality.test.ts`, over the example vault.)
 
 ### Proactive recall
-- [x] `magpie recall <package>` on the CLI, across both journals.
+- [x] `repomagpie recall <package>` on the CLI, across both journals.
 - [x] Map package names to notes ([spec](spec.md), section 5): exact by PURL, then name-only, including GitHub repository names.
 - [x] Hook mode: a Claude Code `PreToolUse` hook that runs recall before a package install. It never denies: an avoid note asks the user to confirm; other notes inform ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
-- [x] Skill mode: `SKILL.md` tells agents in other clients to run `magpie recall` before installing, and to ask first on an avoid note (`skills/repomagpie/SKILL.md`).
+- [x] Skill mode: `SKILL.md` tells agents in other clients to run `repomagpie recall` before installing, and to ask first on an avoid note (`skills/repomagpie/SKILL.md`).
 
 **Done when:** in Claude Code, installing a package that has a note shows that note to the agent and the user; a note that says to avoid it makes Claude Code ask the user first; and magpie never denies an install. (Built and tested on `feat/recall`. Live check in a Claude Code session on 2026-10-04: an avoid note made Claude Code ask, in the default permission mode and in auto mode. Budget of 150 ms, median on a Windows dev machine: recall 149–155 ms, at the limit; the hook 140–144 ms with a note and 100–104 ms without an install. With the bundled CLI ([decision 0025](decisions/0025-bundle-the-cli.md), 2026-10-06): recall 113–115 ms; the hook 108 ms with a note and 64–65 ms without an install. The CI runner's numbers are reported by the "Links and benchmarks" job.)
 
 ### Local app
-`magpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).
+`repomagpie ui`: an Obsidian-inspired app in the browser, served from the user's machine over the same core ([decision 0021](decisions/0021-local-ui-server.md), [UI](ui.md)). Visual language: [`DESIGN.md`](../DESIGN.md).
 
 UI server (`feat/ui-server`, after `feat/recall`):
 - [x] Core: `setSection`, edits of the human-owned keys (`kind`, `tags`, `tried`, `rating`) and note versions (`sha256`), with round-trip tests ([decision 0023](decisions/0023-api-is-the-json-contract.md)).
 - [x] Core: the shared JSON documents: Settings, Tag list, Note list, Note, Note preview ([spec](spec.md), section 2).
-- [x] `magpie ui [--port <n>] [--no-open]`: loopback only, the URL with a session token, opens the browser, stops on Ctrl+C ([spec](spec.md), section 2).
+- [x] `repomagpie ui [--port <n>] [--no-open]`: loopback only, the URL with a session token, opens the browser, stops on Ctrl+C ([spec](spec.md), section 2).
 - [x] The API endpoints ([UI](ui.md), "API"); each response equals the CLI's `--json` for the same input.
 - [x] Every security rule in [UI](ui.md), "Security", each with a test.
 - [x] Live updates: `fs.watch` on both `notes/` folders, a signature check every 5 s, Server-Sent Events.
@@ -163,17 +164,17 @@ UI server (`feat/ui-server`, after `feat/recall`):
 
 UI app (`feat/ui-app`, after `feat/ui-server`):
 - [x] The maintainer approves [decision 0022](decisions/0022-frontend-stack.md)'s dependencies (2026-10-04; installed on `feat/ui-app`).
-- [x] The build: a static bundle in `dist/ui/`, served by `magpie ui`, with a bundle-size check (at most 200 kB gzipped).
+- [x] The build: a static bundle in `dist/ui/`, served by `repomagpie ui`, with a bundle-size check (at most 200 kB gzipped).
 - [x] The layout and components from `DESIGN.md`: three panes, the command palette, dark and light themes.
 - [x] Inbox review, search, the note view, add and import, read-only settings, and the "Check a package" box ([UI](ui.md), "Screens and flows").
 - [x] Every state, the keyboard map and the accessibility rules ([UI](ui.md), "States", "Accessibility").
 - [x] End-to-end tests with `@playwright/test` in one CI job, Chromium only; screenshots in light and dark for the pull request.
 - [x] Before the pull request: `web-design-guidelines` and `writing-guidelines` passes, findings fixed or listed.
-- [x] Fixes from the maintainer's first use (`fix/ui-polish`): the palette shows what `magpie search` finds, PURLs shown decoded, "Create tag list" for a journal without `tags.md`, and a lenient read of import lists copied out of a chat.
+- [x] Fixes from the maintainer's first use (`fix/ui-polish`): the palette shows what `repomagpie search` finds, PURLs shown decoded, "Create tag list" for a journal without `tags.md`, and a lenient read of import lists copied out of a chat.
 
 **Done when:** an inbox note can be reviewed in under 15 seconds; the first render with 2,000 notes takes under 1 s; the bundle is at most 200 kB gzipped; and the end-to-end flows pass in CI. (On `feat/ui-app`, 2026-10-06, Windows dev machine: the inbox review end-to-end test reviews a note by keyboard in under a second of test time; first render with 2,000 notes 417 ms with a warm cache, 944 ms cold; the bundle 91.8 kB gzipped. CI runs the end-to-end flows in the "App build and end-to-end tests" job; not yet seen green in CI.)
 
-### `magpie suggest`
+### `repomagpie suggest`
 - [x] Input: a project's manifests and README, or a free-text description.
 - [x] Narrow candidates from both journals by keyword and tags; no embeddings.
 - [x] Output: matching notes, verdict first. The coding agent makes the semantic choice, guided by `SKILL.md`.
@@ -183,7 +184,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 
 **Done when:** for three sample projects, the notes the maintainer expects are among the candidates. (Two of three met on `feat/suggest-adopt`, in `src/core/suggest-quality.test.ts` over the example vault: "a React landing page with a strong visual design" has taste-skill, awesome-design-md and vercel-labs/agent-skills in the top 5; "let my coding agent test a web app in a browser" has playwright-cli first. The third, RepoMagpie itself, is a quality test over the example vault since `fix/pre-launch` (playwright-cli first, vercel-labs/agent-skills and karpathy-skills, not open-lakehouse; since `feat/launch-prep` not mattpocock/skills, which matched only through words any project has); still open: the maintainer's check on the real journal, where 8 of 9 notes were suggested before the cutoff. Benchmark on a Windows dev machine, 2026-10-06, three runs: 349–437 ms median from 25 dependencies and a README, 292–365 ms with a description; search measured 247–318 ms in the same runs.)
 
-### `magpie adopt <name>`
+### `repomagpie adopt <name>`
 - [x] Copy a note from the personal journal into the project's `.magpie/`.
 - [x] Print the install command. Never install anything. A repository note with one package gets that package's command; with several, one command per package to choose from.
 - [x] In the local app: "Adopt to project" on a personal note ([UI](ui.md), section 7).
@@ -191,29 +192,50 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 **Done when:** after `adopt`, the project journal holds the note and nothing was installed. (Met on `feat/suggest-adopt`: `src/core/adopt.test.ts` checks that only `.magpie/` appears in the project; the end-to-end test checks the same through the app.)
 
 ### Agent skill
-- [x] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall (`skills/repomagpie/`, installed with `npx skills add Varshavia/RepoMagpie`). Tests check its frontmatter against the Agent Skills format, and every command, flag and `--json` field it names against `magpie --help` and the spec.
+- [x] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall (`skills/repomagpie/`, installed with `npx skills add Varshavia/RepoMagpie`). Tests check its frontmatter against the Agent Skills format, and every command, flag and `--json` field it names against `repomagpie --help` and the spec.
 - [ ] Publish it to skills.sh and add the badge to the README.
 
-**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `magpie search` and returned the maintainer's playwright-cli note.)
+**Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `repomagpie search` and returned the maintainer's playwright-cli note.)
 
-### `magpie init` (if time allows; otherwise v0.3)
+### `repomagpie init` (if time allows; otherwise v0.3)
 - [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
 
 ### Development practice
 - [x] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor. Approved 2026-10-03: commander, MiniSearch, yaml, packageurl-js, typescript (dev), @types/node (dev); `engines.node >=22.12.0`.
-- [x] Scaffold: `package.json` with the approved libraries, TypeScript settings, the `src/` layout (`core/`, `cli/`, `hook/`), a minimal CLI (`magpie --version`, `magpie --help` listing the v0.1 commands as not implemented yet), and CI on Node 22, 24 and 26 × Linux and Windows.
+- [x] Scaffold: `package.json` with the approved libraries, TypeScript settings, the `src/` layout (`core/`, `cli/`, `hook/`), a minimal CLI (`repomagpie --version`, `repomagpie --help` listing the v0.1 commands as not implemented yet), and CI on Node 22, 24 and 26 × Linux and Windows.
 - [ ] Use `tdd` from `mattpocock/skills` while implementing v0.1, and its `code-review` before each pull request.
 - [ ] Once v0.1 code exists, map the codebase with `Egonex-AI/Understand-Anything`, and use the map to onboard contributors.
 
 ### Pre-launch
 Before the launch work (`fix/pre-launch`):
-- [x] `magpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched). Candidates under a fifth of the best score are left out; prefix matching only, no fuzzy ([spec](spec.md), section 5). On RepoMagpie itself, with the example vault: 5 candidates instead of 8, open-lakehouse out, playwright-cli first through `@playwright/test`.
-- [x] Startup time of the hook and `magpie recall` on Windows; consider bundling `dist/` into one file. Bundled with Vite into `dist/cli/`, an entry and chunks loaded on demand ([decision 0025](decisions/0025-bundle-the-cli.md)). Windows dev machine, 2,000 notes, median: recall 154 → 113 ms; the hook 152 → 108 ms with a note, 110 → 64 ms without an install.
+- [x] `repomagpie suggest`: a relevance cutoff relative to the top score, and a "why" line per candidate (the keywords it matched). Candidates under a fifth of the best score are left out; prefix matching only, no fuzzy ([spec](spec.md), section 5). On RepoMagpie itself, with the example vault: 5 candidates instead of 8, open-lakehouse out, playwright-cli first through `@playwright/test`.
+- [x] Startup time of the hook and `repomagpie recall` on Windows; consider bundling `dist/` into one file. Bundled with Vite into `dist/cli/`, an entry and chunks loaded on demand ([decision 0025](decisions/0025-bundle-the-cli.md)). Windows dev machine, 2,000 notes, median: recall 154 → 113 ms; the hook 152 → 108 ms with a note, 110 → 64 ms without an install.
 - [x] Fresh screenshots of every screen, dark and light, on a journal of real-looking notes, for the final design review (`SCREENS=1`, `ui/e2e/screens.spec.ts`).
+
+### Pre-launch hardening (`feat/hardening`)
+Before the tester round and the launch: the command name, note text from other people, and the supply chain. Decisions: [0031](decisions/0031-the-command-is-repomagpie.md), [0032](decisions/0032-note-text-is-data.md), [0033](decisions/0033-releases-staged-from-ci.md).
+- [x] Decisions 0031 (the command is `repomagpie`), 0032 (note text is data) and 0033 (releases are staged from CI).
+- [x] The command name: `bin` has `repomagpie` and the short alias; every machine-facing string and doc uses `repomagpie`; the `RepoMagpie:` and `repomagpie:` prefixes; a check that no doc tells someone to run the alias (`npm run check:commands`); tests against a packed tarball.
+- [x] The text module: control characters shown as markers such as `<U+202E>` (after the live test, also in the app's read views), agent-facing fields capped with `truncated`, note text quoted and labelled with its source; the skill's two rules.
+- [x] The file rules: links never followed and never written through; files over 256 KB skipped; the YAML alias limit.
+- [x] The app: links from notes only for `http:` and `https:`; no note text as HTML; GitHub fields cleaned at write time.
+- [x] A red-team pass as the author of a cloned repository, of a GitHub repository, and of a web page open next to `repomagpie ui`; every finding a test, or a follow-up below.
+- [x] CI and hygiene: least-privilege workflows with pinned actions, Dependabot, a macOS job, a check of what `npm pack` ships, and a check script that fails when a source file holds bidi controls or zero-width characters.
+- [x] The release workflow (`release.yml`): checks, the tag against the version, `npm stage publish` through trusted publishing; `docs/release.md` rewritten.
+- [x] Socket's alerts fixed or explained; `SECURITY.md` and the README name the official channels.
+
+**Done when:** a machine always runs `repomagpie`, the short alias still works, and the skill is named `repomagpie`; the hostile tests pass (no control character reaches an agent, a terminal or the app's read views except as a visible marker; agent-facing text is capped, quoted and labelled; links are never followed; huge files and alias bombs are bounded; app links are `http(s)` only); recall and the hook stay under 150 ms, and the hook's chunk imports only `note`, `note-cache`, `recall` and the text module; CI is least-privilege and pinned, with Dependabot and a green macOS job; `release.yml` is ready; every Socket alert is fixed or explained; all checks and end-to-end tests pass. (On `feat/hardening`, 2026-10-13, Windows dev machine, Node 24.13: 975 tests (972 pass, 3 skipped), 147 hook tests, 70 end-to-end flows; every check of the [release process](release.md) passes. Recall 120–127 ms and the hook 113–118 ms with a note, 64 ms without an install (`0.2.0-beta.2`: 130 and 123 ms); CI's Linux runner 73–80 and 72–76 ms. The hook loads `note`, `note-cache`, `journals`, `recall`, the shared `wikilinks` rule and `text`, as before plus `text`. Socket's audit of the skill on skills.sh is answered in `SKILL.md`; socket.dev's one alert on the npm package, "URL strings" (low; no dependency alerts, 0 dependencies), is explained in `SECURITY.md`, URL by URL: the package contacts only `api.github.com` and listens only on `127.0.0.1`.)
+
+Follow-ups from the red-team pass (2026-10-13; the fixed findings are tests in `src/core/red-team.test.ts`, `src/server/red-team.test.ts` and `ui/e2e/hostile.spec.ts`):
+- [ ] Low: the opening URL with `?token=` can stay in the browser's history. The token is valid for that run only, and the address bar drops it at once.
+
+Accepted, not scheduled:
+- Look-alike names in plain ASCII (`pupeteer` for `puppeteer`) can't be told from real ones without asking the registry. The hook and the skill ask the user to confirm the exact name of a project journal's alternative (decision 0032, rule 4).
+- A hard link inside a journal can't be told from a note. A clone can't contain one (git doesn't create hard links), so only the user can make one.
 
 ### Launch
 See [marketing.md](marketing.md).
-- [x] Small fixes before the beta (`feat/launch-prep`): `magpie suggest` leaves out words common to any project (`code`, `install`, `js`) from its keywords and why line; the note view shows whether you tried a package and your rating under the title.
+- [x] Small fixes before the beta (`feat/launch-prep`): `repomagpie suggest` leaves out words common to any project (`code`, `install`, `js`) from its keywords and why line; the note view shows whether you tried a package and your rating under the title.
 - [x] Move `commander`, `minisearch`, `packageurl-js` and `yaml` to `devDependencies`: the CLI bundles them ([decision 0025](decisions/0025-bundle-the-cli.md)). Checked on `feat/launch-prep`: a clean install of the `npm pack` tarball adds one package, and every command runs from it.
 - [x] Write `DESIGN.md` (Obsidian-inspired, dark-first) before the logo, social preview, landing page and demo GIF, so they share one visual language. Use `VoltAgent/awesome-design-md` as reference only; copy no brand. (Written on `docs/ui`; the local app uses it too.)
 - [x] Landing page and README hero, with `Leonxlnx/taste-skill`. Not for the CLI or data-dense views; its own scope excludes dashboards. (The README is the landing page, on `feat/launch-prep`: the logo, the one-liner, three bullets, a quick start and three dark screenshots of the app. No separate site.)
@@ -232,7 +254,7 @@ See [marketing.md](marketing.md).
 - [ ] Product Hunt
 
 ## v0.2 Connect
-The app becomes the place where you write and connect notes: links, backlinks, the `alternatives` relation and a graph, built into `magpie ui` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). Three parts, each on its own branch. Released in beta: parts 1 and 2 in `0.2.0-beta.1`, part 3 in `0.2.0-beta.2` (2026-10-08).
+The app becomes the place where you write and connect notes: links, backlinks, the `alternatives` relation and a graph, built into `repomagpie ui` ([decision 0026](decisions/0026-the-app-is-the-workspace.md)). Three parts, each on its own branch. Released in beta: parts 1 and 2 in `0.2.0-beta.1`, part 3 in `0.2.0-beta.2` (2026-10-08).
 
 ### Part 1: linked notes (`feat/linked-notes`)
 - [x] Decisions: the app is the workspace ([0026](decisions/0026-the-app-is-the-workspace.md)); `alternatives` becomes active, one side is enough ([0027](decisions/0027-alternatives-active.md)).
@@ -276,12 +298,12 @@ Not doing, from the `web-design-guidelines` review of `feat/graph`:
 
 ### Part 3: agent output (`feat/agent-output`)
 - [x] Decision: recall names alternatives ([0029](decisions/0029-recall-names-alternatives.md)).
-- [x] `magpie recall`, the hook, `magpie suggest` and "Check a package" in the app show a note's alternatives; `magpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision. (Also the app's Suggest page: an "Instead:" line under "In use, avoid", the maintainer, 2026-10-08.)
+- [x] `repomagpie recall`, the hook, `repomagpie suggest` and "Check a package" in the app show a note's alternatives; `repomagpie note --alternative` records one; the skill explains them. Neighbours means alternatives only: same-tag notes and `[[links]]` are not shown at install time, because they add noise and no decision. (Also the app's Suggest page: an "Instead:" line under "In use, avoid", the maintainer, 2026-10-08.)
 
-**Done when:** the hook's prompt for an avoid note names its alternatives, and the agent's context says to offer them; `recall`, `suggest` and the app show alternatives; `magpie note --alternative` records one without changing anything else in the file; recall, the hook and suggest stay within their budgets, and the hook's chunk imports nothing beyond the shared wikilink rule; all checks and end-to-end tests pass. (Met on `feat/agent-output`, 2026-10-08, Windows dev machine, Node 24.13: 841 tests (839 pass, 2 skipped), 147 hook tests and 62 end-to-end flows pass. Recall 130 ms, the hook 123 / 73 ms; on a journal where one note in five has alternatives, 134 ms and 128 / 72 ms. Suggest 332 / 281 ms, and 356 / 294 ms with alternatives. The app 148.4 kB gzipped; the other screens' first files 101.6 kB (+0.3). The hook loads `note`, `note-cache`, `recall` and the new `wikilinks` (1.8 kB). Not yet seen green in CI.)
+**Done when:** the hook's prompt for an avoid note names its alternatives, and the agent's context says to offer them; `recall`, `suggest` and the app show alternatives; `repomagpie note --alternative` records one without changing anything else in the file; recall, the hook and suggest stay within their budgets, and the hook's chunk imports nothing beyond the shared wikilink rule; all checks and end-to-end tests pass. (Met on `feat/agent-output`, 2026-10-08, Windows dev machine, Node 24.13: 841 tests (839 pass, 2 skipped), 147 hook tests and 62 end-to-end flows pass. Recall 130 ms, the hook 123 / 73 ms; on a journal where one note in five has alternatives, 134 ms and 128 / 72 ms. Suggest 332 / 281 ms, and 356 / 294 ms with alternatives. The app 148.4 kB gzipped; the other screens' first files 101.6 kB (+0.3). The hook loads `note`, `note-cache`, `recall` and the new `wikilinks` (1.8 kB). Not yet seen green in CI.)
 
 Follow-up, watch (the maintainer, 2026-10-08):
-- [ ] Recall's margin. `magpie recall` and the hook take about 145 ms at 2,000 notes on a Windows dev machine (budget 150). Most of it is Node's startup and loading the chunks (about 75 ms: the hook with no install) and reading 2,000 file times for the cache signature (30–35 ms); the cache read and its shape check take about 10 ms, alternatives 1–2 ms. Act when CI's Linux median passes 120 ms, or when a change adds more than 5 ms. Options for headroom:
+- [ ] Recall's margin. `repomagpie recall` and the hook take about 145 ms at 2,000 notes on a Windows dev machine (budget 150). Most of it is Node's startup and loading the chunks (about 75 ms: the hook with no install) and reading 2,000 file times for the cache signature (30–35 ms); the cache read and its shape check take about 10 ms, alternatives 1–2 ms. Act when CI's Linux median passes 120 ms, or when a change adds more than 5 ms. Options for headroom:
   - Node's compile cache (`module.enableCompileCache()`, Node 22.1+) for the built CLI, so the chunks aren't parsed and compiled on every run.
   - Load `yaml` only when the cache is rebuilt: a warm run never parses a note, but the hook's chunk carries the YAML parser (part of the 268 kB `note` chunk).
   - Read the file times in parallel (`fs.promises.stat` through libuv's thread pool) instead of 2,000 synchronous `statSync` calls.
@@ -291,8 +313,8 @@ Follow-up, watch (the maintainer, 2026-10-08):
 ### Follow-up: topics become tags, a better kind guess (`feat/topic-tags`)
 From the maintainer's first day of real use (2026-10-09): ten GitHub repositories gave 4 tags in total, and 9 of 20 notes were `other`. Decision: [0030](decisions/0030-github-topics-become-tags.md).
 - [x] Decision 0030, and note-schema rules 2 and 5.
-- [x] At creation (`magpie note`, `magpie import`, Add), a repository's GitHub topics become its tags: ranked (in `tags.md`, then carried by other notes, then the rest), without its own name or the stop list, at most 8; new tags are appended to `tags.md`. Add's preview shows them, each removable.
-- [x] "Add GitHub topics as tags" for existing notes: `magpie tags --from-topics`, `POST /api/tags/from-topics` and a button in All notes; a dry run first, never a tag removed or reordered, a second run adds nothing.
+- [x] At creation (`repomagpie note`, `repomagpie import`, Add), a repository's GitHub topics become its tags: ranked (in `tags.md`, then carried by other notes, then the rest), without its own name or the stop list, at most 8; new tags are appended to `tags.md`. Add's preview shows them, each removable.
+- [x] "Add GitHub topics as tags" for existing notes: `repomagpie tags --from-topics`, `POST /api/tags/from-topics` and a button in All notes; a dry run first, never a tag removed or reordered, a second run adds nothing.
 - [x] A better kind guess: `app`, `platform`, `framework`, `library` and `template`; a skill pack by its name, a topic, or 3 or more skill folders outside hidden folders. Recorded on 13 real repositories (`src/core/fixtures/kinds.json`).
 - [x] The sidebar shows the 15 tags with the most notes, then "Show all N tags".
 
@@ -302,21 +324,21 @@ Follow-up, later (the maintainer, 2026-10-09):
 - [ ] Tag synonyms: topics give near-duplicate tags (`llm` and `llms`, `no-code` and `nocode`, `web-scraping`, `webscraping` and `web-scraper`, `self-hosted` and `self-hosting`). Decide whether magpie merges or suggests one spelling; renaming and merging tags are out of scope until then.
 
 ## v0.3 Trust
-- [ ] `magpie init`, if it missed v0.1.
+- [ ] `repomagpie init`, if it missed v0.1.
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.
-- [ ] `magpie drift`: lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
-- [ ] `magpie gaps`: dependencies used in a project but missing from the journals.
-- [ ] `--project <dir>` also moves where `magpie suggest` reads the manifests and README, like `git -C`. In v0.1 they come from the working directory ([spec](spec.md), section 2), so `magpie --project ../app suggest` reads the current folder's manifests.
+- [ ] `repomagpie drift`: lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
+- [ ] `repomagpie gaps`: dependencies used in a project but missing from the journals.
+- [ ] `--project <dir>` also moves where `repomagpie suggest` reads the manifests and README, like `git -C`. In v0.1 they come from the working directory ([spec](spec.md), section 2), so `repomagpie --project ../app suggest` reads the current folder's manifests.
 
 ## v0.4 Share
-- [ ] `magpie publish`: a static "nest" site from notes marked public, following `DESIGN.md`. Review it with `web-design-guidelines` and check it with `playwright-cli`.
-- [ ] `magpie follow <nest-url>`: another user's public notes in your search results, attributed.
+- [ ] `repomagpie publish`: a static "nest" site from notes marked public, following `DESIGN.md`. Review it with `web-design-guidelines` and check it with `playwright-cli`.
+- [ ] `repomagpie follow <nest-url>`: another user's public notes in your search results, attributed.
 - [ ] `/uses` page generator.
 - [ ] Semantic search, also for `suggest`. First decide embeddings: local model or API; the default must work offline (moved from step 2). Orama is the candidate library ([spec](spec.md), section 9).
 
 ## Later
 - [ ] Resurfacing digest.
-- [ ] `magpie today`: one optional daily find.
+- [ ] `repomagpie today`: one optional daily find.
 - [ ] A thin MCP server for clients without a shell ([decision 0002](decisions/0002-cli-first.md)).
 - [ ] Recall for installs without package names (`npm install`, `pip install -r requirements.txt`): check the whole manifest. Ignored in v0.1 ([spec](spec.md), section 6).
 - [ ] Hook mode for clients other than Claude Code, as their hooks allow passing context on an allowed command ([ideas](ideas.md#hook-support-in-major-clients)). v0.1 uses skill mode there.

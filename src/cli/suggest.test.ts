@@ -90,7 +90,7 @@ test("nothing to go on is a usage error (exit 2); --json adds the error to the e
   const r = await magpie(box, ["suggest"]);
   assert.equal(r.code, 2);
   assert.equal(r.out, "");
-  assert.match(r.err, /^magpie suggest: Nothing to go on in .*Describe the project instead/);
+  assert.match(r.err, /^repomagpie suggest: Nothing to go on in .*Describe the project instead/);
   const json = await magpie(box, ["suggest", "--json"]);
   assert.equal(json.code, 2);
   assert.deepEqual(Object.keys(JSON.parse(json.out)), ["source", "keywords", "candidates", "in_use_avoid", "error"]);

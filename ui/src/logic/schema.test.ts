@@ -4,7 +4,24 @@ import { DRAFT_MARKER as CORE_DRAFT_MARKER, KINDS as CORE_KINDS } from "../../..
 import { readablePurl as coreReadablePurl } from "../../../src/core/identity.ts";
 import { isAvoid as coreIsAvoid, verdictSaysAvoid as coreVerdictSaysAvoid } from "../../../src/core/recall.ts";
 import { isStopTopic as coreIsStopTopic } from "../../../src/core/topic-tags.ts";
-import { DRAFT_MARKER, hookWouldAsk, isAvoid, isStopTopic, KINDS, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
+import { concernLabel, DRAFT_MARKER, hookWouldAsk, isAvoid, isStopTopic, KINDS, nameConcern, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
+import { nameConcern as coreNameConcern } from "../../../src/core/text.ts";
+
+test("nameConcern agrees with core's (decision 0032) on every case", () => {
+  const cyrillic = String.fromCharCode(0x0440); // looks like p
+  const cases = ["puppeteer", `${cyrillic}uppeteer`, "@babel/core", "pdf kit", "../x", "microsoft/playwright-cli", "café", ""];
+  for (const name of cases) for (const bare of [true, false]) assert.equal(nameConcern(name, bare), coreNameConcern(name, bare), `${name} ${bare}`);
+  assert.equal(nameConcern(`${cyrillic}uppeteer`, false), "non-ascii");
+  assert.equal(nameConcern("pdf kit", true), "invalid");
+  assert.equal(nameConcern("microsoft/playwright-cli", false), null);
+});
+
+test("concernLabel: the concern in words, as recall's card says it", () => {
+  assert.equal(concernLabel(`${String.fromCharCode(0x0440)}ad-left`, true), " (non-ASCII letters)");
+  assert.equal(concernLabel("pad kit", true), " (not a valid package name)");
+  assert.equal(concernLabel("pad kit", false), null);
+  assert.equal(concernLabel("left-pad", true), null);
+});
 
 // The app can't bundle core's modules (they read files), so it mirrors some of core's values and
 // rules. These tests keep the mirror equal to core: core stays the single source.

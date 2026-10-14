@@ -46,7 +46,7 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
     <div className="page">
       <h1 className="page-title">Import</h1>
       <p className="page-lede">
-        Works like <code>magpie import</code>: one note per line that starts with a dash. Check the lines first; magpie writes nothing until you import them.
+        Works like <code>repomagpie import</code>: one note per line that starts with a dash. Check the lines first; RepoMagpie writes nothing until you import them.
       </p>
 
       <div className="page-section">

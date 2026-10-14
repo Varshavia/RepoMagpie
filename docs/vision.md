@@ -35,7 +35,7 @@ Compared with a typical star manager:
 
 | | Typical star manager | RepoMagpie |
 |---|---|---|
-| Entry point | Bulk import of all stars | One deliberate entry at a time, or a list you wrote (`magpie import`) |
+| Entry point | Bulk import of all stars | One deliberate entry at a time, or a list you wrote (`repomagpie import`) |
 | Who writes the judgment | AI | You: when to use it, when to avoid it |
 | When it helps | When you search | When you search, and before your agent installs |
 | Storage | App database / plugin data | Plain Markdown files you own |
@@ -48,7 +48,7 @@ Compared with a typical star manager:
 - **Personal journal:** a folder outside any repository, private by default. It holds anything you explored and judged: repositories, skills, tools.
 - **Project journal:** `.magpie/` inside a project repository, committed with the code. The team shares it, reviews it and keeps its history through git, with no server.
 
-Search, suggest and recall work across both. `magpie adopt` copies a note from your personal journal into a project.
+Search, suggest and recall work across both. `repomagpie adopt` copies a note from your personal journal into a project.
 
 ## Why "magpie"
 
@@ -57,10 +57,10 @@ Magpies are known for collecting shiny things and keeping them in their nest. Th
 ## Non-goals
 
 - **Not a security scanner.** RepoMagpie never claims to detect malware or vulnerabilities. It shows what you and your team recorded.
-- **Not a star importer.** `magpie import` adds lines you wrote, not your stars. Imported notes land as `status: inbox`, and none becomes `reviewed` without your own judgment.
-- **Not a hosted service.** No accounts, no remote server, no telemetry by default. The local app (`magpie ui`) is a process you start on your own machine; it listens on `127.0.0.1` only, and only while it runs ([decision 0021](decisions/0021-local-ui-server.md)).
+- **Not a star importer.** `repomagpie import` adds lines you wrote, not your stars. Imported notes land as `status: inbox`, and none becomes `reviewed` without your own judgment.
+- **Not a hosted service.** No accounts, no remote server, no telemetry by default. The local app (`repomagpie ui`) is a process you start on your own machine; it listens on `127.0.0.1` only, and only while it runs ([decision 0021](decisions/0021-local-ui-server.md)).
 - **Not tied to Obsidian.** Journals are Obsidian-friendly, but Obsidian is optional.
-- **Not an installer.** RepoMagpie never installs packages or skills. `magpie adopt` prints the install command; you or your agent run it.
+- **Not an installer.** RepoMagpie never installs packages or skills. `repomagpie adopt` prints the install command; you or your agent run it.
 
 ## Success looks like
 

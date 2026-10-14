@@ -1,12 +1,14 @@
 // The note's alternatives (decision 0027, docs/ui.md §7): chips that open the note (or look
 // unresolved, like any [[link]]), each with a remove button, and "+ Add" with the [[ autocomplete's
 // list; free text names a subject without a note. "Alternative to: …" shows the notes that list this
-// one: one side is enough, so it comes from backlinks.
+// one: one side is enough, so it comes from backlinks. A chip's name that can't be the package it
+// seems is flagged in words, as Check a package flags it (decision 0032).
 import { useId, useRef, useState, type ReactNode } from "react";
 import type { Backlink, Link } from "../../../src/core/links.ts";
 import { Icon } from "../icons.tsx";
 import { alternativeEntry, alternativeOptions, linkText, withAlternative, type LinkNote } from "../logic/links.ts";
-import { readablePurl } from "../logic/schema.ts";
+import { concernLabel, readablePurl } from "../logic/schema.ts";
+import { visible } from "../logic/text.ts";
 import { FieldError } from "./common.tsx";
 
 interface Props {
@@ -83,13 +85,14 @@ export function Alternatives({ alternatives, raw, alternativeTo, notes, self, ed
             {alternatives.map((l, i) => (
               <li key={`${l.target} ${i}`} className="chip alternative">
                 {link(l.target, l.target)}
+                {concernLabel(l.name ?? l.target, l.id === null)}
                 {editable ? (
                   <button
                     type="button"
                     className="chip-remove"
-                    onClick={() => void remove(i, linkText(l))}
+                    onClick={() => void remove(i, visible(linkText(l)))}
                     disabled={saving}
-                    aria-label={`Remove ${linkText(l)} from alternatives`}
+                    aria-label={`Remove ${visible(linkText(l))} from alternatives`}
                     title="Remove"
                   >
                     <Icon name="x" size={12} />
@@ -141,7 +144,7 @@ export function Alternatives({ alternatives, raw, alternativeTo, notes, self, ed
               } else if ((e.key === "Enter" || e.key === "Tab") && options.length && !e.shiftKey) {
                 e.preventDefault();
                 const option = options[at];
-                void add(option.target, option.kind === "note" ? (option.note.name ?? option.target) : option.target);
+                void add(option.target, visible(option.kind === "note" ? (option.note.name ?? option.target) : option.target));
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 close();
@@ -167,19 +170,19 @@ export function Alternatives({ alternatives, raw, alternativeTo, notes, self, ed
                   className="link-option"
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseMove={() => i !== at && setActive(i)}
-                  onClick={() => void add(option.target, option.kind === "note" ? (option.note.name ?? option.target) : option.target)}
+                  onClick={() => void add(option.target, visible(option.kind === "note" ? (option.note.name ?? option.target) : option.target))}
                 >
                   {option.kind === "note" ? (
                     <>
                       <span className="label" translate="no">
-                        {option.note.name ?? option.target}
+                        {visible(option.note.name ?? option.target)}
                       </span>
                       <span className="detail mono" translate="no">
-                        {option.target}
+                        {visible(option.target)}
                       </span>
                     </>
                   ) : (
-                    <span className="label">{`Add “${option.target}”, no note yet`}</span>
+                    <span className="label">{`Add “${visible(option.target)}”, no note yet`}</span>
                   )}
                 </li>
               ))}
@@ -203,7 +206,7 @@ export function Alternatives({ alternatives, raw, alternativeTo, notes, self, ed
           {alternativeTo.map((b, i) => (
             <span key={b.id}>
               {i ? ", " : null}
-              {noteLink(b.id, b.name ?? readablePurl(b.id))}
+              {noteLink(b.id, visible(b.name ?? readablePurl(b.id)))}
             </span>
           ))}
         </p>

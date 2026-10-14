@@ -2,7 +2,7 @@
 import { exitCode } from "../core/outcome.ts";
 import { runNote, type Journal } from "../core/save.ts";
 import type { PackageType } from "../core/identity.ts";
-import { contextOf, type GlobalOptions } from "./context.ts";
+import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface NoteOptions extends GlobalOptions {
@@ -11,7 +11,8 @@ export interface NoteOptions extends GlobalOptions {
   alternative?: string[];
 }
 
-export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, io: Io): Promise<number> {
+export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, terminal: Io): Promise<number> {
+  const io = plainIo(terminal);
   const json = Boolean(options.json);
   const ask = io.interactive && !json ? io.ask : undefined;
   const request = { target, text, type: options.type, to: options.to, alternatives: options.alternative };
@@ -23,7 +24,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
 
   const { journal, saved: r } = run;
   if (!r) {
-    io.err(`magpie note: ${run.document.error}\n`);
+    io.err(`repomagpie note: ${run.document.error}\n`);
     return exitCode(run.outcome);
   }
   for (const warning of [...journal.warnings, ...r.warnings]) io.err(`warning: ${warning}\n`);
@@ -34,7 +35,7 @@ export async function noteCommand(target: string, text: string | undefined, opti
   if (r.result === "created") io.err(`✔ Saved to ${where}: ${name}\n`);
   else if (r.result === "updated") io.err(`✔ Updated in ${where}: ${name}\n`);
   else if (r.result === "unchanged") io.err(`Already in ${where}: ${name}\n`);
-  else io.err(`magpie note: ${r.error}\n`);
+  else io.err(`repomagpie note: ${r.error}\n`);
   if (r.tagsMdAdded.length) io.err(`Added to tags.md: ${r.tagsMdAdded.join(", ")}\n`);
   if (r.path) io.out(`${r.path}\n`);
   return exitCode(run.outcome);

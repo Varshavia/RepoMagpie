@@ -24,8 +24,8 @@ import { KINDS } from "../core/note.ts";
 import type { Outcome } from "../core/outcome.ts";
 import { runRecall } from "../core/recall.ts";
 import { importFailure, runImport, runNote, type Context } from "../core/save.ts";
-import { runSearch } from "../core/search.ts";
-import { runSuggest } from "../core/suggest.ts";
+import { runSearch, searchForAgent } from "../core/search.ts";
+import { runSuggest, suggestForAgent } from "../core/suggest.ts";
 import { tagsFromTopics } from "../core/tags-from-topics.ts";
 
 export interface ApiRequest {
@@ -91,7 +91,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
     "/api/notes": {
       GET: ({ query }) => {
         const journal = scope(query.get("journal"));
-        const empty = { journal, count: 0, notes: [] };
+        const empty = { journal, count: 0, notes: [], skipped: [] };
         if (!journal) return bad(empty, JOURNAL);
         const status = query.get("status") ?? undefined;
         if (status !== undefined && status !== "inbox" && status !== "reviewed") return bad(empty, "status must be inbox or reviewed.");
@@ -155,7 +155,8 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (journal === null) return bad(empty, JOURNAL);
         const limit = query.has("limit") ? Number(query.get("limit")) : 10;
         if (!Number.isInteger(limit) || limit < 1) return bad(empty, "limit must be a whole number of 1 or more.");
-        return reply(runSearch({ query: q, tags: query.getAll("tag"), kind, journal, limit }, context));
+        const run = runSearch({ query: q, tags: query.getAll("tag"), kind, journal, limit }, context);
+        return reply({ ...run, document: searchForAgent(run.document) });
       },
     },
 
@@ -201,7 +202,8 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (journal === null) return bad(empty, JOURNAL);
         const limit = query.has("limit") ? Number(query.get("limit")) : 20;
         if (!Number.isInteger(limit) || limit < 1) return bad(empty, "limit must be a whole number of 1 or more.");
-        return reply(runSuggest({ description, journal, limit }, context));
+        const run = runSuggest({ description, journal, limit }, context);
+        return reply({ ...run, document: suggestForAgent(run.document) });
       },
     },
 

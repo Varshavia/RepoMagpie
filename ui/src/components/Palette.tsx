@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, type SearchResult } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { noteResults, rankActions, type NoteSearch, type PaletteAction } from "../logic/palette.ts";
+import { visible } from "../logic/text.ts";
 
 export interface Command extends PaletteAction {
   icon: IconName;
@@ -132,8 +133,8 @@ export function Palette({ actions, onNote, onClose }: Props) {
                         {item.kind === "note" ? (
                           <>
                             <Icon name={item.result.type === "skill" ? "cube" : "notebook"} />
-                            <span className="label">{item.result.type === "skill" ? `${item.result.skill} · ${item.result.name}` : item.result.name}</span>
-                            <span className="detail">{item.result.verdict ?? "no verdict yet"}</span>
+                            <span className="label">{visible(item.result.type === "skill" ? `${item.result.skill} · ${item.result.name}` : item.result.name)}</span>
+                            <span className="detail">{item.result.verdict === null ? "no verdict yet" : visible(item.result.verdict)}</span>
                             <span className="row-meta">{item.result.journal}</span>
                           </>
                         ) : (

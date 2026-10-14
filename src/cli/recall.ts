@@ -4,6 +4,7 @@ import { sep } from "node:path";
 import type { PackageType } from "../core/identity.ts";
 import { DRAFT_MARKER, readNote } from "../core/note.ts";
 import { runRecall, type Alternative, type RecallMatch } from "../core/recall.ts";
+import { clean, cleanAll, nameConcern } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
@@ -18,11 +19,12 @@ export async function recallCommand(queries: string[], options: RecallOptions, i
     io.out(`${JSON.stringify(document)}\n`);
     return 0;
   }
-  for (const warning of warnings) io.err(`warning: ${warning}\n`);
+  for (const warning of warnings) io.err(`warning: ${clean(warning)}\n`);
   const color = io.columns !== undefined && !io.env.NO_COLOR;
-  const cards = results.flatMap((r) => r.matches).map((m) => card(m, { home: io.home, color, full: Boolean(options.full), piped: io.columns === undefined }));
+  // Note text reaches the terminal cleaned, never cut: the Verdict is never cut (decision 0032).
+  const cards = results.flatMap((r) => r.matches).map((m) => card(cleanAll(m), { home: io.home, color, full: Boolean(options.full), piped: io.columns === undefined }));
   if (cards.length) io.out(`${cards.join("\n\n")}\n`);
-  for (const r of results) if (!r.matches.length) io.err(`No note for ${r.query}.\n`);
+  for (const r of results) if (!r.matches.length) io.err(`No note for ${clean(r.query)}.\n`);
   return 0;
 }
 
@@ -66,7 +68,7 @@ function alternativeLines(m: RecallMatch, options: CardOptions, head: string, wi
   if (!m.alternatives.length) return [];
   const shown = options.full ? m.alternatives : m.alternatives.slice(0, 3);
   const items = shown.map((a) => alternativeText(a, options.color));
-  if (shown.length < m.alternatives.length) items.push(`+${m.alternatives.length - shown.length} more (magpie recall ${m.query} --full)`);
+  if (shown.length < m.alternatives.length) items.push(`+${m.alternatives.length - shown.length} more (repomagpie recall ${m.query} --full)`);
   if (options.piped) return [`  ${head}${items.join("; ")}`];
   return [`  ${head}${items[0]}`, ...items.slice(1).map((item) => `  ${" ".repeat(width)}${item}`)];
 }
@@ -74,8 +76,10 @@ function alternativeLines(m: RecallMatch, options: CardOptions, head: string, wi
 // One alternative: its name and Verdict (or [inbox]), and whether it is noted to avoid too. One
 // without a note in the journal is its name alone.
 function alternativeText(a: Alternative, color: boolean): string {
-  if (a.path === null) return a.name;
-  return `${a.name}: ${a.verdict ?? `${paint(color, 33, "[inbox]")} no verdict yet`}${a.avoid ? " (you also noted to avoid it)" : ""}`;
+  const concern = nameConcern(a.name, a.path === null);
+  const name = `${a.name}${concern === "non-ascii" ? " (non-ASCII letters)" : concern === "invalid" ? " (not a valid package name)" : ""}`;
+  if (a.path === null) return name;
+  return `${name}: ${a.verdict ?? `${paint(color, 33, "[inbox]")} no verdict yet`}${a.avoid ? " (you also noted to avoid it)" : ""}`;
 }
 
 // Every section of the note with text, in the file's order: the label, then its lines. The
@@ -90,11 +94,11 @@ function fullSections(m: RecallMatch, options: CardOptions): string[] {
   const { color } = options;
   const width = 16;
   const blocks = readNote(text).sections.map((section) => {
-    const body = section.body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    const body = section.body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/).map((line) => clean(line).trim()).filter(Boolean)
       .map((line) => line.replace(/^[-*+]\s+/, ""));
     if (section.name === "Verdict" && !body.length) body.push(`${paint(color, 33, "[inbox]")} no verdict yet`);
     if (!body.length) return { name: section.name, lines: [] };
-    const name = section.heading;
+    const name = clean(section.heading);
     const head = `  ${paint(color && name === "Avoid when", 31, name)}${" ".repeat(Math.max(width - name.length, 1))}${section.draft ? "(draft) " : ""}`;
     return { name: section.name, lines: [head + body[0], ...body.slice(1).map((line) => `  ${" ".repeat(Math.max(width, name.length + 1))}${line}`)] };
   });

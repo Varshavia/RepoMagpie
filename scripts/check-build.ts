@@ -1,10 +1,13 @@
 // npm run check:build: the bundled CLI in dist/cli/ (decision 0025) answers as the source does. Both
 // run the same commands on a scratch journal copied from the example vault, in a scratch project
 // with a package.json; stdout and the exit code must be equal. The hook always exits 0 (it fails
-// open), so its output is what shows a broken bundle. Run npm run build first.
+// open), so its output is what shows a broken bundle. Then the packed package (decision 0031): the
+// tarball from npm pack, installed into a scratch prefix with no network, runs as `repomagpie` and as
+// `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
+// runs the one named like the package, and fails when none is. Run npm run build first.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const built = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
@@ -30,6 +33,14 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
 ];
 
+// What the package may ship: npm's own files, the licences, and the built CLI and app.
+const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt"];
+const SHIPPED = [
+  ...REQUIRED.map((file) => new RegExp(`^${file.replace(/[.]/g, "\\.")}$`)),
+  /^dist\/cli\/[A-Za-z0-9_-]+\.js$/,
+  /^dist\/ui\/[A-Za-z0-9_.-]+\.(js|css|svg)$/,
+];
+
 let failed = 0;
 try {
   mkdirSync(join(root, ".git"));
@@ -43,13 +54,58 @@ try {
     const [b, s] = [run(built), run(source)];
     const same = b.status === s.status && b.stdout === s.stdout && (b.stdout === "") === Boolean(quiet);
     if (!same) failed++;
-    console.log(`${same ? "same" : "DIFFERENT"}  magpie ${args.join(" ")}`);
+    console.log(`${same ? "same" : "DIFFERENT"}  repomagpie ${args.join(" ")}`);
     if (!same) console.log(`  built (exit ${b.status}): ${b.stdout.slice(0, 200)}${b.stderr.slice(0, 200)}\n  source (exit ${s.status}): ${s.stdout.slice(0, 200)}`);
   }
+  failed += checkPackage(join(root, "pack"));
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
 if (failed) {
-  console.error(`${failed} of ${CASES.length} commands answer differently from the source.`);
+  console.error(`${failed} checks failed: commands that answer differently from the source, or the packed package.`);
   process.exitCode = 1;
+}
+
+// Returns the number of failed checks. npm and npx are .cmd files on Windows, which Node runs only
+// through a shell; the shell gets every argument quoted. The npm cache is a scratch folder too.
+function checkPackage(dir: string): number {
+  const windows = process.platform === "win32";
+  const repo = fileURLToPath(new URL("..", import.meta.url));
+  const shell = (command: string, args: string[], cwd = dir) =>
+    spawnSync([command, ...args].map((a) => (/[\s"]/.test(a) ? `"${a}"` : a)).join(" "), { cwd, encoding: "utf8", shell: true });
+  mkdirSync(dir, { recursive: true });
+  const npm = ["--offline", "--no-audit", "--no-fund", "--no-update-notifier", "--cache", join(dir, "cache")];
+  const packed = shell("npm", ["pack", "--json", "--pack-destination", dir], repo);
+  if (packed.status !== 0) return report(false, "npm pack", packed.stderr);
+  const [pack] = JSON.parse(packed.stdout) as { filename: string; files: { path: string }[] }[];
+  const tarball = join(dir, pack.filename);
+  // Only the allowlisted files ship: no tests, fixtures, sources, .worklog or .scratch. And the
+  // package has no runtime dependencies (decision 0025).
+  const shipped = pack.files.map((file) => file.path.replace(/\\/g, "/"));
+  const unexpected = shipped.filter((file) => !SHIPPED.some((allowed) => allowed.test(file)));
+  const missing = REQUIRED.filter((file) => !shipped.includes(file));
+  const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+  const dependencies = Object.keys(pkg.dependencies ?? {});
+  let failures = report(!unexpected.length && !missing.length && !dependencies.length, `npm pack ships only the allowlisted files (${shipped.length}), no runtime dependencies`,
+    [...unexpected.map((f) => `not allowed: ${f}`), ...missing.map((f) => `missing: ${f}`), ...dependencies.map((d) => `runtime dependency: ${d}`)].join("\n  "));
+  const prefix = join(dir, "prefix");
+  const install = shell("npm", ["install", "--global", "--prefix", prefix, ...npm, tarball]);
+  if (install.status !== 0) return report(false, "npm install of the tarball (offline)", install.stderr);
+  const version = (JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string }).version;
+  for (const name of ["repomagpie", "magpie"]) {
+    const run = shell(windows ? join(prefix, `${name}.cmd`) : join(prefix, "bin", name), ["--version"]);
+    failures += report(run.status === 0 && run.stdout.trim() === version, `${name} --version from the installed tarball`, run.stdout + run.stderr);
+  }
+  // A relative path: npx takes an absolute Windows path (C:\…) for a command, not a package. npx
+  // resolves it from the nearest package.json, so the folder gets its own, away from the repository's.
+  writeFileSync(join(dir, "package.json"), "{}\n");
+  const npx = shell("npx", ["--yes", ...npm, `./${basename(tarball)}`, "--version"]);
+  failures += report(npx.status === 0 && npx.stdout.trim() === version, "npx <tarball> --version", `exit ${npx.status}: ${npx.stdout}${npx.stderr}`);
+  return failures;
+}
+
+function report(ok: boolean, what: string, output: string): number {
+  console.log(`${ok ? "ok" : "FAILED"}  ${what}`);
+  if (!ok) console.log(`  ${output.trim().slice(0, 400)}`);
+  return ok ? 0 : 1;
 }

@@ -2,14 +2,14 @@
 // Note list, Graph, Note and Note preview, and the edit of one note. The local app's API returns them as
 // they are. Notes are found only by their id, or by a file name equal to one in the journal's
 // notes/ listing: no request text is ever joined to a path. Never prints.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { editNote, noteVersion } from "./edit.ts";
 import { graphData, type GraphData } from "./graph.ts";
 import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
 import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
-import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
+import { assertWritable, isRecord, isTextOrNull, isTexts, journalPathProblem, noteEntries, noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { knownTags, locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
 import { rankTopics } from "./topic-tags.ts";
@@ -64,6 +64,7 @@ export function createTagList(scope: Scope, place: Place): Result<TagListJson> {
   const journal = locateJournal(scope, place);
   if (journal.error) return tagListDocument(scope, place);
   try {
+    assertWritable(journal.path, join(journal.path, "tags.md"));
     mkdirSync(journal.path, { recursive: true });
     writeFileSync(join(journal.path, "tags.md"), STARTER_TAGS, { flag: "wx" });
   } catch (error) {
@@ -113,6 +114,7 @@ export interface NoteListJson {
   journal: Scope;
   count: number;
   notes: NoteSummary[];
+  skipped: string[]; // the files left out, and why: links and files over 256 KB (decision 0032)
   error?: string;
 }
 
@@ -124,11 +126,12 @@ export interface NoteFilters {
 
 export function noteListDocument(scope: Scope, filters: NoteFilters, place: Place): Result<NoteListJson> {
   const journal = locateJournal(scope, place);
-  if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], error: journal.error } };
-  const notes = summaries(journal.path)
+  if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], skipped: [], error: journal.error } };
+  const { notes: all, skipped } = summaries(journal.path);
+  const notes = all
     .filter((n) => (!filters.status || n.status === filters.status) && (!filters.kind || n.kind === filters.kind) && (filters.tags ?? []).every((tag) => n.tags.includes(tag)))
     .sort((a, b) => compare((a.name ?? a.file).toLowerCase(), (b.name ?? b.file).toLowerCase()) || compare(a.file, b.file));
-  return { outcome: "ok", document: { journal: scope, count: notes.length, notes } };
+  return { outcome: "ok", document: { journal: scope, count: notes.length, notes, skipped } };
 }
 
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
@@ -136,9 +139,9 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 const NOTE_LIST_CACHE = "note-list.json";
 const NOTE_LIST_VERSION = 1;
 
-function summaries(journal: string): NoteSummary[] {
-  const { files, data } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
-  return files.map((file) => data[file]);
+function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
+  const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
+  return { notes: files.map((file) => data[file]), skipped };
 }
 
 // Whether a cached value has a summary's shape (a damaged cache is read again from the note).
@@ -241,7 +244,7 @@ export function tagListPath(scope: Scope, place: Place): string | null {
   const journal = locateJournal(scope, place);
   if (journal.error) return null;
   const path = join(journal.path, "tags.md");
-  return existsSync(path) ? path : null;
+  return existsSync(path) && !journalPathProblem(journal.path, path, false) ? path : null;
 }
 
 // One read of the link cache finds the note and gives its links and backlinks.
@@ -250,7 +253,7 @@ export function noteDocument(scope: Scope, address: NoteAddress, place: Place): 
   if (journal.error) return { outcome: "failed", document: { ...emptyNote(scope), error: journal.error } };
   const entries = linkEntries(journal.path);
   const path = notePath(journal.path, address, entries);
-  if (!path) return { outcome: "not-found", document: { ...emptyNote(scope), error: "No note with that id or file name in this journal." } };
+  if (!path || journalPathProblem(journal.path, path)) return { outcome: "not-found", document: { ...emptyNote(scope), error: "No note with that id or file name in this journal." } };
   return { outcome: "ok", document: noteJson(scope, path, readFileSync(path), entries) };
 }
 
@@ -317,6 +320,7 @@ export function patchNote(request: Record<string, unknown>, place: Place): Resul
   const now = readFileSync(path);
   if (noteVersion(now) !== version) return { outcome: "conflict", document: { ...noteJson(scopeName, path, now), error: CONFLICT } };
   try {
+    assertWritable(dirname(dirname(path)), path); // the journal is the folder above notes/
     writeFileSync(path, edit.text);
   } catch (error) {
     return { outcome: "failed", document: { ...current, error: `Couldn't write ${path}: ${(error as Error).message}` } };
@@ -396,13 +400,10 @@ export async function previewNote(request: { target: string; type?: "npm" | "pyp
 
 // --- helpers ---
 
-// The .md files in <journal>/notes/, sorted; none when the folder doesn't exist.
+// The .md files in <journal>/notes/ that may be read, sorted (noteSignature: no links, nothing over
+// the size limit); none when the folder doesn't exist.
 function noteFiles(journal: string): string[] {
-  try {
-    return readdirSync(join(journal, "notes")).filter((name) => name.endsWith(".md")).sort();
-  } catch {
-    return [];
-  }
+  return noteSignature(journal).files;
 }
 
 // A note is editable only with readable frontmatter that has an id (decision 0023).

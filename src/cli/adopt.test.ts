@@ -78,7 +78,7 @@ test("already in the project: exit 1 with its path, the note unchanged; --json a
   const r = await magpie(box, ["adopt", "pdfkit"], { today: () => "2026-12-01" });
   assert.equal(r.code, 1);
   assert.equal(r.out, "");
-  assert.equal(r.err, `magpie adopt: Already in this project: ${copy}\n`);
+  assert.equal(r.err, `repomagpie adopt: Already in this project: ${copy}\n`);
   assert.equal(readFileSync(copy, "utf8"), before);
   const json = await magpie(box, ["adopt", "pdfkit", "--json"]);
   assert.equal(json.code, 1);
@@ -89,7 +89,7 @@ test("no note: exit 1; an unsupported input: exit 2; nothing written", async () 
   const box = sandbox(FILES);
   const missing = await magpie(box, ["adopt", "chalk"]);
   assert.equal(missing.code, 1);
-  assert.equal(missing.err, "magpie adopt: Your personal journal has no note for pkg:npm/chalk. Write one first with magpie note pkg:npm/chalk.\n");
+  assert.equal(missing.err, "repomagpie adopt: Your personal journal has no note for pkg:npm/chalk. Write one first with repomagpie note pkg:npm/chalk.\n");
   const bad = await magpie(box, ["adopt", "https://example.com/x", "--json"]);
   assert.equal(bad.code, 2);
   assert.deepEqual(Object.keys(JSON.parse(bad.out)), ["id", "from", "to", "install", "install_choices", "error"]);

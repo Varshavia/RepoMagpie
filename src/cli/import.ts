@@ -6,7 +6,7 @@ import { readablePurl } from "../core/identity.ts";
 import { noItemsHint } from "../core/import.ts";
 import { exitCode } from "../core/outcome.ts";
 import { importFailure, locateJournal, runImport, type Journal } from "../core/save.ts";
-import { contextOf, type GlobalOptions } from "./context.ts";
+import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface ImportOptions extends GlobalOptions {
@@ -14,12 +14,13 @@ export interface ImportOptions extends GlobalOptions {
   dryRun?: boolean;
 }
 
-export async function importCommand(file: string, options: ImportOptions, io: Io): Promise<number> {
+export async function importCommand(file: string, options: ImportOptions, terminal: Io): Promise<number> {
+  const io = plainIo(terminal);
   const json = Boolean(options.json);
   const print = (document: object) => io.out(`${JSON.stringify(document)}\n`);
   const stop = (error: string) => {
     if (json) print(importFailure(error));
-    else io.err(`magpie import: ${error}\n`);
+    else io.err(`repomagpie import: ${error}\n`);
     return 1;
   };
 

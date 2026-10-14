@@ -90,7 +90,7 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
     >
       <h1 className="page-title">Add a note</h1>
       <p className="page-lede">
-        Works like <code>magpie note</code>. For a GitHub URL, magpie fetches the repository's description, licence and skills as drafts. magpie writes nothing until you choose Save note.
+        Works like <code>repomagpie note</code>. For a GitHub URL, RepoMagpie fetches the repository's description, licence and skills as drafts. RepoMagpie writes nothing until you choose Save note.
       </p>
 
       <form
@@ -122,7 +122,7 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
             </button>
           </div>
           <p className="field-help">
-            For example <code>pdfkit</code>, the package URL (PURL) <code>pkg:pypi/requests</code>, or a repository URL. Only a GitHub URL makes magpie contact GitHub.
+            For example <code>pdfkit</code>, the package URL (PURL) <code>pkg:pypi/requests</code>, or a repository URL. Only a GitHub URL makes RepoMagpie contact GitHub.
           </p>
         </div>
         <div className="review-fields">

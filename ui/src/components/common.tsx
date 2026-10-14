@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from "react";
 import type { Alternative } from "../../../src/core/recall.ts";
 import { Icon } from "../icons.tsx";
 import { noteHash, unresolvedTitle, type Scope } from "../logic/links.ts";
+import { visible } from "../logic/text.ts";
 
 // A plain click opens the note in the app; a click with a modifier, or the middle button, is left to
 // the browser (a new tab opens the same note from its address).
@@ -34,11 +35,11 @@ export function AlternativeName({ alternative: a, onOpen, onAdd, onSearch, inRow
           onOpen(a.journal, id);
         }}
       >
-        <span translate="no">{a.name}</span>
+        <span translate="no">{visible(a.name)}</span>
       </a>
     );
   }
-  const why = unresolvedTitle({ target: a.name, reason: a.reason });
+  const why = visible(unresolvedTitle({ target: a.name, reason: a.reason }));
   const ambiguous = a.reason === "ambiguous";
   return (
     <button
@@ -52,7 +53,7 @@ export function AlternativeName({ alternative: a, onOpen, onAdd, onSearch, inRow
         else onAdd(a.journal, a.name);
       }}
     >
-      <span translate="no">{a.name}</span>
+      <span translate="no">{visible(a.name)}</span>
       <span className="visually-hidden">{` (${why}. ${ambiguous ? "Search for it" : "Add it"}.)`}</span>
     </button>
   );

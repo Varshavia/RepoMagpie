@@ -25,7 +25,7 @@ export async function uiCommand(options: UiOptions, io: Io): Promise<number> {
         ? `port ${options.port} can't be used here. Choose another with --port.`
         : `the server couldn't start: ${(error as Error).message}`;
     if (json) io.out(`${JSON.stringify({ url: null, port: options.port ?? null, error: message })}\n`);
-    else io.err(`magpie ui: ${message}\n`);
+    else io.err(`repomagpie ui: ${message}\n`);
     return 1;
   }
 

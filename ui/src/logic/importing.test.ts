@@ -22,7 +22,7 @@ test("lineTarget: the target on that line, without the dash and the parts", () =
 // The app can't bundle core, so it mirrors core's item rule; these keep the two equal.
 const LENIENT = [
   TEXT,
-  "﻿* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
+  String.fromCharCode(0xfeff) + "* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
   "",
   " \n\t\n",
   "\n\n1. pdfkit — verdict: ok",
@@ -54,6 +54,6 @@ test("resultWord: what will happen in a dry run, what happened otherwise", () =>
 
 test("summary counts every result, unchanged included", () => {
   const items = [{ result: "created" }, { result: "created" }, { result: "unchanged" }, { result: "failed" }] as const;
-  assert.equal(summary([...items], true), "magpie wrote nothing yet: 2 to create, 0 to update, 1 unchanged, 1 failing.");
+  assert.equal(summary([...items], true), "RepoMagpie wrote nothing yet: 2 to create, 0 to update, 1 unchanged, 1 failing.");
   assert.equal(summary([...items], false), "2 created, 0 updated, 1 unchanged, 1 failed.");
 });

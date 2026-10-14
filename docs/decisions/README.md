@@ -10,7 +10,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | # | Decision | Status |
 |---|---|---|
 | 0001 | [Plain Markdown storage](0001-plain-markdown-storage.md) | accepted |
-| 0002 | [CLI first, SKILL.md, MCP later](0002-cli-first.md) | accepted |
+| 0002 | [CLI first, SKILL.md, MCP later](0002-cli-first.md) | accepted (command name amended by 0031) |
 | 0003 | [Personal vault lives outside the repo](0003-vault-outside-repo.md) | accepted |
 | 0004 | [English everywhere](0004-english-everywhere.md) | accepted |
 | 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | superseded by 0018 |
@@ -23,7 +23,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
 | 0014 | [Close step 1.5 with desk research instead of interviews](0014-step-1-5-desk-research.md) | accepted |
-| 0015 | [Language and runtime: TypeScript on Node.js](0015-typescript-on-node.md) | accepted |
+| 0015 | [Language and runtime: TypeScript on Node.js](0015-typescript-on-node.md) | accepted (command name settled by 0031) |
 | 0016 | [Journal locations and config resolution](0016-journal-locations-and-config.md) | accepted |
 | 0017 | [Package identity with Package URL (PURL)](0017-package-identity-purl.md) | accepted |
 | 0018 | [AI drafts, humans decide](0018-ai-drafts-humans-decide.md) | accepted (supersedes 0005) |
@@ -39,3 +39,6 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0028 | [The graph page](0028-the-graph-page.md) | accepted |
 | 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
 | 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted |
+| 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
+| 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
+| 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |

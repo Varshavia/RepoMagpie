@@ -6,9 +6,10 @@ import { join } from "node:path";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { readProject } from "./manifests.ts";
 import type { Outcome } from "./outcome.ts";
-import { alternativesOfFile, isAvoid, loadRecallEntries, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
+import { alternativeForAgent, alternativesOfFile, isAvoid, loadRecallEntries, matchForAgent, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
 import { projectFirst, type JournalSource } from "./search.ts";
 import { loadIndex, type SearchDoc } from "./search-index.ts";
+import { CAPS, clean, forAgent } from "./text.ts";
 
 export interface SuggestRequest {
   description?: string; // instead of the project's manifests and README
@@ -54,8 +55,27 @@ export interface SuggestRun {
   warnings: string[];
 }
 
+// The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
+// API alike; people get the document as read. Candidates' alternatives are capped as recall's.
+export function suggestForAgent(document: SuggestJson): SuggestJson {
+  const candidates = document.candidates.map((c) => forAgent({ ...c, alternatives: c.alternatives.map(alternativeForAgent) }, {
+    id: CAPS.id, name: CAPS.name, verdict: CAPS.verdict, path: Infinity,
+    tags: { each: CAPS.tag, count: CAPS.tags }, alternatives: { each: CAPS.other, count: CAPS.alternatives },
+  }));
+  return forAgent({ ...document, candidates, in_use_avoid: document.in_use_avoid.map(matchForAgent) }, {});
+}
+
 export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
-  const project = readProject(place.cwd, place.home);
+  // A cloned repository's manifests and README are written by strangers, as notes are (decision
+  // 0032): cleaned before anything uses them, so no dependency's name reaches the why line or the
+  // JSON as written.
+  const read = readProject(place.cwd, place.home);
+  const project = {
+    ...read,
+    dependencies: read.dependencies.map((d) => ({ ...d, name: clean(d.name) })),
+    keywords: read.keywords.map((k) => clean(k)),
+    texts: read.texts.map((t) => clean(t, true)),
+  };
   const source = request.description === undefined ? "manifests" : "description";
   const keywords = keywordsOf(source === "description"
     ? [request.description ?? ""]
@@ -66,8 +86,8 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   const run = (outcome: Outcome, total = 0, inUseNames: string[] = []): SuggestRun => ({ outcome, document, total, in_use_names: inUseNames, warnings: personal.warnings });
   if (!keywords.length) {
     document.error = source === "description"
-      ? "The description has no words to look for. Name what the project does, for example: magpie suggest \"a TypeScript CLI with tests\""
-      : `Nothing to go on in ${project.folder}: no package.json, pyproject.toml, Cargo.toml or README. Describe the project instead: magpie suggest "a TypeScript CLI with tests"`;
+      ? "The description has no words to look for. Name what the project does, for example: repomagpie suggest \"a TypeScript CLI with tests\""
+      : `Nothing to go on in ${project.folder}: no package.json, pyproject.toml, Cargo.toml or README. Describe the project instead: repomagpie suggest "a TypeScript CLI with tests"`;
     return run("usage");
   }
 
@@ -144,8 +164,9 @@ const COMMON_WORDS = new Set(("about after again before both does each end every
 
 // The keywords of some texts: lowercase words, each once, in order; no stop words, no common words,
 // no numbers. Package names split into their words (@types/node → node).
+// A hidden character's marker (decision 0032, rule 1) is a word break, not a word.
 export function keywordsOf(texts: string[]): string[] {
-  const words = texts.flatMap((text) => text.toLowerCase().split(/[^a-z0-9]+/));
+  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4}>/g, " ").split(/[^a-z0-9]+/));
   return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
 }
 

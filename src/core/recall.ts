@@ -8,6 +8,7 @@ import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { DRAFT_MARKER, readNote } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
+import { CAPS, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
@@ -80,7 +81,11 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
 export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean } {
   const { files, signature } = noteSignature(journal);
   const cached = readCache(journal, RECALL_CACHE, CACHE_VERSION, signature);
-  if (Array.isArray(cached) && cached.every(isRecallEntry)) return { entries: cached as RecallEntry[], rebuilt: false };
+  // Every entry must also name a note file the listing has: a cache a repository committed can't
+  // send recall to a file elsewhere (decision 0032).
+  if (Array.isArray(cached) && cached.every((e) => isRecallEntry(e) && Object.hasOwn(signature, (e as RecallEntry).file))) {
+    return { entries: cached as RecallEntry[], rebuilt: false };
+  }
   const entries = files.flatMap((file) => entryOf(readFileSync(join(journal, "notes", file), "utf8"), file) ?? []);
   if (files.length) writeCache(journal, RECALL_CACHE, CACHE_VERSION, signature, entries);
   return { entries, rebuilt: true };
@@ -256,10 +261,23 @@ function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[]
 const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];
 
 export interface RecallRun {
-  document: { matches: Omit<RecallMatch, "name">[] }; // the --json document (spec §2)
-  results: { query: string; matches: RecallMatch[] }[];
+  document: { matches: Omit<RecallMatch, "name">[] }; // the --json document (spec §2), for an agent
+  results: { query: string; matches: RecallMatch[] }[]; // as read, for people
   warnings: string[];
 }
+
+// A match as agent-facing output shows it (decision 0032, rule 2): note text cleaned and capped, and
+// `truncated` on each match and alternative that had a field cut. suggest's in_use_avoid uses it too.
+const ALTERNATIVE_CAPS = { name: CAPS.name, id: CAPS.id, verdict: CAPS.verdict, path: Infinity };
+const MATCH_CAPS = {
+  id: CAPS.id, name: CAPS.name, verdict: CAPS.verdict, path: Infinity,
+  avoid_when: { each: CAPS.item, count: CAPS.items }, use_when: { each: CAPS.item, count: CAPS.items },
+  alternatives: { each: CAPS.other, count: CAPS.alternatives },
+};
+export function matchForAgent<M extends Omit<RecallMatch, "name">>(match: M): M & { truncated?: string[] } {
+  return forAgent({ ...match, alternatives: match.alternatives.map(alternativeForAgent) }, MATCH_CAPS);
+}
+export const alternativeForAgent = (alternative: Alternative): Alternative => forAgent(alternative, ALTERNATIVE_CAPS);
 
 // magpie recall <package...>. A bare name's type: `type`, else the nearest manifest; unsettled
 // means every type (spec §2).
@@ -268,7 +286,7 @@ export function runRecall(queries: string[], type: PackageType | undefined, plac
   const types = type ? [type] : fromManifests.length ? fromManifests : ALL_TYPES;
   const { sources, warnings } = openRecallSources(place);
   const results = queries.map((query) => ({ query, matches: recall(sources, query, types) }));
-  const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => match);
+  const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => matchForAgent(match));
   return { document: { matches }, results, warnings };
 }
 

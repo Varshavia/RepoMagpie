@@ -3,10 +3,11 @@
 // reorders a tag. The ranking reads the journal as it was before the run, so the result doesn't depend
 // on the order the notes are visited. A human edit: it runs only when the user asks (magpie tags
 // --from-topics, the app's button). Writes notes and tags.md; never prints.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { appendTags, carried, journalTagList, type Place } from "./journals.ts";
 import { readableId, readNote } from "./note.ts";
+import { assertWritable, noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { locateJournal, type Journal } from "./save.ts";
 import { rankTopics, TAG_LIMIT } from "./topic-tags.ts";
@@ -30,7 +31,7 @@ export function tagsFromTopics(request: { journal: Scope; dryRun: boolean }, pla
 
   // Every note, read once, before anything is written.
   const folder = join(journal.path, "notes");
-  const notes = noteFiles(folder).map((file) => {
+  const notes = noteSignature(journal.path).files.map((file) => {
     const path = join(folder, file);
     try {
       const text = readFileSync(path, "utf8");
@@ -66,6 +67,7 @@ export function tagsFromTopics(request: { journal: Scope; dryRun: boolean }, pla
   for (const note of planned) {
     if (!request.dryRun) {
       try {
+        assertWritable(journal.path, note.path);
         writeFileSync(note.path, note.text);
       } catch (error) {
         document.skipped.push({ path: note.path, reason: `Couldn't write it: ${(error as Error).message}` });
@@ -86,13 +88,4 @@ export function tagsFromTopics(request: { journal: Scope; dryRun: boolean }, pla
     }
   }
   return { outcome: "ok", document };
-}
-
-// The .md files in <journal>/notes/, sorted; none when the folder doesn't exist.
-function noteFiles(folder: string): string[] {
-  try {
-    return readdirSync(folder).filter((name) => name.endsWith(".md")).sort();
-  } catch {
-    return [];
-  }
 }

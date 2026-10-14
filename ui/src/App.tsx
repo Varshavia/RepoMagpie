@@ -23,12 +23,12 @@ import { keyAction, type Action, type Pending } from "./logic/keys.ts";
 import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagListState } from "./logic/notes.ts";
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
 import { addTarget, noteHash, parseNoteHash } from "./logic/links.ts";
-import { homePath } from "./logic/text.ts";
+import { homePath, visible } from "./logic/text.ts";
 import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
 
-type ListState = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; notes: NoteSummary[] };
+type ListState = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; notes: NoteSummary[]; skipped: string[] };
 type Live = { tick: number; files: string[] };
 
 const SCOPES: Scope[] = ["personal", "project"];
@@ -72,7 +72,7 @@ export function App() {
   const loadList = useCallback((scope: Scope, quiet = false) => {
     if (!quiet) setLists((l) => ({ ...l, [scope]: { status: "loading" } }));
     api.notes(scope).then(
-      (doc) => setLists((l) => ({ ...l, [scope]: { status: "ready", notes: doc.notes } })),
+      (doc) => setLists((l) => ({ ...l, [scope]: { status: "ready", notes: doc.notes, skipped: doc.skipped ?? [] } })),
       (error: ApiError) => setLists((l) => ({ ...l, [scope]: { status: "error", error: error.message } })),
     );
   }, []);
@@ -298,7 +298,8 @@ export function App() {
             }
           : n,
       );
-      setLists((l) => ({ ...l, [doc.journal]: { status: "ready", notes: updated } }));
+      const was = lists[doc.journal];
+      setLists((l) => ({ ...l, [doc.journal]: { status: "ready", notes: updated, skipped: was.status === "ready" ? was.skipped : [] } }));
       // Inbox review: a saved Verdict moves the note to reviewed; the next inbox note opens.
       if (view.page === "inbox" && doc.status === "reviewed" && doc.journal === journal) {
         const next = nextAfter(items.map(keyOf), key);
@@ -480,6 +481,7 @@ export function App() {
           {view.page === "all" && fromTopics.plan ? (
             <FromTopicsBanner plan={fromTopics.plan} busy={fromTopics.busy} onApply={fromTopics.apply} onCancel={fromTopics.cancel} />
           ) : null}
+          {state.status === "ready" && state.skipped.length ? <SkippedFiles skipped={state.skipped} /> : null}
           {state.status === "loading" ? (
             <SkeletonRows label="Loading the notes" />
           ) : state.status === "error" ? (
@@ -509,7 +511,7 @@ export function App() {
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>{`Your inbox is empty. Add a repository here, or from the palette (${MOD}+K).`}</EmptyState>
           ) : (
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>
-              No notes in this journal yet. Add one here, or run <code>magpie note</code> in a terminal.
+              No notes in this journal yet. Add one here, or run <code>repomagpie note</code> in a terminal.
             </EmptyState>
           )}
         </section>
@@ -630,7 +632,7 @@ export function App() {
       {connection === "lost" ? (
         <div className="banner-strip" role="alert">
           <Icon name="warning" />
-          <span className="text">Lost the connection to magpie ui. Your notes are safe on disk. Start magpie ui again, then open the URL it prints.</span>
+          <span className="text">Lost the connection to repomagpie ui. Your notes are safe on disk. Start repomagpie ui again, then open the URL it prints.</span>
         </div>
       ) : null}
       <Sidebar
@@ -654,6 +656,27 @@ export function App() {
       {palette ? <Palette actions={commands} onNote={(r) => r.id && openNote(r.journal, r.id)} onClose={() => setPalette(false)} /> : null}
       {help ? <KeyMapDialog onClose={() => setHelp(false)} /> : null}
       <Toasts toasts={toasts} />
+    </div>
+  );
+}
+
+// The files the journal left out (decision 0032): links and files over 256 KB are never read, so a
+// cloned repository can't make the app read a file elsewhere. Named here, so nothing goes missing
+// without a word.
+function SkippedFiles({ skipped }: { skipped: string[] }) {
+  return (
+    <div className="skipped-files" role="region" aria-label="Skipped files">
+      <p className="text">
+        <Icon name="warning" />
+        {` Skipped ${skipped.length} ${skipped.length === 1 ? "file" : "files"} in this journal. RepoMagpie never reads a link, or a file over 256 KB, in a journal.`}
+      </p>
+      <ul>
+        {skipped.map((problem) => (
+          <li key={problem} className="mono">
+            {visible(problem)}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

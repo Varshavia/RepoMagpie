@@ -4,9 +4,9 @@
 
 > RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
 
-- **Remember:** write a verdict in one line, `magpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
+- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes Claude Code ask you.
-- **Suggest:** `magpie suggest` reads a project's manifests and README, and lists the notes that fit it.
+- **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
 **Status:** pre-release `0.2.0-beta.2`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
@@ -14,17 +14,19 @@
 
 You need Node.js 22.12 or later.
 
-1. Install the `magpie` command:
+1. Install the `repomagpie` command:
 
    ```bash
    npm install -g repomagpie@beta
    ```
 
+   `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+
 2. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
    ```bash
-   magpie note pdfkit "avoid: async streams painful; use puppeteer"
-   magpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
+   repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
+   repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
    ```
 
    Notes go to your personal journal in `~/.magpie`. Add `--to project` to write to the project journal, `.magpie/` in the repository, which your team shares through git.
@@ -36,18 +38,18 @@ You need Node.js 22.12 or later.
      "hooks": {
        "PreToolUse": [
          { "matcher": "Bash|PowerShell",
-           "hooks": [ { "type": "command", "command": "magpie hook claude-code" } ] }
+           "hooks": [ { "type": "command", "command": "repomagpie hook claude-code" } ] }
        ]
      }
    }
    ```
 
-   The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `magpie hook claude-code --inform-only`, so notes inform the agent and never ask.
+   The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `repomagpie hook claude-code --inform-only`, so notes inform the agent and never ask.
 
 4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
 
    ```bash
-   magpie ui
+   repomagpie ui
    ```
 
 5. Install the agent skill, for Claude Code and any other agent that supports [Agent Skills](https://agentskills.io):
@@ -56,29 +58,29 @@ You need Node.js 22.12 or later.
    npx skills add Varshavia/RepoMagpie
    ```
 
-   With the skill, the agent runs `magpie recall` before it adds a dependency, answers "what do I have for browser testing?" with `magpie search`, and offers to save your opinion on a tool. In agents without the hook, the skill is the only recall check, and it works as well as the agent follows it.
+   With the skill, the agent runs `repomagpie recall` before it adds a dependency, answers "what do I have for browser testing?" with `repomagpie search`, and offers to save your opinion on a tool. In agents without the hook, the skill is the only recall check, and it works as well as the agent follows it.
 
-More commands: `magpie search`, `magpie recall`, `magpie adopt` and `magpie import`. Run `magpie --help`, or read the [spec](docs/spec.md).
+More commands: `repomagpie search`, `repomagpie recall`, `repomagpie adopt` and `repomagpie import`. Run `repomagpie --help`, or read the [spec](docs/spec.md).
 
 ## The local app
 
 Review an inbox note: write the Verdict, set kind, tags and rating, and press Ctrl+Enter.
 
-![The inbox review in magpie ui: the note's description and Use when above the Verdict editor](docs/assets/screen-inbox-review.png)
+![The inbox review in repomagpie ui: the note's description and Use when above the Verdict editor](docs/assets/screen-inbox-review.png)
 
 Check a package: what your journals say before an install, and what the Claude Code hook would do.
 
-![Check a package in magpie ui: pdfkit has an avoid note, so Claude Code asks first; puppeteer has a note; left-pad has none](docs/assets/screen-check-package.png)
+![Check a package in repomagpie ui: pdfkit has an avoid note, so Claude Code asks first; puppeteer has a note; left-pad has none](docs/assets/screen-check-package.png)
 
 Suggest for this project: the notes that fit, and why each one is a candidate.
 
-![Suggest in magpie ui: candidates with a why line, and pdfkit listed apart as in use with an avoid note](docs/assets/screen-suggest.png)
+![Suggest in repomagpie ui: candidates with a why line, and pdfkit listed apart as in use with an avoid note](docs/assets/screen-suggest.png)
 
 Link notes: write `[[puppeteer]]` in any section to link to that note, and add alternatives under the Verdict. "Linked from" at the end of a note lists the notes that link to it. A repository's GitHub topics show as tags you can add with one click.
 
 See a journal as a graph: notes, the tags they carry, their links and alternatives. Click a note to read and edit it beside the graph, or filter by kind, tag and status.
 
-![The graph page in magpie ui: 800 notes around their tags, with the most connected tags listed beside the graph](docs/assets/screen-graph.png)
+![The graph page in repomagpie ui: 800 notes around their tags, with the most connected tags listed beside the graph](docs/assets/screen-graph.png)
 
 ## How it compares
 
@@ -94,11 +96,11 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 
 ## Privacy
 
-magpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `magpie ui` listens on `127.0.0.1` only.
+RepoMagpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `repomagpie ui` listens on `127.0.0.1` only.
 
-The only network requests are to GitHub's API, when you give `magpie note`, `magpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry.
+The only network requests are to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry.
 
-Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give magpie its token for the current shell to raise the limit:
+Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit:
 
 ```bash
 export GITHUB_TOKEN=$(gh auth token)
@@ -110,7 +112,7 @@ $env:GITHUB_TOKEN = gh auth token
 
 ## Platforms
 
-- Node.js 22.12 or later. CI runs on Linux and Windows, with Node 22, 24 and 26. macOS isn't tested yet.
+- Node.js 22.12 or later. CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
 - The hook works in Claude Code. Other agents use the skill.
 - The package has no runtime dependencies.
 
@@ -123,6 +125,8 @@ $env:GITHUB_TOKEN = gh auth token
 - [Vision](docs/vision.md), [competitors](docs/competitors.md) and [decisions](docs/decisions/)
 
 Open an issue for bugs and ideas. The project doesn't take pull requests yet ([CONTRIBUTING.md](CONTRIBUTING.md)). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+**Official channels:** this repository, the npm package `repomagpie` and its skills.sh listing. There are no installers or `.exe` downloads; anything else is not ours ([SECURITY.md](SECURITY.md#official-channels)).
 
 ## Licence
 

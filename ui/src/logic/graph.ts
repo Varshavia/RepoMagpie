@@ -2,6 +2,7 @@
 // starts, how big it is, the edge styles, the layout's settings and the status line. No DOM, no
 // sigma: the page (components/GraphPage.tsx) draws what this decides.
 import type { GraphJson } from "../../../src/core/documents.ts";
+import { visible } from "./text.ts";
 
 export type { GraphJson };
 export type GraphNode = GraphJson["nodes"][number];
@@ -124,8 +125,9 @@ export function largest(shown: Shown, limit: number): GraphNode[] {
 }
 
 // The name a node goes by: a note's name or file stem, #tag, a missing note's target.
+// With hidden characters as markers (decision 0032, rule 1): the canvas applies bidi to its text too.
 export function nodeLabel(node: GraphNode): string {
-  return node.type === "note" ? (node.name ?? node.file.replace(/\.md$/, "")) : node.type === "tag" ? `#${node.tag}` : node.target;
+  return visible(node.type === "note" ? (node.name ?? node.file.replace(/\.md$/, "")) : node.type === "tag" ? `#${node.tag}` : node.target);
 }
 
 export const KIND_GROUP_LABEL: Record<KindGroup, string> = { "skill-pack": "Skill pack", tool: "Tool", resource: "Resource", other: "Other" };

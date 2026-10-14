@@ -164,7 +164,7 @@ test("several alternatives in a terminal: one per line, at most 3, then +N more;
     "  Alternatives  playwright: browser tests",
     "                puppeteer: default for PDF rendering in new projects",
     "                pdf-lib: [inbox] no verdict yet",
-    "                +2 more (magpie recall pdfkit --full)",
+    "                +2 more (repomagpie recall pdfkit --full)",
     `  ${join(box.journal, "notes", "npm--pdfkit.md")}`,
     "",
   ].join("\n"));
@@ -173,7 +173,7 @@ test("several alternatives in a terminal: one per line, at most 3, then +N more;
 test("several alternatives piped: one line, separated by ; (spec §8)", async () => {
   const box = sandbox(ALTERNATIVES);
   const r = await magpie(box, ["recall", "pdfkit"]);
-  assert.match(r.out, /\n {2}Alternatives {2}playwright: browser tests; puppeteer: default for PDF rendering in new projects; pdf-lib: \[inbox\] no verdict yet; \+2 more \(magpie recall pdfkit --full\)\n/);
+  assert.match(r.out, /\n {2}Alternatives {2}playwright: browser tests; puppeteer: default for PDF rendering in new projects; pdf-lib: \[inbox\] no verdict yet; \+2 more \(repomagpie recall pdfkit --full\)\n/);
 });
 
 test("--full lists every alternative, after Avoid when", async () => {
@@ -187,7 +187,7 @@ test("--full lists every alternative, after Avoid when", async () => {
     " {18}jspdf: avoid: tiny API \\(you also noted to avoid it\\)",
     " {18}wkhtmltopdf\n",
   ].join("\n")));
-  assert.ok(!r.out.includes("more (magpie recall"));
+  assert.ok(!r.out.includes("more (repomagpie recall"));
 });
 
 test("--json: every match carries its alternatives in recall's shape", async () => {

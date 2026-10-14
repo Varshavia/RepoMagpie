@@ -1,10 +1,11 @@
 // Where the journals are and what they hold: spec section 3, decision 0016.
 // Uses the file system; never prints. Home, environment and working directory are passed in.
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Manifest } from "./identity.ts";
-import { readNote } from "./note.ts";
+import { readNote, YAML_LIMITS } from "./note.ts";
+import { assertWritable, linkProblem, noteSignature, readableJournalFile, skip } from "./note-cache.ts";
 
 export type Env = Record<string, string | undefined>;
 
@@ -41,7 +42,7 @@ export function resolvePersonalJournal(options: { home: string; env: Env; cwd: s
 
   let config: unknown;
   try {
-    config = parseYaml(readFileSync(file, "utf8"));
+    config = parseYaml(readFileSync(file, "utf8"), YAML_LIMITS);
   } catch (error) {
     return { ...fallback, warnings: [`Ignoring ${file}: ${(error as Error).message.split("\n")[0]}`] };
   }
@@ -57,19 +58,38 @@ export function resolvePersonalJournal(options: { home: string; env: Env; cwd: s
 // --project, or the first .magpie/ folder walking up from the working directory.
 // --project names the project root, like git -C; a path to the .magpie folder itself also works.
 // The walk stops at the git root (a folder containing .git), the home directory or the filesystem
-// root. It never takes the personal journal's folder, nor the home directory's own .magpie.
+// root. It never takes the personal journal's folder, nor the home directory's own .magpie. A .magpie
+// that is a link is never a project journal (decision 0032, rule 5): the repository chose where it
+// points. It is skipped for the report.
 export function findProjectJournal(options: { cwd: string; home: string; personalJournal: string; flag?: string }): string | null {
   const { cwd, home, personalJournal, flag } = options;
   if (flag) {
-    const path = resolve(cwd, flag);
-    return basename(path) === ".magpie" ? path : join(path, ".magpie");
+    const path = flagJournal(cwd, flag);
+    return isLink(path) ? (skip(linkProblem(path)), null) : path;
   }
   const personal = comparable(personalJournal);
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
     if (samePath(dir, home)) return null;
     const candidate = join(dir, ".magpie");
-    if (isDirectory(candidate) && comparable(candidate) !== personal) return candidate;
+    if (comparable(candidate) === personal) {
+      // The personal journal's folder, which may be a link the user made: never the project journal.
+    } else if (isLink(candidate)) skip(linkProblem(candidate));
+    else if (isDirectory(candidate)) return candidate;
     if (existsSync(join(dir, ".git")) || dirname(dir) === dir) return null;
+  }
+}
+
+// The project journal --project names: the project root's .magpie, or the .magpie folder itself.
+export function flagJournal(cwd: string, flag: string): string {
+  const path = resolve(cwd, flag);
+  return basename(path) === ".magpie" ? path : join(path, ".magpie");
+}
+
+export function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
   }
 }
 
@@ -125,14 +145,18 @@ The tag list for this journal. Use only these tags in notes; add a line here bef
 // Prepares a journal for a note (spec §3): notes/, and for a project journal a .gitignore for
 // .cache/. A journal created now (no notes/ yet) also gets the starter tag list, unless it has a
 // tags.md. Existing files are never overwritten. Returns true when the journal folder was created.
+// Never writes through a link (decision 0032, rule 5): a project journal that is a link, or a link
+// at notes/, tags.md or .gitignore, throws.
 export function createJournal(path: string, scope: "personal" | "project"): boolean {
+  if (scope === "project" && isLink(path)) throw new Error(`Won't write to ${path}: ${linkProblem(path).message}.`);
   const created = !existsSync(path);
   const notes = join(path, "notes");
+  const tags = join(path, "tags.md");
+  const ignore = join(path, ".gitignore");
+  for (const file of [notes, tags, ignore]) assertWritable(path, file, false);
   const isNew = !existsSync(notes);
   mkdirSync(notes, { recursive: true });
-  const tags = join(path, "tags.md");
   if (isNew && !existsSync(tags)) writeFileSync(tags, STARTER_TAGS);
-  const ignore = join(path, ".gitignore");
   if (scope === "project" && !existsSync(ignore)) writeFileSync(ignore, ".cache/\n");
   return created;
 }
@@ -140,8 +164,18 @@ export function createJournal(path: string, scope: "personal" | "project"): bool
 // The tag list to draft tags from: tags.md; for a journal not created yet, the starter list it
 // will get; otherwise none.
 export function journalTagList(path: string): string[] {
-  if (existsSync(join(path, "tags.md"))) return readTagList(path);
+  if (lstatExists(join(path, "tags.md"))) return readTagList(path);
   return existsSync(join(path, "notes")) ? [] : parseTagList(STARTER_TAGS);
+}
+
+// Whether something is at the path, without following a link.
+function lstatExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export interface NoteEntry {
@@ -152,13 +186,12 @@ export interface NoteEntry {
   text?: string; // set by a dry run: the text that would have been written
 }
 
-// Every note in <journal>/notes/ with its id, packages, topics and tags.
+// Every note in <journal>/notes/ with its id, packages, topics and tags; links and files over the
+// size limit are left out (noteSignature).
 export function listNotes(journal: string): NoteEntry[] {
   const folder = join(journal, "notes");
   if (!isDirectory(folder)) return [];
-  return readdirSync(folder)
-    .filter((name) => name.endsWith(".md"))
-    .sort()
+  return noteSignature(journal).files
     .map((name) => {
       const path = join(folder, name);
       const { frontmatter } = readNote(readFileSync(path, "utf8"));
@@ -193,6 +226,8 @@ export function parseTagList(text: string): string[] {
 // heading and just these tags (decision 0030). Returns the tags appended; throws if it can't write.
 export function appendTags(journal: string, tags: readonly string[]): string[] {
   const file = join(journal, "tags.md");
+  if (!tags.length) return [];
+  assertWritable(journal, file); // never through a link, nor to a file over the size limit
   const text = existsSync(file) ? readFileSync(file, "utf8") : null;
   const listed = text === null ? [] : parseTagList(text);
   const added = [...new Set(tags)].filter((tag) => !listed.includes(tag));
@@ -203,10 +238,11 @@ export function appendTags(journal: string, tags: readonly string[]): string[] {
   return added;
 }
 
-// The journal's tag list, <journal>/tags.md; empty when there is none.
+// The journal's tag list, <journal>/tags.md; empty when there is none, or when it is a link or over
+// the size limit (skipped for the report).
 export function readTagList(journal: string): string[] {
-  const file = join(journal, "tags.md");
-  return existsSync(file) ? parseTagList(readFileSync(file, "utf8")) : [];
+  const file = readableJournalFile(journal, join(journal, "tags.md"));
+  return file ? parseTagList(readFileSync(file, "utf8")) : [];
 }
 
 function isDirectory(path: string): boolean {

@@ -58,7 +58,7 @@ export function JournalChoice({ value, onChange, project }: { value: Scope; onCh
           Project
         </button>
       </div>
-      {project === "none" ? <p className="field-help">No project here: start magpie ui inside a project to use its journal.</p> : null}
+      {project === "none" ? <p className="field-help">No project here: start repomagpie ui inside a project to use its journal.</p> : null}
       {value === "project" && project === "new" ? <p className="field-help">This project has no journal yet; saving creates .magpie/ at its root.</p> : null}
     </div>
   );

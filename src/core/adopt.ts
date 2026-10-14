@@ -7,6 +7,7 @@ import { PackageURL } from "packageurl-js";
 import { fileNameClash, readablePurl, type PackageType } from "./identity.ts";
 import { createJournal, listNotes, noteFor } from "./journals.ts";
 import { readNote } from "./note.ts";
+import { assertWritable, journalPathProblem } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { verdictSaysAvoid } from "./recall.ts";
 import { locateJournal, resolveInput, type Context } from "./save.ts";
@@ -47,7 +48,7 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   if (!resolved.ok) return stop(resolved.error, "usage");
   const source = noteFor(listNotes(personal.path), resolved.purl);
   const readable = readablePurl(resolved.purl);
-  if (!source?.id) return stop(`Your personal journal has no note for ${readable}. Write one first with magpie note ${readable}.`, "failed");
+  if (!source?.id) return stop(`Your personal journal has no note for ${readable}. Write one first with repomagpie note ${readable}.`, "failed");
 
   const project = locateJournal("project", context);
   if (project.error) return stop(project.error, "failed", { id: source.id, from: source.path });
@@ -58,6 +59,8 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   const projectNotes = listNotes(project.path);
   const there = [source.id, ...source.packages].map((purl) => noteFor(projectNotes, purl)).find((entry) => entry);
   if (there) return stop(`Already in this project: ${there.path}`, "failed", { ...found, to: there.path });
+  const blocked = journalPathProblem(project.path, to); // a link, or a file over the size limit (decision 0032)
+  if (blocked) return stop(`Won't write ${to}: ${blocked.message}.`, "failed", found);
   if (existsSync(to)) {
     const clash = fileNameClash(source.id, projectNotes.find((entry) => entry.path === to)?.id);
     return stop(clash ?? `${to} has no readable id, so it was left unchanged.`, "failed", found);
@@ -68,6 +71,7 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   const notices: string[] = [];
   try {
     if (createJournal(project.path, "project")) notices.push(`Created the project journal: ${project.path}`);
+    assertWritable(project.path, to);
     writeFileSync(to, copy.text, { flag: "wx" }); // never over a file that appeared meanwhile
   } catch (error) {
     return stop(`Couldn't write ${to}: ${(error as Error).message}`, "failed", found);
