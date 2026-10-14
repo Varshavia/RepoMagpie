@@ -267,7 +267,7 @@ Sets up RepoMagpie in the user's coding agents ([decision 0035](decisions/0035-s
 
 - Flags: `--yes` (apply without asking), `--dry-run` (the plan only), `--agents <list>` (`claude-code`, `codex`, `cursor`, `gemini`, `vscode`, comma-separated; default: every installed one), `--remove` (take RepoMagpie's entries out), `--allow-write` (the entry starts the server with the `note` tool), and the global `--json`, `--home` and `--project`.
 - **The skill**, when any agent is set up: the package's `skills/repomagpie/` copied to `~/.agents/skills/repomagpie/` (read by Codex, Cursor, Gemini CLI, VS Code, Copilot CLI and Zed), and, when Claude Code is set up, `~/.claude/skills/repomagpie` as a link to it: a junction on Windows, a relative symlink elsewhere, a copy when a link can't be made. That is the `skills` CLI's layout, so `npx skills add` and `setup` agree. An older copy is updated in place; an older real copy in Claude Code's folder is replaced by the link. Backups go beside the skills folder (`~/.agents/repomagpie-skill.repomagpie-backup-<stamp>`), never in it, where an agent would read them as a second skill. A folder or link that isn't RepoMagpie's is left alone, and named.
-- **The Claude Code hook**, when Claude Code is set up: a `PreToolUse` group `{"matcher": "Bash|PowerShell", "hooks": [{"type": "command", "command": "repomagpie hook claude-code"}]}` last in `~/.claude/settings.json`'s `hooks.PreToolUse`, every other byte kept (section 6). An entry that runs `magpie hook claude-code` is changed to `repomagpie hook claude-code` in place, its flags kept (`--inform-only`); with a current entry too, the old one is removed. An entry that runs RepoMagpie another way is kept. `--remove` takes out only RepoMagpie's hooks: a group of its own whole, its hook alone from a shared group. <!-- check:commands allow -->
+- **The Claude Code hook**, when Claude Code is set up: a `PreToolUse` group with matcher `Bash|PowerShell`, last in `~/.claude/settings.json`'s `hooks.PreToolUse`, every other byte kept. In the user's settings it starts node directly (the exec form: the MCP entry's node, `--disallow-code-generation-from-strings`, the entry file, `hook claude-code`); with `--project`, it is `repomagpie hook claude-code` (section 6). Older entries (`magpie hook claude-code`, the `repomagpie` shell form in the user's settings, an exec form with other paths) are changed in place, their flags kept (`--inform-only`), other keys of the entry kept; a second entry of ours is removed. An entry that runs RepoMagpie another way is kept. `--remove` takes out only RepoMagpie's hooks, in any form: a group of its own whole, its hook alone from a shared group. From npx's cache, no user hook is written, as no MCP entry is. <!-- check:commands allow -->
 - **`--project <dir>`** (the global flag: the project root, or its `.magpie` folder): the skill and the hook go into that project (`.agents/skills/`, `.claude/skills/`, `.claude/settings.json`), to commit for the team; on Windows the Claude Code folder gets a copy, since a junction can't be committed. The MCP entries stay in the user's own settings: an entry names this machine's `node` and install. A `--project` that isn't a folder is a usage error.
 - **Agents:** an agent is installed when its config folder exists or its command is on `PATH` ([agents](agents.md)). Without `--agents`, the ones that aren't are listed as `not installed`.
 - **The entry** starts the absolute `node` with `--disallow-code-generation-from-strings`, the absolute entry file of the installed CLI, and `mcp` (then `--allow-write`, and `--home <journal>` when the journal was chosen with `--home` or `MAGPIE_HOME`). The `node` is the one running `setup`, written as `PATH` names it when that is the same file. When `setup` runs from npx's cache, the temp folder or a version manager's per-shell folder, no entry is written: the plan says why and to run `npm install -g repomagpie` first.
@@ -287,14 +287,14 @@ Shows what is wired and what isn't, for the user and for a bug report ([decision
 It reports, in this order:
 1. **Commands on PATH:** every `repomagpie` and `magpie` file on `PATH`, in the order the shell looks (on Windows, each `PATHEXT` extension), the first one being the one that runs; for each, the npm package it runs (read from npm's link or `.cmd` / `.ps1` shim) and whether that is RepoMagpie. A `repomagpie` that isn't RepoMagpie, or of another version, and a `magpie` that isn't RepoMagpie ([decision 0031](decisions/0031-the-command-is-repomagpie.md)), are listed under "To do". <!-- check:commands allow -->
 2. **Skill:** each folder that holds RepoMagpie's skill (`~/.agents/skills/`, `~/.claude/skills/`, and the Cursor, Copilot, Gemini CLI and Codex folders), whether it is a link and to where, and the skill's version from its frontmatter's `metadata.version` (`version unknown` without one). A version other than the CLI's is a to-do.
-3. **Claude Code hook:** each `hook claude-code` entry in `~/.claude/settings.json` and the working folder's `.claude/settings.json` and `.claude/settings.local.json`; `magpie hook claude-code` is named as the old form. <!-- check:commands allow -->
+3. **Claude Code hook:** each `hook claude-code` entry in `~/.claude/settings.json` and the working folder's `.claude/settings.json` and `.claude/settings.local.json`, by form: `exec` (node started directly), `shell` (`repomagpie hook claude-code`), `old` (`magpie hook claude-code`, a to-do) or `other`. For the exec form, as for an MCP entry: whether its node and entry file exist and whether code generation is off (each gap a to-do). The shell form in the user's settings is a to-do too: `setup` starts node directly instead. <!-- check:commands allow -->
 4. **MCP server in each agent** of `setup`'s first set ([agents](agents.md)): whether it is installed (its config folder exists, or its command is on `PATH`), and its `repomagpie` entry: the command and arguments, whether the `node` and the entry file exist, the RepoMagpie version that entry file belongs to, whether node gets `--disallow-code-generation-from-strings` before the script (a to-do when not: `setup` always writes it), and whether `--allow-write` is on. The names of the entry's environment variables are shown, never their values. JSON with comments is read; Codex's TOML is read as `codex mcp add` writes it. A file that can't be read is named with why.
 5. **Journals:** the personal journal and, if found, the project journal: the path, whether it exists, the note count, the files skipped (links, files over 256 KB) and the notes whose frontmatter can't be read.
 6. **To do:** one sentence per problem, each saying what to run (`Run repomagpie setup.`). Without problems: `Everything is wired.`
 
 Text from config files and journals shows hidden characters as markers (section 1), on the terminal and in `--json`.
 
-`--json`: `{"version": "...", "node": {"path": "...", "version": "..."}, "platform": "win32", "commands": [{"name": "repomagpie", "found": [{"path": "...", "package": "repomagpie", "version": "...", "ours": true}]}, {"name": "magpie", "found": []}], "skills": [{"path": "...", "link": null, "version": "..."}], "hook": [{"file": "...", "entries": [{"matcher": "Bash|PowerShell", "command": "repomagpie hook claude-code", "form": "current|old|other"}]}], "agents": [{"id": "cursor", "name": "Cursor", "installed": true, "config": "...", "mcp": {"command": "...", "args": [...], "env_keys": [...], "allow_write": false, "code_generation_off": true, "node_found": true, "entry": "...", "entry_found": true, "version": "..."}}], "journals": [{"scope": "personal", "path": "...", "exists": true, "notes": 812, "skipped": [], "unreadable": []}], "problems": ["..."]}`. An agent without an entry has `"mcp": null`; a config file that can't be read adds `"error"` to its agent or hook file.
+`--json`: `{"version": "...", "node": {"path": "...", "version": "..."}, "platform": "win32", "commands": [{"name": "repomagpie", "found": [{"path": "...", "package": "repomagpie", "version": "...", "ours": true}]}, {"name": "magpie", "found": []}], "skills": [{"path": "...", "link": null, "version": "..."}], "hook": [{"file": "...", "entries": [{"matcher": "Bash|PowerShell", "command": "...", "args": [...], "form": "exec|shell|old|other", "node_found": true, "entry_found": true, "code_generation_off": true}]}], "agents": [{"id": "cursor", "name": "Cursor", "installed": true, "config": "...", "mcp": {"command": "...", "args": [...], "env_keys": [...], "allow_write": false, "code_generation_off": true, "node_found": true, "entry": "...", "entry_found": true, "version": "..."}}], "journals": [{"scope": "personal", "path": "...", "exists": true, "notes": 812, "skipped": [], "unreadable": []}], "problems": ["..."]}`. An agent without an entry has `"mcp": null`; a config file that can't be read adds `"error"` to its agent or hook file.
 
 ### `repomagpie ui`
 
@@ -505,18 +505,28 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 
 Checked against the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) on 2026-10-03, and again on 2026-10-04: the input has `tool_name`, `tool_input.command` and `cwd`; the output fields below; `permissionDecision` `"ask"`; the 10,000-character cap on `additionalContext` and `systemMessage`.
 
-**Setup** (user settings or the project's `.claude/settings.json`; `repomagpie setup` writes it, and changes an old `magpie hook claude-code` entry to this one, section 2): <!-- check:commands allow -->
+**Setup.** `repomagpie setup` writes the entry (section 2). In the user's `~/.claude/settings.json` it is Claude Code's exec form, which starts node directly, with no shell: on Windows a shell and npm's shim cost about 190 ms on every shell command the agent runs ([agents](agents.md)). It names the same node and entry file as the MCP entry, with code generation off ([decision 0035](decisions/0035-setup-and-doctor.md)):
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       { "matcher": "Bash|PowerShell",
-        "hooks": [ { "type": "command", "command": "repomagpie hook claude-code" } ] }
+        "hooks": [ { "type": "command",
+                     "command": "C:\\Program Files\\nodejs\\node.exe",
+                     "args": ["--disallow-code-generation-from-strings", "C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\repomagpie\\dist\\cli\\main.js", "hook", "claude-code"] } ] }
     ]
   }
 }
 ```
+
+In a project's `.claude/settings.json` (`--project`), which teammates share, it is the shell form, which runs whatever RepoMagpie each machine has on `PATH`:
+
+```json
+{ "type": "command", "command": "repomagpie hook claude-code" }
+```
+
+Either form takes the hook's flags after `claude-code` (`--inform-only`). `setup` changes older user entries (`magpie hook claude-code`, `repomagpie hook claude-code`, an exec form with other paths) to the exec form, their flags kept. <!-- check:commands allow -->
 
 **Input** (stdin): Claude Code's JSON; `repomagpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand.
 
