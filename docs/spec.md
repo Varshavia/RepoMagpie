@@ -663,7 +663,7 @@ Alternatives considered:
 
 ## 10. Out of scope for v0.1
 
-Embeddings and semantic search, the MCP server, star import ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)), vet and drift, the graph, nests, and subjects other than GitHub repositories and registry packages.
+Embeddings and semantic search, the MCP server (superseded by [decision 0034](decisions/0034-the-mcp-server.md): no longer out of scope), star import ([decision 0019](decisions/0019-no-star-import-in-v0-1.md)), vet and drift, the graph, nests, and subjects other than GitHub repositories and registry packages.
 
 ## 11. Open questions
 

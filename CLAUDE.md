@@ -69,6 +69,7 @@ Before starting any task, read the documents relevant to it:
 | Writing a SKILL.md, CLI, or MCP code | `docs/standards.md`, `docs/decisions/0002-cli-first.md` |
 | Writing README, docs, or anything user-facing | `docs/vision.md`, `docs/marketing.md` |
 | Working on the local app (`repomagpie ui`, `src/server/`, `ui/`) or any visual surface | `docs/ui.md`, `DESIGN.md` |
+| Working on `repomagpie mcp`, `setup`, `doctor`, or hooks for other agents | `docs/agents.md`, decisions 0034 and 0035 |
 
 If a task conflicts with a document, **stop and ask**. Do not silently diverge. If the maintainer approves a change of direction, record it as part of the same task: ordinary docs are updated in place; decision records merged to `main` are superseded by a new record (before the merge, they may be revised on their branch).
 
@@ -82,7 +83,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) and `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
-| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), research, `decisions/` (decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
+| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), the coding agents' config formats (`agents.md`), research, `decisions/` (decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `server/` (`repomagpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
 | `ui/` | The local app (React, Vite): `src/` (components, the API client, and `logic/` with unit tests), `e2e/` (Playwright), its `tsconfig.json`, `vite.config.ts` and `playwright.config.ts`. Built into `dist/ui/`, which `repomagpie ui` serves ([UI](docs/ui.md)). |

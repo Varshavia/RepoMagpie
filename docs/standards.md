@@ -21,9 +21,11 @@ What we adopt, why, and how firmly. Researched October 2026.
 
 **For RepoMagpie:** `npx skills add Varshavia/RepoMagpie` installs our skill. Publish it on skills.sh at launch; add the badge to the README.
 
-## CLI vs. MCP — **CLI first, MCP later**
+## CLI vs. MCP — **CLI first, MCP for every agent**
 
-See [decision 0002](decisions/0002-cli-first.md). Summary: the Playwright team recommends CLI + skills for coding agents on token-efficiency grounds; an independent measurement (Checkly) found roughly equal token use. We pick CLI for simplicity and portability, and add a thin MCP wrapper later for clients without a shell.
+See [decision 0002](decisions/0002-cli-first.md). Summary: the Playwright team recommends CLI + skills for coding agents on token-efficiency grounds; an independent measurement (Checkly) found roughly equal token use. We pick CLI for simplicity and portability.
+
+[Decision 0034](decisions/0034-the-mcp-server.md) adds `repomagpie mcp` now, for every agent, not later and not only for clients without a shell: a local stdio server whose tools return the CLI's `--json` documents. It serves the 2025-11-25 and 2026-07-28 protocol revisions. How each agent registers it: [agents](agents.md).
 
 ## DESIGN.md — **use, but loosely**
 

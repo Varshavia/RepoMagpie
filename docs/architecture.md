@@ -11,7 +11,7 @@ human ─────────────────────► repomag
 agent with a shell ─► SKILL.md ─► repomagpie ───┤
 agent hook (recall) ─► repomagpie ──────────────┤
 browser (local app) ─► repomagpie ui (server) ──┤
-agent without a shell ─► MCP server ────────────┴─► core ─┬─► personal journal (Markdown files)
+agent (any) ─► repomagpie mcp (stdio) ──────────┴─► core ─┬─► personal journal (Markdown files)
                                                           ├─► project journal (.magpie/)
                                                           └─► search index (cache)
 ```
@@ -24,7 +24,7 @@ agent without a shell ─► MCP server ────────────┴�
 | **hook** | The Claude Code adapter (`repomagpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never denies (an avoid note asks the user; [decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)) and fails open ([spec](spec.md), section 6). | v0.1 |
 | **server** | `repomagpie ui`: a loopback-only HTTP server that serves the local app and a JSON API. It parses requests, calls the core and returns the same JSON documents as the CLI's `--json`; it has no logic of its own ([decision 0021](decisions/0021-local-ui-server.md), [decision 0023](decisions/0023-api-is-the-json-contract.md), [UI](ui.md)). | v0.1 |
 | **app** | The local app: a static bundle in the browser that talks only to the server's API ([decision 0022](decisions/0022-frontend-stack.md)). | v0.1 |
-| **mcp** | Optional MCP server over the same core, for clients without a shell. | later |
+| **mcp** | `repomagpie mcp`: a local stdio MCP server over the same core, for every agent. Its tools return the same documents as the CLI's `--json` ([decision 0034](decisions/0034-the-mcp-server.md)). | planned (`feat/mcp-setup`) |
 
 Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
 

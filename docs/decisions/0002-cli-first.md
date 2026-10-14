@@ -1,6 +1,6 @@
 # 0002 — CLI first, SKILL.md, MCP later
 
-**Status:** accepted (2026-10-01)
+**Status:** accepted (2026-10-01). The MCP server's timing and audience ("added later … for clients without shell access") superseded by [0034](0034-the-mcp-server.md) (2026-10-14); the CLI as the primary interface and the core module stand.
 
 ## Context
 Agents can reach tools via MCP servers or via CLIs described by a `SKILL.md`. The Playwright team recommends CLI + skills for coding agents, citing token efficiency. An independent measurement (Checkly, 2026) found MCP and CLI+skill flows used roughly the same tokens for the same task. The debate is open.
