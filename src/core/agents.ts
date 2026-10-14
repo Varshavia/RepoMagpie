@@ -2,7 +2,7 @@
 // in docs/agents.md): where each keeps its MCP entry, and reading those files without changing them.
 // Never prints, never writes.
 import { closeSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, posix, resolve, win32 } from "node:path";
 import type { Env } from "./journals.ts";
 
 export type Platform = "win32" | "darwin" | "linux";
@@ -62,7 +62,10 @@ export function onPath(name: string, w: Where): string[] {
   const separator = w.platform === "win32" ? ";" : ":";
   const extensions = w.platform === "win32" ? (w.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((e) => e.toLowerCase()) : [""];
   const found: string[] = [];
-  for (const folder of path.split(separator).filter(Boolean)) {
+  // Only absolute folders: a relative entry (".", "bin") means the current folder, which may be a
+  // repository someone else wrote, and setup would run its claude.cmd.
+  const absolute = w.platform === "win32" ? win32.isAbsolute : posix.isAbsolute;
+  for (const folder of path.split(separator).filter((entry) => entry && absolute(entry))) {
     for (const extension of extensions) {
       const file = join(folder, name + extension);
       try {
@@ -160,7 +163,10 @@ export function readJsonc(text: string): { value: unknown; plain: boolean } | { 
   try {
     return { value: JSON.parse(out), plain };
   } catch (error) {
-    return { error: `not valid JSON: ${(error as Error).message}` };
+    // Node's message can quote the text around the mistake, and a config file can hold secrets, so
+    // only the position is kept (the position in the text without comments).
+    const at = (error as Error).message.match(/position (\d+)/)?.[1];
+    return { error: `not valid JSON${at ? ` (at character ${at})` : ""}` };
   }
 }
 

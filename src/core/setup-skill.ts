@@ -119,8 +119,11 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
       if (plan.shared.action === "remove") rmSync(plan.shared.path, { recursive: true });
     } else {
       if (plan.shared.action === "add" || plan.shared.action === "update") {
+        // An update starts from an empty folder: copying over the old one would write through any
+        // link inside it (references/ as a junction to somewhere else). rm removes links, never follows.
         if (plan.shared.backup) cpSync(plan.shared.path, plan.shared.backup, { recursive: true, errorOnExist: true, force: false });
-        cpSync(r.source, plan.shared.path, { recursive: true, force: true });
+        if (plan.shared.action === "update") rmSync(plan.shared.path, { recursive: true });
+        cpSync(r.source, plan.shared.path, { recursive: true });
       }
       if (claude && ["link", "relink", "copy"].includes(claude.action)) {
         if (claude.backup) renameSync(claude.path, claude.backup);

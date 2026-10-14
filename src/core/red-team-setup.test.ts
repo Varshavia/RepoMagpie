@@ -1,0 +1,198 @@
+import { test, type TestContext } from "node:test";
+import assert from "node:assert/strict";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { onPath, readJsonc, type Platform, type Where } from "./agents.ts";
+import { runDoctor } from "./doctor.ts";
+import { scratchBase } from "./fixtures/scratch.ts";
+import { NO_CODEGEN } from "./launch.ts";
+import { applySetup, planSetup, type SetupRequest } from "./setup.ts";
+import { applySkill, planSkill } from "./setup-skill.ts";
+
+// The red-team pass on setup and doctor (feat/mcp-setup brief §3.8): hostile agent config files,
+// links, PATH, paths with awkward characters, skills that aren't ours, and secrets in configs. Each
+// finding of that pass is a test here; docs/roadmap.md lists them.
+
+const platform = process.platform as Platform;
+const FAKE = fileURLToPath(new URL("./fixtures/fake-agent.ts", import.meta.url));
+const SECRETS = ["ghp_0123456789abcdefghijABCDEFGHIJ0123", "sk-live-9f8e7d6c5b4a39281706f5e4", "hunter2-super-secret", "AKIAIOSFODNN7EXAMPLE"];
+
+function scratch(clis: ("claude" | "codex" | "gemini" | "code")[] = [], user = "home") {
+  const root = scratchBase("red-setup");
+  const home = join(root, user);
+  const bin = join(root, "bin");
+  mkdirSync(home, { recursive: true });
+  mkdirSync(bin);
+  const log = join(root, "agents.jsonl");
+  writeFileSync(log, "");
+  for (const name of clis) {
+    if (platform === "win32") writeFileSync(join(bin, `${name}.cmd`), `@"${process.execPath}" "${FAKE}" ${name} %*\r\n`);
+    else {
+      writeFileSync(join(bin, name), `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" ${name} "$@"\n`);
+      chmodSync(join(bin, name), 0o755);
+    }
+  }
+  const env = { PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD", SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, HOME: home, USERPROFILE: home, APPDATA: join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(home, ".config"), FAKE_AGENT_LOG: log };
+  const where: Where = { home, env, platform };
+  const launch = { command: join(root, "nodejs", "node.exe"), args: [NO_CODEGEN, join(root, "npm", "node_modules", "repomagpie", "dist", "cli", "main.js"), "mcp"] };
+  const request = (over: Partial<SetupRequest> = {}): SetupRequest => ({ where, launch, remove: false, stamp: "20261014-120000", ...over });
+  const write = (path: string, text: string) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text);
+  };
+  const doctor = () => runDoctor({ home, env, cwd: root, platform, version: "0.2.0", node: { path: process.execPath, version: "24" } });
+  return { root, home, bin, where, launch, request, write, doctor, cursor: join(home, ".cursor", "mcp.json"), settings: join(home, ".claude", "settings.json") };
+}
+
+// A symbolic link to a file, which Windows allows only with Developer Mode or admin rights.
+function fileLink(t: TestContext, target: string, path: string): boolean {
+  try {
+    symlinkSync(target, path, "file");
+    return true;
+  } catch {
+    t.skip("file symlinks need Developer Mode or admin rights here");
+    return false;
+  }
+}
+
+test("S1: a config file over 64 MB is refused unread: by setup, by the hook's setup and by doctor", () => {
+  const s = scratch();
+  for (const file of [s.cursor, s.settings]) {
+    s.write(file, "{");
+    truncateSync(file, 64 * 1024 * 1024 + 1);
+  }
+  const plan = planSetup(s.request({ only: ["cursor", "claude-code"] }));
+  const cursor = plan.agents.find((a) => a.id === "cursor");
+  assert.equal(cursor?.action, "refused");
+  assert.match(cursor?.reason ?? "", /larger than 64 MB/);
+  assert.equal(plan.hook?.action, "refused");
+  assert.match(plan.hook?.reason ?? "", /larger than 64 MB/);
+  const report = s.doctor();
+  assert.match(report.agents.find((a) => a.id === "cursor")?.error ?? "", /larger than 64 MB/);
+  assert.match(report.hook[0].error ?? "", /larger than 64 MB/);
+});
+
+test("S2: a config file that is a link is refused, and its target stays as it was", (t) => {
+  const s = scratch();
+  const target = join(s.root, "elsewhere.json");
+  writeFileSync(target, "{}");
+  mkdirSync(dirname(s.cursor), { recursive: true });
+  mkdirSync(dirname(s.settings), { recursive: true });
+  if (!fileLink(t, target, s.cursor) || !fileLink(t, target, s.settings)) return;
+  const plan = planSetup(s.request({ only: ["cursor", "claude-code"] }));
+  assert.equal(plan.agents.find((a) => a.id === "cursor")?.action, "refused");
+  assert.equal(plan.hook?.action, "refused");
+  applySetup(plan, s.request({ only: ["cursor", "claude-code"] }));
+  assert.equal(readFileSync(target, "utf8"), "{}");
+});
+
+test("S3: wrong types are refused at plan time, never half-written: mcpServers a list, our entry a string, hooks a list or a string, PreToolUse null", () => {
+  const s = scratch();
+  for (const [cursor, settings] of [
+    ['{"mcpServers": []}', '{"hooks": []}'],
+    ['{"mcpServers": {"repomagpie": "x"}}', '{"hooks": "x"}'],
+    ['{"mcpServers": {"repomagpie": {"command": 7}}}', '{"hooks": {"PreToolUse": null}}'],
+  ]) {
+    s.write(s.cursor, cursor);
+    mkdirSync(join(s.home, ".claude"), { recursive: true });
+    writeFileSync(s.settings, settings);
+    const plan = planSetup(s.request({ only: ["cursor", "claude-code"] }));
+    const done = applySetup(plan, s.request({ only: ["cursor", "claude-code"] }));
+    assert.equal(readFileSync(s.settings, "utf8"), settings, settings);
+    assert.ok(plan.hook?.action === "refused", `${settings}: ${plan.hook?.action} ${done.hook?.error ?? ""}`);
+    if (cursor !== '{"mcpServers": {"repomagpie": {"command": 7}}}') {
+      assert.equal(plan.agents.find((a) => a.id === "cursor")?.action, "refused", cursor);
+      assert.equal(readFileSync(s.cursor, "utf8"), cursor);
+    }
+  }
+});
+
+test("S4: a relative PATH entry is never searched: a cloned repository's claude.cmd or magpie can't be run or reported as a command", () => {
+  const s = scratch();
+  const cloned = join(s.root, "cloned-repo");
+  mkdirSync(cloned);
+  const name = platform === "win32" ? "claude.cmd" : "claude";
+  writeFileSync(join(cloned, name), "echo pwned\n");
+  if (platform !== "win32") chmodSync(join(cloned, name), 0o755);
+  const where = { ...s.where, env: { ...s.where.env, PATH: [relative(process.cwd(), cloned), ".", s.bin].join(platform === "win32" ? ";" : ":") } };
+  assert.deepEqual(onPath("claude", where), []);
+});
+
+test("S5: doctor never shows a secret: env values, secret-looking arguments, a hook command with a token, a broken file", () => {
+  const s = scratch();
+  s.write(s.cursor, JSON.stringify({ mcpServers: { repomagpie: { command: "node", args: ["main.js", "mcp", "--token", SECRETS[0], `--api-key=${SECRETS[1]}`, `https://user:${SECRETS[2]}@example.com/x`], env: { GITHUB_TOKEN: SECRETS[0], OTHER: SECRETS[3] } } } }));
+  s.write(s.settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `GITHUB_TOKEN=${SECRETS[0]} repomagpie hook claude-code` }] }] } }));
+  s.write(join(s.home, ".gemini", "settings.json"), `{"apiKey": "${SECRETS[3]}" oops}`);
+  const report = JSON.stringify(s.doctor());
+  for (const secret of SECRETS) assert.ok(!report.includes(secret), `${secret} in ${report}`);
+  assert.match(report, /<redacted>/);
+});
+
+test("S6: a skill folder of ours with a link inside it: updating never writes through the link", (t) => {
+  const s = scratch();
+  const source = fileURLToPath(new URL("../../skills/repomagpie/", import.meta.url));
+  const shared = join(s.home, ".agents", "skills", "repomagpie");
+  const outside = join(s.root, "outside");
+  mkdirSync(outside);
+  s.write(join(shared, "SKILL.md"), "---\nname: repomagpie\nmetadata:\n  version: \"0.0.1\"\n---\nold\n");
+  try {
+    symlinkSync(outside, join(shared, "references"), "junction");
+  } catch {
+    t.skip("no links here");
+    return;
+  }
+  const r = { source, shared, claude: null, root: s.home, remove: false, stamp: "20261014-120000", platform, project: false };
+  const plan = planSkill(r);
+  assert.equal(plan.shared.action, "update");
+  applySkill(plan, r);
+  assert.equal(existsSync(join(outside, "json.md")), false, "nothing written through the link");
+  assert.equal(readFileSync(join(shared, "references", "json.md"), "utf8"), readFileSync(join(source, "references", "json.md"), "utf8"));
+});
+
+test("S7: node and entry paths with spaces, quotes, % and non-ASCII letters in the user name reach every agent exactly", () => {
+  const s = scratch(["claude", "codex", "gemini", "code"], "Zoë O'Brien %USERNAME% (dev) & co");
+  mkdirSync(join(s.home, ".cursor"));
+  const userish = join(s.home, "AppData", "Roaming", "npm");
+  const launch = { command: join(s.home, "nodejs", "node.exe"), args: [NO_CODEGEN, join(userish, "node_modules", "repomagpie", "dist", "cli", "main.js"), "mcp"] };
+  const done = applySetup(planSetup(s.request({ launch })), s.request({ launch }));
+  assert.deepEqual(done.agents.map((a) => [a.id, a.result, a.error]), ["claude-code", "codex", "cursor", "gemini", "vscode"].map((id) => [id, "done", undefined]));
+  assert.equal(done.hook?.result, "done");
+  const hook = JSON.parse(readFileSync(s.settings, "utf8")).hooks.PreToolUse[0].hooks[0];
+  assert.deepEqual(hook, { type: "command", command: launch.command, args: [NO_CODEGEN, launch.args[1], "hook", "claude-code"] });
+});
+
+test("S8: a config file's permissions survive the edit, and the backup has them too", { skip: platform === "win32" && "POSIX permissions" }, () => {
+  const s = scratch();
+  s.write(s.cursor, '{\n  "mcpServers": {\n    "other": { "command": "x", "env": { "TOKEN": "secret" } }\n  }\n}\n');
+  chmodSync(s.cursor, 0o600);
+  const plan = planSetup(s.request({ only: ["cursor"] }));
+  applySetup(plan, s.request({ only: ["cursor"] }));
+  assert.equal(statSync(s.cursor).mode & 0o777, 0o600);
+  assert.equal(statSync(plan.agents[0].backup as string).mode & 0o777, 0o600);
+});
+
+test("S10: setup's plan and its failures never show a secret: the entry it replaces, a CLI's error output", () => {
+  const s = scratch(["gemini"]);
+  s.write(s.cursor, JSON.stringify({ mcpServers: { repomagpie: { command: "npx", args: ["-y", "some-server", "--token", SECRETS[0], `--password=${SECRETS[2]}`] } } }));
+  const plan = planSetup(s.request({ only: ["cursor"] }));
+  assert.equal(plan.agents[0].action, "update");
+  for (const secret of SECRETS) assert.ok(!JSON.stringify(plan).includes(secret), secret);
+
+  // A CLI that fails and prints a token in its error.
+  const failing = scratch(["gemini"]);
+  const fake = join(failing.bin, platform === "win32" ? "gemini.cmd" : "gemini");
+  writeFileSync(fake, platform === "win32" ? `@echo error: bad credentials GITHUB_TOKEN=${SECRETS[0]} 1>&2\r\n@exit /b 1\r\n` : `#!/bin/sh\necho "error: bad credentials GITHUB_TOKEN=${SECRETS[0]}" >&2\nexit 1\n`);
+  const done = applySetup(planSetup(failing.request({ only: ["gemini"] })), failing.request({ only: ["gemini"] }));
+  assert.equal(done.agents[0].result, "failed");
+  assert.match(done.agents[0].error ?? "", /bad credentials/);
+  assert.ok(!(done.agents[0].error ?? "").includes(SECRETS[0]), done.agents[0].error);
+});
+
+test("S9: a malformed file's error never quotes the file (Node's JSON errors can quote the text around the mistake)", () => {
+  for (const text of [`{"token": "${SECRETS[2]}" x}`, `{"token": ${SECRETS[2]}}`, `${SECRETS[2]}`, `{"a": 1,\n "token": "${SECRETS[2]}",\n bad}`]) {
+    const read = readJsonc(text);
+    assert.ok("error" in read, text);
+    assert.ok(!read.error.includes(SECRETS[2].slice(0, 8)), read.error);
+  }
+});

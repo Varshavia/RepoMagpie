@@ -6,6 +6,8 @@ import { isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
+import { CONFIG_LIMIT } from "./config-write.ts";
+import { redactArgs, redactText } from "./redact.ts";
 import { findHooks } from "./setup-hook.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
@@ -67,7 +69,6 @@ export interface DoctorJson {
   problems: string[]; // what to do, one sentence each
 }
 
-const CONFIG_LIMIT = 64 * 1024 * 1024; // ~/.claude.json grows with Claude Code's history; a bigger file isn't a config file
 
 export function runDoctor(request: DoctorRequest): DoctorJson {
   const where: Where = { home: request.home, env: request.env, platform: request.platform };
@@ -99,7 +100,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   const hookFiles = [claudeSettings(where), ...projectSettings(request)].filter((file) => existsSync(file));
   const hook = hookFiles.map((file) => {
     const read = readConfig(file);
-    if ("error" in read) return { file, entries: [], error: read.error };
+    if ("error" in read) return { file, entries: [], error: redactText(read.error) };
     const parsed = readJsonc(read.text);
     return "error" in parsed ? { file, entries: [], error: parsed.error } : { file, entries: hookEntries(parsed.value, where) };
   });
@@ -122,7 +123,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     if (!existsSync(config)) return report;
     const read = readConfig(config);
     const found = "error" in read ? read : mcpEntry(read.text, agent.format, "repomagpie");
-    if ("error" in found) return { ...report, error: found.error };
+    if ("error" in found) return { ...report, error: redactText(found.error) };
     if (!found.entry) return report;
     const entry = found.entry;
     const script = entry.args.find((arg) => /\.[cm]?js$/.test(arg)) ?? null;
@@ -130,7 +131,10 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     return {
       ...report,
       mcp: {
-        ...entry,
+        // Shown with secrets redacted; the checks below use the real values.
+        command: entry.command === null ? null : redactText(entry.command),
+        args: redactArgs(entry.args),
+        env_keys: entry.env_keys,
         allow_write: entry.args.includes("--allow-write"),
         // node's flag before the script: the server can't run generated code (decision 0034).
         code_generation_off: script !== null && entry.args.indexOf(NO_CODEGEN) >= 0 && entry.args.indexOf(NO_CODEGEN) < entry.args.indexOf(script),
@@ -180,8 +184,8 @@ function hookEntries(settings: unknown, where: Where): HookEntry[] {
     const script = exec ? f.args?.find((a) => /\.[cm]?js$/.test(a)) ?? null : null;
     return {
       matcher: typeof matcher === "string" ? matcher : null,
-      command: f.command,
-      args: f.args,
+      command: redactText(f.command),
+      args: f.args && redactArgs(f.args),
       form: f.form,
       node_found: exec ? (isAbsolute(f.command) ? isFile(f.command) : onPath(f.command, where).length > 0) : null,
       entry_found: exec ? script !== null && isFile(script) : null,

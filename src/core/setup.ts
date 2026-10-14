@@ -4,13 +4,14 @@
 // (setup-hook.ts). A backup before every change; never through a link, never outside the home
 // folder (or the project, with --project); nothing that weakens an agent's safety (no trust or
 // auto-approve key is written). Never prints, never prompts.
-import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
 import { AGENTS, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type McpFormat, type Where } from "./agents.ts";
-import { backupName, pathProblem, writeAtomically } from "./config-write.ts";
+import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
+import { redactArgs, redactText } from "./redact.ts";
 import type { Launch } from "./launch.ts";
 import { applyHook, planHook, type HookPlan, type HookTarget } from "./setup-hook.ts";
 import { applySkill, planSkill, type SkillPlan } from "./setup-skill.ts";
@@ -116,10 +117,14 @@ function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch:
   const unsafe = pathProblem(base.file, where.home);
   if (unsafe) return refuse(unsafe);
 
-  const text = existsSync(base.file) ? readFileSync(base.file, "utf8") : null;
+  const config = readConfig(base.file);
+  if ("error" in config) return refuse(config.error);
+  const text = config.text;
   const read = text === null ? { entry: null } : mcpEntry(text, agent.format, NAME);
   const plain = text === null || agent.format === "codex-toml" || (() => { const r = readJsonc(text); return !("error" in r) && r.plain; })();
-  const current = "entry" in read && read.entry ? { command: read.entry.command, args: read.entry.args } : null;
+  const entry = "entry" in read ? read.entry : null;
+  // Shown in the plan with secrets redacted (another server's command can hold a token); compared raw.
+  const current = entry ? { command: entry.command === null ? null : redactText(entry.command), args: redactArgs(entry.args) } : null;
   const cli = onPath(agent.cli, where)[0];
   const how = CLI[agent.id];
   const backup = text === null ? null : backupName(base.file, request.stamp);
@@ -133,7 +138,7 @@ function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch:
   }
 
   if (!launch) return { ...withCurrent, action: "refused", backup: null, reason: "this copy of RepoMagpie can't be started by an agent (see above)" };
-  if (current && same(current, launch)) return { ...withCurrent, action: "keep", backup: null };
+  if (entry && same(entry, launch)) return { ...withCurrent, action: "keep", backup: null };
   const action: Action = current ? "update" : "add";
   // An update through a CLI needs it to remove the old entry first.
   if (cli && how.add && (!current || how.remove)) return { ...withCurrent, action, method: "cli" };
@@ -162,22 +167,25 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
       const steps = [...(p.action !== "add" && how.remove ? [how.remove] : []), ...(wanted && how.add ? [how.add(wanted)] : [])];
       for (const args of steps) {
         const run = runCli(cli, args, { env: where.env, platform: where.platform, cwd: where.home });
-        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${(run.stderr || run.stdout).trim().split("\n").slice(-3).join(" ")}`);
+        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${redactText((run.stderr || run.stdout).trim().split("\n").slice(-3).join(" "))}`);
       }
     } else {
       try {
-        const text = existsSync(p.file) ? readFileSync(p.file, "utf8") : null;
+        const read = readConfig(p.file);
+        if ("error" in read) return fail(read.error);
         const container = agent.format as Exclude<McpFormat, "codex-toml">;
-        writeAtomically(p.file, setMember(text, [container, NAME], wanted ? { command: wanted.command, args: wanted.args } : undefined));
+        writeAtomically(p.file, setMember(read.text, [container, NAME], wanted ? { command: wanted.command, args: wanted.args } : undefined));
       } catch (error) {
         return fail((error as Error).message);
       }
     }
     // Read it back: the change is done only if the file says so.
-    const check = existsSync(p.file) ? mcpEntry(readFileSync(p.file, "utf8"), agent.format, NAME) : { entry: null };
+    const after = readConfig(p.file);
+    if ("error" in after) return fail(after.error);
+    const check = after.text === null ? { entry: null } : mcpEntry(after.text, agent.format, NAME);
     if ("error" in check) return fail(`${p.file} can't be read after the change: ${check.error}`);
     if (wanted ? !check.entry || !same(check.entry, wanted) : check.entry) {
-      return fail(`${agent.name} didn't record the entry as expected in ${p.file}.${wanted ? ` Its entry now: ${JSON.stringify(check.entry)}.` : ""}`);
+      return fail(`${agent.name} didn't record the entry as expected in ${p.file}.${wanted ? ` Its entry now: ${redactText(JSON.stringify(check.entry && { ...check.entry, args: redactArgs(check.entry.args) }))}.` : ""}`);
     }
     return { ...p, result: "done" };
   });

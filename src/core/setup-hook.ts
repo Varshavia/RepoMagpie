@@ -7,7 +7,7 @@
 // flags kept. Only plain JSON is edited, and only our entries. Never prints.
 import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { readJsonc } from "./agents.ts";
-import { backupName, pathProblem, writeAtomically } from "./config-write.ts";
+import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { appendItem, removeAt, replaceAt, setMember } from "./json-edit.ts";
 
 export const HOOK_COMMAND = "repomagpie hook claude-code";
@@ -39,7 +39,9 @@ export interface FoundHook {
 // Every hook command in parsed settings that runs `hook claude-code`; an error text when
 // hooks.PreToolUse isn't a list.
 export function findHooks(settings: unknown): FoundHook[] | string {
-  const pre = (settings as { hooks?: { PreToolUse?: unknown } } | null)?.hooks?.PreToolUse;
+  const hooksField = (settings as { hooks?: unknown } | null)?.hooks;
+  if (hooksField !== undefined && (typeof hooksField !== "object" || hooksField === null || Array.isArray(hooksField))) return "hooks isn't an object";
+  const pre = (hooksField as { PreToolUse?: unknown } | undefined)?.PreToolUse;
   if (pre === undefined) return [];
   if (!Array.isArray(pre)) return "hooks.PreToolUse isn't a list";
   const found: FoundHook[] = [];
@@ -76,7 +78,9 @@ export function planHook(file: string, root: string, remove: boolean, stamp: str
   const base: HookPlan = { file, action: "keep", reason: null, backup: null, snippet: null };
   const unsafe = pathProblem(file, root);
   if (unsafe) return { ...base, action: "refused", reason: unsafe };
-  const text = existsSync(file) ? readFileSync(file, "utf8") : null;
+  const config = readConfig(file);
+  if ("error" in config) return { ...base, action: "refused", reason: config.error };
+  const text = config.text;
   const read = text === null ? { value: {}, plain: true } : readJsonc(text);
   if ("error" in read) return { ...base, action: "refused", reason: `${file} can't be read: ${read.error}` };
   const found = findHooks(read.value);
@@ -106,7 +110,9 @@ export function applyHook(plan: HookPlan, root: string, target: HookTarget): Hoo
   if (unsafe) return fail(unsafe);
   try {
     if (plan.backup && existsSync(plan.file)) copyFileSync(plan.file, plan.backup, 1 /* COPYFILE_EXCL */);
-    let text = existsSync(plan.file) ? readFileSync(plan.file, "utf8") : null;
+    const config = readConfig(plan.file);
+    if ("error" in config) return fail(config.error);
+    let text = config.text;
     if (plan.action === "add") {
       const settings = (text === null ? {} : JSON.parse(text)) as { hooks?: { PreToolUse?: unknown } };
       const entry = group(target as Exclude<HookTarget, { error: string }>, []);
