@@ -26,7 +26,8 @@
     "magpie": "dist/cli/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "engines": {
     "node": ">=22.12.0"

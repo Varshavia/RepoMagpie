@@ -62,6 +62,14 @@ test("SKILL.md frontmatter follows the Agent Skills format", () => {
   assert.ok(body.split("\n").length < 500, "keep SKILL.md under 500 lines");
 });
 
+// Decision 0035: repomagpie doctor compares the installed skill's version with the CLI's, so the
+// skill carries the package's version, and a release changes both.
+test("SKILL.md's metadata.version is package.json's version", () => {
+  const { data } = frontmatter(readFileSync(skillFile, "utf8"));
+  const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
+  assert.equal((data.metadata as { version?: unknown } | undefined)?.version, pkg.version);
+});
+
 // --- Behaviour seen in a live test ---------------------------------------------------------------
 
 // Live test, 2026-10-08: when the user answers No to the hook's prompt, Claude Code ends the turn and

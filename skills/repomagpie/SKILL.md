@@ -3,6 +3,8 @@ name: repomagpie
 description: Reads and records the user's own notes on dependencies and tools with the repomagpie CLI (RepoMagpie). Use before adding or installing any package (npm, pnpm, yarn, bun, pip, uv, cargo), when the user asks what they have or know for a task ("what do I have for browser testing?"), when choosing libraries or tools for a project, and when the user gives an opinion on a tool worth remembering.
 license: MIT
 compatibility: Needs a shell and the repomagpie command, from the npm package repomagpie (source and releases at github.com/Varshavia/RepoMagpie; Node.js 22.12 or later).
+metadata:
+  version: "0.2.0-beta.3"
 ---
 
 # RepoMagpie

@@ -35,12 +35,14 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
 ];
 
-// What the package may ship: npm's own files, the licences, and the built CLI and app.
-const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt"];
+// What the package may ship: npm's own files, the licences, the built CLI and app, and the agent
+// skill that repomagpie setup installs (decision 0035).
+const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt", "skills/repomagpie/SKILL.md"];
 const SHIPPED = [
   ...REQUIRED.map((file) => new RegExp(`^${file.replace(/[.]/g, "\\.")}$`)),
   /^dist\/cli\/[A-Za-z0-9_-]+\.js$/,
   /^dist\/ui\/[A-Za-z0-9_.-]+\.(js|css|svg)$/,
+  /^skills\/repomagpie\/references\/[a-z0-9-]+\.md$/,
 ];
 
 let failed = 0;
