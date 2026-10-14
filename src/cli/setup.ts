@@ -1,12 +1,15 @@
 // repomagpie setup (decision 0035): detect the agents, show a plan, ask, apply, then a summary.
 // This part sets up the MCP server in each agent; the skill and the Claude Code hook come next.
 // Under --json, or without a terminal, it never asks: --yes applies, --dry-run only shows.
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { basename, dirname, resolve } from "node:path";
 import { AGENTS, type Agent, type Platform } from "../core/agents.ts";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { launchCommand } from "../core/launch.ts";
 import { applySetup, planSetup, type AgentPlan, type SetupPlan, type SetupRequest } from "../core/setup.ts";
+import type { HookPlan } from "../core/setup-hook.ts";
+import type { SkillItem } from "../core/setup-skill.ts";
 import { clean, cleanAll } from "../core/text.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
@@ -32,6 +35,14 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   const ask = !options.json && !options.yes && !options.dryRun && io.interactive;
   if (!ask && !options.yes && !options.dryRun) return usage("there's no terminal to ask in. Add --yes to apply the plan, or --dry-run to see it.");
 
+  // --project: the project root (or its .magpie folder), for the skill and the hook.
+  let project: string | undefined;
+  if (options.project) {
+    project = resolve(io.cwd, options.project);
+    if (basename(project) === ".magpie") project = dirname(project);
+    if (!statSync(project, { throwIfNoEntry: false })?.isDirectory()) return usage(`--project ${options.project} isn't a folder.`);
+  }
+
   const platform = process.platform as Platform;
   const self = io.self ?? { execPath: process.execPath, entry: realpathSync(process.argv[1]) };
   // The journal the agent's server reads: the agent doesn't get --home or MAGPIE_HOME, so a journal
@@ -44,6 +55,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
     remove: Boolean(options.remove),
     only,
     stamp,
+    project,
   });
 
   let allowWrite = Boolean(options.allowWrite);
@@ -66,7 +78,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
     }
     plan = planSetup(request(allowWrite, only));
     io.err(render(plan, io.home));
-    if (!plan.agents.some(changes)) return 0;
+    if (!anyChange(plan)) return 0;
     const go = await confirm(terminal, "Make these changes?", true);
     if (!go) return cancelled(io);
   } else if (!options.json) io.err(render(plan, io.home));
@@ -75,11 +87,15 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite, ...done }))}\n`);
   else if (!options.dryRun) io.err(summary(done, io.home));
   else io.err("Dry run: nothing changed.\n");
-  const failed = done.agents.some((a) => a.result === "failed") || (!options.remove && done.launch_error !== null && done.agents.some((a) => a.installed));
+  const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" ||
+    (!options.remove && done.launch_error !== null && done.agents.some((a) => a.installed));
   return failed && !options.dryRun ? 1 : 0;
 }
 
 const changes = (a: AgentPlan) => a.action === "add" || a.action === "update" || a.action === "remove";
+const anyChange = (plan: SetupPlan) => plan.agents.some(changes) ||
+  [plan.skill?.shared, plan.skill?.claude].some((item) => item && !["keep", "leave"].includes(item.action)) ||
+  (plan.hook !== null && ["add", "migrate", "remove"].includes(plan.hook.action));
 
 function cancelled(io: Io): number {
   io.err("Cancelled. Nothing changed.\n");
@@ -108,13 +124,37 @@ export function render(plan: SetupPlan, home: string): string {
     if (a.backup) lines.push(`                backup first: ${tilde(a.backup)}`);
     if (a.snippet) lines.push(`                ${a.action === "manual" && !plan.remove ? `paste into ${tilde(a.file)}:` : ""}`.trimEnd(), ...a.snippet.split("\n").map((line) => `                  ${line}`));
   }
+  if (plan.skill || plan.hook) lines.push("", plan.project ? `In the project ${plan.project} (the MCP entries above stay in your own settings):` : "And in your home folder:");
+  for (const item of [plan.skill?.shared, plan.skill?.claude]) {
+    if (!item) continue;
+    lines.push(`  ${"Skill".padEnd(12)}  ${SKILL_WHAT[item.action]}: ${tilde(item.path)}${item.reason ? `: ${item.reason}` : ""}`);
+    if (item.backup) lines.push(`                backup first: ${tilde(item.backup)}`);
+  }
+  if (plan.hook) {
+    const h = plan.hook;
+    lines.push(`  ${"Hook".padEnd(12)}  ${HOOK_WHAT[h.action]}: ${tilde(h.file)}${h.reason ? `: ${h.reason}` : ""}`);
+    if (h.backup) lines.push(`                backup first: ${tilde(h.backup)}`);
+    if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                  ${line}`));
+  }
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }
+
+const SKILL_WHAT: Record<SkillItem["action"], string> = {
+  add: "install", update: "update", keep: "already there", remove: "remove", leave: "leave", link: "link to the shared folder", relink: "replace with a link to the shared folder", copy: "copy",
+};
+const HOOK_WHAT: Record<HookPlan["action"], string> = {
+  add: "add repomagpie hook claude-code", migrate: "change magpie hook claude-code to repomagpie", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
+};
 
 function summary(plan: SetupPlan, home: string): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
   const lines = plan.agents.filter((a) => a.result).map((a) =>
     a.result === "done" ? `Done: ${a.name}, ${a.action === "add" ? "added" : a.action === "update" ? "updated" : "removed"}${a.backup ? ` (backup: ${tilde(a.backup)})` : ""}.` : `Failed: ${a.name}: ${a.error}`);
+  for (const item of [plan.skill?.shared, plan.skill?.claude]) {
+    if (!item || !plan.skill?.result || ["keep", "leave"].includes(item.action)) continue;
+    lines.push(plan.skill.result === "done" ? `Done: the skill, ${SKILL_WHAT[item.action]}: ${tilde(item.path)}${item.made === "copy" && item.action !== "copy" ? " (a copy: a link couldn't be made)" : ""}.` : `Failed: the skill: ${plan.skill.error}`);
+  }
+  if (plan.hook?.result) lines.push(plan.hook.result === "done" ? `Done: the Claude Code hook, ${HOOK_WHAT[plan.hook.action]}${plan.hook.backup ? ` (backup: ${tilde(plan.hook.backup)})` : ""}.` : `Failed: the Claude Code hook: ${plan.hook.error}`);
   if (!lines.length) lines.push("Nothing to change.");
   if (plan.launch_error && !plan.remove) lines.push("No MCP entry was written.");
   lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");

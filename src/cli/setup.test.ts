@@ -57,7 +57,9 @@ test("--json needs --yes or --dry-run, and prints the plan with each result", as
   const r = await magpie(b, ["setup", "--yes", "--json"], b.over);
   assert.equal(r.err, "");
   const doc = JSON.parse(r.out);
-  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "launch", "launch_error", "agents"]);
+  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "project", "launch", "launch_error", "agents", "skill", "hook"]);
+  assert.equal(doc.skill.result, "done");
+  assert.equal(doc.hook, null, "no Claude Code here");
   const cursor = doc.agents.find((a: { id: string }) => a.id === "cursor");
   assert.deepEqual([cursor.action, cursor.method, cursor.result], ["add", "json", "done"]);
 });
@@ -104,6 +106,20 @@ test("--remove takes out only our entry, after a backup", async () => {
   assert.equal(r.code, 0, r.err);
   assert.equal(readFileSync(b.cursor, "utf8"), '{\n  "mcpServers": {\n    "other": { "command": "x" }\n  }\n}\n');
   assert.match(r.err, /^Done: Cursor, removed \(backup: ~[\\/]\.cursor[\\/]mcp\.json\.repomagpie-backup-\d{8}-\d{6}(-\d+)?\)\.$/m);
+});
+
+test("--project: the skill and the Claude Code hook go into the project; the MCP entries stay in the user's settings", async () => {
+  const b = box();
+  mkdirSync(join(b.home, ".claude"));
+  const r = await magpie(b, ["--project", b.project, "setup", "--yes"], b.over);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /In the project .* \(the MCP entries above stay in your own settings\):/);
+  assert.ok(existsSync(join(b.project, ".agents", "skills", "repomagpie", "SKILL.md")));
+  assert.ok(existsSync(join(b.project, ".claude", "skills", "repomagpie", "SKILL.md")));
+  assert.equal(JSON.parse(readFileSync(join(b.project, ".claude", "settings.json"), "utf8")).hooks.PreToolUse[0].hooks[0].command, "repomagpie hook claude-code");
+  assert.ok(!existsSync(join(b.home, ".agents")) && !existsSync(join(b.home, ".claude", "settings.json")));
+  assert.deepEqual(b.entry().args.slice(0, 1), [NO_CODEGEN], "Cursor's MCP entry is in ~/.cursor, as without --project");
+  assert.equal((await magpie(b, ["--project", join(b.root, "nope"), "setup", "--yes"], b.over)).code, 2);
 });
 
 test("a journal chosen with MAGPIE_HOME goes into the entry, since the agent won't have it", async () => {

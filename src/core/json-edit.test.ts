@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { setMember } from "./json-edit.ts";
+import { appendItem, removeAt, replaceAt, setMember } from "./json-edit.ts";
 
 // One member of one object in a plain JSON file, changed and nothing else (decision 0035, "How it
 // writes"): key order, indentation, line endings and the final newline stay as they were.
@@ -44,6 +44,29 @@ test("removing: the only, the first and the last member; the commas stay right",
 test("strings with braces, quotes and escapes don't confuse it; a key is matched after unescaping", () => {
   const text = '{"note": "a } { \\" , ]", "mcpServers": {"repo\\u006dagpie": 1}}';
   assert.equal(setMember(text, ["mcpServers", "repomagpie"], 2), '{"note": "a } { \\" , ]", "mcpServers": {"repo\\u006dagpie": 2}}');
+});
+
+// Claude Code's settings.json, with a hook group of its own already in PreToolUse.
+const SETTINGS = '{\n  "permissions": { "allow": ["Bash(npm test)"] },\n  "hooks": {\n    "PreToolUse": [\n      {\n        "matcher": "Bash",\n        "hooks": [{ "type": "command", "command": "node git-guard.mjs" }]\n      }\n    ]\n  }\n}\n';
+const GROUP = { matcher: "Bash|PowerShell", hooks: [{ type: "command", command: "repomagpie hook claude-code" }] };
+
+test("appendItem: a new item goes last in an array, indented for its depth; an empty array is filled", () => {
+  const added = appendItem(SETTINGS, ["hooks", "PreToolUse"], GROUP);
+  assert.equal(added, SETTINGS.replace('\n      }\n    ]', '\n      },\n      {\n        "matcher": "Bash|PowerShell",\n        "hooks": [\n          {\n            "type": "command",\n            "command": "repomagpie hook claude-code"\n          }\n        ]\n      }\n    ]'));
+  assert.deepEqual(JSON.parse(added).hooks.PreToolUse[1], GROUP);
+  assert.equal(appendItem('{"a": []}', ["a"], 1), '{"a": [\n    1\n  ]}');
+});
+
+test("removeAt: an array item or an object member, the commas staying right; replaceAt: one value in place", () => {
+  const added = appendItem(SETTINGS, ["hooks", "PreToolUse"], GROUP);
+  assert.equal(removeAt(added, ["hooks", "PreToolUse", 1]), SETTINGS);
+  assert.equal(removeAt('{"a": [1, 2, 3]}', ["a", 0]), '{"a": [2, 3]}');
+  assert.equal(removeAt('{"a": [1]}', ["a", 0]), '{"a": []}');
+  assert.equal(removeAt('{"x": 1, "y": 2}', ["y"]), '{"x": 1}');
+  const old = SETTINGS.replace("node git-guard.mjs", "magpie hook claude-code");
+  assert.equal(replaceAt(old, ["hooks", "PreToolUse", 0, "hooks", 0, "command"], "repomagpie hook claude-code"), SETTINGS.replace("node git-guard.mjs", "repomagpie hook claude-code"));
+  assert.throws(() => replaceAt(SETTINGS, ["hooks", "PreToolUse", 5], 1), /no item 5/);
+  assert.throws(() => appendItem(SETTINGS, ["permissions"], 1), /not an array/);
 });
 
 test("refused: a root or a container that isn't an object, and text that isn't JSON", () => {

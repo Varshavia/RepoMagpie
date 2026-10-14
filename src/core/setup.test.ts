@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Platform, Where } from "./agents.ts";
@@ -164,7 +164,9 @@ test("refused or manual, never edited: JSON with comments, a linked config folde
   assert.equal(by("codex")?.snippet, `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(s.launch.command)}\nargs = ${JSON.stringify(s.launch.args)}`);
   assert.match(by("codex")?.reason ?? "", /codex command isn't on PATH/);
   applySetup(plan, s.request());
-  assert.deepEqual(snapshot(s.root), before);
+  // Only the skill is installed: no config file changed.
+  const skill = join(s.home, ".agents");
+  assert.deepEqual(snapshot(s.root).filter((line) => !line.startsWith(skill) && !line.startsWith(`${s.home} `)), before.filter((line) => !line.startsWith(`${s.home} `)));
 });
 
 test("a failing CLI, and a CLI that records something else, are failures that say so", () => {
@@ -175,6 +177,25 @@ test("a failing CLI, and a CLI that records something else, are failures that sa
   assert.match(by("gemini")?.error ?? "", /gemini mcp add failed \(exit 1\): gemini: something went wrong/);
   assert.equal(by("vscode")?.result, "failed");
   assert.match(by("vscode")?.error ?? "", /didn't record the entry as expected/);
+});
+
+test("with Claude Code: its MCP entry, the skill linked, and the old magpie hook migrated; --remove takes all three out", () => {
+  const s = scratch(["claude-code"]);
+  const settings = join(s.home, ".claude", "settings.json");
+  const original = '{\n  "hooks": {\n    "PreToolUse": [\n      { "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "magpie hook claude-code" }] }\n    ]\n  }\n}\n';
+  s.write(settings, original);
+  const plan = planSetup(s.request());
+  assert.deepEqual([plan.skill?.shared.action, plan.skill?.claude?.action, plan.hook?.action], ["add", "link", "migrate"]);
+  const done = applySetup(plan, s.request());
+  assert.deepEqual([done.agents[0].result, done.skill?.result, done.hook?.result], ["done", "done", "done"], JSON.stringify([done.skill?.error, done.hook?.error]));
+  assert.equal(readFileSync(settings, "utf8"), original.replace('"magpie hook', '"repomagpie hook'));
+  assert.ok(existsSync(join(s.home, ".agents", "skills", "repomagpie", "SKILL.md")));
+  assert.ok(lstatSync(join(s.home, ".claude", "skills", "repomagpie")).isSymbolicLink());
+
+  const removed = applySetup(planSetup(s.request({ remove: true, stamp: "20261014-140000" })), s.request({ remove: true, stamp: "20261014-140000" }));
+  assert.deepEqual([removed.agents[0].result, removed.skill?.result, removed.hook?.result], ["done", "done", "done"]);
+  assert.equal(readFileSync(settings, "utf8"), '{\n  "hooks": {\n    "PreToolUse": []\n  }\n}\n');
+  assert.ok(!existsSync(join(s.home, ".agents", "skills", "repomagpie")) && !existsSync(join(s.home, ".claude", "skills", "repomagpie")));
 });
 
 test("a launch that can't work refuses every agent and writes nothing; --agents limits the plan", () => {

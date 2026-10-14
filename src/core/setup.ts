@@ -1,14 +1,22 @@
-// repomagpie setup, the MCP part (decision 0035): a plan per agent, then applying it. Through the
+// repomagpie setup (decision 0035): a plan per agent, then applying it. The MCP entry through the
 // agent's own CLI where it has one, otherwise a round-trip-safe edit of plain JSON, otherwise a
-// snippet for the user to paste. A backup before every change; never through a link, never outside
-// the home folder; nothing that weakens an agent's safety (no trust or auto-approve key is written).
-// Never prints, never prompts.
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+// snippet for the user to paste; then the skill (setup-skill.ts) and the Claude Code hook
+// (setup-hook.ts). A backup before every change; never through a link, never outside the home
+// folder (or the project, with --project); nothing that weakens an agent's safety (no trust or
+// auto-approve key is written). Never prints, never prompts.
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
 import { AGENTS, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type McpFormat, type Where } from "./agents.ts";
+import { backupName, pathProblem, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import type { Launch } from "./launch.ts";
+import { applyHook, planHook, type HookPlan } from "./setup-hook.ts";
+import { applySkill, planSkill, type SkillPlan } from "./setup-skill.ts";
+
+// The package's skill: beside dist/ in the package, beside src/ in the repository.
+export const SKILL_SOURCE = fileURLToPath(new URL("../../skills/repomagpie/", import.meta.url));
 
 export const NAME = "repomagpie";
 
@@ -31,9 +39,12 @@ export interface AgentPlan {
 
 export interface SetupPlan {
   remove: boolean;
+  project: string | null; // --project: where the skill and the hook go
   launch: { command: string; args: string[] } | null;
   launch_error: string | null;
-  agents: AgentPlan[];
+  agents: AgentPlan[]; // the MCP entries, always in the user's settings
+  skill: SkillPlan | null; // when any agent is set up
+  hook: HookPlan | null; // when Claude Code is set up
 }
 
 export interface SetupRequest {
@@ -42,6 +53,8 @@ export interface SetupRequest {
   remove: boolean;
   only?: Agent["id"][]; // --agents; default: every installed agent
   stamp: string; // for backup names: YYYYMMDD-HHMMSS
+  project?: string; // --project: the project root, for the skill and the hook
+  skillSource?: string; // default: the package's
 }
 
 // The agent CLIs' commands (docs/agents.md). VS Code's CLI can add but not remove.
@@ -56,7 +69,7 @@ const CLI: Record<Agent["id"], { add?: (l: { command: string; args: string[] }) 
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
   const launch = "error" in request.launch ? null : request.launch;
-  const plan: SetupPlan = { remove: request.remove, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [] };
+  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null };
   for (const agent of AGENTS) {
     const installed = existsSync(agent.folder(where)) || onPath(agent.cli, where).length > 0;
     const file = agent.mcpFile(where);
@@ -71,8 +84,21 @@ export function planSetup(request: SetupRequest): SetupPlan {
     }
     plan.agents.push(planAgent(agent, base, request, launch));
   }
+  // The skill and the hook: in the home folder, or the project's folders with --project.
+  const chosen = plan.agents.filter((a) => a.action !== "skip");
+  const claude = chosen.some((a) => a.id === "claude-code");
+  const root = request.project ?? where.home;
+  if (chosen.length) {
+    plan.skill = planSkill({
+      source: request.skillSource ?? SKILL_SOURCE, shared: join(root, ".agents", "skills", NAME), claude: claude ? join(root, ".claude", "skills", NAME) : null,
+      root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
+    });
+  }
+  if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp);
   return plan;
 }
+
+const ROOT = (request: SetupRequest) => request.project ?? request.where.home;
 
 function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch: SetupPlan["launch"]): AgentPlan {
   const { where } = request;
@@ -145,46 +171,17 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
     }
     return { ...p, result: "done" };
   });
-  return { ...plan, agents };
+  const root = ROOT(request);
+  const skill = plan.skill && applySkill(plan.skill, {
+    source: request.skillSource ?? SKILL_SOURCE, shared: plan.skill.shared.path, claude: plan.skill.claude?.path ?? null,
+    root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
+  });
+  const hook = plan.hook && applyHook(plan.hook, root);
+  return { ...plan, agents, skill, hook };
 }
 
 const same = (a: Pick<McpEntry, "command" | "args">, b: { command: string; args: string[] }) =>
   a.command === b.command && a.args.length === b.args.length && a.args.every((arg, i) => arg === b.args[i]);
-
-// Why a config file can't be written: a link on its way from the home folder (decision 0032, rule
-// 5), or a place outside the home folder. null when it can.
-export function pathProblem(file: string, home: string): string | null {
-  const inside = relative(resolve(home), resolve(file));
-  if (!inside || inside.startsWith("..") || resolve(inside) === inside) return `${file} is outside your home folder; setup writes only inside it.`;
-  let path = resolve(home);
-  for (const part of inside.split(sep)) {
-    path = join(path, part);
-    try {
-      if (lstatSync(path).isSymbolicLink()) return `${path} is a link; setup never writes through one.`;
-    } catch {
-      break; // doesn't exist yet: nothing below it does either
-    }
-  }
-  return null;
-}
-
-function writeAtomically(file: string, text: string): void {
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.repomagpie-${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, text, { flag: "wx" });
-    renameSync(temporary, file);
-  } catch (error) {
-    rmSync(temporary, { force: true });
-    throw error;
-  }
-}
-
-function backupName(file: string, stamp: string): string {
-  let name = `${file}.repomagpie-backup-${stamp}`;
-  for (let n = 2; existsSync(name); n++) name = `${file}.repomagpie-backup-${stamp}-${n}`;
-  return name;
-}
 
 function manualReason(agent: Agent, cli: string | undefined, plain: boolean): string {
   if (!cli && agent.id === "codex") return "the codex command isn't on PATH, and setup doesn't edit TOML itself";
