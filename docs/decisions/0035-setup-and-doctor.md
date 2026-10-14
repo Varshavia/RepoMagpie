@@ -1,6 +1,6 @@
 # 0035 — `setup` and `doctor` change other tools' settings safely
 
-**Status:** accepted (2026-10-14). Builds on [0034](0034-the-mcp-server.md) (the MCP server), [0031](0031-the-command-is-repomagpie.md) (the command is `repomagpie`; "the planned `setup` command will move old entries to the new name") and [0032](0032-note-text-is-data.md), rule 5 (never write through a link). Agent facts, with sources and dates: [agents](../agents.md).
+**Status:** accepted (2026-10-14); revised on its branch the same day: the skill is one folder in `~/.agents/skills/` with a link from `~/.claude/skills/`, as the `skills` CLI installs it, instead of two copies. Builds on [0034](0034-the-mcp-server.md) (the MCP server), [0031](0031-the-command-is-repomagpie.md) (the command is `repomagpie`; "the planned `setup` command will move old entries to the new name") and [0032](0032-note-text-is-data.md), rule 5 (never write through a link). Agent facts, with sources and dates: [agents](../agents.md).
 
 ## Context
 Wiring RepoMagpie into an agent is manual today: the user edits `~/.claude/settings.json` for the hook, and runs `npx skills add` for the skill. With the MCP server ([0034](0034-the-mcp-server.md)), each agent also needs an MCP entry, and every agent keeps it in a different place and format: JSON with `mcpServers` or `servers`, TOML, YAML, or a file only the agent's own CLI should touch.
@@ -34,9 +34,21 @@ For the other agents in [agents](../agents.md) (Copilot CLI, Windsurf, Cline, Ze
 - **Never a file it can't round-trip.** JSON with comments or trailing commas, a file that isn't valid JSON, a value of the wrong type where our entry goes, or TOML without the agent's CLI: `setup` changes nothing there, and prints the exact snippet and the path instead.
 - On Windows an agent's CLI can be a `.cmd` shim. `setup` runs it through `cmd.exe` with each argument quoted, never through a shell string it builds from untrusted text, and treats a non-zero exit as "not changed" with the CLI's message.
 
+### The skill
+`setup` lays the skill out the way the `skills` CLI (`npx skills add`) does today, so the two produce the same result and never fight:
+- **One real folder:** `~/.agents/skills/repomagpie/`, copied from the installed package's `skills/repomagpie/`. Codex, Cursor, Gemini CLI, VS Code, Copilot CLI and Zed read this folder directly ([agents](../agents.md), "The shared skills folder").
+- **A link for Claude Code:** `~/.claude/skills/repomagpie` is a link to that folder: a relative symlink on macOS and Linux, a directory junction on Windows (it needs no admin rights or Developer Mode). This is what the `skills` CLI's installer does: canonical copy in `.agents/skills/<name>`, `symlink(…, 'junction')` on `win32`, a relative path elsewhere ([`src/installer.ts`](https://github.com/vercel-labs/skills/blob/417405ecc8a03136f1675bcb19d5c05b299123f4/src/installer.ts), commit of 2026-10-07, read on 2026-10-14).
+- **A copy only when a link can't be made** (a file system without links, a refused junction). The summary says it copied, and `doctor` then checks that both copies match.
+- **An existing install:**
+  - the same layout, from `npx skills` or an earlier `setup`: `setup` updates the files in `~/.agents/skills/repomagpie/` in place and leaves the link as it is. The `skills` CLI's lock file (`~/.agents/.skill-lock.json`) isn't ours and isn't edited, so `npx skills update` may later replace our files with the version on GitHub; `doctor` shows the version either way.
+  - `~/.claude/skills/repomagpie` is a real folder with our skill in it (an older copy): it is replaced by the link, after a backup, and the summary names both.
+  - anything else in either place (another skill named `repomagpie`, a link that points elsewhere): `setup` changes nothing there and says so.
+- **The link rule:** `setup` never writes through a link. It creates the one link above and writes only into the real folder it points to. If `~/.agents/skills/repomagpie` itself is a link (the user's own), `setup` leaves it and says so.
+- `--remove` deletes the link and the real folder only when the folder holds RepoMagpie's skill; it never follows a link to delete.
+
 ### Safety
 - **A backup before every edit**, next to the file: `<file>.repomagpie-backup-<timestamp>`, named in the summary. An edit made through the agent's CLI gets the same backup of the file the CLI writes, when `setup` knows that file.
-- **Never through a link** ([0032](0032-note-text-is-data.md), rule 5): a config file or folder that is a link (or a junction) is refused, and named. **Never outside the user's home**: a path that resolves outside it is refused.
+- **Never through a link** ([0032](0032-note-text-is-data.md), rule 5): a config file or folder that is a link (or a junction) is refused, and named. The skill's link for Claude Code is the one link `setup` creates ("The skill", above). **Never outside the user's home**: a path that resolves outside it is refused.
 - **Idempotent:** a second run finds every entry as it should be and changes nothing, not even a backup.
 - **An entry named `repomagpie` that runs something else** (another program, or another copy of RepoMagpie) is shown in the plan as a change, with the old command, and changed only with the user's yes (or `--yes`).
 - **`--remove`** deletes only RepoMagpie's own entries: the MCP entry, the hook entry and the skill folders it installed. It never restores a backup over the file, because the user or another tool may have changed it since. It uses the agent's CLI where `setup` did (`claude mcp remove`, `codex mcp remove`, `gemini mcp remove`). VS Code has no command-line remove, so `--remove` names the entry and the command that opens the file ("MCP: Open User Configuration").
@@ -91,7 +103,7 @@ It has human output and `--json`, and exits 0 whatever it finds: it is a report,
 - Installing becomes `npm install -g repomagpie`, then `repomagpie setup`. The README's manual hook and skill steps move to `docs/`.
 - `setup` needs a test per agent and per file: before and after, idempotency, `--remove`, comments, links, Windows paths, and fake agent CLIs on `PATH` that record their arguments. Tests point `HOME`, `USERPROFILE`, `APPDATA` and the XDG variables at scratch folders and never touch a real agent's settings.
 - The package ships `skills/repomagpie/`. The skill carries the CLI's version in its frontmatter (`metadata`), kept equal to `package.json` by a test, so `doctor` can compare them.
-- **Skills:** `setup` installs one copy in the shared folder `~/.agents/skills/repomagpie/` (read by Codex, Cursor, Gemini CLI, VS Code, Copilot CLI and Zed) and one in `~/.claude/skills/repomagpie/` (Claude Code reads only its own folder). Both copies are identical and come from the same package. Cursor and VS Code read both folders, so they may list the skill twice, with the same text. An `npx skills` install is updated in place or left alone, and the summary says which; its lock file isn't ours and isn't edited. Details on the branch, in `setup`'s second part.
+- **Skills:** one real folder and one link, as the `skills` CLI lays them out, so a user can mix `npx skills add` and `repomagpie setup` in either order. Cursor and VS Code read both `~/.agents/skills/` and `~/.claude/skills/`, so they may list the skill twice; that is true of an `npx skills` install too. Junctions are absolute paths, so moving the home folder breaks the link on Windows; `doctor` shows it.
 - The MCP entry pins one Node.js and one install. After switching Node.js versions, the user runs `repomagpie doctor`, then `repomagpie setup` again.
 - An MCP entry written for one OS doesn't work on another, so a dotfiles repository that syncs `~/.cursor/mcp.json` across machines carries a broken path to the others. `doctor` shows it; `--project` files carry the same risk and are opt-in.
 - `SECURITY.md` says what `setup` writes, its backups, `--remove`, and that MCP is local stdio only.
