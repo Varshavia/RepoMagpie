@@ -6,6 +6,7 @@ import { isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
+import { findHooks } from "./setup-hook.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
 
@@ -25,7 +26,15 @@ export interface Command {
 export interface HookEntry {
   matcher: string | null;
   command: string;
-  form: "current" | "old" | "other"; // repomagpie hook claude-code, magpie hook claude-code, anything else that runs our hook
+  args: string[] | null; // the exec form's arguments; null for the shell form
+  // exec: node started directly (what setup writes in the user's settings); shell: `repomagpie hook
+  // claude-code`; old: `magpie hook claude-code`; other: anything else that runs our hook.
+  form: "exec" | "shell" | "old" | "other";
+  // For the exec form, as for an MCP entry: whether its node and entry file exist, and whether node
+  // gets --disallow-code-generation-from-strings before the script. null for the other forms.
+  node_found: boolean | null;
+  entry_found: boolean | null;
+  code_generation_off: boolean | null;
 }
 
 export interface AgentReport {
@@ -92,11 +101,17 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     const read = readConfig(file);
     if ("error" in read) return { file, entries: [], error: read.error };
     const parsed = readJsonc(read.text);
-    return "error" in parsed ? { file, entries: [], error: parsed.error } : { file, entries: hookEntries(parsed.value) };
+    return "error" in parsed ? { file, entries: [], error: parsed.error } : { file, entries: hookEntries(parsed.value, where) };
   });
+  const userSettings = claudeSettings(where);
   for (const { file, entries, error } of hook) {
     if (error) problems.push(`Couldn't read ${tilde(file)}: ${error}.`);
-    if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. Run repomagpie setup to change it to repomagpie.`);
+    if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. Run repomagpie setup to change it.`);
+    if (file === userSettings && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. Run repomagpie setup to start node directly.`);
+    for (const e of entries.filter((x) => x.form === "exec")) {
+      if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. Run repomagpie setup again.`);
+      else if (!e.code_generation_off) problems.push(`The Claude Code hook in ${tilde(file)} doesn't start node with ${NO_CODEGEN}. Run repomagpie setup again.`);
+    }
   }
 
   // Each agent's MCP entry.
@@ -154,22 +169,25 @@ function projectSettings(request: DoctorRequest): string[] {
   return [join(request.cwd, ".claude", "settings.json"), join(request.cwd, ".claude", "settings.local.json")];
 }
 
-function hookEntries(settings: unknown): HookEntry[] {
-  const groups = (settings as { hooks?: { PreToolUse?: unknown } })?.hooks?.PreToolUse;
-  if (!Array.isArray(groups)) return [];
-  const entries: HookEntry[] = [];
-  for (const group of groups) {
-    const hooks = (group as { hooks?: unknown })?.hooks;
-    if (!Array.isArray(hooks)) continue;
-    for (const h of hooks) {
-      const command = (h as { command?: unknown })?.command;
-      if (typeof command !== "string" || !/\bhook\s+claude-code\b/.test(command)) continue;
-      const form = /^\s*repomagpie(\.cmd)?\s+hook\s+claude-code\b/.test(command) ? "current" : /^\s*magpie(\.cmd)?\s+hook\s+claude-code\b/.test(command) ? "old" : "other";
-      const matcher = (group as { matcher?: unknown }).matcher;
-      entries.push({ matcher: typeof matcher === "string" ? matcher : null, command, form });
-    }
-  }
-  return entries;
+// Our hook entries, read as setup reads them (setup-hook.ts), with the exec form's paths checked.
+function hookEntries(settings: unknown, where: Where): HookEntry[] {
+  const found = findHooks(settings);
+  if (typeof found === "string") return [];
+  const groups = (settings as { hooks: { PreToolUse: { matcher?: unknown }[] } }).hooks.PreToolUse;
+  return found.map((f) => {
+    const matcher = groups[f.group]?.matcher;
+    const exec = f.form === "exec" && f.args !== null;
+    const script = exec ? f.args?.find((a) => /\.[cm]?js$/.test(a)) ?? null : null;
+    return {
+      matcher: typeof matcher === "string" ? matcher : null,
+      command: f.command,
+      args: f.args,
+      form: f.form,
+      node_found: exec ? (isAbsolute(f.command) ? isFile(f.command) : onPath(f.command, where).length > 0) : null,
+      entry_found: exec ? script !== null && isFile(script) : null,
+      code_generation_off: exec ? script !== null && (f.args as string[]).indexOf(NO_CODEGEN) >= 0 && (f.args as string[]).indexOf(NO_CODEGEN) < (f.args as string[]).indexOf(script) : null,
+    };
+  });
 }
 
 function journalReport(scope: "personal" | "project", path: string): JournalReport {

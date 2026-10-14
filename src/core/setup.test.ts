@@ -188,7 +188,8 @@ test("with Claude Code: its MCP entry, the skill linked, and the old magpie hook
   assert.deepEqual([plan.skill?.shared.action, plan.skill?.claude?.action, plan.hook?.action], ["add", "link", "migrate"]);
   const done = applySetup(plan, s.request());
   assert.deepEqual([done.agents[0].result, done.skill?.result, done.hook?.result], ["done", "done", "done"], JSON.stringify([done.skill?.error, done.hook?.error]));
-  assert.equal(readFileSync(settings, "utf8"), original.replace('"magpie hook', '"repomagpie hook'));
+  // The exec form: the MCP entry's node and entry file, then hook claude-code.
+  assert.deepEqual(JSON.parse(readFileSync(settings, "utf8")).hooks.PreToolUse[0].hooks, [{ type: "command", command: s.launch.command, args: [NO_CODEGEN, s.launch.args[1], "hook", "claude-code"] }]);
   assert.ok(existsSync(join(s.home, ".agents", "skills", "repomagpie", "SKILL.md")));
   assert.ok(lstatSync(join(s.home, ".claude", "skills", "repomagpie")).isSymbolicLink());
 

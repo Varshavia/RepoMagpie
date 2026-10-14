@@ -83,19 +83,39 @@ test("PATH: our repomagpie with its version, and a magpie that isn't ours is fla
   assert.ok(report.problems.some((p) => p.startsWith("magpie on PATH runs another program")));
 });
 
-test("the old hook entry is found and named; the current one is fine", () => {
+test("the hook's shell forms in the user's settings: the old name, and the slower shell, are to-dos", () => {
   const box = scratchHome();
   const settings = (command: string) => JSON.stringify({ permissions: { allow: ["Bash(npm test)"] }, hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [{ type: "command", command }] }] } });
   box.write(join(box.home, ".claude", "settings.json"), settings("magpie hook claude-code"));
   const old = runDoctor(box.request);
-  assert.deepEqual(old.hook, [{ file: join(box.home, ".claude", "settings.json"), entries: [{ matcher: "Bash|PowerShell", command: "magpie hook claude-code", form: "old" }] }]);
+  assert.deepEqual(old.hook, [{ file: join(box.home, ".claude", "settings.json"), entries: [{ matcher: "Bash|PowerShell", command: "magpie hook claude-code", args: null, form: "old", node_found: null, entry_found: null, code_generation_off: null }] }]);
   assert.ok(old.problems.some((p) => p.includes("runs magpie hook claude-code, the old name")));
   assert.ok(old.problems.includes("Claude Code has no repomagpie MCP server. Run repomagpie setup."), "~/.claude exists, so Claude Code counts as installed");
 
   box.write(join(box.home, ".claude", "settings.json"), settings("repomagpie hook claude-code"));
-  const current = runDoctor(box.request);
-  assert.equal(current.hook[0].entries[0].form, "current");
-  assert.ok(!current.problems.some((p) => p.includes("old name")));
+  const shell = runDoctor(box.request);
+  assert.equal(shell.hook[0].entries[0].form, "shell");
+  assert.ok(!shell.problems.some((p) => p.includes("old name")));
+  assert.ok(shell.problems.some((p) => p.includes("starts through a shell") && p.endsWith("Run repomagpie setup to start node directly.")));
+});
+
+test("the hook's exec form: fine when both paths exist and code generation is off; each gap is a to-do", () => {
+  const box = scratchHome();
+  command(box, "repomagpie", { name: "repomagpie", version: "0.2.0" });
+  const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
+  const settings = (node: string, args: string[]) => JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [{ type: "command", command: node, args }] }] } });
+  const file = join(box.home, ".claude", "settings.json");
+  const hookProblems = () => runDoctor(box.request).problems.filter((p) => p.startsWith("The Claude Code hook"));
+
+  box.write(file, settings(process.execPath, ["--disallow-code-generation-from-strings", entry, "hook", "claude-code"]));
+  const fine = runDoctor(box.request).hook[0].entries[0];
+  assert.deepEqual([fine.form, fine.node_found, fine.entry_found, fine.code_generation_off], ["exec", true, true, true]);
+  assert.deepEqual(hookProblems(), []);
+
+  box.write(file, settings(join(box.root, "gone", "node.exe"), ["--disallow-code-generation-from-strings", entry, "hook", "claude-code"]));
+  assert.match(hookProblems()[0], /starts .*gone.*node\.exe, which doesn't exist\. Run repomagpie setup again\.$/);
+  box.write(file, settings(process.execPath, [entry, "hook", "claude-code"]));
+  assert.match(hookProblems()[0], /doesn't start node with --disallow-code-generation-from-strings/);
 });
 
 test("MCP entries: a broken path is found; a good one shows its version and --allow-write; env values never appear", () => {

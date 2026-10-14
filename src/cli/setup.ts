@@ -133,6 +133,7 @@ export function render(plan: SetupPlan, home: string): string {
   if (plan.hook) {
     const h = plan.hook;
     lines.push(`  ${"Hook".padEnd(12)}  ${HOOK_WHAT[h.action]}: ${tilde(h.file)}${h.reason ? `: ${h.reason}` : ""}`);
+    if (h.action === "add" || h.action === "migrate") lines.push(`                it will start: ${plan.project ? "repomagpie hook claude-code (through a shell, so any teammate's install runs it)" : "node directly, as the MCP entry does, then hook claude-code"}`);
     if (h.backup) lines.push(`                backup first: ${tilde(h.backup)}`);
     if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                  ${line}`));
   }
@@ -143,7 +144,7 @@ const SKILL_WHAT: Record<SkillItem["action"], string> = {
   add: "install", update: "update", keep: "already there", remove: "remove", leave: "leave", link: "link to the shared folder", relink: "replace with a link to the shared folder", copy: "copy",
 };
 const HOOK_WHAT: Record<HookPlan["action"], string> = {
-  add: "add repomagpie hook claude-code", migrate: "change magpie hook claude-code to repomagpie", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
+  add: "add the hook", migrate: "update the hook entry", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
 };
 
 function summary(plan: SetupPlan, home: string): string {

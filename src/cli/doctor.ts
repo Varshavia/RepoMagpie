@@ -38,7 +38,11 @@ export function render(r: DoctorJson, home: string): string {
   lines.push("", "Claude Code hook");
   if (!r.hook.some((h) => h.entries.length)) lines.push("  none");
   for (const h of r.hook) {
-    for (const e of h.entries) lines.push(`  ${tilde(h.file)}: ${e.command}${e.form === "old" ? "  (the old name)" : ""}`);
+    for (const e of h.entries) {
+      const shown = [e.command, ...(e.args ?? [])].map((part) => tilde(part)).join(" ");
+      const note = e.form === "old" ? "  (the old name)" : e.form === "exec" ? `  (node started directly${e.node_found && e.entry_found ? "" : "; a path is missing"}${e.code_generation_off ? ", code generation off" : ""})` : "";
+      lines.push(`  ${tilde(h.file)}: ${shown}${note}`);
+    }
     if (h.error) lines.push(`  ${tilde(h.file)}: can't be read: ${h.error}`);
   }
 

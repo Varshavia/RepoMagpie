@@ -12,7 +12,7 @@ import { AGENTS, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type Mc
 import { backupName, pathProblem, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import type { Launch } from "./launch.ts";
-import { applyHook, planHook, type HookPlan } from "./setup-hook.ts";
+import { applyHook, planHook, type HookPlan, type HookTarget } from "./setup-hook.ts";
 import { applySkill, planSkill, type SkillPlan } from "./setup-skill.ts";
 
 // The package's skill: beside dist/ in the package, beside src/ in the repository.
@@ -94,8 +94,18 @@ export function planSetup(request: SetupRequest): SetupPlan {
       root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
     });
   }
-  if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp);
+  if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request));
   return plan;
+}
+
+// The hook entry: in a project the shell form, which a teammate's machine can run; in the user's
+// settings the exec form, from the same node and entry file as the MCP entry, with code generation
+// off (decision 0035).
+function hookTarget(request: SetupRequest): HookTarget {
+  if (request.project !== undefined) return { shell: true };
+  if ("error" in request.launch) return { error: request.launch.error };
+  const [flag, entry] = request.launch.args;
+  return { exec: { command: request.launch.command, args: [flag, entry, "hook", "claude-code"] } };
 }
 
 const ROOT = (request: SetupRequest) => request.project ?? request.where.home;
@@ -176,7 +186,7 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
     source: request.skillSource ?? SKILL_SOURCE, shared: plan.skill.shared.path, claude: plan.skill.claude?.path ?? null,
     root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
   });
-  const hook = plan.hook && applyHook(plan.hook, root);
+  const hook = plan.hook && applyHook(plan.hook, root, hookTarget(request));
   return { ...plan, agents, skill, hook };
 }
 
