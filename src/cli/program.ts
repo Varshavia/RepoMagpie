@@ -1,6 +1,7 @@
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
 import type { AdoptOptions } from "./adopt.ts";
+import type { CatalogOptions } from "./catalog.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
@@ -35,7 +36,7 @@ export interface Io {
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
 }
 
-const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "recall", "suggest", "adopt"]);
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt"]);
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
@@ -97,6 +98,18 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--limit <n>", "show at most n results", positiveInteger, 10)
     .action(async (query: string, _options: unknown, command: Command) => {
       code = await (await import("./search.ts")).searchCommand(query, command.optsWithGlobals<SearchOptions>(), io);
+    });
+
+  program
+    .command("catalog")
+    .description("list every note in one compact row, in pages")
+    .option("--tag <tag>", "only notes with this tag (repeatable: every tag must match)", (tag: string, tags: string[]) => [...tags, tag], [])
+    .addOption(new Option("--kind <kind>", "only notes of this kind").choices(KINDS))
+    .addOption(new Option("--journal <journal>", "list one journal only").choices(["personal", "project"]))
+    .option("--limit <n>", "show at most n notes, from 1 to 1000", catalogLimit, 100)
+    .option("--cursor <cursor>", "the next page: next_cursor from the previous page")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./catalog.ts")).catalogCommand(command.optsWithGlobals<CatalogOptions>(), io);
     });
 
   program
@@ -174,6 +187,13 @@ export async function run(argv: string[], io: Io): Promise<number> {
 function portNumber(value: string): number {
   const n = Number(value);
   if (!/^\d+$/.test(value) || n < 1 || n > 65535) throw new InvalidArgumentError("Use a port number from 1 to 65535.");
+  return n;
+}
+
+// catalog's --limit: at most 1000 rows a page (decision 0034, "Limits").
+function catalogLimit(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) throw new InvalidArgumentError("Use a whole number from 1 to 1000.");
   return n;
 }
 

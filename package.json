@@ -40,7 +40,7 @@
     "check:bundle": "node scripts/check-bundle.ts",
     "check:build": "node scripts/check-build.ts",
     "test:e2e": "playwright test -c ui/playwright.config.ts",
-    "bench": "npm run build && node scripts/bench-search.ts && node scripts/bench-suggest.ts && node scripts/bench-recall.ts && node scripts/bench-links.ts && node scripts/bench-graph.ts && node scripts/bench-note.ts",
+    "bench": "npm run build && node scripts/bench-search.ts && node scripts/bench-catalog.ts && node scripts/bench-suggest.ts && node scripts/bench-recall.ts && node scripts/bench-links.ts && node scripts/bench-graph.ts && node scripts/bench-note.ts",
     "check:links": "node scripts/check-links.ts",
     "check:commands": "node scripts/check-commands.ts",
     "check:characters": "node scripts/check-characters.ts",
