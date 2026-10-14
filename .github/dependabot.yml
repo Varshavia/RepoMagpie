@@ -10,6 +10,13 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # Major updates that need work of their own: sigma 4 needs the graph page ported and a decision on
+    # the bundle size (roadmap); @types/node stays on the Node floor's major (spec, section 9).
+    ignore:
+      - dependency-name: sigma
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       dev-dependencies:
         dependency-type: development
