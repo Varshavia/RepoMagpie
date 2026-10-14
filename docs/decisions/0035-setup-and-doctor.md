@@ -21,7 +21,7 @@ Two other installers set the expectation: `npx skills add` and REA's `npx rea-ag
 
 **Flags:** `--yes` (no questions; the detected agents, `--allow-write` only if given), `--dry-run` (the plan, nothing written), `--agents <list>`, `--remove`, `--json` (implies no questions; with neither `--yes` nor `--dry-run` it is a usage error, so `--json` never writes by surprise), `--project`, `--allow-write`. Without a terminal, setup can't ask, so it needs `--yes` or `--dry-run` too (a usage error otherwise).
 
-**`--project` is the global flag** (`repomagpie --project <dir>`, the project root): with it, `setup` writes that project's files instead of the user's. It comes with `setup`'s second part, together with the project forms of the skill and the hook; the first part writes user scope only.
+**`--project` is the global flag** (`repomagpie --project <dir>`, the project root, or its `.magpie` folder): with it, the skill and the Claude Code hook go into that project (`.agents/skills/`, `.claude/skills/`, `.claude/settings.json`), for the team to commit. **The MCP entries stay in the user's own settings**, with or without `--project`: an entry names this machine's `node` and install ("How agents launch RepoMagpie"), which a teammate's machine doesn't have, so a committed `.mcp.json`, `.cursor/mcp.json` or `.vscode/mcp.json` would break for everyone else. (This narrows "Project files … only with `--project`" under Safety; to be confirmed by the maintainer on the branch.)
 
 **The prompts** are a minimal multi-select and yes/no on `node:readline`'s keypress events, not a library: about 60 lines, no new dependency. In raw mode Node's terminal layer turns arrow keys into the same escape sequences on Windows consoles (cmd, PowerShell, Windows Terminal) as on macOS and Linux, so one code path serves all. They draw on stderr; Ctrl+C or Esc cancels, and nothing changes.
 
@@ -59,6 +59,9 @@ For the other agents in [agents](../agents.md) (Copilot CLI, Windsurf, Cline, Ze
   - anything else in either place (another skill named `repomagpie`, a link that points elsewhere): `setup` changes nothing there and says so.
 - **The link rule:** `setup` never writes through a link. It creates the one link above and writes only into the real folder it points to. If `~/.agents/skills/repomagpie` itself is a link (the user's own), `setup` leaves it and says so.
 - `--remove` deletes the link and the real folder only when the folder holds RepoMagpie's skill; it never follows a link to delete.
+- **Backups** of a skill folder go beside the skills folder (`.agents/repomagpie-skill.repomagpie-backup-<stamp>`), never in it: an agent would read a backup there as a second skill.
+- **With `--project` on Windows**, `.claude/skills/repomagpie` is a copy, not a junction: git can't commit a junction. Elsewhere it is the relative symlink, which git commits.
+- **The skill's version** is in its frontmatter (`metadata.version`), kept equal to `package.json`'s by a test, so `doctor` can compare it with the CLI's.
 
 ### Safety
 - **A backup before every edit**, next to the file: `<file>.repomagpie-backup-<timestamp>`, named in the summary. An edit made through the agent's CLI gets the same backup of the file the CLI writes, when `setup` knows that file.
@@ -101,7 +104,9 @@ Options:
 - **No new runtime and no wrapper script:** the agent starts `node` directly. No shell is involved, so nothing in the path is parsed by a shell.
 - **The cost:** the entry holds two absolute paths. Uninstalling that Node.js version, switching with a version manager to one where RepoMagpie isn't installed, or moving npm's global folder breaks it. `repomagpie doctor` checks that both paths exist and says to run `repomagpie setup` again; a second `setup` from the new install rewrites the entry.
 
-**The Claude Code hook keeps `repomagpie hook claude-code`.** Claude Code runs hook commands through a shell, so the `.cmd` shim works on Windows, and Claude Code is a terminal program that has the user's `PATH`. Its entry is the one the spec and the README show.
+**The Claude Code hook keeps `repomagpie hook claude-code`.** Claude Code runs hook commands through a shell, so the `.cmd` shim works on Windows, and Claude Code is a terminal program that has the user's `PATH`. Its entry is the one the spec and the README show. Measured on Windows (2026-10-14): through Git Bash, which Claude Code uses for a hook in shell form, npm's shell shim makes the hook take 268 ms against 74 ms for `node` started directly, as a hook in Claude Code's exec form (`args`, no shell) would ([agents](../agents.md)). Whether `setup` writes the exec form instead is open for the maintainer.
+
+**The hook entry:** `setup` adds `{"matcher": "Bash|PowerShell", "hooks": [{"type": "command", "command": "repomagpie hook claude-code"}]}` last in `hooks.PreToolUse`. An old `magpie hook claude-code` command is changed in place, its flags kept; with a current entry too, the old one is removed. An entry that runs RepoMagpie another way is kept. `--remove` takes out a group of its own whole, or its hook alone from a shared group.
 
 ### `repomagpie doctor`
 Read-only: it writes nothing, not even a cache. It reports:

@@ -68,8 +68,11 @@ src/
                doctor: repomagpie doctor's report; read-only
                launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
                setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
-               reading each change back; agent-cli: running an agent's CLI, with cmd.exe's escaping for
-               .cmd shims; json-edit: one member of a plain JSON file changed, every other byte kept
+               reading each change back; setup-skill: the skill's shared folder and Claude Code's link;
+               setup-hook: the Claude Code hook, added, migrated, removed; config-write: no links, no
+               writes outside the home folder or project, backups, atomic writes; agent-cli: running an
+               agent's CLI, with cmd.exe's escaping for .cmd shims; json-edit: one value of a plain JSON
+               file changed (an object member or an array item), every other byte kept
   cli/         one module per command, loaded only when it runs; human and --json output; prompt.ts: setup's
                multi-select and yes/no on node:readline
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
