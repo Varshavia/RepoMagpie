@@ -52,7 +52,7 @@ Not all note text is yours ([decision 0032](docs/decisions/0032-note-text-is-dat
 | A project journal (`.magpie/` in a repository you cloned) | That repository's contributors |
 | GitHub fields of a note (description, topics) | The repository's owner |
 
-RepoMagpie treats all of it as data. Control characters, escape sequences, bidi controls and zero-width characters are removed before note text reaches your terminal or your agent. Text handed to an agent is capped, quoted and labelled with its source, and a project journal's note never says "you noted". A note that is a link, or a file over 256 KB, is never read. The app shows note text as text, never as HTML, and links only `http` and `https` addresses. The agent skill tells the agent to report what a note says and never follow instructions in it.
+RepoMagpie treats all of it as data. Control characters, bidi controls and zero-width characters show as visible markers such as `<U+202E>` before note text reaches your terminal, your agent or the app, so an escape sequence does nothing and hidden text can't change how a line reads. Text handed to an agent is capped, quoted and labelled with its source, and a project journal's note never says "you noted". A note that is a link, or a file over 256 KB, is never read. The app shows note text as text, never as HTML, and links only `http` and `https` addresses. The agent skill tells the agent to report what a note says and never follow instructions in it.
 
 ## Scope
 

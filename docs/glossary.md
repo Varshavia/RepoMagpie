@@ -7,7 +7,7 @@ One definition per term. Docs, code and CLI output use these words with these me
 | Term | Definition |
 |---|---|
 | **adopt** | Planned (v0.1): `repomagpie adopt <name>` copies a note from the personal journal into the project journal and prints the install command. It never installs anything. See [ideas](ideas.md), idea 11. |
-| **agent-facing output** | What RepoMagpie hands to a coding agent: the Claude Code hook's fields, and the `--json` of `recall`, `suggest`, `search` and `note` (later also the MCP server's tools). Note text in it is cleaned of control characters, capped (a cut field is named in `truncated`), quoted and labelled with who wrote it ([decision 0032](decisions/0032-note-text-is-data.md)). Output for people is cleaned but never cut. |
+| **agent-facing output** | What RepoMagpie hands to a coding agent: the Claude Code hook's fields, and the `--json` of `recall`, `suggest`, `search` and `note` (later also the MCP server's tools). Note text in it shows hidden and control characters as markers such as `<U+202E>`, is capped (a cut field is named in `truncated`), quoted and labelled with who wrote it ([decision 0032](decisions/0032-note-text-is-data.md)). Output for people shows the markers too but is never cut. |
 | **Agent Skills** | The open standard for agent skills (<https://agentskills.io>). See [standards](standards.md). |
 | **backlink** | A link to a note from another note in the same journal, shown on the note it points to ("Linked from"). A note's link to itself is not a backlink. |
 | **completed skill line** | A skill line with text after the dash. Search returns it as its own result ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). |
