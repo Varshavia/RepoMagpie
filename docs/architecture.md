@@ -66,7 +66,12 @@ src/
                agents: the coding agents setup and doctor know (decision 0035, docs/agents.md): their config
                files, commands on PATH and the packages they run, reading JSON with comments and Codex's TOML
                doctor: repomagpie doctor's report; read-only
-  cli/         one module per command, loaded only when it runs; human and --json output
+               launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
+               setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
+               reading each change back; agent-cli: running an agent's CLI, with cmd.exe's escaping for
+               .cmd shims; json-edit: one member of a plain JSON file changed, every other byte kept
+  cli/         one module per command, loaded only when it runs; human and --json output; prompt.ts: setup's
+               multi-select and yes/no on node:readline
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
   mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
                rules, the server instructions; cli/mcp.ts serves it on stdio. The SDK is bundled into its

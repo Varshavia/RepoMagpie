@@ -1,6 +1,6 @@
 # 0035 — `setup` and `doctor` change other tools' settings safely
 
-**Status:** accepted (2026-10-14); revised on its branch the same day: the skill is one folder in `~/.agents/skills/` with a link from `~/.claude/skills/`, as the `skills` CLI installs it, instead of two copies. Builds on [0034](0034-the-mcp-server.md) (the MCP server), [0031](0031-the-command-is-repomagpie.md) (the command is `repomagpie`; "the planned `setup` command will move old entries to the new name") and [0032](0032-note-text-is-data.md), rule 5 (never write through a link). Agent facts, with sources and dates: [agents](../agents.md).
+**Status:** accepted (2026-10-14); revised on its branch the same day: the skill is one folder in `~/.agents/skills/` with a link from `~/.claude/skills/`, as the `skills` CLI installs it, instead of two copies; every MCP entry starts node with `--disallow-code-generation-from-strings`; the details found while building `setup` (the agents' exact commands, reading each change back, the prompts, `--project` in the second part). Builds on [0034](0034-the-mcp-server.md) (the MCP server), [0031](0031-the-command-is-repomagpie.md) (the command is `repomagpie`; "the planned `setup` command will move old entries to the new name") and [0032](0032-note-text-is-data.md), rule 5 (never write through a link). Agent facts, with sources and dates: [agents](../agents.md).
 
 ## Context
 Wiring RepoMagpie into an agent is manual today: the user edits `~/.claude/settings.json` for the hook, and runs `npx skills add` for the skill. With the MCP server ([0034](0034-the-mcp-server.md)), each agent also needs an MCP entry, and every agent keeps it in a different place and format: JSON with `mcpServers` or `servers`, TOML, YAML, or a file only the agent's own CLI should touch.
@@ -15,11 +15,15 @@ Two other installers set the expectation: `npx skills add` and REA's `npx rea-ag
 **The flow:**
 1. Detect the installed agents of the first set: Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code. An agent counts as installed when its config folder exists or its CLI is on `PATH`.
 2. Show a plan: for each agent, what changes, in which file, how (the agent's CLI or a JSON edit), and the backup that will be written.
-3. Ask: which agents (a multi-select, all detected ones chosen), then whether to turn on `--allow-write` (no by default).
+3. Ask: which agents (a multi-select, all detected ones chosen), then whether to turn on `--allow-write` (no by default), then the plan for those, then "Make these changes?".
 4. Apply.
 5. Print a summary: what changed, the backups, and anything left to do by hand.
 
-**Flags:** `--yes` (no questions; the detected agents, `--allow-write` only if given), `--dry-run` (the plan, nothing written), `--agents <list>`, `--remove`, `--json` (implies no questions; with neither `--yes` nor `--dry-run` it is a usage error, so `--json` never writes by surprise), `--project`, `--allow-write`.
+**Flags:** `--yes` (no questions; the detected agents, `--allow-write` only if given), `--dry-run` (the plan, nothing written), `--agents <list>`, `--remove`, `--json` (implies no questions; with neither `--yes` nor `--dry-run` it is a usage error, so `--json` never writes by surprise), `--project`, `--allow-write`. Without a terminal, setup can't ask, so it needs `--yes` or `--dry-run` too (a usage error otherwise).
+
+**`--project` is the global flag** (`repomagpie --project <dir>`, the project root): with it, `setup` writes that project's files instead of the user's. It comes with `setup`'s second part, together with the project forms of the skill and the hook; the first part writes user scope only.
+
+**The prompts** are a minimal multi-select and yes/no on `node:readline`'s keypress events, not a library: about 60 lines, no new dependency. In raw mode Node's terminal layer turns arrow keys into the same escape sequences on Windows consoles (cmd, PowerShell, Windows Terminal) as on macOS and Linux, so one code path serves all. They draw on stderr; Ctrl+C or Esc cancels, and nothing changes.
 
 **What it installs, per agent:**
 - the MCP server entry, named `repomagpie`;
@@ -29,10 +33,20 @@ Two other installers set the expectation: `npx skills add` and REA's `npx rea-ag
 For the other agents in [agents](../agents.md) (Copilot CLI, Windsurf, Cline, Zed, OpenCode, Goose, Claude Desktop), `setup` prints the snippet and the path to paste it into. It writes nothing for them.
 
 ### How it writes
-- **The agent's own CLI first**, where one exists: `claude mcp add --scope user`, `codex mcp add`, `gemini mcp add --scope user`, `code --add-mcp`. The agent then owns its format. Claude Code's `~/.claude.json` is rewritten by Claude Code while it runs, and Codex's `config.toml` is TOML: editing either ourselves would race the agent or need a TOML writer.
+- **The agent's own CLI first**, where one exists. The agent then owns its format. Claude Code's `~/.claude.json` is rewritten by Claude Code while it runs, and Codex's `config.toml` is TOML: editing either ourselves would race the agent or need a TOML writer. The commands, with `--` before the server's command so that node's flags reach node, not the agent's CLI:
+
+  | Agent | Add | Remove |
+  |---|---|---|
+  | Claude Code | `claude mcp add --scope user --transport stdio repomagpie -- <node> <args…>` | `claude mcp remove --scope user repomagpie` |
+  | Codex CLI | `codex mcp add repomagpie -- <node> <args…>` | `codex mcp remove repomagpie` |
+  | Gemini CLI | `gemini mcp add --scope user repomagpie -- <node> <args…>` | `gemini mcp remove --scope user repomagpie` |
+  | VS Code | `code --add-mcp '{"name":"repomagpie","command":…,"args":[…]}'` | none: a JSON edit of the user `mcp.json` |
+
+  An entry that differs is removed first, then added. VS Code's CLI can't remove, so changing or removing its entry is a JSON edit of `…/Code/User/mcp.json` (the path checked on a real install, [agents](../agents.md)).
+- **Read back:** after every change, `setup` reads the file again with `doctor`'s reader. The change counts as done only when the file holds exactly the entry meant (or, for `--remove`, none); otherwise the summary says what the file holds now. A CLI's own bugs, or a newer CLI that writes elsewhere, show up there rather than as a silent success.
 - **Otherwise a round-trip-safe JSON edit**, as for Cursor's `~/.cursor/mcp.json` and Claude Code's `~/.claude/settings.json` (the hook): only our entry changes; key order, indentation, line endings and a final newline stay as they were.
 - **Never a file it can't round-trip.** JSON with comments or trailing commas, a file that isn't valid JSON, a value of the wrong type where our entry goes, or TOML without the agent's CLI: `setup` changes nothing there, and prints the exact snippet and the path instead.
-- On Windows an agent's CLI can be a `.cmd` shim. `setup` runs it through `cmd.exe` with each argument quoted, never through a shell string it builds from untrusted text, and treats a non-zero exit as "not changed" with the CLI's message.
+- On Windows an agent's CLI can be a `.cmd` shim. `setup` runs it through `cmd.exe` with each argument quoted, never through a shell string it builds from untrusted text, and treats a non-zero exit as "not changed" with the CLI's message. The quoting is the one the cross-spawn package uses (MIT): the C runtime's rules for quotes and backslashes, then cmd.exe's special characters escaped with `^`, twice, because a shim reads its arguments again through `%*`. A test passes `%PATH%`, `&`, `|`, quotes, a trailing backslash, a JSON document and an empty string through a `.cmd` shim in a folder with a space, and the program receives each one exactly.
 
 ### The skill
 `setup` lays the skill out the way the `skills` CLI (`npx skills add`) does today, so the two produce the same result and never fight:
@@ -74,11 +88,11 @@ Options:
 | the shim's absolute path | yes | no: still a `.cmd` | yes | Windows; on macOS and Linux the shim is `#!/usr/bin/env node`, which needs `node` on `PATH` |
 | **absolute `node`, absolute entry file, `mcp`** | **yes** | **yes** | **yes** | **chosen** |
 
-**The decision:** `command` is the absolute path of `node`, and `args` are the absolute path of the installed CLI's entry file (`<package>/dist/cli/main.js`) and `mcp` (plus `--allow-write` when chosen). For example, on Windows:
+**The decision:** `command` is the absolute path of `node`, and `args` are node's `--disallow-code-generation-from-strings`, the absolute path of the installed CLI's entry file (`<package>/dist/cli/main.js`) and `mcp` (plus `--allow-write` when chosen, and `--home <journal>` when the journal was chosen with `--home` or `MAGPIE_HOME`, which the agent won't have). The flag stands before the script, so node reads it: the server needs no generated code ([0034](0034-the-mcp-server.md), "No generated code"), so with it the server can't run any either, whatever reaches it. For example, on Windows:
 
 ```json
 { "command": "C:\\Program Files\\nodejs\\node.exe",
-  "args": ["C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\repomagpie\\dist\\cli\\main.js", "mcp"] }
+  "args": ["--disallow-code-generation-from-strings", "C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\repomagpie\\dist\\cli\\main.js", "mcp"] }
 ```
 
 - **Which `node`:** the one running `setup`. If the `node` that `PATH` names is the same program (the same file once links are resolved), `setup` writes the `PATH` form, which survives upgrades (`/opt/homebrew/bin/node` rather than a versioned folder under `Cellar/`). Otherwise it writes the running node's own path.
@@ -94,7 +108,7 @@ Read-only: it writes nothing, not even a cache. It reports:
 - which programs `repomagpie` and `magpie` run on `PATH`, and whether each is this package; a `magpie` that isn't ours (such as yetone/magpie, [0031](0031-the-command-is-repomagpie.md)) is flagged;
 - the CLI's version against the installed skill's version, in each skills folder it finds (`npx skills` installs included);
 - the Claude Code hook entry, including the old `magpie hook claude-code` form;
-- the MCP entry in each detected agent: present or not, whether its `node` and entry file exist, whether it is this version, and whether `--allow-write` is on;
+- the MCP entry in each detected agent: present or not, whether its `node` and entry file exist, whether it is this version, whether node gets `--disallow-code-generation-from-strings` before the script (a to-do when not), and whether `--allow-write` is on;
 - the journals found, with note counts and skipped files (links, files over 256 KB, unparseable notes).
 
 It has human output and `--json`, and exits 0 whatever it finds: it is a report, not a check, so a tester can always attach its output to a bug report. It never prints a secret: a value from a config file's `env` is shown as its key only.

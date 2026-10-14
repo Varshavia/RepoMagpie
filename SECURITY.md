@@ -32,11 +32,11 @@ RepoMagpie is in beta (`0.x`). Security fixes go into the next release; only the
 - for the Claude Code hook, the tool call Claude Code sends on standard input;
 - the environment variables `GITHUB_TOKEN`, `MAGPIE_HOME` and `NO_COLOR`. The bundled libraries also read `FORCE_COLOR`, `CLICOLOR_FORCE`, `LOG_TOKENS` and `LOG_STREAM`.
 
-**Writes:** notes, `tags.md` and caches (`.cache/`) inside the journals, a project journal's `.gitignore`, and the hook's error log in `<personal journal>/.cache/`. Nothing outside the journals, and never through a link (a symbolic link or junction) inside one ([decision 0032](docs/decisions/0032-note-text-is-data.md)).
+**Writes:** notes, `tags.md` and caches (`.cache/`) inside the journals, a project journal's `.gitignore`, and the hook's error log in `<personal journal>/.cache/`. Nothing outside the journals, and never through a link (a symbolic link or junction) inside one ([decision 0032](docs/decisions/0032-note-text-is-data.md)). The one exception is `repomagpie setup`, and only after it has shown its plan and you said yes (or gave `--yes`): it adds its MCP entry to your agents' settings, through each agent's own CLI or by changing that one entry in a plain JSON file, inside your home folder and never through a link. It backs up each file first, next to it (`<file>.repomagpie-backup-<timestamp>`), and never sets an agent's trust or auto-approval. `repomagpie setup --remove` takes out only its own entries and never restores a backup over your later changes ([decision 0035](docs/decisions/0035-setup-and-doctor.md)).
 
 **Sends:** read-only GET requests to GitHub's API (`api.github.com`), only when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository. `GITHUB_TOKEN`, if you set it, goes only in their `Authorization` header and never appears in a message or a log. Nothing from your journals is sent anywhere, and there is no telemetry.
 
-**Never:** installs a package, edits a settings file (the Claude Code hook is set up by you), or runs a command it finds in a note. `repomagpie ui` starts one other program: your default browser, through the platform's open command.
+**Never:** installs a package, edits a settings file without `setup`'s plan and your yes, or runs a command it finds in a note. `repomagpie ui` starts one other program: your default browser, through the platform's open command. `repomagpie setup` starts your agents' own CLIs (`claude`, `codex`, `gemini`, `code`) to add or remove its entry. `repomagpie mcp` listens on no port: your agent starts it and talks to it over stdin and stdout.
 
 ## URLs and addresses in the package
 
@@ -72,6 +72,7 @@ The app's Content-Security-Policy allows connections to its own origin only ([do
 - **No ajv.** The SDK's default JSON Schema validator for Node.js, ajv, compiles every schema into code with `new Function`. RepoMagpie passes the SDK the `@cfworker/json-schema` validator instead, which interprets a schema and generates no code, and the build leaves ajv out of the bundle.
 - **Only our own schemas.** The only schemas validated are the tools' own input and output schemas, written in `src/mcp/server.ts`, and the SDK's protocol messages. Tool arguments from an agent and note text are data checked against those schemas, never compiled.
 - **Proven, not assumed.** The tests and the benchmark start the server with Node's `--disallow-code-generation-from-strings`, under which any `eval` or `new Function` throws, and every tool works ([src/mcp/server.test.ts](src/mcp/server.test.ts), `scripts/bench-mcp.ts`). With the SDK's default validator, the same flag makes the first tool call fail with an `EvalError`.
+- **Enforced where it runs.** Every MCP entry `repomagpie setup` writes starts node with that flag before the script (`node --disallow-code-generation-from-strings …/main.js mcp`), so the server your agent runs can't execute generated code either, whatever a tool call or a note holds. `repomagpie doctor` names an entry without it.
 
 ## The local app
 
