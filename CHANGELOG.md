@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.3] - 2026-10-14
+
+The fourth pre-release: the command is `repomagpie`, note text written by other people is handled as data, GitHub topics become tags, and the first version built and staged on npm by GitHub Actions, with provenance.
+
 ### Added
 
 - `repomagpie tags --from-topics` adds GitHub topics as tags to the notes you already have, until each has 8 tags. It never removes or reorders a tag, keeps the rest of each file exactly as it was, and adds the new tags to `tags.md`. `--dry-run` shows what it would do; a second run adds nothing. A note that can't be read is skipped and named. `--journal project` tags the project journal; `--json` lists each note's added tags.
@@ -130,7 +134,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...HEAD
+[0.2.0-beta.3]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...v0.2.0-beta.3
 [0.2.0-beta.2]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...v0.2.0-beta.2
 [0.2.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.1.0-beta.1...v0.2.0-beta.1
 [0.1.0-beta.1]: https://github.com/Varshavia/RepoMagpie/releases/tag/v0.1.0-beta.1
