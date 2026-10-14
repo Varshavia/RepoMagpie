@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `repomagpie catalog` lists every note in one compact row: name, kind, tags, a one-line summary (the first "Use when" item, else "What it does"), the Verdict, status, journal and the names of its alternatives. It reads 100 notes at a time; the next page's command is on stderr, and `--json` gives `next_cursor`. `--tag`, `--kind` and `--journal` filter it. Use it to see what you have, or to let your coding agent read your whole journal and pick what fits.
+- `repomagpie mcp`, an MCP server for coding agents, started by the agent over stdio. Its tools `recall`, `search`, `suggest` and `catalog` answer exactly as the commands' `--json` does, so any agent with MCP can check a package before installing it, and ask what you have, without the skill or a shell. `--allow-write` adds a `note` tool that records your Verdict or an alternative, in your words; it is off by default. The server works with both MCP protocol revisions agents use today (2025-11-25 and 2026-07-28), never opens a network connection or a port, and makes the package about 200 kB larger.
+
+- `repomagpie catalog` lists every note in one row: name, kind, journal and the Verdict. It reads 100 notes at a time; the next page's command is on stderr. `--tag`, `--kind` and `--journal` filter it. Its `--json` is made for your coding agent to read your whole journal and pick what fits: one short row per note (name, kind, journal, whether you noted to avoid it, a one-line summary and the start of the Verdict), about 20,000 characters for 100 notes, with `next_cursor` for the next page. `--full --json` gives every field: id, tags, status, a longer summary and Verdict, and the names of its alternatives.
 
 ## [0.2.0-beta.3] - 2026-10-14
 

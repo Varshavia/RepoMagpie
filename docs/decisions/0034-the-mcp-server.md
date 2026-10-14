@@ -1,6 +1,6 @@
 # 0034 — The MCP server
 
-**Status:** accepted (2026-10-14); revised on its branch the same day: a tool's `project` is the folder the call runs in, so no CLI flag is added. Supersedes the timing and the audience of the MCP server in [0002](0002-cli-first.md) ("added later … for clients without shell access") and [0010](0010-v0-1-scope.md) ("MCP server: later"), and the line in the [spec](../spec.md), section 10, that puts it out of scope. 0002's other decisions stand: the CLI stays the primary interface, and business logic stays in core. Builds on [0023](0023-api-is-the-json-contract.md) (one JSON contract) and [0032](0032-note-text-is-data.md) (note text is data).
+**Status:** accepted (2026-10-14); revised on its branch the same day: a tool's `project` is the folder the call runs in, so no CLI flag is added; `project` is absolute and without `..`, and the SDK's licence and size are recorded. Supersedes the timing and the audience of the MCP server in [0002](0002-cli-first.md) ("added later … for clients without shell access") and [0010](0010-v0-1-scope.md) ("MCP server: later"), and the line in the [spec](../spec.md), section 10, that puts it out of scope. 0002's other decisions stand: the CLI stays the primary interface, and business logic stays in core. Builds on [0023](0023-api-is-the-json-contract.md) (one JSON contract) and [0032](0032-note-text-is-data.md) (note text is data).
 
 ## Context
 The maintainer keeps one personal journal of 100 to 800 repositories and tools and uses it from every project. Any coding agent should be able to ask "what do I have for X?" and check a package before it installs it, without the user wiring anything by hand.
@@ -46,7 +46,7 @@ Two facts about the protocol, checked on 2026-10-14:
 ### One answer for every surface
 - Each tool returns **the same document as the CLI's `--json`** for the same input ([0023](0023-api-is-the-json-contract.md)), built in core and passed through the text module ([0032](0032-note-text-is-data.md)): markers for hidden and control characters, the caps and `truncated`, and the source of every note (`journal`).
 - The document is the tool's `structuredContent`, described by a declared `outputSchema`. The same document as JSON text is the text content, for clients that read only text.
-- Errors follow the CLI's rule: the success document plus an `error` field, returned as a tool result with `isError: true`. A malformed call (an unknown argument, a wrong type) is a protocol error.
+- Errors follow the CLI's rule: the success document plus an `error` field, returned as a tool result with `isError: true`. A malformed call (an unknown argument, a wrong type, a value over its limit) is refused before any work, as a tool error with the SDK's validation message.
 - Tests prove, tool by tool, that the document equals the CLI's `--json` byte for byte.
 
 ### What the agent reads
@@ -77,7 +77,12 @@ Inputs are capped, as the hook caps its lookups ([spec](../spec.md), section 6).
 | `suggest`'s `need` | at most 10,000 characters |
 | tag and kind filters | at most 32 values, each at most 64 characters (0032's tag cap) |
 | `catalog`'s `limit` | 1 to 1,000; 100 by default |
-| `project` | at most 4,096 characters; an existing folder; no control characters, no NUL; no Windows device name (`CON`, `NUL`, `COM1`, …) in any part |
+| `search`'s and `suggest`'s `limit` | 1 to 100 |
+| `note`'s `text` | at most 1,000 characters (0032's Verdict cap) |
+| `project` | at most 4,096 characters; an absolute path to an existing folder; no `..`, no control characters, no NUL; no Windows device name (`CON`, `NUL`, `COM1`, …) in any part, and no `\\?\` or `\\.\` path |
+| all of a call's arguments | at most 500 array items and object members in all (the SDK's `maxToolInputElements`) |
+
+`project` is absolute because the server's working folder depends on how the agent started it, and an agent always knows the project's absolute path; refusing `..` keeps a path from leaving the folder it names.
 
 The `project` folder is then read under the same rules as `--project`: a `.magpie/` that is a link is skipped, and nothing inside a journal is followed through a link (0032, rule 5).
 
@@ -86,7 +91,7 @@ The `project` folder is then read under the same rules as `--project`: a `.magpi
 - The CLI, the API and MCP give one answer: a change to a `--json` shape is a breaking change for all three ([release process](../release.md)).
 - `repomagpie catalog` is a new command, for MCP and for the CLI.
 - `search` and `suggest` need no new flag for MCP (checked while building `catalog`).
-- The SDK becomes a bundled dev dependency, in its own chunk. The published package keeps no runtime dependencies.
+- The SDK becomes a bundled dev dependency, in its own chunk. The published package keeps no runtime dependencies. Measured on the branch: `@modelcontextprotocol/server` 2.3.1 is Apache-2.0 (the MCP project is moving from MIT to Apache-2.0); with `@modelcontextprotocol/core` and `zod` it adds an 893 kB chunk, and the packed package grows from 319 kB to 525 kB ([spec](../spec.md), section 9). The SDK carries ajv and five other MIT or BSD-3-Clause libraries inside its own files; their notices ship in `dist/cli/THIRD-PARTY-LICENSES.md`, and `npm run check:build` fails when a newer SDK inlines a library without one.
 - The skill stays: it guides the agent through the same rules, and it is how an agent with a shell but no MCP server finds RepoMagpie. When the MCP tools are available, the skill tells the agent to prefer them.
 - Hook adapters for Codex, Gemini CLI and Cursor are researched in [agents](../agents.md) and built in a later brief. MCP doesn't replace hooks: a hook runs before every install whether or not the agent remembers to; MCP needs the agent to call `recall`.
 - The roadmap's Later item "A thin MCP server for clients without a shell" is replaced by this work.
