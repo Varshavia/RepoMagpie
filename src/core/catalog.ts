@@ -1,14 +1,15 @@
-// repomagpie catalog (spec §2): the journals at a glance, one compact row per note, in pages, so an
-// agent can read what the user has and make the semantic choice itself (decision 0034). Rows come
+// repomagpie catalog (spec §2): the journals at a glance, one row per note, in pages, so an agent can
+// read what the user has and make the semantic choice itself (decision 0034): compact rows by
+// default, every field with --full. Rows come
 // from the search index's stored fields, alternatives from recall's entries: no cache of its own.
 // Never prints.
 import MiniSearch from "minisearch";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import type { Outcome } from "./outcome.ts";
-import { alternativesOfFile, loadRecallEntries } from "./recall.ts";
+import { alternativesOfFile, loadRecallEntries, verdictSaysAvoid } from "./recall.ts";
 import type { JournalSource } from "./search.ts";
 import { loadIndex, type SearchDoc } from "./search-index.ts";
-import { CAPS, forAgent } from "./text.ts";
+import { CAPS, clean, cut, forAgent } from "./text.ts";
 
 type Scope = JournalSource["scope"];
 
@@ -43,14 +44,31 @@ export interface CatalogRequest {
 
 export interface CatalogRun {
   outcome: Outcome;
-  document: CatalogJson; // the --json document, as read
+  document: CatalogJson; // the --full --json document, as read
+  avoid: boolean[]; // for each row of document.notes: an avoid note, by recall's rule (decision 0024)
   warnings: string[];
 }
 
+// The default document for an agent: one array per row, its fields named once in `columns`, so a
+// page of the whole journal stays small enough to read at once. `journal` stays: an agent always
+// learns who wrote a note's text (decision 0032, "Who wrote it").
+export const COLUMNS = ["name", "kind", "journal", "avoid", "summary", "verdict"] as const;
+export type CompactRow = [name: string, kind: string | null, journal: Scope, avoid: boolean, summary: string | null, verdict: string | null];
+
+export interface CompactCatalogJson {
+  columns: typeof COLUMNS;
+  rows: CompactRow[];
+  total: number;
+  next_cursor: string | null;
+  error?: string;
+}
+
 // Shorter caps than decision 0032's for the Verdict and the summary: a row is one line of a list an
-// agent may read whole, and recall or search give the full note. An honest Verdict is far shorter
-// (the example vault's longest is 113 characters); the other fields keep 0032's caps.
+// agent may read whole, and recall or search give the full note. In the compact rows they are a
+// preview, cut with "…"; --full keeps more and names a cut in `truncated`. An honest Verdict is
+// rarely over 200 characters (the example vault's longest is 113); the other fields keep 0032's caps.
 export const CATALOG_CAPS = { verdict: 200, summary: 200 } as const;
+export const COMPACT_CAPS = { verdict: 60, summary: 100 } as const;
 
 // A row's place in the order: its name ignoring case (cut, so a cursor stays short), the project
 // journal before the personal one for the same name (spec §3), then its file. Unique per row.
@@ -82,12 +100,24 @@ export function catalogForAgent(document: CatalogJson): CatalogJson {
   return forAgent({ ...document, notes }, { next_cursor: Infinity });
 }
 
+// The compact document for an agent, the default for the CLI's --json and for MCP: each string
+// cleaned and cut (decision 0032, rules 1 and 2).
+export function compactForAgent(run: Pick<CatalogRun, "document" | "avoid">): CompactCatalogJson {
+  const text = (value: string | null, cap: number) => (value === null ? null : cut(clean(value), cap));
+  const rows = run.document.notes.map((row, i): CompactRow => [
+    text(row.name, CAPS.name) as string, text(row.kind, CAPS.tag), row.journal, run.avoid[i],
+    text(row.summary, COMPACT_CAPS.summary), text(row.verdict, COMPACT_CAPS.verdict),
+  ]);
+  const { error, ...page } = forAgent({ total: run.document.total, next_cursor: run.document.next_cursor, error: run.document.error }, { next_cursor: Infinity });
+  return { columns: COLUMNS, rows, total: page.total, next_cursor: page.next_cursor, ...(error === undefined ? {} : { error }) };
+}
+
 export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
   const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
   const after = request.cursor === undefined ? null : decode(request.cursor);
   if (request.cursor !== undefined && !after) {
     const error = "Not a cursor from repomagpie catalog. Pass next_cursor from the previous page as it is, or leave it out for the first page.";
-    return { outcome: "usage", document: { notes: [], total: 0, next_cursor: null, error }, warnings: personal.warnings };
+    return { outcome: "usage", document: { notes: [], total: 0, next_cursor: null, error }, avoid: [], warnings: personal.warnings };
   }
 
   const journals: { scope: Scope; path: string }[] = [];
@@ -98,7 +128,7 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
   }
 
   const keep = (doc: SearchDoc) => doc.type === "note" && (!request.kind || doc.kind === request.kind) && (request.tags ?? []).every((tag) => doc.tags.includes(tag));
-  const rows: { row: CatalogRow; key: Key }[] = [];
+  const rows: { row: CatalogRow; avoid: boolean; key: Key }[] = [];
   for (const journal of journals) {
     const index = loadIndex(journal.path).index;
     const source = { ...journal, entries: loadRecallEntries(journal.path).entries };
@@ -115,7 +145,9 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
         journal: journal.scope,
         alternatives: alternativesOfFile(source, doc.file).map((a) => a.name),
       };
-      rows.push({ row, key: keyOf(row, doc.file) });
+      // recall's isAvoid on the index's text: "Avoid when" without comments or the draft marker.
+      const avoid = verdictSaysAvoid(row.verdict) || doc.avoidWhen.trim() !== "";
+      rows.push({ row, avoid, key: keyOf(row, doc.file) });
     }
   }
   rows.sort((a, b) => compare(a.key, b.key));
@@ -126,6 +158,7 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
   return {
     outcome: "ok",
     document: { notes: page.map((r) => r.row), total: rows.length, next_cursor: more ? encode(last.key) : null },
+    avoid: page.map((r) => r.avoid),
     warnings: personal.warnings,
   };
 }

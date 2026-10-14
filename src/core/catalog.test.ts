@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { CATALOG_CAPS, catalogForAgent, runCatalog, type CatalogRequest } from "./catalog.ts";
+import { CATALOG_CAPS, COMPACT_CAPS, catalogForAgent, compactForAgent, runCatalog, type CatalogRequest } from "./catalog.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import type { Place } from "./journals.ts";
 import { renderNote, type NewNote } from "./write.ts";
@@ -144,4 +144,40 @@ test("for an agent: note text gets markers and the catalog's caps, with truncate
   assert.deepEqual(row.truncated, ["summary", "verdict"]);
   const honest = catalogForAgent(runCatalog(request(), place(PERSONAL)).document).notes;
   assert.ok(honest.every((n) => !("truncated" in n)));
+});
+
+test("compact (the default for an agent): one array per row under columns; same total and cursor as full", () => {
+  const run = runCatalog(request({ limit: 3 }), place(PERSONAL, PROJECT));
+  const compact = compactForAgent(run);
+  assert.deepEqual(Object.keys(compact), ["columns", "rows", "total", "next_cursor"]);
+  assert.deepEqual(compact.columns, ["name", "kind", "journal", "avoid", "summary", "verdict"]);
+  assert.deepEqual(compact.rows, [
+    ["mattpocock/skills", "skill-pack", "personal", false, null, null],
+    ["pdf-lib", "library", "personal", false, "Create and modify PDF documents.", null],
+    ["pdfkit", "library", "personal", true, "small PDFs, no streams", "avoid: async streams painful; use puppeteer"],
+  ]);
+  const full = catalogForAgent(run.document);
+  assert.equal(compact.total, full.total);
+  assert.equal(compact.next_cursor, full.next_cursor);
+});
+
+test("compact: avoid follows recall's rule (a Verdict starting with avoid, or Avoid when text); summary and Verdict cut with …", () => {
+  const rtl = String.fromCharCode(0x202e);
+  const p = place({
+    "npm--a.md": note({ id: "pkg:npm/a", name: "a", verdict: "fine", avoidWhen: ["you need streams"] }),
+    "npm--b.md": note({ id: "pkg:npm/b", name: "b", verdict: `v${rtl}${"v".repeat(100)}`, useWhen: ["u".repeat(150)] }),
+    "npm--c.md": note({ id: "pkg:npm/c", name: "c", verdict: "Avoid: slow" }),
+  });
+  const rows = compactForAgent(runCatalog(request(), p)).rows;
+  assert.deepEqual(rows.map((r) => r[3]), [true, false, true]);
+  const [, , , , summary, verdict] = rows[1];
+  assert.equal(summary?.length, COMPACT_CAPS.summary);
+  assert.ok(summary?.endsWith("…"));
+  assert.equal(verdict?.length, COMPACT_CAPS.verdict);
+  assert.ok(verdict?.startsWith("v<U+202E>v"));
+});
+
+test("compact keeps the usage error's document shape", () => {
+  const compact = compactForAgent(runCatalog(request({ cursor: "nope" }), place(PERSONAL)));
+  assert.deepEqual({ ...compact, error: typeof compact.error }, { columns: ["name", "kind", "journal", "avoid", "summary", "verdict"], rows: [], total: 0, next_cursor: null, error: "string" });
 });
