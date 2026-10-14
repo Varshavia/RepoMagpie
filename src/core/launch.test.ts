@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NO_CODEGEN, launchCommand } from "./launch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
@@ -18,6 +18,8 @@ function folders() {
   mkdirSync(join(pkg, "dist", "cli"), { recursive: true });
   const node = join(nodeDir, platform === "win32" ? "node.exe" : "node");
   writeFileSync(node, "");
+  // Executable, as a real node is: PATH lookup on macOS and Linux skips files that aren't, like a shell.
+  chmodSync(node, 0o755);
   const entry = join(pkg, "dist", "cli", "main.js");
   writeFileSync(entry, "");
   return { root, node, entry, tmp: join(root, "tmp") };
