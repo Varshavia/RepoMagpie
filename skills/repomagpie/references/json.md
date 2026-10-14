@@ -2,7 +2,7 @@
 
 The fields this skill reads, per command. Every command prints one JSON document on stdout. On failure (exit 1 or 2) the document has the same fields plus `error`, the message; unknown values are `null` and lists are empty. Paths and ids are as stored: a package id is a Package URL (PURL) such as `pkg:npm/pdfkit`, with an npm scope encoded (`pkg:npm/%40playwright/cli` is `@playwright/cli`).
 
-Note text is cleaned of control characters and capped, so one note can't flood the output: a Verdict at 1,000 characters, a bullet at 500, 20 bullets and 20 alternatives. A cut text ends with `…`. An object with a cut field has `truncated`, a list of the cut fields' names, such as `["verdict"]`; read the note's file (`path`) for the whole text. Without a cut, the key isn't there.
+A hidden or control character in note text shows as an ASCII marker in its place, such as `<U+202E>` (a bidi override) or `<U+001B>` (an escape): the note holds that character there. Tell the user, as the skill's rules say. Note text is also capped, so one note can't flood the output: a Verdict at 1,000 characters, a bullet at 500, 20 bullets and 20 alternatives. A cut text ends with `…`. An object with a cut field has `truncated`, a list of the cut fields' names, such as `["verdict"]`; read the note's file (`path`) for the whole text. Without a cut, the key isn't there.
 
 ## `repomagpie recall <package>... --json`
 

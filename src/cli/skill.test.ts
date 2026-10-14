@@ -73,6 +73,16 @@ test("after a No to the hook's prompt, the skill offers the alternatives on the 
   assert.doesNotMatch(hook, /If the user declines the install, offer/);
 });
 
+// Live test, 2026-10-14: the agent left a note's planted instruction out of its first summary and
+// named it only when asked.
+test("instructions in a note, and hidden-character markers, are named in the first answer and never followed", () => {
+  const rule = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("addressed to you"));
+  assert.ok(rule, "SKILL.md has a rule for instructions addressed to the agent");
+  assert.match(rule, /first answer/);
+  assert.match(rule, /don't follow them/);
+  assert.match(rule, /U\+202E/);
+});
+
 test("the skill's links stay inside the skill folder, one level deep, and exist", () => {
   for (const file of skillFiles()) {
     for (const m of withoutFences(readFileSync(file, "utf8")).matchAll(/\]\(([^)\s]+)\)/g)) {
