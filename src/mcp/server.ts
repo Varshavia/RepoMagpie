@@ -4,6 +4,7 @@
 import { statSync } from "node:fs";
 import { isAbsolute, sep } from "node:path";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/server/validators/cf-worker";
 import { catalogForAgent, compactForAgent, runCatalog } from "../core/catalog.ts";
 import type { PackageType } from "../core/identity.ts";
 import type { Place } from "../core/journals.ts";
@@ -36,22 +37,28 @@ const INSTRUCTIONS = [
   "For \"what do I have for X?\", call search or suggest; on a small journal, catalog lists every note.",
 ].join("\n");
 
+// Our tool schemas are checked by @cfworker/json-schema, which interprets a schema; the SDK's Node
+// default, ajv, compiles each schema to code with `new Function`. Only these fixed schemas are ever
+// compiled, never user input, but an interpreter needs no generated code at all. The build swaps the
+// SDK's default for this one too (src/mcp/sdk-shims.ts), so ajv isn't bundled.
+const validator = new CfWorkerJsonSchemaValidator();
+
 // A tool's JSON Schemas. Unknown arguments are refused (additionalProperties: false).
 const string = (maxLength: number, description: string) => ({ type: "string", minLength: 1, maxLength, description });
 const strings = (maxItems: number, maxLength: number, description: string) => ({ type: "array", maxItems, items: { type: "string", minLength: 1, maxLength }, description });
 const journal = { type: "string", enum: ["personal", "project"], description: "One journal only." };
 const project = string(LIMITS.project, "The project's folder, as an absolute path; default: the folder the server runs in.");
 const input = (properties: Record<string, unknown>, required: string[] = []) =>
-  fromJsonSchema<Record<string, unknown>>({ type: "object", properties: { ...properties, project }, required, additionalProperties: false });
+  fromJsonSchema<Record<string, unknown>>({ type: "object", properties: { ...properties, project }, required, additionalProperties: false }, validator);
 const output = (properties: Record<string, unknown>, required: string[]) =>
-  fromJsonSchema<Record<string, unknown>>({ type: "object", properties: { ...properties, error: { type: "string" } }, required });
+  fromJsonSchema<Record<string, unknown>>({ type: "object", properties: { ...properties, error: { type: "string" } }, required }, validator);
 const list = { type: "array", items: { type: "object" } };
 const nullable = (type: string) => ({ type: [type, "null"] });
 
 const READ = { readOnlyHint: true, openWorldHint: false } as const;
 
 export function buildServer(options: McpOptions): McpServer {
-  const server = new McpServer({ name: "repomagpie", version: options.version }, { instructions: INSTRUCTIONS, maxToolInputElements: 500 });
+  const server = new McpServer({ name: "repomagpie", version: options.version }, { instructions: INSTRUCTIONS, maxToolInputElements: 500, jsonSchemaValidator: validator });
 
   // Runs one tool call: checks the project folder, runs core in it, reports what core skipped on
   // stderr, and returns the document. An error document is a tool error (isError), as the CLI's

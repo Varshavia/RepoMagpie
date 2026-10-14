@@ -24,6 +24,8 @@ await build({
     rollupOptions: { output: { entryFileNames: "main.js", chunkFileNames: "[name]-[hash].js" } },
   },
   ssr: { noExternal: true, target: "node" },
+  // The MCP SDK's default validator, without ajv's generated code (src/mcp/sdk-shims.ts).
+  resolve: { alias: [{ find: /^@modelcontextprotocol\/server\/_shims$/, replacement: fileURLToPath(new URL("../src/mcp/sdk-shims.ts", import.meta.url)) }] },
 });
 // Libraries inlined in another package's own files are bundled without a package.json of their own,
 // so Vite can't list them: their notices are kept in scripts/licenses-inlined.md (decision 0034).

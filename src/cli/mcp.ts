@@ -1,6 +1,7 @@
 // repomagpie mcp (decision 0034): a stdio MCP server for the agent that starts it. Serves the
 // 2025-11-25 and 2026-07-28 protocol revisions from one process (the SDK's serveStdio). stdout
 // carries only the protocol; everything else goes to stderr. Runs until the agent closes stdin.
+import "../mcp/jitless.ts"; // first: before zod creates a schema
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { packageVersion } from "../core/version.ts";
 import { buildServer } from "../mcp/server.ts";

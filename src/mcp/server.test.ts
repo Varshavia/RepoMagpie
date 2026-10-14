@@ -11,7 +11,9 @@ import { LIMITS, projectFolder } from "./server.ts";
 
 // repomagpie mcp (decision 0034) over real stdio: a child process per test, driven by a 2025-11-25
 // client (initialize first) or a 2026-07-28 client (no handshake; every request carries its
-// revision in _meta). Each tool's document must equal the CLI's --json for the same input.
+// revision in _meta). Each tool's document must equal the CLI's --json for the same input. The
+// server runs with code generation from strings disallowed, so a validator or parser that needs
+// eval or new Function fails these tests.
 
 const MAIN = fileURLToPath(new URL("../cli/main.ts", import.meta.url));
 const note = (n: Partial<NewNote> & { id: string; name: string }) => renderNote({ explored: "2026-10-14", kind: "library", tags: [], ...n });
@@ -41,7 +43,8 @@ class Client {
 
   constructor(box: Box, args: string[] = [], modern = false) {
     this.modern = modern;
-    this.child = spawn(process.execPath, [MAIN, "mcp", ...args], {
+    // Code generation off, as V8 allows: any eval or new Function in the server would throw.
+    this.child = spawn(process.execPath, ["--disallow-code-generation-from-strings", MAIN, "mcp", ...args], {
       cwd: box.project,
       env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, MAGPIE_HOME: box.journal, HOME: box.home, USERPROFILE: box.home, APPDATA: join(box.home, "AppData") },
     });
@@ -258,6 +261,13 @@ test("unknown arguments and huge arrays are refused before any work", async () =
       assert.ok(answer.error || (answer.result as { isError?: boolean }).isError, JSON.stringify(answer).slice(0, 200));
     }
   });
+});
+
+test("jitless.ts turns zod's code generation off and keeps the rest of its shared config", async () => {
+  const shared = globalThis as { __zod_globalConfig?: Record<string, unknown> };
+  shared.__zod_globalConfig = { locale: "kept" };
+  await import("./jitless.ts");
+  assert.deepEqual(shared.__zod_globalConfig, { locale: "kept", jitless: true });
 });
 
 test("projectFolder: the rules without a server", () => {

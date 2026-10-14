@@ -10,7 +10,8 @@ type Answer = { id: number; result?: unknown; error?: unknown };
 
 // One server process; `send` resolves with the answer to one request.
 function server(root: string, journal: string) {
-  const child = spawn(process.execPath, [cli, "mcp", "--home", journal], { cwd: root, stdio: ["pipe", "pipe", "ignore"] });
+  // Code generation off, as in the tests: the built server must need no eval or new Function.
+  const child = spawn(process.execPath, ["--disallow-code-generation-from-strings", cli, "mcp", "--home", journal], { cwd: root, stdio: ["pipe", "pipe", "ignore"] });
   const waiting = new Map<number, (answer: Answer) => void>();
   let buffer = "";
   let next = 1;

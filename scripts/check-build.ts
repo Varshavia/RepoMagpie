@@ -30,6 +30,7 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["catalog", "--json"] },
   { args: ["suggest", "--json"] },
   { args: ["tags", "--from-topics", "--dry-run", "--json"] },
+  { args: ["doctor", "--json"] },
   { args: ["hook", "claude-code"], input: hook("npm install @playwright/cli") },
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
 ];
@@ -49,7 +50,10 @@ try {
   const project = join(root, "project");
   mkdirSync(project);
   writeFileSync(join(project, "package.json"), JSON.stringify({ description: "Let an agent test a web app in a browser", devDependencies: { "@playwright/test": "*" } }));
-  const env = { ...process.env, MAGPIE_HOME: join(root, "journal"), NO_COLOR: "1" };
+  // A scratch home too, so doctor reads no real agent's settings.
+  const home = join(root, "home");
+  mkdirSync(home);
+  const env = { ...process.env, MAGPIE_HOME: join(root, "journal"), NO_COLOR: "1", HOME: home, USERPROFILE: home, APPDATA: join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(home, ".config"), CODEX_HOME: join(home, ".codex") };
   for (const { args, input, quiet } of CASES) {
     const run = (main: string) => spawnSync(process.execPath, [main, ...args], { cwd: project, input, encoding: "utf8", env });
     const [b, s] = [run(built), run(source)];
@@ -106,16 +110,26 @@ function checkPackage(dir: string): number {
   return failures;
 }
 
-// The libraries the MCP SDK inlines in its own files (their pnpm paths are in its comments; the
-// bundle drops comments) each have a notice in the built THIRD-PARTY-LICENSES.md, at that version
-// (scripts/licenses-inlined.md). A newer SDK that inlines other versions fails here until updated.
+// The libraries the MCP SDK inlines in its own files each have a notice in the built
+// THIRD-PARTY-LICENSES.md, at that version (scripts/licenses-inlined.md), and no notice is left for
+// one the bundle no longer carries. The bundle names each SDK file it includes in a //#region
+// comment; that file, in node_modules, names what it inlines by its pnpm path (a scope's "/" is
+// "+" there). A newer SDK that inlines other versions fails here until the notices are updated.
 function checkInlinedLicenses(): number {
-  const sdk = fileURLToPath(new URL("../node_modules/@modelcontextprotocol/server/dist/", import.meta.url));
-  const files = readdirSync(sdk).filter((file) => file.endsWith(".mjs")).map((file) => readFileSync(join(sdk, file), "utf8")).join("\n");
-  const inlined = new Set([...files.matchAll(/node_modules\/\.pnpm\/((?:@[^/@]+\/)?[^/@]+)@(\d[^/_"' ]*)/g)].map((m) => `${m[1]} - ${m[2]}`));
-  const licenses = readFileSync(fileURLToPath(new URL("../dist/cli/THIRD-PARTY-LICENSES.md", import.meta.url)), "utf8");
+  const dist = fileURLToPath(new URL("../dist/cli/", import.meta.url));
+  const bundle = readdirSync(dist).filter((file) => file.endsWith(".js")).map((file) => readFileSync(join(dist, file), "utf8")).join("\n");
+  const sdkFiles = new Set([...bundle.matchAll(/\/\/#region (node_modules\/@modelcontextprotocol\/[a-z]+\/dist\/[\w.-]+\.mjs)/g)].map((m) => m[1]));
+  const inlined = new Set<string>();
+  for (const file of sdkFiles) {
+    const text = readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8");
+    for (const m of text.matchAll(/node_modules\/\.pnpm\/(@?[^/@]+)@(\d[^/_"' ]*)/g)) inlined.add(`${m[1].replace("+", "/")} - ${m[2]}`);
+  }
+  const licenses = readFileSync(join(dist, "THIRD-PARTY-LICENSES.md"), "utf8");
+  const listed = (readFileSync(fileURLToPath(new URL("licenses-inlined.md", import.meta.url)), "utf8").match(/^## .+ - \S+(?= \()/gm) ?? []).map((h) => h.slice(3));
   const missing = [...inlined].filter((entry) => !licenses.includes(`## ${entry} (`));
-  return report(inlined.size > 0 && !missing.length, `a licence notice for each library the MCP SDK inlines (${inlined.size})`, `missing: ${missing.join(", ") || "none found"}`);
+  const stale = listed.filter((entry) => !inlined.has(entry));
+  return report(sdkFiles.size > 0 && !missing.length && !stale.length, `a licence notice for each library the MCP SDK inlines in the bundle (${inlined.size})`,
+    [...missing.map((e) => `missing: ${e}`), ...stale.map((e) => `not bundled any more: ${e}`)].join("\n  ") || "no SDK file found in the bundle");
 }
 
 function report(ok: boolean, what: string, output: string): number {
