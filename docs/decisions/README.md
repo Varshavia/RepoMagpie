@@ -32,7 +32,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0021 | [Local UI server](0021-local-ui-server.md) | accepted |
 | 0022 | [Frontend stack](0022-frontend-stack.md) | accepted |
 | 0023 | [The API is the `--json` contract](0023-api-is-the-json-contract.md) | accepted |
-| 0024 | [Recall asks on avoid notes](0024-recall-asks-on-avoid-notes.md) | accepted (refines 0010) |
+| 0024 | [Recall asks on avoid notes](0024-recall-asks-on-avoid-notes.md) | accepted (refines 0010; refined by 0036 for agents that can't ask) |
 | 0025 | [Bundle the CLI](0025-bundle-the-cli.md) | accepted |
 | 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
@@ -43,4 +43,5 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
 | 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |
 | 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
-| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted |
+| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036) |
+| 0036 | [The hook in agents that can't ask](0036-hooks-in-other-agents.md) | accepted (refines 0024 and 0035) |
