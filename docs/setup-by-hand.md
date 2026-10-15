@@ -1,6 +1,6 @@
 # Setting up by hand
 
-`repomagpie setup` does all of this for you ([README](../README.md#quick-start)). This page is for an agent `setup` doesn't know yet, a settings file with comments, or when you want to write the entries yourself. `repomagpie setup --dry-run` prints the entries with your machine's paths and changes nothing. `repomagpie doctor` checks what you wrote.
+`repomagpie setup` does all of this for you ([README](../README.md#quick-start)). This page is for an agent `setup` doesn't know yet, a settings file with comments, or when you want to write the entries yourself. `repomagpie setup --dry-run` prints the entries with your machine's paths and changes nothing: its first line, `Each agent will start: …`, is the command and then the arguments, with full paths, ready to copy into `command` and `args`. `repomagpie doctor` checks what you wrote.
 
 ## The MCP server
 
