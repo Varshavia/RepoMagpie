@@ -32,6 +32,7 @@ test("--json prints the report; human output has every section and what to do; e
   }
   assert.match(human.out, /^ {2}~[\\/]\.claude[\\/]settings\.json: magpie hook claude-code {2}\(the old name\)$/m);
   assert.match(human.out, /^ {2}Claude Code {3}installed; no repomagpie entry in ~[\\/]\.claude\.json$/m);
+  assert.match(human.out, /^ {2}VS Code \(GitHub Copilot\) {2}not installed$/m);
   assert.match(human.out, /^ {2}- The Claude Code hook in ~[\\/]\.claude[\\/]settings\.json runs magpie hook claude-code, the old name\./m);
 });
 

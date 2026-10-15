@@ -48,7 +48,8 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   // The journal the agent's server reads: the agent doesn't get --home or MAGPIE_HOME, so a journal
   // chosen by either goes into the entry.
   const journal = options.home || io.env.MAGPIE_HOME ? resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home }).path : undefined;
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+  // UTC, so backup names sort and never jump at a daylight-saving change; the Z says so.
+  const stamp = `${new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-")}Z`;
   const request = (noteTool: boolean | undefined, only?: Agent["id"][]): SetupRequest => ({
     where: { home: io.home, env: io.env, platform },
     launch: launchCommand({ execPath: self.execPath, entry: self.entry, env: io.env, platform, tmp: tmpdir(), home: journal }),
@@ -129,7 +130,8 @@ export function render(plan: SetupPlan, home: string): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
   const lines: string[] = [];
   if (plan.launch_error && !plan.remove) lines.push(plan.launch_error, "");
-  else if (plan.launch && !plan.remove) lines.push(`Each agent will start: ${[plan.launch.command, ...plan.launch.args].map((part) => (/\s/.test(part) ? `"${part}"` : part)).map(tilde).join(" ")}`, "");
+  // Full paths: setting up by hand copies this line, and agents don't expand ~.
+  else if (plan.launch && !plan.remove) lines.push(`Each agent will start: ${[plan.launch.command, ...plan.launch.args].map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(" ")}`, "");
   for (const a of plan.agents) {
     if (a.action === "skip") {
       lines.push(`  ${a.name.padEnd(12)}  ${a.reason ?? "skip"}`);
@@ -179,6 +181,7 @@ function summary(plan: SetupPlan, home: string): string {
   if (plan.hook?.result) lines.push(plan.hook.result === "done" ? `Done: the Claude Code hook, ${HOOK_WHAT[plan.hook.action]}${plan.hook.backup ? ` (backup: ${tilde(plan.hook.backup)})` : ""}.` : `Failed: the Claude Code hook: ${plan.hook.error}`);
   if (!lines.length) lines.push("Nothing to change.");
   if (plan.launch_error && !plan.remove) lines.push("No MCP entry was written.");
-  lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");
+  const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done";
+  if (changed) lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }

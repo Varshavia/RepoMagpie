@@ -59,7 +59,7 @@ export interface SetupRequest {
   noteTool?: boolean;
   remove: boolean;
   only?: Agent["id"][]; // --agents; default: every installed agent
-  stamp: string; // for backup names: YYYYMMDD-HHMMSS
+  stamp: string; // for backup names: YYYYMMDD-HHMMSSZ, in UTC
   project?: string; // --project: the project root, for the skill and the hook
   skillSource?: string; // default: the package's
 }

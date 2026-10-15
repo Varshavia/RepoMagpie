@@ -38,9 +38,19 @@ test("--dry-run shows the plan on stderr and changes nothing", async () => {
   assert.equal(r.out, "");
   assert.match(r.err, /^Each agent will start: .*node\.exe --disallow-code-generation-from-strings .*main\.js mcp$/m);
   assert.match(r.err, /^ {2}Cursor {8}add: edit ~[\\/]\.cursor[\\/]mcp\.json$/m);
-  assert.match(r.err, /^ {2}VS Code {7}not installed$/m);
+  // Named for what uses the entry: GitHub Copilot, in VS Code.
+  assert.match(r.err, /^ {2}VS Code \(GitHub Copilot\) {2}not installed$/m);
   assert.match(r.err, /Dry run: nothing changed\.\n$/);
   assert.equal(existsSync(b.cursor), false);
+});
+
+test("the plan's first line, which setting up by hand copies, has full paths even inside the home folder", async () => {
+  const b = box();
+  const self = { execPath: join(b.home, "nodejs", "node.exe"), entry: join(b.home, "AppData", "Roaming", "npm", "node_modules", "repomagpie", "dist", "cli", "main.js") };
+  const r = await magpie(b, ["setup", "--dry-run"], { ...b.over, self });
+  const first = r.err.split("\n")[0];
+  assert.equal(first, `Each agent will start: ${[self.execPath, NO_CODEGEN, self.entry, "mcp"].map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(" ")}`);
+  assert.match(r.err, /^ {2}Cursor {8}add: edit ~[\\/]\.cursor[\\/]mcp\.json$/m, "the other lines still shorten the home folder");
 });
 
 test("--yes applies: the entry starts node with code generation off; a summary; a second run changes nothing", async () => {
@@ -49,10 +59,17 @@ test("--yes applies: the entry starts node with code generation off; a summary; 
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(b.entry(), { command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "mcp"] });
   assert.match(r.err, /^Done: Cursor, added\.$/m);
-  assert.match(r.err, /Run repomagpie doctor to check\.\n$/);
+  assert.match(r.err, /\nRestart your agents to load the change\. Run repomagpie doctor to check\.\n$/);
   const again = await magpie(b, ["setup", "--yes"], b.over);
+  assert.equal(again.code, 0);
   assert.match(again.err, /^ {2}Cursor {8}already set up$/m);
-  assert.match(again.err, /^Nothing to change\.$/m);
+  // Nothing changed, so there is nothing to restart for.
+  assert.match(again.err, /\nNothing to change\.\n$/);
+  assert.doesNotMatch(again.err, /Restart/);
+  const json = await magpie(b, ["setup", "--yes", "--json"], b.over);
+  assert.equal(json.code, 0);
+  assert.equal(json.err, "");
+  assert.ok(JSON.parse(json.out).agents.every((a: { result?: string }) => a.result === undefined));
 });
 
 test("--json needs --yes or --dry-run, and prints the plan with each result", async () => {
@@ -198,7 +215,10 @@ test("--remove takes out only our entry, after a backup", async () => {
   const r = await magpie(b, ["setup", "--remove", "--yes"], b.over);
   assert.equal(r.code, 0, r.err);
   assert.equal(readFileSync(b.cursor, "utf8"), '{\n  "mcpServers": {\n    "other": { "command": "x" }\n  }\n}\n');
-  assert.match(r.err, /^Done: Cursor, removed \(backup: ~[\\/]\.cursor[\\/]mcp\.json\.repomagpie-backup-\d{8}-\d{6}(-\d+)?\)\.$/m);
+  assert.match(r.err, /^Done: Cursor, removed \(backup: ~[\\/]\.cursor[\\/]mcp\.json\.repomagpie-backup-\d{8}-\d{6}Z(-\d+)?\)\.$/m);
+  // The stamp is UTC, and its Z says so.
+  const [, y, mo, d, h, mi, s] = /backup-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)Z/.exec(r.err) ?? [];
+  assert.ok(Math.abs(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s) - Date.now()) < 60_000, r.err);
 });
 
 test("--project: the skill and the Claude Code hook go into the project; the MCP entries stay in the user's settings", async () => {
