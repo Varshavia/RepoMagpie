@@ -10,7 +10,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | # | Decision | Status |
 |---|---|---|
 | 0001 | [Plain Markdown storage](0001-plain-markdown-storage.md) | accepted |
-| 0002 | [CLI first, SKILL.md, MCP later](0002-cli-first.md) | accepted (command name amended by 0031) |
+| 0002 | [CLI first, SKILL.md, MCP later](0002-cli-first.md) | accepted (command name amended by 0031; MCP's timing and audience superseded by 0034) |
 | 0003 | [Personal vault lives outside the repo](0003-vault-outside-repo.md) | accepted |
 | 0004 | [English everywhere](0004-english-everywhere.md) | accepted |
 | 0005 | [Human-written "when it's useful"](0005-human-written-usefulness.md) | superseded by 0018 |
@@ -18,7 +18,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | accepted in part by 0027 (`alternatives`); `works_with` stays proposed |
 | 0008 | [Machine-readable output for every command](0008-machine-readable-output.md) | accepted |
 | 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted |
-| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024; the graph's status changed by 0026) |
+| 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024; the graph's status changed by 0026; "MCP server: later" superseded by 0034) |
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
@@ -42,3 +42,5 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
 | 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |
+| 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
+| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted |

@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
 import { hookOutput } from "../hook/claude-code.ts";
+import { cpuTime } from "./fixtures/cpu-time.ts";
 import { fetchRepository, type Fetch } from "./github.ts";
 import { fileNameFor, resolveTarget } from "./identity.ts";
 import { parsePyproject, readProject } from "./manifests.ts";
@@ -51,18 +52,16 @@ test("R1: a README or package.json that is a link to a file elsewhere is never r
 });
 
 test("R2: an unclosed TOML array of 50,000 lines is read in linear time", () => {
-  const started = performance.now();
-  const read = parsePyproject(`[project]\ndependencies = [\n${'"x",\n'.repeat(50_000)}`);
-  assert.ok(performance.now() - started < 2000, `${performance.now() - started} ms`);
+  const { value: read, ms } = cpuTime(() => parsePyproject(`[project]\ndependencies = [\n${'"x",\n'.repeat(50_000)}`));
+  assert.ok(ms < 2000, `${ms} ms of CPU time`);
   assert.ok(read.dependencies.length > 0);
 });
 
 test("R3: a 20 MB README is not read whole: only its start, for the first heading and paragraph", () => {
   const box = sandbox({ "project/README.md": `# Invoices\n\nRender invoices as PDF.\n\n${"filler ".repeat(3_000_000)}` });
-  const started = performance.now();
-  const project = readProject(box.project, box.home);
+  const { value: project, ms } = cpuTime(() => readProject(box.project, box.home));
   assert.deepEqual(project.texts, ["Invoices\nRender invoices as PDF."]);
-  assert.ok(performance.now() - started < 1000, `${performance.now() - started} ms`);
+  assert.ok(ms < 1000, `${ms} ms of CPU time`);
 });
 
 // --- Cloned repository: a project journal's files and caches ---------------------------------
@@ -102,9 +101,8 @@ test("R4: a 1 MB install command of 70,000 packages is answered in bounded time;
   const names = Array.from({ length: 70_000 }, (_, i) => `pkg${i}`);
   const command = `npm install ${names.join(" ")} chalk`;
   assert.ok(command.length > 500_000);
-  const started = performance.now();
-  const out = hookOutput(JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: box.project }), { env: { MAGPIE_HOME: box.journal }, home: box.home, cwd: box.project, informOnly: false });
-  assert.ok(performance.now() - started < 3000, `${performance.now() - started} ms`);
+  const { value: out, ms } = cpuTime(() => hookOutput(JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: box.project }), { env: { MAGPIE_HOME: box.journal }, home: box.home, cwd: box.project, informOnly: false }));
+  assert.ok(ms < 3000, `${ms} ms of CPU time`);
   const context: string = JSON.parse(out ?? "{}").hookSpecificOutput.additionalContext;
   assert.match(context, /RepoMagpie: this command installs 70,001 packages; only the first 100 were looked up in your journals\./);
 });

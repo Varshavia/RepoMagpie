@@ -262,6 +262,8 @@ test("topics: without tags.md the chips wait for Create tag list", async ({ page
   await page.getByRole("button", { name: "Create tag list" }).first().click();
   await expect(chip).toBeEnabled();
   await chip.click();
+  // The click writes tags.md, then marks the tag: wait for the mark before reading the file.
+  await expect(page.getByRole("group", { name: "Tags" }).getByRole("button", { name: "codex" })).toHaveAttribute("aria-pressed", "true");
   expect(readFileSync(join(magpie.journal, "tags.md"), "utf8")).toBe(`${STARTER_TAGS}- \`codex\`\n`);
 });
 

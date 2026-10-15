@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFil
 import { join } from "node:path";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
 import { noteDocument, patchNote } from "./documents.ts";
+import { cpuTime } from "./fixtures/cpu-time.ts";
 import { readNote } from "./note.ts";
 import { NOTE_SIZE_LIMIT, takeSkipped } from "./note-cache.ts";
 import { renderNote, type NewNote } from "./write.ts";
@@ -140,9 +141,8 @@ test("a YAML alias bomb in the frontmatter is refused fast; the note reads as un
   const levels = ["a: &a [x, x, x, x, x, x, x, x, x]"];
   for (let i = 1; i < 10; i++) levels.push(`${"abcdefghij"[i]}: &${"abcdefghij"[i]} [${Array(9).fill(`*${"abcdefghij"[i - 1]}`).join(", ")}]`);
   const text = `---\nid: pkg:npm/bomb\n${levels.join("\n")}\n---\n\n## Verdict\n\nfine\n`;
-  const started = performance.now();
-  const read = readNote(text);
-  assert.ok(performance.now() - started < 1000, "bounded");
+  const { value: read, ms } = cpuTime(() => readNote(text));
+  assert.ok(ms < 1000, `bounded: ${ms} ms of CPU time`);
   assert.deepEqual(read.frontmatter, {});
   assert.ok(read.warnings.length > 0);
 });

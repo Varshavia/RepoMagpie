@@ -15,6 +15,26 @@ interface Job { permissions?: Record<string, string>; steps: Step[] }
 interface Workflow { on: Record<string, unknown>; permissions?: Record<string, string>; jobs: Record<string, Job> }
 const workflows = readdirSync(folder).filter((f) => f.endsWith(".yml")).map((file) => ({ file, flow: parse(readFileSync(folder + file, "utf8")) as Workflow }));
 
+// Dependabot proposes a release only after it is 7 days old, for every ecosystem: a compromised
+// release is usually found and pulled within days (the maintainer's rule, as for download-artifact).
+test("dependabot.yml: every ecosystem waits 7 days before proposing a new release", () => {
+  const config = parse(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8")) as { updates: { "package-ecosystem": string; cooldown?: { "default-days"?: number } }[] };
+  assert.deepEqual(config.updates.map((u) => u["package-ecosystem"]).sort(), ["github-actions", "npm"]);
+  for (const update of config.updates) assert.equal(update.cooldown?.["default-days"], 7, update["package-ecosystem"]);
+});
+
+// Major updates that need work of their own, so the grouped dev-dependency pull request can pass:
+// sigma 4 (the graph page's port and its bundle size, roadmap) and @types/node, which stays on the
+// Node floor's major (spec §9).
+test("dependabot.yml: npm ignores major updates of sigma and @types/node", () => {
+  const config = parse(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8")) as { updates: { "package-ecosystem": string; ignore?: { "dependency-name": string; "update-types"?: string[] }[] }[] };
+  const npm = config.updates.find((u) => u["package-ecosystem"] === "npm");
+  assert.deepEqual(npm?.ignore, [
+    { "dependency-name": "sigma", "update-types": ["version-update:semver-major"] },
+    { "dependency-name": "@types/node", "update-types": ["version-update:semver-major"] },
+  ]);
+});
+
 test("every workflow is read-only by default and never runs on pull_request_target", () => {
   assert.ok(workflows.length >= 2);
   for (const { file, flow } of workflows) {

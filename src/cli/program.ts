@@ -1,13 +1,18 @@
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
 import type { AdoptOptions } from "./adopt.ts";
+import type { CatalogOptions } from "./catalog.ts";
+import type { GlobalOptions } from "./context.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
 import { HOOK_HELP } from "./hook-help.ts";
 import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
+import type { McpCommandOptions } from "./mcp.ts";
 import type { NoteOptions } from "./note.ts";
+import type { Terminal } from "./prompt.ts";
+import type { SetupOptions } from "./setup.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
 import type { SuggestOptions } from "./suggest.ts";
@@ -33,9 +38,11 @@ export interface Io {
   stdin?: () => Promise<string>; // all of standard input (the hook reads Claude Code's JSON from it)
   openExternal?: (target: string) => Promise<void>; // opens a URL or file in the default app (magpie ui); default: the platform's command
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
+  terminal?: Terminal; // setup's prompts read keys here; default: stdin, drawn on stderr
+  self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
 }
 
-const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "recall", "suggest", "adopt"]);
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt"]);
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
@@ -100,6 +107,19 @@ export async function run(argv: string[], io: Io): Promise<number> {
     });
 
   program
+    .command("catalog")
+    .description("list every note in one compact row, in pages")
+    .option("--tag <tag>", "only notes with this tag (repeatable: every tag must match)", (tag: string, tags: string[]) => [...tags, tag], [])
+    .addOption(new Option("--kind <kind>", "only notes of this kind").choices(KINDS))
+    .addOption(new Option("--journal <journal>", "list one journal only").choices(["personal", "project"]))
+    .option("--limit <n>", "show at most n notes, from 1 to 1000", catalogLimit, 100)
+    .option("--cursor <cursor>", "the next page: next_cursor from the previous page")
+    .option("--full", "with --json: every field of each note, instead of compact rows")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./catalog.ts")).catalogCommand(command.optsWithGlobals<CatalogOptions>(), io);
+    });
+
+  program
     .command("recall")
     .description("show your notes before an install")
     .argument("<package...>", "package names (a version or extras are ignored) or PURLs")
@@ -135,6 +155,34 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--no-open", "don't open the browser; only print the URL")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./ui.ts")).uiCommand(command.optsWithGlobals<UiOptions>(), io);
+    });
+
+  program
+    .command("setup")
+    .description("set up RepoMagpie's MCP server in your coding agents: a plan, a question, then the changes, each file backed up first")
+    .option("--yes", "apply the plan without asking")
+    .option("--dry-run", "show the plan; change nothing")
+    .option("--agents <list>", "only these agents, comma-separated: claude-code, codex, cursor, gemini, vscode")
+    .option("--remove", "remove RepoMagpie's entries instead")
+    .option("--allow-write", "turn on the note tool in the entries (without this or --no-allow-write, each entry keeps its own; setup asks when it can)")
+    .option("--no-allow-write", "turn off the note tool in the entries")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./setup.ts")).setupCommand(command.optsWithGlobals<SetupOptions>(), io);
+    });
+
+  program
+    .command("doctor")
+    .description("show what is wired: commands on PATH, the skill, the hook, each agent's MCP server, the journals")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./doctor.ts")).doctorCommand(command.optsWithGlobals<GlobalOptions>(), io);
+    });
+
+  program
+    .command("mcp")
+    .description("an MCP server on stdio, for coding agents (started by the agent, not typed by people)")
+    .option("--allow-write", "also serve the note tool, which records the user's Verdict or alternative")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./mcp.ts")).mcpCommand(command.optsWithGlobals<McpCommandOptions>(), io);
     });
 
   program
@@ -174,6 +222,13 @@ export async function run(argv: string[], io: Io): Promise<number> {
 function portNumber(value: string): number {
   const n = Number(value);
   if (!/^\d+$/.test(value) || n < 1 || n > 65535) throw new InvalidArgumentError("Use a port number from 1 to 65535.");
+  return n;
+}
+
+// catalog's --limit: at most 1000 rows a page (decision 0034, "Limits").
+function catalogLimit(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) throw new InvalidArgumentError("Use a whole number from 1 to 1000.");
   return n;
 }
 

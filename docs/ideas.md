@@ -19,7 +19,7 @@ The product's category moved:
 1. Plain Markdown with YAML frontmatter is the only source of truth. Indexes are rebuildable caches ([decision 0001](decisions/0001-plain-markdown-storage.md)).
 2. AI may draft "What it does" and "Use when"; the Verdict is human-only, and a note without one stays `inbox` ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)).
 3. One note per repository; skills are searchable lines ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-4. CLI first, `SKILL.md` for agents, MCP later as a thin layer ([decision 0002](decisions/0002-cli-first.md)).
+4. CLI first, `SKILL.md` for agents, MCP as a thin layer for every agent ([decision 0002](decisions/0002-cli-first.md), [decision 0034](decisions/0034-the-mcp-server.md)).
 5. Two journal scopes with one format: a personal journal outside any repository, and a project journal in `.magpie/` ([decision 0013](decisions/0013-two-journal-scopes.md)). This repository holds neither, only the example vault ([decision 0003](decisions/0003-vault-outside-repo.md)).
 6. Local-first: no accounts, no server, no telemetry by default. Nothing is published unless the user marks it public.
 7. Compose with security tools; never claim to detect malware ([decision 0009](decisions/0009-positioning-dependency-memory.md), [decision 0011](decisions/0011-vet-and-drift-reduced.md)).
@@ -64,7 +64,7 @@ The product's category moved:
 
 ### Hook support in major clients
 
-Checked 2026-10-03 against each client's documentation. Hook support is not universal, and it changes often: re-check before building hook mode.
+Checked 2026-10-03 against each client's documentation. Hook support is not universal, and it changes often: re-check before building hook mode. Checked again on 2026-10-14, for more agents, in [agents](agents.md#hooks-what-an-adapter-could-do); where the two differ, that page is current.
 
 | Client | Hook before a shell command | Can it allow the command and still pass the note on? | Source |
 |---|---|---|---|

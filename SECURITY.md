@@ -32,11 +32,11 @@ RepoMagpie is in beta (`0.x`). Security fixes go into the next release; only the
 - for the Claude Code hook, the tool call Claude Code sends on standard input;
 - the environment variables `GITHUB_TOKEN`, `MAGPIE_HOME` and `NO_COLOR`. The bundled libraries also read `FORCE_COLOR`, `CLICOLOR_FORCE`, `LOG_TOKENS` and `LOG_STREAM`.
 
-**Writes:** notes, `tags.md` and caches (`.cache/`) inside the journals, a project journal's `.gitignore`, and the hook's error log in `<personal journal>/.cache/`. Nothing outside the journals, and never through a link (a symbolic link or junction) inside one ([decision 0032](docs/decisions/0032-note-text-is-data.md)).
+**Writes:** notes, `tags.md` and caches (`.cache/`) inside the journals, a project journal's `.gitignore`, and the hook's error log in `<personal journal>/.cache/`. Nothing outside the journals, and never through a link (a symbolic link or junction) inside one ([decision 0032](docs/decisions/0032-note-text-is-data.md)). The one exception is `repomagpie setup`, and only after it has shown its plan and you said yes (or gave `--yes`): it adds its MCP entry to your agents' settings, through each agent's own CLI or by changing that one entry in a plain JSON file; it copies the agent skill to `~/.agents/skills/repomagpie/` with a link to it from `~/.claude/skills/`; and it adds its hook to `~/.claude/settings.json`. All inside your home folder (or the project you name with `--project`), never through a link. It backs up each file first, next to it (`<file>.repomagpie-backup-<timestamp>`, the time in UTC), and never sets an agent's trust or auto-approval. A backup is a whole copy of the file, and `setup` never deletes one: backups of `~/.claude.json` sit in your home folder (`~/.claude.json.repomagpie-backup-…`) and can hold Claude Code's sign-in tokens and other MCP servers' secrets, as can those of other agents' MCP files. `repomagpie doctor` lists every backup `setup` made; delete them when you no longer need them. `repomagpie setup --remove` takes out only its own entries and never restores a backup over your later changes ([decision 0035](docs/decisions/0035-setup-and-doctor.md)).
 
 **Sends:** read-only GET requests to GitHub's API (`api.github.com`), only when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository. `GITHUB_TOKEN`, if you set it, goes only in their `Authorization` header and never appears in a message or a log. Nothing from your journals is sent anywhere, and there is no telemetry.
 
-**Never:** installs a package, edits a settings file (the Claude Code hook is set up by you), or runs a command it finds in a note. `repomagpie ui` starts one other program: your default browser, through the platform's open command.
+**Never:** installs a package, edits a settings file without `setup`'s plan and your yes, or runs a command it finds in a note. `repomagpie ui` starts one other program: your default browser, through the platform's open command, run by absolute path (`cmd.exe` from `ComSpec` or `SystemRoot`, `/usr/bin/open`, `xdg-open` from an absolute `PATH` folder), so a `cmd.exe` in the folder you started it from never runs. `repomagpie setup` starts your agents' own CLIs (`claude`, `codex`, `gemini`, `code`) to add or remove its entry, each by the absolute path it found in an absolute `PATH` folder and in your home folder, never by name: on Windows a bare name is looked up in the current folder first, which can be a repository someone else wrote. `repomagpie mcp` listens on no port: your agent starts it and talks to it over stdin and stdout. Its tools only read, unless its entry has `--allow-write`: `repomagpie setup` writes that only with `--allow-write` or your yes to its question, keeps it on a later run without either flag, and takes it out with `--no-allow-write` or your no. Then a `note` tool records your Verdict or an alternative in your journal, with the same rules as `repomagpie note`, and never replaces a Verdict.
 
 ## URLs and addresses in the package
 
@@ -59,6 +59,20 @@ Socket's "URL strings" alert (low) on the npm package says it holds fragments of
 | `agentskills.io`, `cli.github.com`, and GitHub repositories (`microsoft/playwright-cli`, `AmintaCCCP/GithubStarsManager`, `starcat-app/Starcat`, `SocketDev/sfw-free`) | `README.md` | Links for the reader |
 
 The app's Content-Security-Policy allows connections to its own origin only ([docs/ui.md](docs/ui.md#3-security)), so the browser side can't reach any of these hosts either; GitHub's API is called by the server.
+
+## Dynamic code in the package
+
+`repomagpie mcp` bundles the official MCP TypeScript SDK and zod, which it uses ([decision 0034](docs/decisions/0034-the-mcp-server.md)). A scanner such as Socket may flag `new Function` in its chunk (`dist/cli/mcp-*.js`). What it is, and why it never runs:
+
+| In the bundle | What it is | At runtime |
+|---|---|---|
+| `new Function("")` in zod's `allowsEval` | A probe: may this process generate code? | Never runs: `src/mcp/jitless.ts` turns on zod's `jitless` option before the SDK loads, and the probe is only asked when `jitless` is off |
+| `new F(…)` in zod's `Doc.compile` | zod's faster object parser, compiled from the schema | Never runs, for the same reason |
+
+- **No ajv.** The SDK's default JSON Schema validator for Node.js, ajv, compiles every schema into code with `new Function`. RepoMagpie passes the SDK the `@cfworker/json-schema` validator instead, which interprets a schema and generates no code, and the build leaves ajv out of the bundle.
+- **Only our own schemas.** The only schemas validated are the tools' own input and output schemas, written in `src/mcp/server.ts`, and the SDK's protocol messages. Tool arguments from an agent and note text are data checked against those schemas, never compiled.
+- **Proven, not assumed.** The tests and the benchmark start the server with Node's `--disallow-code-generation-from-strings`, under which any `eval` or `new Function` throws, and every tool works ([src/mcp/server.test.ts](src/mcp/server.test.ts), `scripts/bench-mcp.ts`). With the SDK's default validator, the same flag makes the first tool call fail with an `EvalError`.
+- **Enforced where it runs.** Every MCP entry `repomagpie setup` writes starts node with that flag before the script (`node --disallow-code-generation-from-strings …/main.js mcp`), so the server your agent runs can't execute generated code either, whatever a tool call or a note holds. `repomagpie doctor` names an entry without it.
 
 ## The local app
 

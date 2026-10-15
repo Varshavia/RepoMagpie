@@ -70,6 +70,8 @@ jobs:
       - run: npm run build
       - name: Search benchmark (report only)
         run: node scripts/bench-search.ts --report-only
+      - name: Catalog benchmark (report only)
+        run: node scripts/bench-catalog.ts --report-only
       - name: Suggest benchmark (report only)
         run: node scripts/bench-suggest.ts --report-only
       - name: Recall and hook benchmark (report only)
@@ -80,6 +82,8 @@ jobs:
         run: node scripts/bench-graph.ts --report-only
       - name: Opening a note benchmark (report only)
         run: node scripts/bench-note.ts --report-only
+      - name: MCP server benchmark (report only)
+        run: node scripts/bench-mcp.ts --report-only
 
   # The local app (docs/ui.md §10, §11): the built bundle against its size budget, then the
   # end-to-end tests against magpie ui on a temporary journal. Chromium only.

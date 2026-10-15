@@ -11,7 +11,7 @@ human ─────────────────────► repomag
 agent with a shell ─► SKILL.md ─► repomagpie ───┤
 agent hook (recall) ─► repomagpie ──────────────┤
 browser (local app) ─► repomagpie ui (server) ──┤
-agent without a shell ─► MCP server ────────────┴─► core ─┬─► personal journal (Markdown files)
+agent (any) ─► repomagpie mcp (stdio) ──────────┴─► core ─┬─► personal journal (Markdown files)
                                                           ├─► project journal (.magpie/)
                                                           └─► search index (cache)
 ```
@@ -24,7 +24,7 @@ agent without a shell ─► MCP server ────────────┴�
 | **hook** | The Claude Code adapter (`repomagpie hook claude-code`): reads the hook's JSON, finds package installs, asks the core for recall, and prints the hook's JSON. It never denies (an avoid note asks the user; [decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)) and fails open ([spec](spec.md), section 6). | v0.1 |
 | **server** | `repomagpie ui`: a loopback-only HTTP server that serves the local app and a JSON API. It parses requests, calls the core and returns the same JSON documents as the CLI's `--json`; it has no logic of its own ([decision 0021](decisions/0021-local-ui-server.md), [decision 0023](decisions/0023-api-is-the-json-contract.md), [UI](ui.md)). | v0.1 |
 | **app** | The local app: a static bundle in the browser that talks only to the server's API ([decision 0022](decisions/0022-frontend-stack.md)). | v0.1 |
-| **mcp** | Optional MCP server over the same core, for clients without a shell. | later |
+| **mcp** | `repomagpie mcp`: a local stdio MCP server over the same core, for every agent, on the official TypeScript SDK. Its tools return the same documents as the CLI's `--json`; it has no logic of its own ([decision 0034](decisions/0034-the-mcp-server.md)). | `feat/mcp-setup` |
 
 Decision 0002 calls the CLI the primary interface and uses *core* for the business-logic module, as this document does.
 
@@ -43,11 +43,13 @@ src/
                wikilinks: the [[wikilink]] syntax, the alternatives field and how a target resolves; shared by
                links and recall, so the hook doesn't load the link index (decision 0029)
                text: note text is data (decision 0032): control characters as markers, the caps of agent-facing
-               fields and `truncated`, quoting; no imports, so the hook loads it; the MCP server will use it too
+               fields and `truncated`, quoting; no imports, so the hook loads it; the MCP server's documents pass through it too
                links: [[wikilinks]] and alternatives, resolved within a journal; the link index (decision 0026)
                graph: the graph's nodes and edges (tags, links, alternatives, similarity, missing notes) (decision 0028)
                search-index: one journal's index and its cache (MiniSearch)
                search: filters, ranking and results across journals
+               catalog: one compact row per note, in pages with a cursor, from the search index's stored
+               fields and recall's alternatives (decision 0034)
                install-detect: package installs in a shell command line
                recall: recall's matching rules, the journals it reads, its cache, each match's alternatives
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
@@ -61,8 +63,23 @@ src/
                documents: the shared JSON documents (Settings, Tag list, Note list, Note, Note preview) and editing a note
                edit: a person's edit of one note, checked and applied all or nothing; note versions (sha256)
                outcome: how a run ended, as an exit code (CLI) or an HTTP status (server)
-  cli/         one module per command, loaded only when it runs; human and --json output
+               agents: the coding agents setup and doctor know (decision 0035, docs/agents.md): their config
+               files, commands on PATH and the packages they run, reading JSON with comments and Codex's TOML
+               doctor: repomagpie doctor's report; read-only
+               launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
+               setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
+               reading each change back; setup-skill: the skill's shared folder and Claude Code's link;
+               setup-hook: the Claude Code hook, added, migrated, removed; config-write: no links, no
+               writes outside the home folder or project, backups, atomic writes; agent-cli: running an
+               agent's CLI, with cmd.exe's escaping for .cmd shims; json-edit: one value of a plain JSON
+               file changed (an object member or an array item), every other byte kept
+  cli/         one module per command, loaded only when it runs; human and --json output; prompt.ts: setup's
+               multi-select and yes/no on node:readline
   hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
+  mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
+               rules, the server instructions; cli/mcp.ts serves it on stdio. The SDK is bundled into its
+               own chunk, which only repomagpie mcp loads. jitless.ts: zod generates no code;
+               sdk-shims.ts: the SDK's default validator in the build, without ajv
   server/      repomagpie ui, node:http only: server (security checks, routing, events stream), api (endpoints →
                core), live (fs.watch + signature check), open (the platform's open command)
 ui/            the local app (decision 0022): React and Vite, built into dist/ui/ (npm run build)
@@ -76,12 +93,13 @@ skills/
                SKILL.md, and references/json.md (the --json fields it reads); src/cli/skill.test.ts
                checks it against repomagpie --help and the spec's --json shapes
 scripts/       the test runner with the ~/.magpie canary, the CLI's build (build-cli.ts: Vite bundles src/cli/main.ts
-               into dist/cli/, decision 0025) and its check, benchmarks, the link check, the command-name check (decision 0031); not part of the package
+               into dist/cli/, decision 0025) and its check, benchmarks, the retrieval baseline (eval-retrieval.ts),
+               the link check, the command-name check (decision 0031); not part of the package
 ```
 
 Tests (`node:test`) sit next to the code they test as `*.test.ts`, with fixture journals in scratch folders under `.scratch/tests/` (each with its own `.git`, so no walk leaves it) and no network. `npm test` fails if the real `~/.magpie` changed during the run. The app's logic tests (`ui/src/logic/*.test.ts`) run in `npm test` too. Its end-to-end tests use `@playwright/test` against `repomagpie ui` on a journal in `.scratch/e2e/` ([decision 0022](decisions/0022-frontend-stack.md)) ([UI](ui.md), "Design process and testing").
 
-`cli/`, `hook/` and `server/` import from `core/` only; the one exception is `cli/ui.ts`, which starts the server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API. It imports only types from `core/` (the API's documents); what it needs at run time is mirrored, and tests keep each mirror equal to core's: the kinds, the draft marker, the avoid rule, the readable PURL and the topic stop list in `ui/src/logic/schema.ts`, the import item rule and its no-items hint in `ui/src/logic/importing.ts`, and suggest's why line (as `repomagpie suggest` prints it) in `ui/src/logic/suggest.ts`.
+`cli/`, `hook/`, `mcp/` and `server/` import from `core/` only; the exceptions are `cli/ui.ts`, which starts the server, and `cli/mcp.ts`, which starts the MCP server. A command's `--json` document is built in core, so the CLI prints and the server returns the same one. `core/` never prints and never reads `process.argv`. `ui/` reaches the journals only through the server's API. It imports only types from `core/` (the API's documents); what it needs at run time is mirrored, and tests keep each mirror equal to core's: the kinds, the draft marker, the avoid rule, the readable PURL and the topic stop list in `ui/src/logic/schema.ts`, the import item rule and its no-items hint in `ui/src/logic/importing.ts`, and suggest's why line (as `repomagpie suggest` prints it) in `ui/src/logic/suggest.ts`.
 
 ### Future components
 

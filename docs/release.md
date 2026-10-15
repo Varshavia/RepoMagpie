@@ -38,7 +38,7 @@ The example is a pre-release, `0.2.0-beta.2`. For a final release, drop `--tag b
 
 The maintainer creates the branch `release/vX.Y.Z` (or `release/vX.Y.Z-beta.N`) from `main`. On it, the agent:
 
-- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`);
+- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), and in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's; `npm test` fails until the three agree);
 - [ ] moves the Unreleased entries in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`, with a one-line summary, leaves an empty `## [Unreleased]`, and updates the compare links at the end of the file;
 - [ ] checks that the section covers everything merged since the last release (`git log --oneline vPREVIOUS..HEAD`);
 - [ ] updates the README's status line and the roadmap's Now and Next;

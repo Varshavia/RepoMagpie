@@ -22,7 +22,17 @@ You need Node.js 22.12 or later.
 
    `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
 
-2. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
+2. Set it up in your coding agents:
+
+   ```bash
+   repomagpie setup
+   ```
+
+   It finds Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code, lets you choose, shows what it will change in which file, and asks first. Each agent gets RepoMagpie's MCP server, so it can check your notes before an install and answer "what do I have for browser testing?"; and the agent skill, which tells it when to. Claude Code also gets the hook. Every file is backed up first. `--dry-run` only shows the plan; `--remove` takes it all out. For other agents, or to write the entries yourself, see [setting up by hand](docs/setup-by-hand.md).
+
+   Then run `repomagpie doctor`: it shows what is wired in each agent, and what to do when something isn't.
+
+3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
    ```bash
    repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
@@ -31,20 +41,7 @@ You need Node.js 22.12 or later.
 
    Notes go to your personal journal in `~/.magpie`. Add `--to project` to write to the project journal, `.magpie/` in the repository, which your team shares through git.
 
-3. Add the hook to `~/.claude/settings.json`, or to a project's `.claude/settings.json`, so Claude Code checks your notes before every install:
-
-   ```json
-   {
-     "hooks": {
-       "PreToolUse": [
-         { "matcher": "Bash|PowerShell",
-           "hooks": [ { "type": "command", "command": "repomagpie hook claude-code" } ] }
-       ]
-     }
-   }
-   ```
-
-   The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, use `repomagpie hook claude-code --inform-only`, so notes inform the agent and never ask.
+   Now when your agent runs `npm install pdfkit`, it sees your note first. In Claude Code, the hook asks you before the install and names the alternatives you noted; it never blocks one. Other agents check through the MCP server and the skill, which work as well as the agent follows them.
 
 4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
 
@@ -52,15 +49,7 @@ You need Node.js 22.12 or later.
    repomagpie ui
    ```
 
-5. Install the agent skill, for Claude Code and any other agent that supports [Agent Skills](https://agentskills.io):
-
-   ```bash
-   npx skills add Varshavia/RepoMagpie
-   ```
-
-   With the skill, the agent runs `repomagpie recall` before it adds a dependency, answers "what do I have for browser testing?" with `repomagpie search`, and offers to save your opinion on a tool. In agents without the hook, the skill is the only recall check, and it works as well as the agent follows it.
-
-More commands: `repomagpie search`, `repomagpie recall`, `repomagpie adopt` and `repomagpie import`. Run `repomagpie --help`, or read the [spec](docs/spec.md).
+More commands: `repomagpie search`, `repomagpie recall`, `repomagpie catalog`, `repomagpie adopt` and `repomagpie import`. Run `repomagpie --help`, or read the [spec](docs/spec.md).
 
 ## The local app
 
@@ -113,12 +102,13 @@ $env:GITHUB_TOKEN = gh auth token
 ## Platforms
 
 - Node.js 22.12 or later. CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
-- The hook works in Claude Code. Other agents use the skill.
-- The package has no runtime dependencies.
+- The hook works in Claude Code. Every agent with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
+- The package has no runtime dependencies: the MCP server's libraries are bundled in it.
 
 ## Documentation
 
 - [Spec](docs/spec.md): every command, flag and `--json` document
+- [Agents](docs/agents.md): what each coding agent supports, and [setting up by hand](docs/setup-by-hand.md)
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules
 - [Roadmap](docs/roadmap.md) and [changelog](CHANGELOG.md)
