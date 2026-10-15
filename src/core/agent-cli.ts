@@ -31,8 +31,9 @@ export function runCli(file: string, args: string[], options: { env: Env; platfo
   return { status: run.status ?? -1, stdout: run.stdout ?? "", stderr: missing ? `${file} can't be run: ${run.stderr.trim()}` : run.stderr ?? "" };
 }
 
-// cmd.exe by absolute path: ComSpec when it is one, else the system's own.
-function commandShell(env: Env): string {
+// cmd.exe by absolute path: ComSpec when it is one, else the system's own. Also how repomagpie ui
+// starts it (server/open.ts).
+export function commandShell(env: Env): string {
   const comspec = env.ComSpec ?? env.COMSPEC;
   if (comspec && win32.isAbsolute(comspec)) return comspec;
   return win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows", "System32", "cmd.exe");
