@@ -5,6 +5,8 @@ import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { run } from "./program.ts";
+import { sandbox } from "./fixtures/sandbox.ts";
+import { withClient } from "../mcp/fixtures/client.ts";
 
 // The agent skill (skills/repomagpie/) is checked against the Agent Skills format (agentskills.io/specification,
 // checked 2026-10-06), against `repomagpie --help`, and against the --json shapes in docs/spec.md.
@@ -202,7 +204,7 @@ test("every command and flag the skill uses is in repomagpie --help", async () =
       }
     }
   }
-  for (const command of ["recall", "search", "suggest", "note", "adopt"]) {
+  for (const command of ["recall", "search", "suggest", "catalog", "note", "adopt"]) {
     assert.ok(used.has(command), `the skill should teach magpie ${command}`);
   }
 });
@@ -299,8 +301,17 @@ test("the spec's --json examples parse, for the commands the skill uses", () => 
 // A bare identifier in inline code (`verdict`, `matches[].avoid_when`) is a JSON field; values are
 // written in JSON form ("exact", null). Under a heading that names `repomagpie <command> --json`,
 // a field must be in that command's shape; elsewhere, in any command's shape.
-test("every JSON field the skill relies on is in the spec's --json shapes", () => {
+// On a line about the MCP tools, a name is a tool's or one of its inputs, from the server's own
+// tools/list (with --allow-write, so note is listed).
+test("every JSON field the skill relies on is in the spec's --json shapes", async () => {
   const shapes = specShapes();
+  const mcpNames = new Set<string>();
+  await withClient(sandbox({}), { args: ["--allow-write"] }, async (client) => {
+    for (const tool of (await client.request("tools/list")).result?.tools as { name: string; inputSchema: { properties: Record<string, unknown> } }[]) {
+      mcpNames.add(tool.name);
+      for (const input of Object.keys(tool.inputSchema.properties)) mcpNames.add(input);
+    }
+  });
   let checked = 0;
   for (const file of skillFiles()) {
     let command: string | null = null;
@@ -310,8 +321,10 @@ test("every JSON field the skill relies on is in the spec's --json shapes", () =
         if (command) assert.ok(shapes.has(command), `${basename(file)}: no --json shape for ${command} in the spec`);
         continue;
       }
+      const mcp = /\bMCP\b/.test(line);
       for (const span of codeSpans(line)) {
         if (!FIELD.test(span) || NOT_FIELDS.has(span)) continue;
+        if (mcp && mcpNames.has(span)) continue;
         checked++;
         const where = `${basename(file)}: \`${span}\``;
         if (command) assert.ok(has(shapes.get(command), span), `${where} is not in magpie ${command} --json (spec §2)`);

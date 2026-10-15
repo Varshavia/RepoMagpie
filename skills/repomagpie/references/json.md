@@ -37,6 +37,17 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `results[].status`: `"reviewed"` or `"inbox"`.
 - `results[].path`: the note's file; read it for the full note.
 
+## `repomagpie catalog --json`
+
+- `columns`: the names of a row's values, in order: `["name", "kind", "journal", "avoid", "summary", "verdict"]`.
+- `rows[]`: one array per note, by name, holding:
+  - the note's name and kind, and its journal (`"personal"` or `"project"`: who wrote it);
+  - avoid: `true` for an avoid note (as in recall);
+  - summary: the note's first "Use when" item, else the first line of "What it does", else `null`; at most 100 characters;
+  - verdict: the start of the Verdict, at most 60 characters, or `null` for an inbox note. Recall or search the note for the whole Verdict.
+- `total`: how many notes match the filters.
+- `next_cursor`: pass it to `--cursor` for the next page; `null` on the last page.
+
 ## `repomagpie suggest ["description"] --json`
 
 - `source`: `"manifests"` (read from the project) or `"description"`.
