@@ -13,7 +13,7 @@ Two other installers set the expectation: `npx skills add` and REA's `npx rea-ag
 
 ### `repomagpie setup`
 **The flow:**
-1. Detect the installed agents of the first set: Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code. An agent counts as installed when its config folder exists or its CLI is on `PATH`.
+1. Detect the installed agents of the first set: Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code. An agent counts as installed when its config folder exists or its CLI is on `PATH`. For Gemini CLI, its `settings.json` counts, not `~/.gemini`: Antigravity CLI makes that folder too and reads neither that file nor `~/.agents/skills/` (found in the live-test preparation, 2026-10-15).
 2. Show a plan: for each agent, what changes, in which file, how (the agent's CLI or a JSON edit), and the backup that will be written.
 3. Ask: which agents (a multi-select, all detected ones chosen), then whether to turn on `--allow-write` (no by default), then the plan for those, then "Make these changes?".
 4. Apply.
