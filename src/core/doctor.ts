@@ -6,7 +6,7 @@ import { isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, isInstalled, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
-import { CONFIG_LIMIT } from "./config-write.ts";
+import { backupsOf, CONFIG_LIMIT } from "./config-write.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { findHooks } from "./setup-hook.ts";
 import { readNote } from "./note.ts";
@@ -65,6 +65,7 @@ export interface DoctorJson {
   skills: { path: string; link: string | null; version: string | null }[]; // the folders that exist
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
   agents: AgentReport[];
+  backups: { path: string; date: string }[]; // setup's backups, for the user to delete; never a problem
   journals: JournalReport[];
   problems: string[]; // what to do, one sentence each
 }
@@ -155,6 +156,10 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     else if (agent.mcp && !agent.mcp.code_generation_off) problems.push(`${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}. Run repomagpie setup again.`);
   }
 
+  // Setup's backups: beside each file it edits, and beside the skills folders (setup-skill.ts).
+  const backedUp = [...AGENTS.map((agent) => agent.mcpFile(where)), claudeSettings(where), join(request.home, ".agents", "repomagpie-skill"), join(request.home, ".claude", "repomagpie-skill")];
+  const backups = backedUp.flatMap((file) => backupsOf(file, request.home));
+
   // The journals.
   const personal = resolvePersonalJournal({ home: request.home, env: request.env, cwd: request.cwd, flag: request.homeFlag });
   const project = findProjectJournal({ cwd: request.cwd, home: request.home, personalJournal: personal.path, flag: request.projectFlag });
@@ -165,7 +170,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     if (j.unreadable.length) problems.push(`${j.unreadable.length} ${j.unreadable.length === 1 ? "note has" : "notes have"} frontmatter that can't be read in the ${j.scope} journal.`);
   }
 
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, agents, journals, problems };
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, agents, backups, journals, problems };
 }
 
 // Claude Code's project settings, in the project root (where a .claude/ folder is).

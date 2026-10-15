@@ -68,6 +68,29 @@ test("a home with nothing set up: nothing found, what to do, and nothing written
   assert.ok(report.agents.every((a) => !a.installed && a.mcp === null));
   assert.deepEqual(report.journals, [{ scope: "personal", path: join(box.home, ".magpie"), exists: false, notes: 0, skipped: [], unreadable: [] }]);
   assert.deepEqual(report.problems, ["repomagpie isn't on PATH. Install it with npm install -g repomagpie.", "The skill isn't installed. Run repomagpie setup."]);
+  assert.deepEqual(report.backups, []);
+});
+
+test("setup's backups beside each file it edits and the skill's: listed with their dates, never a to-do", () => {
+  const box = scratchHome();
+  const vscode = windows ? join(box.home, "AppData", "Roaming", "Code", "User", "mcp.json")
+    : platform === "darwin" ? join(box.home, "Library", "Application Support", "Code", "User", "mcp.json") : join(box.home, ".config", "Code", "User", "mcp.json");
+  const backups = [
+    `${join(box.home, ".claude.json")}.repomagpie-backup-20261015-010147`,
+    `${join(box.home, ".claude.json")}.repomagpie-backup-20261015-020000Z`,
+    `${join(box.home, ".cursor", "mcp.json")}.repomagpie-backup-20261015-020000Z`,
+    `${vscode}.repomagpie-backup-20261015-020000Z`,
+    `${join(box.home, ".claude", "settings.json")}.repomagpie-backup-20261015-020000Z`,
+  ];
+  for (const path of backups) box.write(path, "{}");
+  const skill = join(box.home, ".agents", "repomagpie-skill.repomagpie-backup-20261015-020000Z");
+  box.write(join(skill, "SKILL.md"), "---\nname: repomagpie\n---\n");
+  const before = snapshot(box.root);
+  const report = runDoctor(box.request);
+  assert.deepEqual(snapshot(box.root), before);
+  assert.deepEqual(report.backups.map((b) => b.path), [...backups, skill]);
+  assert.deepEqual(report.backups[0], { path: backups[0], date: "2026-10-15T01:01:47Z" });
+  assert.ok(!report.problems.some((p) => /backup/i.test(p)), JSON.stringify(report.problems));
 });
 
 test("an Antigravity ~/.gemini without settings.json isn't Gemini CLI; the gemini command on PATH is", () => {

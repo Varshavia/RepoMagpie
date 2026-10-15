@@ -49,6 +49,13 @@ export function render(r: DoctorJson, home: string): string {
   lines.push("", "MCP server in each agent");
   for (const a of r.agents) lines.push(`  ${a.name.padEnd(12)}  ${agentLine(a, tilde)}`);
 
+  // Information, not a to-do: the first backup is the file as it was before setup, so only the user
+  // decides when to delete them.
+  lines.push("", "Backups from setup");
+  if (!r.backups.length) lines.push("  none");
+  for (const b of r.backups) lines.push(`  ${tilde(b.path)}  ${b.date.slice(0, 10)} ${b.date.slice(11, 16)} UTC`);
+  if (r.backups.length) lines.push(`  Each is a whole copy of the file: those of ~${r.platform === "win32" ? "\\" : "/"}.claude.json can hold sign-in tokens and MCP servers' secrets. Delete the backups you no longer need.`);
+
   lines.push("", "Journals");
   for (const j of r.journals) {
     const state = j.exists ? `${j.notes} ${j.notes === 1 ? "note" : "notes"}${j.skipped.length ? `, ${j.skipped.length} skipped` : ""}${j.unreadable.length ? `, ${j.unreadable.length} unreadable` : ""}` : "doesn't exist yet";
