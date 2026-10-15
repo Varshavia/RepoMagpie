@@ -28,7 +28,7 @@ test("--json prints the report; human output has every section and what to do; e
   const human = await magpie(b, ["doctor"], { env: b.env });
   assert.equal(human.code, 0);
   for (const heading of ["Commands on PATH (the first one runs)", "Skill", "Claude Code hook", "MCP server in each agent", "Journals", "To do"]) {
-    assert.match(human.out, new RegExp(`^${heading.replace(/[()]/g, "\\$&")}$`, "m"), heading);
+    assert.ok(human.out.split(/\r?\n/).includes(heading), heading);
   }
   assert.match(human.out, /^ {2}~[\\/]\.claude[\\/]settings\.json: magpie hook claude-code {2}\(the old name\)$/m);
   assert.match(human.out, /^ {2}Claude Code {3}installed; no repomagpie entry in ~[\\/]\.claude\.json$/m);

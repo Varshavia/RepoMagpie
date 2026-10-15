@@ -286,7 +286,7 @@ test("--to project without a project journal creates .magpie/ at the git root an
   const r = await magpie(box, ["note", "pkg:npm/pdfkit", "ok", "--to", "project"], { cwd: join(box.project, "src") });
   assert.equal(r.code, 0, r.err);
   const journal = join(box.project, ".magpie");
-  assert.match(r.err, new RegExp(`Created the project journal: ${journal.replace(/\\/g, "\\\\")}`));
+  assert.ok(r.err.includes(`Created the project journal: ${journal}`), r.err);
   assert.match(r.err, /✔ Saved to the project journal: pdfkit/);
   assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n");
   assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), STARTER_TAGS);
