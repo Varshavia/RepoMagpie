@@ -66,6 +66,7 @@ For the other agents in [agents](../agents.md) (Copilot CLI, Windsurf, Cline, Ze
 ### Safety
 - **A backup before every edit**, next to the file: `<file>.repomagpie-backup-<timestamp>`, named in the summary. An edit made through the agent's CLI gets the same backup of the file the CLI writes, when `setup` knows that file.
 - **Never through a link** ([0032](0032-note-text-is-data.md), rule 5): a config file or folder that is a link (or a junction) is refused, and named. The skill's link for Claude Code is the one link `setup` creates ("The skill", above). **Never outside the user's home**: a path that resolves outside it is refused.
+- **Found by the red-team pass (2026-10-14) and fixed:** a config file over 64 MB is refused unread (`setup` read it whole); a `hooks` that isn't an object is refused in the plan, not half-way through; a relative `PATH` entry is never searched, so a cloned repository's `claude.cmd` can't be run; updating the skill starts from an empty folder, so a link inside the old one is never written through; an edited file keeps its permissions (the temporary file had the default ones).
 - **Idempotent:** a second run finds every entry as it should be and changes nothing, not even a backup.
 - **An entry named `repomagpie` that runs something else** (another program, or another copy of RepoMagpie) is shown in the plan as a change, with the old command, and changed only with the user's yes (or `--yes`).
 - **`--remove`** deletes only RepoMagpie's own entries: the MCP entry, the hook entry and the skill folders it installed. It never restores a backup over the file, because the user or another tool may have changed it since. It uses the agent's CLI where `setup` did (`claude mcp remove`, `codex mcp remove`, `gemini mcp remove`). VS Code has no command-line remove, so `--remove` names the entry and the command that opens the file ("MCP: Open User Configuration").
@@ -126,7 +127,7 @@ Read-only: it writes nothing, not even a cache. It reports:
 - the MCP entry in each detected agent: present or not, whether its `node` and entry file exist, whether it is this version, whether node gets `--disallow-code-generation-from-strings` before the script (a to-do when not), and whether `--allow-write` is on;
 - the journals found, with note counts and skipped files (links, files over 256 KB, unparseable notes).
 
-It has human output and `--json`, and exits 0 whatever it finds: it is a report, not a check, so a tester can always attach its output to a bug report. It never prints a secret: a value from a config file's `env` is shown as its key only.
+It has human output and `--json`, and exits 0 whatever it finds: it is a report, not a check, so a tester can always attach its output to a bug report. It never prints a secret: a value from a config file's `env` is shown as its key only, and in commands, arguments and errors a value after a secret-looking name (`TOKEN=`, `--api-key=`, `--token <value>`, `"password":`), a well-known token format and a URL's password become `<redacted>`. A file that isn't valid JSON is reported with a position, never with Node's error text, which can quote the file. `setup`'s plan and its failures redact the same way.
 
 ## Consequences
 - Installing becomes `npm install -g repomagpie`, then `repomagpie setup`. The README's manual hook and skill steps move to `docs/`.

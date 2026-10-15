@@ -3,6 +3,7 @@
 // cmd.exe runs: the command line is then built with cmd.exe's escaping (as the cross-spawn package
 // does, MIT), never from a string a shell would read on its own. Never prints.
 import { spawnSync } from "node:child_process";
+import { posix, win32 } from "node:path";
 import type { Platform } from "./agents.ts";
 import type { Env } from "./journals.ts";
 
@@ -14,15 +15,27 @@ export interface CliResult {
 
 const TIMEOUT = 60_000;
 
+// Only by absolute path: Windows looks a bare name up in the current folder before PATH, and that
+// folder can be a repository someone else wrote. setup passes the path it resolved on PATH, and the
+// home folder as the working folder.
 export function runCli(file: string, args: string[], options: { env: Env; platform: Platform; cwd?: string }): CliResult {
+  const absolute = options.platform === "win32" ? win32.isAbsolute : posix.isAbsolute;
+  if (!absolute(file)) return { status: -1, stdout: "", stderr: `${file} isn't an absolute path; setup runs a program only by the path it found on PATH.` };
   const shim = options.platform === "win32" && /\.(cmd|bat)$/i.test(file);
   const run = shim
-    ? spawnSync(options.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${[escapeCommand(file), ...args.map(escapeArgument)].join(" ")}"`],
+    ? spawnSync(commandShell(options.env), ["/d", "/s", "/c", `"${[escapeCommand(file), ...args.map(escapeArgument)].join(" ")}"`],
       { env: options.env, cwd: options.cwd, encoding: "utf8", timeout: TIMEOUT, windowsVerbatimArguments: true, windowsHide: true })
     : spawnSync(file, args, { env: options.env, cwd: options.cwd, encoding: "utf8", timeout: TIMEOUT, windowsHide: true });
   if (run.error) return { status: -1, stdout: run.stdout ?? "", stderr: run.error.message };
   const missing = shim && run.status !== 0 && /is not recognized|cannot find/i.test(run.stderr ?? "");
   return { status: run.status ?? -1, stdout: run.stdout ?? "", stderr: missing ? `${file} can't be run: ${run.stderr.trim()}` : run.stderr ?? "" };
+}
+
+// cmd.exe by absolute path: ComSpec when it is one, else the system's own.
+function commandShell(env: Env): string {
+  const comspec = env.ComSpec ?? env.COMSPEC;
+  if (comspec && win32.isAbsolute(comspec)) return comspec;
+  return win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows", "System32", "cmd.exe");
 }
 
 // cmd.exe's special characters, escaped with ^. A shim passes its arguments on with %*, which

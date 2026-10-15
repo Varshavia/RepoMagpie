@@ -8,7 +8,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, join } from "node:path";
 
 const [agent, ...args] = process.argv.slice(2);
-appendFileSync(process.env.FAKE_AGENT_LOG as string, `${JSON.stringify({ agent, args })}\n`);
+appendFileSync(process.env.FAKE_AGENT_LOG as string, `${JSON.stringify({ agent, args, cwd: process.cwd() })}\n`);
 if (process.env.FAKE_AGENT_FAIL === agent) {
   process.stderr.write(`${agent}: something went wrong\n`);
   process.exit(1);

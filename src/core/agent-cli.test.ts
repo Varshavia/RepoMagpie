@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
@@ -52,6 +52,44 @@ test("every argument arrives exactly as given, through the platform's shim", () 
   const result = runCli(cli.file, HARD, { env: cli.env, platform });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(cli.received(), [HARD]);
+});
+
+test("only an absolute program is run: a bare name, which Windows would look up in the current folder first, is refused", () => {
+  const cli = fakeCli("agent");
+  for (const name of ["agent", "agent.cmd", join("relative", "agent.cmd")]) {
+    const result = runCli(name, ["x"], { env: cli.env, platform });
+    assert.equal(result.status, -1, name);
+    assert.match(result.stderr, /isn't an absolute path/);
+  }
+});
+
+test("the CLI runs in the folder given (setup gives the home folder), never the one setup was started from", () => {
+  const cli = fakeCli("agent");
+  const home = join(scratchBase("agent-cli"), "home");
+  mkdirSync(home);
+  runCli(cli.file, [], { env: { ...cli.env, RECORD_CWD: "1" }, platform, cwd: home });
+  assert.deepEqual(cli.received(), [home]);
+});
+
+test("Windows: cmd.exe comes from ComSpec when absolute, else from SystemRoot: a cmd.exe in the working folder never runs", { skip: platform !== "win32" && "Windows only" }, () => {
+  const cli = fakeCli("agent");
+  const cloned = join(scratchBase("agent-cli"), "cloned-repo");
+  mkdirSync(cloned);
+  // A program that isn't cmd.exe, under that name, where a bare lookup would find it first.
+  copyFileSync(join(process.env.SystemRoot as string, "System32", "whoami.exe"), join(cloned, "cmd.exe"));
+  // Node looks in the current folder unless this process has NoDefaultCurrentDirectoryInExePath
+  // (some terminals set it): without it, as on most machines, a bare "cmd.exe" here runs whoami.
+  const saved = process.env.NoDefaultCurrentDirectoryInExePath;
+  delete process.env.NoDefaultCurrentDirectoryInExePath;
+  try {
+    for (const ComSpec of ["cmd.exe", undefined]) {
+      const result = runCli(cli.file, ["ok"], { env: { ...cli.env, ComSpec }, platform, cwd: cloned });
+      assert.equal(result.status, 0, result.stderr);
+    }
+  } finally {
+    if (saved !== undefined) process.env.NoDefaultCurrentDirectoryInExePath = saved;
+  }
+  assert.deepEqual(cli.received(), [["ok"], ["ok"]]);
 });
 
 test("a missing program is a failure with a message, not a throw", () => {

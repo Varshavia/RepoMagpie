@@ -3,4 +3,5 @@
 // Not part of the build.
 import { appendFileSync } from "node:fs";
 
-appendFileSync(process.env.RECORD_FILE as string, `${JSON.stringify(process.argv.slice(2))}\n`);
+// With RECORD_CWD set, the folder it ran in instead.
+appendFileSync(process.env.RECORD_FILE as string, `${JSON.stringify(process.env.RECORD_CWD ? process.cwd() : process.argv.slice(2))}\n`);

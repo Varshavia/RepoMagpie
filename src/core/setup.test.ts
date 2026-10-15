@@ -43,10 +43,11 @@ function scratch(clis: (keyof typeof CLIS)[] = ["claude-code", "codex", "gemini"
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text);
   };
-  const calls = () => readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as { agent: string; args: string[] });
+  const logged = () => readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as { agent: string; args: string[]; cwd: string });
+  const calls = () => logged().map(({ agent, args }) => ({ agent, args }));
   const vscodeMcp = platform === "win32" ? join(home, "AppData", "Roaming", "Code", "User", "mcp.json")
     : platform === "darwin" ? join(home, "Library", "Application Support", "Code", "User", "mcp.json") : join(home, ".config", "Code", "User", "mcp.json");
-  return { root, home, bin, launch, request, write, calls, vscodeMcp, files: { claude: join(home, ".claude.json"), codex: join(home, ".codex", "config.toml"), cursor: join(home, ".cursor", "mcp.json"), gemini: join(home, ".gemini", "settings.json") } };
+  return { root, home, bin, launch, request, write, calls, logged, vscodeMcp, files: { claude: join(home, ".claude.json"), codex: join(home, ".codex", "config.toml"), cursor: join(home, ".cursor", "mcp.json"), gemini: join(home, ".gemini", "settings.json") } };
 }
 
 const snapshot = (folder: string) => readdirSync(folder, { recursive: true, withFileTypes: true })
@@ -79,6 +80,8 @@ test("applying: every agent's CLI gets the exact arguments, every file holds the
     { agent: "code", args: ["--add-mcp", JSON.stringify({ name: "repomagpie", command, args })] },
   ]);
   assert.deepEqual(JSON.parse(readFileSync(s.files.cursor, "utf8")), { mcpServers: { repomagpie: { command, args } } });
+  // Each CLI ran by the absolute path found on PATH, in the home folder, not the folder setup ran in.
+  assert.ok(s.logged().every((call) => call.cwd === s.home), JSON.stringify(s.logged().map((c) => c.cwd)));
   assert.ok(args.includes(NO_CODEGEN));
   // Nothing that weakens an agent's safety.
   for (const file of [s.files.claude, s.files.cursor, s.files.gemini, s.vscodeMcp]) assert.doesNotMatch(readFileSync(file, "utf8"), /trust|autoApprove|alwaysAllow|approval/i, file);
