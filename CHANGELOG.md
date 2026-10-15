@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.4] - 2026-10-15
+
+The fifth pre-release: any coding agent with MCP can check your notes before an install and ask what you have, through `repomagpie mcp`; `repomagpie setup` wires that server, the agent skill and the Claude Code hook into your agents; `repomagpie doctor` shows what is wired; and `repomagpie catalog` lists your whole journal.
+
 ### Added
 
 - `repomagpie mcp`, an MCP server for coding agents, started by the agent over stdio. Its tools `recall`, `search`, `suggest` and `catalog` answer exactly as the commands' `--json` does, so any agent with MCP can check a package before installing it, and ask what you have, without the skill or a shell. `--allow-write` adds a `note` tool that records your Verdict or an alternative, in your words; it is off by default. The server works with both MCP protocol revisions agents use today (2025-11-25 and 2026-07-28), never opens a network connection or a port, and generates no code at run time. It makes the package about 160 kB larger.
@@ -13,7 +17,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The npm package now includes the agent skill (`skills/repomagpie/`).
 - `repomagpie setup` sets up the MCP server in Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code (for GitHub Copilot, and named so). It finds the agents you have (Gemini CLI by its `settings.json` or its command, since Antigravity CLI also uses `~/.gemini`), lets you choose them, shows what it will change in which file, and asks before it changes anything. It uses each agent's own command where there is one, changes only RepoMagpie's entry in a file, backs the file up first (the backup's name ends in a UTC time, such as `20261015-010147Z`, and the summary says how many backups that file now has; `setup` never deletes one), and never turns on an agent's auto-approval. A file with comments gets a snippet to paste instead. Running it again changes nothing, and keeps the note tool on or off as you chose it; `--allow-write` and `--no-allow-write` turn it on or off, and in a terminal it asks, saying what it is now; `--remove` takes the entries out; `--dry-run` only shows the plan, whose first line is the entry with full paths, to copy when you set up an agent by hand; `--yes` doesn't ask. The entry starts Node with code generation turned off, so the server can't run generated code. Install with `npm install -g repomagpie` first: from npx's cache, `setup` explains why it can't write a lasting entry.
 - `repomagpie doctor` shows what is wired: which programs `repomagpie` and `magpie` run on your `PATH` (and whether a `magpie` is another tool), where the skill is installed and its version, the Claude Code hook (including the old `magpie hook claude-code` form), the RepoMagpie MCP server in Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code, and your journals with their note counts and skipped files. It ends with what to do. It also lists the backups `setup` made, with their dates, since copies of `~/.claude.json` can hold sign-in tokens: delete them when you no longer need them. It changes nothing, and `--json` gives the same report for a bug report. <!-- check:commands allow -->
-
 - `repomagpie catalog` lists every note in one row: name, kind, journal and the Verdict. It reads 100 notes at a time; the next page's command is on stderr. `--tag`, `--kind` and `--journal` filter it. Its `--json` is made for your coding agent to read your whole journal and pick what fits: one short row per note (name, kind, journal, whether you noted to avoid it, a one-line summary and the start of the Verdict), about 20,000 characters for 100 notes, with `next_cursor` for the next page. `--full --json` gives every field: id, tags, status, a longer summary and Verdict, and the names of its alternatives.
 
 ### Changed
@@ -153,7 +156,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...HEAD
+[0.2.0-beta.4]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...v0.2.0-beta.4
 [0.2.0-beta.3]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...v0.2.0-beta.3
 [0.2.0-beta.2]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...v0.2.0-beta.2
 [0.2.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.1.0-beta.1...v0.2.0-beta.1
