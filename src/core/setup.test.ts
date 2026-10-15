@@ -211,3 +211,25 @@ test("a launch that can't work refuses every agent and writes nothing; --agents 
   assert.deepEqual(only.agents.map((a) => [a.id, a.action]), [["codex", "add"], ["cursor", "skip"]]);
   assert.match(only.agents[1].reason ?? "", /^not installed: no /);
 });
+
+// Antigravity CLI keeps its files in ~/.gemini too (config/mcp_config.json, antigravity-cli/), and
+// reads neither ~/.gemini/settings.json nor an entry setup writes there (docs/agents.md).
+test("an Antigravity ~/.gemini without settings.json and no gemini command isn't Gemini CLI: nothing written there", () => {
+  const s = scratch([]);
+  s.write(join(s.home, ".gemini", "config", "mcp_config.json"), '{ "mcpServers": {} }\n');
+  mkdirSync(join(s.home, ".gemini", "antigravity-cli", "skills"), { recursive: true });
+  const gemini = join(s.home, ".gemini");
+  const before = snapshot(gemini);
+  const plan = planSetup(s.request());
+  const by = () => plan.agents.find((a) => a.id === "gemini");
+  assert.deepEqual([by()?.installed, by()?.action, by()?.reason], [false, "skip", "not installed"]);
+  applySetup(plan, s.request());
+  assert.deepEqual(snapshot(gemini), before);
+  assert.equal(existsSync(s.files.gemini), false);
+  const asked = planSetup(s.request({ only: ["gemini"] })).agents[0];
+  assert.equal(asked.reason, `not installed: no ${s.files.gemini} and no gemini command`);
+  // Gemini CLI's own settings.json, without its command on PATH: installed, edited as JSON.
+  s.write(s.files.gemini, "{}\n");
+  const own = planSetup(s.request()).agents.find((a) => a.id === "gemini");
+  assert.deepEqual([own?.installed, own?.action, own?.method], [true, "add", "json"]);
+});

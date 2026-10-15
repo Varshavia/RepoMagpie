@@ -1,7 +1,7 @@
 // The coding agents that repomagpie setup and doctor know (decision 0035; facts, sources and dates
 // in docs/agents.md): where each keeps its MCP entry, and reading those files without changing them.
 // Never prints, never writes.
-import { closeSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, posix, resolve, win32 } from "node:path";
 import type { Env } from "./journals.ts";
 
@@ -21,7 +21,7 @@ export interface Agent {
   id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode";
   name: string;
   cli: string; // the command on PATH
-  folder: (w: Where) => string; // its config folder: it counts as installed when this exists
+  marker: (w: Where) => string; // a folder or file of its own: it counts as installed when this exists (or cli is on PATH)
   mcpFile: (w: Where) => string;
   format: McpFormat;
 }
@@ -32,14 +32,20 @@ const vscodeUser = (w: Where) =>
       : join(w.env.XDG_CONFIG_HOME ?? join(w.home, ".config"), "Code", "User");
 const codexHome = (w: Where) => w.env.CODEX_HOME ?? join(w.home, ".codex");
 
-// The first set (decision 0035), in the order setup and doctor show them.
+const geminiSettings = (w: Where) => join(w.home, ".gemini", "settings.json");
+
+// The first set (decision 0035), in the order setup and doctor show them. Gemini CLI's marker is its
+// settings.json, not ~/.gemini: Antigravity CLI makes that folder too (docs/agents.md).
 export const AGENTS: Agent[] = [
-  { id: "claude-code", name: "Claude Code", cli: "claude", folder: (w) => join(w.home, ".claude"), mcpFile: (w) => join(w.home, ".claude.json"), format: "mcpServers" },
-  { id: "codex", name: "Codex CLI", cli: "codex", folder: codexHome, mcpFile: (w) => join(codexHome(w), "config.toml"), format: "codex-toml" },
-  { id: "cursor", name: "Cursor", cli: "cursor", folder: (w) => join(w.home, ".cursor"), mcpFile: (w) => join(w.home, ".cursor", "mcp.json"), format: "mcpServers" },
-  { id: "gemini", name: "Gemini CLI", cli: "gemini", folder: (w) => join(w.home, ".gemini"), mcpFile: (w) => join(w.home, ".gemini", "settings.json"), format: "mcpServers" },
-  { id: "vscode", name: "VS Code", cli: "code", folder: vscodeUser, mcpFile: (w) => join(vscodeUser(w), "mcp.json"), format: "servers" },
+  { id: "claude-code", name: "Claude Code", cli: "claude", marker: (w) => join(w.home, ".claude"), mcpFile: (w) => join(w.home, ".claude.json"), format: "mcpServers" },
+  { id: "codex", name: "Codex CLI", cli: "codex", marker: codexHome, mcpFile: (w) => join(codexHome(w), "config.toml"), format: "codex-toml" },
+  { id: "cursor", name: "Cursor", cli: "cursor", marker: (w) => join(w.home, ".cursor"), mcpFile: (w) => join(w.home, ".cursor", "mcp.json"), format: "mcpServers" },
+  { id: "gemini", name: "Gemini CLI", cli: "gemini", marker: geminiSettings, mcpFile: geminiSettings, format: "mcpServers" },
+  { id: "vscode", name: "VS Code", cli: "code", marker: vscodeUser, mcpFile: (w) => join(vscodeUser(w), "mcp.json"), format: "servers" },
 ];
+
+// Its marker exists, or its command is in an absolute PATH folder.
+export const isInstalled = (agent: Agent, w: Where): boolean => existsSync(agent.marker(w)) || onPath(agent.cli, w).length > 0;
 
 // Claude Code's user settings, which hold the hook (spec §6).
 export const claudeSettings = (w: Where) => join(w.home, ".claude", "settings.json");

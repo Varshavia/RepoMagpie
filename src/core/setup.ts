@@ -8,7 +8,7 @@ import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
-import { AGENTS, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type McpFormat, type Where } from "./agents.ts";
+import { AGENTS, isInstalled, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type McpFormat, type Where } from "./agents.ts";
 import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
@@ -72,7 +72,7 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const launch = "error" in request.launch ? null : request.launch;
   const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null };
   for (const agent of AGENTS) {
-    const installed = existsSync(agent.folder(where)) || onPath(agent.cli, where).length > 0;
+    const installed = isInstalled(agent, where);
     const file = agent.mcpFile(where);
     const base: AgentPlan = { id: agent.id, name: agent.name, installed, file, action: "skip", method: null, reason: null, current: null, backup: null, snippet: null };
     if (request.only ? !request.only.includes(agent.id) : !installed) {
@@ -80,7 +80,7 @@ export function planSetup(request: SetupRequest): SetupPlan {
       continue;
     }
     if (!installed) {
-      plan.agents.push({ ...base, reason: `not installed: no ${agent.folder(where)} and no ${agent.cli} command` });
+      plan.agents.push({ ...base, reason: `not installed: no ${agent.marker(where)} and no ${agent.cli} command` });
       continue;
     }
     plan.agents.push(planAgent(agent, base, request, launch));

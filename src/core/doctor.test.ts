@@ -70,6 +70,19 @@ test("a home with nothing set up: nothing found, what to do, and nothing written
   assert.deepEqual(report.problems, ["repomagpie isn't on PATH. Install it with npm install -g repomagpie.", "The skill isn't installed. Run repomagpie setup."]);
 });
 
+test("an Antigravity ~/.gemini without settings.json isn't Gemini CLI; the gemini command on PATH is", () => {
+  const box = scratchHome();
+  box.write(join(box.home, ".gemini", "config", "mcp_config.json"), '{ "mcpServers": {} }\n');
+  mkdirSync(join(box.home, ".gemini", "antigravity-cli", "skills"), { recursive: true });
+  const gemini = () => runDoctor(box.request).agents.find((a) => a.id === "gemini");
+  assert.equal(gemini()?.installed, false);
+  assert.ok(!runDoctor(box.request).problems.some((p) => p.includes("Gemini CLI")));
+  box.write(windows ? join(box.bin, "gemini.cmd") : join(box.bin, "gemini"), windows ? "@echo off\r\n" : "#!/bin/sh\n");
+  if (!windows) chmodSync(join(box.bin, "gemini"), 0o755);
+  assert.equal(gemini()?.installed, true);
+  assert.ok(runDoctor(box.request).problems.includes("Gemini CLI has no repomagpie MCP server. Run repomagpie setup."));
+});
+
 test("PATH: our repomagpie with its version, and a magpie that isn't ours is flagged", () => {
   const box = scratchHome();
   command(box, "repomagpie", { name: "repomagpie", version: "0.1.0" });

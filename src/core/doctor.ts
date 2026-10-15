@@ -3,7 +3,7 @@
 // appear, only their names. Never prints.
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { AGENTS, claudeSettings, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
+import { AGENTS, claudeSettings, isInstalled, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT } from "./config-write.ts";
@@ -42,7 +42,7 @@ export interface HookEntry {
 export interface AgentReport {
   id: Agent["id"];
   name: string;
-  installed: boolean; // its config folder exists, or its command is on PATH
+  installed: boolean; // its marker exists (agents.ts), or its command is on PATH
   config: string; // the file that holds its MCP entry
   mcp: (McpEntry & { allow_write: boolean; code_generation_off: boolean; node_found: boolean; entry: string | null; entry_found: boolean; version: string | null }) | null;
   error?: string; // the file exists but can't be read
@@ -118,7 +118,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // Each agent's MCP entry.
   const agents = AGENTS.map((agent): AgentReport => {
     const config = agent.mcpFile(where);
-    const installed = existsSync(agent.folder(where)) || onPath(agent.cli, where).length > 0;
+    const installed = isInstalled(agent, where);
     const report: AgentReport = { id: agent.id, name: agent.name, installed, config, mcp: null };
     if (!existsSync(config)) return report;
     const read = readConfig(config);
