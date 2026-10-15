@@ -24,6 +24,7 @@ Every fact below was checked on **2026-10-14** against the source linked next to
 | OpenCode | `mcp` in `~/.config/opencode/opencode.json` (JSONC allowed) | `~/.config/opencode/skills/` | plugins: `tool.execute.before` can block by throwing | snippet |
 | Goose | `extensions` in `~/.config/goose/config.yaml`; Windows `%APPDATA%\Block\goose\config\config.yaml` | not documented (`~/.config/goose/skills/` per `npx skills`) | not documented | snippet |
 | Claude Desktop | `mcpServers` in `claude_desktop_config.json` (macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\`) | not documented | not documented | snippet |
+| Antigravity CLI | `~/.gemini/config/mcp_config.json` (JSON edit) | `~/.gemini/antigravity-cli/skills/` | `PreToolUse`: allow, deny, ask; `reason` only | not yet (by hand) |
 
 ## The first set
 
@@ -55,7 +56,7 @@ Every fact below was checked on **2026-10-14** against the source linked next to
 - **Environment:** Gemini CLI "redacts sensitive environment variables from the base environment (inherited from the host process)": names matching `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*KEY*`, `*AUTH*`, `*CREDENTIAL*`. So `GITHUB_TOKEN` doesn't reach our server there, which is fine: the MCP tools never call GitHub ([decision 0034](decisions/0034-the-mcp-server.md)). Same source.
 - **Skills:** user `~/.gemini/skills/` or the `~/.agents/skills/` alias; workspace `.gemini/skills/` or `.agents/skills/`. Within a tier, `.agents/skills/` wins. `gemini skills install <git-url or path> --scope user`. Source: [Gemini CLI skills](https://geminicli.com/docs/cli/skills/).
 - **Hook:** `BeforeTool` in `settings.json` → `hooks`; the matcher is the tool name (`run_shell_command`). Output: `decision` `allow` or `deny` (`block` is an alias), `reason` (sent to the agent on deny), `systemMessage` (shown to the user). No `ask`; `additionalContext` exists on `AfterTool` but not on `BeforeTool`. Exit code 2 blocks with stderr as the reason. Source: [Gemini CLI hooks reference](https://geminicli.com/docs/hooks/reference/).
-- **Note:** the same page says Gemini CLI "was replaced by Antigravity CLI on June 18th, 2026, for unpaid tier and Google One users". Antigravity CLI isn't researched here; it is on the hook-adapters research list ([roadmap](roadmap.md)).
+- **Note:** the same page says Gemini CLI "was replaced by Antigravity CLI on June 18th, 2026, for unpaid tier and Google One users". Antigravity CLI keeps its own files ([below](#antigravity-cli)).
 
 ### VS Code (GitHub Copilot)
 - **MCP:** the user profile's `mcp.json`, opened with "MCP: Open User Configuration"; servers there "are available across all your workspaces", and each profile has its own. Workspace: `.vscode/mcp.json`. Shape: `servers` (not `mcpServers`) → `{ "type": "stdio", "command", "args", "cwd", "env", "envFile" }`. From a terminal: `code --add-mcp "{\"name\":\"my-server\",\"command\":\"uvx\",\"args\":[\"mcp-server-fetch\"]}"` adds a server to the user profile. Sources: [VS Code MCP servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [MCP configuration reference](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration).
@@ -103,6 +104,12 @@ Every fact below was checked on **2026-10-14** against the source linked next to
 - **MCP:** `mcpServers` → `{ "command", "args", "env" }` in `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows); restart the app after a change. A server's stderr goes to `mcp-server-<name>.log` in `~/Library/Logs/Claude/` or `%APPDATA%\Claude\logs\`. Source: [Connect to local MCP servers](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
 - **Skills and hooks:** not documented for local use.
 
+### Antigravity CLI
+- Google's agent CLI (`agy`), which replaced Gemini CLI for unpaid tiers on 2026-06-18 (Gemini CLI, above). Read from its docs on 2026-10-14, not yet tried on a machine. `repomagpie setup` and `repomagpie doctor` don't know it yet ([roadmap](roadmap.md)).
+- **MCP:** `mcpServers` → `{ "command", "args", "env" }` in `~/.gemini/config/mcp_config.json` (global, shared with the Antigravity IDE) or `.agents/mcp_config.json` (workspace). No documented command to add one; `/mcp` shows the servers and reloads the file. Not `~/.gemini/settings.json`, which is Gemini CLI's. Source: [Antigravity MCP](https://antigravity.google/docs/mcp/). Each product keeps a cache of installed servers (`~/.gemini/antigravity-cli/mcp/` for the CLI), so a removed entry can stay listed until that folder is cleared: [Where does Antigravity look for MCP servers?](https://atamel.dev/posts/2026/07-10_where_agy_mcp_servers/) (a blog post by a Google developer advocate, 2026-07-10).
+- **Skills:** the CLI reads `~/.gemini/antigravity-cli/skills/<name>/`; the IDE reads `~/.gemini/config/skills/<name>/` (and the older `~/.gemini/antigravity/skills/`); both read a workspace's `.agents/skills/`. `~/.agents/skills/` isn't listed. Source: [Antigravity skills](https://antigravity.google/docs/skills).
+- **Hook:** global `~/.gemini/config/hooks.json`, workspace `.agents/hooks.json`. `PreToolUse` with the matcher `run_command` gets the command line and folder; it answers `decision` `allow`, `deny`, `ask`, `force_ask`, `auto_approve` or `deny_unless_prior_grant`, and `reason`, the only field that reaches the agent. Source: [Antigravity hooks](https://antigravity.google/docs/hooks).
+
 ## Who gets the shell's `PATH`
 
 An MCP server inherits the environment of the agent that starts it. What that environment holds depends on how the agent was opened, and only one agent documents it.
@@ -136,4 +143,5 @@ For the hook-adapters brief. "Ask" is what our Claude Code hook does on an avoid
 | Windsurf | `pre_run_command` | no | no | exit codes other than 2 proceed |
 | Cline | `beforeTool` (SDK plugins) | approval through `policy` | `appendContext` | not documented |
 | OpenCode | `tool.execute.before` (plugins) | no | no | not documented |
+| Antigravity CLI | `PreToolUse` | yes (`ask`, `force_ask`) | `reason` only | not documented |
 | Zed, Goose, Claude Desktop | none documented | | | |

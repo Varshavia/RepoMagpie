@@ -16,6 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `repomagpie catalog` lists every note in one row: name, kind, journal and the Verdict. It reads 100 notes at a time; the next page's command is on stderr. `--tag`, `--kind` and `--journal` filter it. Its `--json` is made for your coding agent to read your whole journal and pick what fits: one short row per note (name, kind, journal, whether you noted to avoid it, a one-line summary and the start of the Verdict), about 20,000 characters for 100 notes, with `next_cursor` for the next page. `--full --json` gives every field: id, tags, status, a longer summary and Verdict, and the names of its alternatives.
 
+### Changed
+
+- The agent skill tells the agent to use RepoMagpie's MCP tools when they are there, and the commands otherwise; and to read `repomagpie catalog` when search finds little in a small journal, since search matches words and "scraping websites" won't find a note that only says "crawler".
+- The README's install is now `npm install -g repomagpie`, then `repomagpie setup`. The hook and skill steps by hand moved to [setting up by hand](docs/setup-by-hand.md).
+
 ## [0.2.0-beta.3] - 2026-10-14
 
 The fourth pre-release: the command is `repomagpie`, note text written by other people is handled as data, GitHub topics become tags, and the first version built and staged on npm by GitHub Actions, with provenance.
