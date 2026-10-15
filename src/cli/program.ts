@@ -164,7 +164,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--dry-run", "show the plan; change nothing")
     .option("--agents <list>", "only these agents, comma-separated: claude-code, codex, cursor, gemini, vscode")
     .option("--remove", "remove RepoMagpie's entries instead")
-    .option("--allow-write", "the MCP server also serves the note tool (setup asks when it can)")
+    .option("--allow-write", "turn on the note tool in the entries (without this or --no-allow-write, each entry keeps its own; setup asks when it can)")
+    .option("--no-allow-write", "turn off the note tool in the entries")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./setup.ts")).setupCommand(command.optsWithGlobals<SetupOptions>(), io);
     });

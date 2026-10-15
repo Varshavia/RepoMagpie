@@ -8,6 +8,7 @@ import { onPath, type Platform } from "./agents.ts";
 import type { Env } from "./journals.ts";
 
 export const NO_CODEGEN = "--disallow-code-generation-from-strings";
+export const ALLOW_WRITE = "--allow-write"; // repomagpie mcp's flag for the note tool
 
 export interface LaunchRequest {
   execPath: string; // the node running setup
@@ -15,7 +16,6 @@ export interface LaunchRequest {
   env: Env;
   platform: Platform;
   tmp: string; // the OS temp folder
-  allowWrite: boolean;
   home?: string; // the personal journal, when it was chosen by --home or MAGPIE_HOME: the agent won't have either
 }
 
@@ -30,8 +30,15 @@ export function launchCommand(r: LaunchRequest): Launch {
   // after an upgrade; the versioned folder it resolves to doesn't.
   const real = realOf(r.execPath);
   const named = onPath("node", { home: "", env: r.env, platform: r.platform }).find((candidate) => realOf(candidate) === real && !temporary(candidate, r.tmp));
-  const args = [NO_CODEGEN, r.entry, "mcp", ...(r.allowWrite ? ["--allow-write"] : []), ...(r.home ? ["--home", r.home] : [])];
+  const args = [NO_CODEGEN, r.entry, "mcp", ...(r.home ? ["--home", r.home] : [])];
   return { command: named ?? r.execPath, args };
+}
+
+// The launch with the note tool on (--allow-write right after mcp) or off. Setup chooses it per entry.
+export function noteTool(launch: { command: string; args: string[] }, on: boolean): { command: string; args: string[] } {
+  const args = launch.args.filter((arg) => arg !== ALLOW_WRITE);
+  if (on) args.splice(args.indexOf("mcp") + 1, 0, ALLOW_WRITE);
+  return { command: launch.command, args };
 }
 
 // Why a path is temporary, or null: npx's cache, the OS temp folder, or fnm's per-shell folders.

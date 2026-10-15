@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { NO_CODEGEN } from "../core/launch.ts";
@@ -18,14 +18,18 @@ function box(env: Record<string, string> = {}) {
   return { ...b, self, over, cursor, entry: () => JSON.parse(readFileSync(cursor, "utf8")).mcpServers.repomagpie };
 }
 
-// A terminal that types `keys`, one burst per prompt, as each prompt opens.
-function terminal(...bursts: string[]): Terminal {
+// A terminal that types `keys`, one burst per prompt, as each prompt opens; `drawn()` is what the
+// prompts wrote.
+function terminal(...bursts: string[]): Terminal & { drawn: () => string } {
   const input = Object.assign(new PassThrough(), { isRaw: false, setRawMode(on: boolean) { input.isRaw = on; return input; } });
   const output = new PassThrough();
-  output.resume();
+  let text = "";
+  output.on("data", (chunk: Buffer) => { text += chunk.toString(); });
   input.on("resume", () => { const keys = bursts.shift(); if (keys !== undefined) setImmediate(() => input.write(keys)); });
-  return { input, output };
+  return { input, output, drawn: () => text };
 }
+
+const backups = (folder: string) => readdirSync(folder).filter((name) => name.includes(".repomagpie-backup-")).length;
 
 test("--dry-run shows the plan on stderr and changes nothing", async () => {
   const b = box();
@@ -77,6 +81,95 @@ test("in a terminal: choose the agents, answer the note-tool question, confirm; 
   const r = await magpie(b, ["setup"], { ...b.over, interactive: true, terminal: terminal("\r", "y", "\r") });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp", "--allow-write"]);
+});
+
+test("the note tool: a plain --yes keeps it as it is; --no-allow-write turns it off and --allow-write on, each after a backup", async () => {
+  const b = box();
+  const folder = join(b.home, ".cursor");
+  assert.equal((await magpie(b, ["setup", "--yes", "--allow-write"], b.over)).code, 0);
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp", "--allow-write"]);
+
+  const again = await magpie(b, ["setup", "--yes"], b.over);
+  assert.equal(again.code, 0, again.err);
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp", "--allow-write"], "still on");
+  assert.match(again.err, /^ {2}Cursor {8}already set up$/m);
+  assert.match(again.err, /^ {16}note tool: on$/m);
+  assert.equal(backups(folder), 0);
+
+  const off = await magpie(b, ["setup", "--yes", "--no-allow-write"], b.over);
+  assert.equal(off.code, 0, off.err);
+  assert.match(off.err, /^ {2}Cursor {8}update: edit ~[\\/]\.cursor[\\/]mcp\.json$/m);
+  assert.match(off.err, /^ {16}note tool: on → off$/m);
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp"]);
+  assert.equal(backups(folder), 1);
+
+  assert.equal((await magpie(b, ["setup", "--yes"], b.over)).code, 0);
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp"], "still off");
+  assert.equal(backups(folder), 1);
+
+  // --dry-run and --json show the same change, and write nothing.
+  const dry = await magpie(b, ["setup", "--dry-run", "--allow-write"], b.over);
+  assert.match(dry.err, /^ {16}note tool: off → on$/m);
+  const json = JSON.parse((await magpie(b, ["setup", "--dry-run", "--json", "--allow-write"], b.over)).out);
+  assert.equal(json.allow_write, true);
+  assert.deepEqual(json.agents.find((a: { id: string }) => a.id === "cursor").note_tool, { from: false, to: true });
+  assert.equal(JSON.parse((await magpie(b, ["setup", "--dry-run", "--json"], b.over)).out).allow_write, null, "neither flag: each entry keeps its own");
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp"]);
+
+  const write = await magpie(b, ["setup", "--yes", "--allow-write"], b.over);
+  assert.match(write.err, /^ {16}note tool: off → on$/m);
+  assert.deepEqual(b.entry().args, [NO_CODEGEN, b.self.entry, "mcp", "--allow-write"]);
+  assert.equal(backups(folder), 2);
+});
+
+test("the note tool, mixed: with neither flag Cursor's and Gemini CLI's entries each keep their own", async () => {
+  const b = box();
+  const gemini = join(b.home, ".gemini", "settings.json");
+  mkdirSync(join(b.home, ".gemini"));
+  const launch = { command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "mcp"] };
+  writeFileSync(b.cursor, JSON.stringify({ mcpServers: { repomagpie: { ...launch, args: [...launch.args, "--allow-write"] } } }));
+  writeFileSync(gemini, JSON.stringify({ mcpServers: { repomagpie: launch } }));
+  const r = await magpie(b, ["setup", "--yes"], b.over);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(b.entry().args, [...launch.args, "--allow-write"]);
+  assert.deepEqual(JSON.parse(readFileSync(gemini, "utf8")).mcpServers.repomagpie.args, launch.args);
+  assert.equal(backups(join(b.home, ".cursor")) + backups(join(b.home, ".gemini")), 0);
+});
+
+test("the note-tool question says what it is now; Enter keeps it on only when every entry has it on", async () => {
+  const launch = (b: ReturnType<typeof box>) => ({ command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "mcp"] });
+  const states: { name: string; cursor: boolean | null; gemini: boolean | null; asks: RegExp; after: [boolean, boolean] }[] = [
+    { name: "no entries", cursor: null, gemini: null, asks: /Now not set up in Cursor and Gemini CLI\. \(y\/N\)/, after: [false, false] },
+    { name: "both on", cursor: true, gemini: true, asks: /Now on in Cursor and Gemini CLI\. \(Y\/n\)/, after: [true, true] },
+    { name: "both off", cursor: false, gemini: false, asks: /Now off in Cursor and Gemini CLI\. \(y\/N\)/, after: [false, false] },
+    { name: "mixed", cursor: true, gemini: false, asks: /Now on in Cursor, off in Gemini CLI\. \(y\/N\)/, after: [false, false] },
+    { name: "one new, one on", cursor: true, gemini: null, asks: /Now on in Cursor, not set up in Gemini CLI\. \(Y\/n\)/, after: [true, true] },
+  ];
+  for (const state of states) {
+    const b = box();
+    const gemini = join(b.home, ".gemini", "settings.json");
+    mkdirSync(join(b.home, ".gemini"));
+    const entry = (on: boolean | null) => (on === null ? {} : { repomagpie: { ...launch(b), args: [...launch(b).args, ...(on ? ["--allow-write"] : [])] } });
+    writeFileSync(b.cursor, JSON.stringify({ mcpServers: entry(state.cursor) }));
+    writeFileSync(gemini, JSON.stringify({ mcpServers: entry(state.gemini) }));
+    const t = terminal("\r", "\r", "\r");
+    const r = await magpie(b, ["setup"], { ...b.over, interactive: true, terminal: t });
+    assert.equal(r.code, 0, r.err);
+    assert.match(t.drawn(), state.asks, state.name);
+    const on = (file: string) => JSON.parse(readFileSync(file, "utf8")).mcpServers.repomagpie.args.includes("--allow-write");
+    assert.deepEqual([on(b.cursor), on(gemini)], state.after, state.name);
+  }
+});
+
+test("in a terminal, --allow-write or --no-allow-write answers the note-tool question", async () => {
+  for (const [flag, on] of [["--allow-write", true], ["--no-allow-write", false]] as const) {
+    const b = box();
+    const t = terminal("\r", "\r");
+    const r = await magpie(b, ["setup", flag], { ...b.over, interactive: true, terminal: t });
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(t.drawn(), /note tool\?/);
+    assert.equal(b.entry().args.includes("--allow-write"), on, flag);
+  }
 });
 
 test("in a terminal, Ctrl+C or no agent chosen changes nothing", async () => {

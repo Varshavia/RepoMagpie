@@ -12,7 +12,7 @@ import { AGENTS, isInstalled, mcpEntry, onPath, readJsonc, type Agent, type McpE
 import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
-import type { Launch } from "./launch.ts";
+import { ALLOW_WRITE, noteTool, type Launch } from "./launch.ts";
 import { applyHook, planHook, type HookPlan, type HookTarget } from "./setup-hook.ts";
 import { applySkill, planSkill, type SkillPlan } from "./setup-skill.ts";
 
@@ -32,6 +32,9 @@ export interface AgentPlan {
   method: "cli" | "json" | null; // how an add, update or remove is made
   reason: string | null; // why manual, refused or skip
   current: { command: string | null; args: string[] } | null; // the entry there now
+  // The note tool (--allow-write) in the entry now (null: no entry yet) and after this run; null
+  // when the entry is removed or can't be planned.
+  note_tool: { from: boolean | null; to: boolean } | null;
   backup: string | null; // the backup an add, update or remove writes first
   snippet: string | null; // for manual: what to paste, or the command to run
   result?: "done" | "failed"; // after applying
@@ -41,7 +44,7 @@ export interface AgentPlan {
 export interface SetupPlan {
   remove: boolean;
   project: string | null; // --project: where the skill and the hook go
-  launch: { command: string; args: string[] } | null;
+  launch: { command: string; args: string[] } | null; // the entry a new agent gets
   launch_error: string | null;
   agents: AgentPlan[]; // the MCP entries, always in the user's settings
   skill: SkillPlan | null; // when any agent is set up
@@ -51,6 +54,9 @@ export interface SetupPlan {
 export interface SetupRequest {
   where: Where;
   launch: Launch;
+  // --allow-write (true), --no-allow-write (false) or the user's answer; left out, each entry keeps
+  // its own and a new one starts without the note tool.
+  noteTool?: boolean;
   remove: boolean;
   only?: Agent["id"][]; // --agents; default: every installed agent
   stamp: string; // for backup names: YYYYMMDD-HHMMSS
@@ -69,12 +75,12 @@ const CLI: Record<Agent["id"], { add?: (l: { command: string; args: string[] }) 
 
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
-  const launch = "error" in request.launch ? null : request.launch;
+  const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
   const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null };
   for (const agent of AGENTS) {
     const installed = isInstalled(agent, where);
     const file = agent.mcpFile(where);
-    const base: AgentPlan = { id: agent.id, name: agent.name, installed, file, action: "skip", method: null, reason: null, current: null, backup: null, snippet: null };
+    const base: AgentPlan = { id: agent.id, name: agent.name, installed, file, action: "skip", method: null, reason: null, current: null, note_tool: null, backup: null, snippet: null };
     if (request.only ? !request.only.includes(agent.id) : !installed) {
       if (!request.only) plan.agents.push({ ...base, reason: "not installed" });
       continue;
@@ -138,13 +144,18 @@ function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch:
   }
 
   if (!launch) return { ...withCurrent, action: "refused", backup: null, reason: "this copy of RepoMagpie can't be started by an agent (see above)" };
-  if (entry && same(entry, launch)) return { ...withCurrent, action: "keep", backup: null };
+  // The note tool: as asked, else as the entry has it now; a new entry starts without it.
+  const from = entry ? entry.args.includes(ALLOW_WRITE) : null;
+  const tool = { from, to: request.noteTool ?? from ?? false };
+  const wanted = noteTool(launch, tool.to);
+  const planned = { ...withCurrent, note_tool: tool };
+  if (entry && same(entry, wanted)) return { ...planned, action: "keep", backup: null };
   const action: Action = current ? "update" : "add";
   // An update through a CLI needs it to remove the old entry first.
-  if (cli && how.add && (!current || how.remove)) return { ...withCurrent, action, method: "cli" };
-  if ("error" in read) return { ...withCurrent, action: "refused", backup: null, reason: `${base.file} can't be read: ${read.error}`, snippet: snippet(agent, launch) };
-  if (how.edit && plain) return { ...withCurrent, action, method: "json" };
-  return { ...withCurrent, action: "manual", backup: null, reason: manualReason(agent, cli, plain), snippet: snippet(agent, launch) };
+  if (cli && how.add && (!current || how.remove)) return { ...planned, action, method: "cli" };
+  if ("error" in read) return { ...planned, action: "refused", backup: null, reason: `${base.file} can't be read: ${read.error}`, snippet: snippet(agent, wanted) };
+  if (how.edit && plain) return { ...planned, action, method: "json" };
+  return { ...planned, action: "manual", backup: null, reason: manualReason(agent, cli, plain), snippet: snippet(agent, wanted) };
 }
 
 export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
@@ -160,7 +171,7 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
     } catch (error) {
       return fail(`Couldn't write the backup ${p.backup}: ${(error as Error).message}`);
     }
-    const wanted = p.action === "remove" ? null : plan.launch;
+    const wanted = p.action === "remove" || !plan.launch ? null : noteTool(plan.launch, p.note_tool?.to ?? false);
     if (p.method === "cli") {
       const cli = onPath(agent.cli, where)[0];
       const how = CLI[agent.id];

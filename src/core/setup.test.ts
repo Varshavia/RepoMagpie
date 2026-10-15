@@ -100,6 +100,48 @@ test("idempotent: a second run plans keep everywhere, calls no CLI and writes no
   assert.deepEqual(snapshot(s.root), before);
 });
 
+// The note tool (--allow-write): a choice the user made stays until they make another.
+test("the note tool: without a choice each entry keeps its own, a new one starts off; on and off change only what differs", () => {
+  const s = scratch(["gemini", "vscode"]);
+  const on = { command: s.launch.command, args: [...s.launch.args, "--allow-write"] };
+  s.write(s.files.cursor, JSON.stringify({ mcpServers: { repomagpie: on } }, null, 2));
+  s.write(s.files.gemini, JSON.stringify({ mcpServers: { repomagpie: s.launch } }, null, 2));
+  const tools = (plan: ReturnType<typeof planSetup>) => plan.agents.filter((a) => a.installed).map((a) => [a.id, a.action, a.note_tool]);
+
+  // No choice: Cursor stays on, Gemini CLI stays off, VS Code's new entry starts off. Only VS Code is written.
+  const kept = planSetup(s.request());
+  assert.deepEqual(tools(kept), [["cursor", "keep", { from: true, to: true }], ["gemini", "keep", { from: false, to: false }], ["vscode", "add", { from: null, to: false }]]);
+  assert.deepEqual(kept.launch, s.launch, "the entry a new agent gets: without --allow-write");
+  const before = snapshot(join(s.home, ".cursor"));
+  applySetup(kept, s.request());
+  assert.deepEqual(snapshot(join(s.home, ".cursor")), before, "no backup, no change");
+  assert.deepEqual(s.calls().map((c) => c.agent), ["code"]);
+  assert.deepEqual(JSON.parse(readFileSync(s.vscodeMcp, "utf8")).servers.repomagpie.args, s.launch.args);
+
+  // Off: only Cursor's entry changes, after a backup.
+  const off = planSetup(s.request({ noteTool: false, stamp: "20261014-130000" }));
+  assert.deepEqual(tools(off), [["cursor", "update", { from: true, to: false }], ["gemini", "keep", { from: false, to: false }], ["vscode", "keep", { from: false, to: false }]]);
+  applySetup(off, s.request({ noteTool: false, stamp: "20261014-130000" }));
+  assert.deepEqual(JSON.parse(readFileSync(s.files.cursor, "utf8")).mcpServers.repomagpie, s.launch);
+  assert.ok(existsSync(`${s.files.cursor}.repomagpie-backup-20261014-130000`));
+
+  // On: every entry, --allow-write right after mcp.
+  const all = planSetup(s.request({ noteTool: true, stamp: "20261014-140000" }));
+  assert.deepEqual(tools(all).map(([id, action]) => [id, action]), [["cursor", "update"], ["gemini", "update"], ["vscode", "update"]]);
+  assert.deepEqual(all.launch, on);
+  const done = applySetup(all, s.request({ noteTool: true, stamp: "20261014-140000" }));
+  assert.ok(done.agents.filter((a) => a.installed).every((a) => a.result === "done"), JSON.stringify(done.agents.map((a) => a.error)));
+  assert.deepEqual(JSON.parse(readFileSync(s.files.cursor, "utf8")).mcpServers.repomagpie, on);
+  assert.deepEqual(JSON.parse(readFileSync(s.files.gemini, "utf8")).mcpServers.repomagpie.args, on.args);
+  assert.deepEqual(s.calls().at(-1), { agent: "gemini", args: ["mcp", "add", "--scope", "user", "repomagpie", "--", on.command, ...on.args] });
+  assert.deepEqual(JSON.parse(readFileSync(s.vscodeMcp, "utf8")).servers.repomagpie.args, on.args, "VS Code's CLI can't remove: its file is edited");
+
+  // A snippet to paste names the same choice: Codex without its CLI, an entry that has the note tool on.
+  s.write(s.files.codex, `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(s.launch.command)}\nargs = ${JSON.stringify(on.args)}\n`);
+  assert.deepEqual(planSetup(s.request()).agents.find((a) => a.id === "codex")?.note_tool, { from: true, to: true });
+  assert.deepEqual(planSetup(s.request({ remove: true })).agents.filter((a) => a.installed).map((a) => a.note_tool), [null, null, null, null], "--remove has no note-tool choice");
+});
+
 test("an existing file is backed up first; its other keys stay byte for byte", () => {
   const s = scratch(["gemini"]);
   const cursor = '{\n\t"mcpServers": {\n\t\t"other": { "command": "x" }\n\t},\n\t"z": 1\n}\n';

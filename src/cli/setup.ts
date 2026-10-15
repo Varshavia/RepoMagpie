@@ -20,7 +20,7 @@ export interface SetupOptions extends GlobalOptions {
   dryRun?: boolean;
   agents?: string;
   remove?: boolean;
-  allowWrite?: boolean;
+  allowWrite?: boolean; // --allow-write (true), --no-allow-write (false), neither (undefined)
 }
 
 export async function setupCommand(options: SetupOptions, io: Io): Promise<number> {
@@ -49,16 +49,18 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   // chosen by either goes into the entry.
   const journal = options.home || io.env.MAGPIE_HOME ? resolvePersonalJournal({ home: io.home, env: io.env, cwd: io.cwd, flag: options.home }).path : undefined;
   const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
-  const request = (allowWrite: boolean, only?: Agent["id"][]): SetupRequest => ({
+  const request = (noteTool: boolean | undefined, only?: Agent["id"][]): SetupRequest => ({
     where: { home: io.home, env: io.env, platform },
-    launch: launchCommand({ execPath: self.execPath, entry: self.entry, env: io.env, platform, tmp: tmpdir(), allowWrite, home: journal }),
+    launch: launchCommand({ execPath: self.execPath, entry: self.entry, env: io.env, platform, tmp: tmpdir(), home: journal }),
+    noteTool,
     remove: Boolean(options.remove),
     only,
     stamp,
     project,
   });
 
-  let allowWrite = Boolean(options.allowWrite);
+  // The note tool changes only with a flag or an answer; otherwise each entry keeps its own.
+  let allowWrite = options.allowWrite;
   let only = ids as Agent["id"][] | undefined;
   let plan = planSetup(request(allowWrite, only));
   if (ask) {
@@ -71,8 +73,11 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
     const picked = await multiSelect(terminal, options.remove ? "Remove RepoMagpie from these agents?" : "Set up RepoMagpie's MCP server in these agents?", candidates.map((a) => ({ label: a.name })));
     if (picked === null || !picked.length) return cancelled(io);
     only = picked.map((i) => candidates[i].id);
-    if (!options.remove && !options.allowWrite) {
-      const write = await confirm(terminal, "Also let agents record your Verdicts with the note tool? It writes to your journal, only with your words.", false);
+    if (!options.remove && allowWrite === undefined) {
+      // The default is the state now: yes only when every chosen agent with an entry has it on.
+      const chosen = candidates.filter((a) => only?.includes(a.id));
+      const now = chosen.filter((a) => a.note_tool && a.note_tool.from !== null);
+      const write = await confirm(terminal, `Let agents record your Verdicts with the note tool? It writes to your journal, only with your words. Now ${noteToolNow(chosen)}.`, now.length > 0 && now.every((a) => a.note_tool?.from));
       if (write === null) return cancelled(io);
       allowWrite = write;
     }
@@ -84,7 +89,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   } else if (!options.json) io.err(render(plan, io.home));
 
   const done = options.dryRun ? plan : applySetup(plan, request(allowWrite, only));
-  if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite, ...done }))}\n`);
+  if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite ?? null, ...done }))}\n`);
   else if (!options.dryRun) io.err(summary(done, io.home));
   else io.err("Dry run: nothing changed.\n");
   const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" ||
@@ -101,6 +106,18 @@ function cancelled(io: Io): number {
   io.err("Cancelled. Nothing changed.\n");
   return 0;
 }
+
+// The note tool in the chosen agents now: "on in Cursor, off in Gemini CLI, not set up in VS Code".
+function noteToolNow(agents: AgentPlan[]): string {
+  const names = (state: boolean | null) => {
+    const list = agents.filter((a) => (a.note_tool?.from ?? null) === state).map((a) => a.name);
+    return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : list[0];
+  };
+  return ([[true, "on in"], [false, "off in"], [null, "not set up in"]] as const)
+    .flatMap(([state, words]) => (names(state) ? [`${words} ${names(state)}`] : [])).join(", ");
+}
+
+const onOff = (on: boolean) => (on ? "on" : "off");
 
 const WHAT: Record<AgentPlan["action"], string> = {
   add: "add", update: "update", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't", skip: "skip",
@@ -120,6 +137,10 @@ export function render(plan: SetupPlan, home: string): string {
     }
     const how = a.method === "cli" ? `through the ${AGENTS.find((x) => x.id === a.id)?.cli} command, in ${tilde(a.file)}` : a.method === "json" ? `edit ${tilde(a.file)}` : "";
     lines.push(`  ${a.name.padEnd(12)}  ${WHAT[a.action]}${how ? `: ${how}` : ""}${a.reason ? `: ${a.reason}` : ""}`);
+    // The note tool when it changes, or when it is on.
+    const tool = a.note_tool;
+    if (tool && tool.from !== null && tool.from !== tool.to) lines.push(`                note tool: ${onOff(tool.from)} → ${onOff(tool.to)}`);
+    else if (tool?.to) lines.push("                note tool: on");
     if (a.action === "update" && a.current) lines.push(`                it now starts: ${[a.current.command ?? "(no command)", ...a.current.args].join(" ")}`);
     if (a.backup) lines.push(`                backup first: ${tilde(a.backup)}`);
     if (a.snippet) lines.push(`                ${a.action === "manual" && !plan.remove ? `paste into ${tilde(a.file)}:` : ""}`.trimEnd(), ...a.snippet.split("\n").map((line) => `                  ${line}`));
