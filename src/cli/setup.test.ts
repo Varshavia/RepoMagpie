@@ -211,9 +211,14 @@ test("run from npx's cache: the plan says why and how to install, nothing is wri
 test("--remove takes out only our entry, after a backup", async () => {
   const b = box();
   writeFileSync(b.cursor, '{\n  "mcpServers": {\n    "other": { "command": "x" }\n  }\n}\n');
-  await magpie(b, ["setup", "--yes"], b.over);
+  const added = await magpie(b, ["setup", "--yes"], b.over);
+  // After a run that wrote a backup: how many there are now, beside that file.
+  assert.match(added.err, /^~[\\/]\.cursor[\\/]mcp\.json now has 1 backup from setup; repomagpie doctor lists them\.$/m);
   const r = await magpie(b, ["setup", "--remove", "--yes"], b.over);
   assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /^~[\\/]\.cursor[\\/]mcp\.json now has 2 backups from setup; repomagpie doctor lists them\.$/m);
+  assert.equal(r.err.match(/ now has /g)?.length, 1, "the skill's removal writes no backup");
+  assert.doesNotMatch((await magpie(b, ["setup", "--remove", "--yes"], b.over)).err, / now has /, "no backup written, no count");
   assert.equal(readFileSync(b.cursor, "utf8"), '{\n  "mcpServers": {\n    "other": { "command": "x" }\n  }\n}\n');
   assert.match(r.err, /^Done: Cursor, removed \(backup: ~[\\/]\.cursor[\\/]mcp\.json\.repomagpie-backup-\d{8}-\d{6}Z(-\d+)?\)\.$/m);
   // The stamp is UTC, and its Z says so.

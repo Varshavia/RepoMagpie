@@ -1,10 +1,11 @@
 // repomagpie setup (decision 0035): detect the agents, show a plan, ask, apply, then a summary.
 // This part sets up the MCP server in each agent; the skill and the Claude Code hook come next.
 // Under --json, or without a terminal, it never asks: --yes applies, --dry-run only shows.
-import { realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { AGENTS, type Agent, type Platform } from "../core/agents.ts";
+import { backedUp, backupsOf } from "../core/config-write.ts";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { launchCommand } from "../core/launch.ts";
 import { applySetup, planSetup, type AgentPlan, type SetupPlan, type SetupRequest } from "../core/setup.ts";
@@ -91,7 +92,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
 
   const done = options.dryRun ? plan : applySetup(plan, request(allowWrite, only));
   if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite ?? null, ...done }))}\n`);
-  else if (!options.dryRun) io.err(summary(done, io.home));
+  else if (!options.dryRun) io.err(summary(done, io.home, backupCounts(done, io.home, project)));
   else io.err("Dry run: nothing changed.\n");
   const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" ||
     (!options.remove && done.launch_error !== null && done.agents.some((a) => a.installed));
@@ -170,7 +171,18 @@ const HOOK_WHAT: Record<HookPlan["action"], string> = {
   add: "add the hook", migrate: "update the hook entry", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
 };
 
-function summary(plan: SetupPlan, home: string): string {
+// For each file this run backed up, how many of setup's backups it has now (they are never deleted
+// for the user: the first is the file as it was before setup).
+function backupCounts(plan: SetupPlan, home: string, project: string | undefined): { label: string; count: number }[] {
+  const written: { label: string; backup: string | null; root: string }[] = [
+    ...plan.agents.filter((a) => a.result === "done").map((a) => ({ label: a.file, backup: a.backup, root: home })),
+    ...(plan.hook?.result === "done" ? [{ label: plan.hook.file, backup: plan.hook.backup, root: project ?? home }] : []),
+    ...(plan.skill?.result === "done" ? [plan.skill.shared, plan.skill.claude].flatMap((item) => (item ? [{ label: item.path, backup: item.backup, root: project ?? home }] : [])) : []),
+  ];
+  return written.flatMap(({ label, backup, root }) => (backup && existsSync(backup) ? [{ label, count: backupsOf(backedUp(backup), root).length }] : []));
+}
+
+function summary(plan: SetupPlan, home: string, backups: { label: string; count: number }[]): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
   const lines = plan.agents.filter((a) => a.result).map((a) =>
     a.result === "done" ? `Done: ${a.name}, ${a.action === "add" ? "added" : a.action === "update" ? "updated" : "removed"}${a.backup ? ` (backup: ${tilde(a.backup)})` : ""}.` : `Failed: ${a.name}: ${a.error}`);
@@ -180,6 +192,7 @@ function summary(plan: SetupPlan, home: string): string {
   }
   if (plan.hook?.result) lines.push(plan.hook.result === "done" ? `Done: the Claude Code hook, ${HOOK_WHAT[plan.hook.action]}${plan.hook.backup ? ` (backup: ${tilde(plan.hook.backup)})` : ""}.` : `Failed: the Claude Code hook: ${plan.hook.error}`);
   if (!lines.length) lines.push("Nothing to change.");
+  for (const b of backups) lines.push(`${tilde(b.label)} now has ${b.count} ${b.count === 1 ? "backup" : "backups"} from setup; repomagpie doctor lists them.`);
   if (plan.launch_error && !plan.remove) lines.push("No MCP entry was written.");
   const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done";
   if (changed) lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");
