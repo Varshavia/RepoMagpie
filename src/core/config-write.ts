@@ -1,8 +1,8 @@
 // Writing other tools' files for repomagpie setup (decision 0035, "Safety"): never through a link,
 // never outside the folder setup may write in (the home folder, or the project with --project), a
 // backup first, and a write that is whole or not at all. Never prints.
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 // Why `path` can't be written: a link on its way down from `root` (decision 0032, rule 5), the path
 // itself a link unless `linkAllowed`, or a place outside `root`. null when it can.
@@ -60,3 +60,31 @@ export function backupName(path: string, stamp: string): string {
   for (let n = 2; existsSync(name); n++) name = `${path}.repomagpie-backup-${stamp}-${n}`;
   return name;
 }
+
+const BACKUP = ".repomagpie-backup-";
+// The stamp is UTC; it ends in Z since 2026-10-15, and names from before have none.
+const STAMP = /^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)Z?(?:-\d+)?$/;
+
+// The backups setup made of `path`, oldest first, with the date in their name (a copy can keep the
+// file's own modified time). Found from the folder's listing only: a backup is never opened or
+// statted, one that is a link is left out, and so is every backup in a folder reached through a link.
+export function backupsOf(path: string, home: string): { path: string; date: string }[] {
+  const folder = dirname(path);
+  if (resolve(folder) !== resolve(home) && pathProblem(folder, home)) return [];
+  let entries;
+  try {
+    entries = readdirSync(folder, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const prefix = `${basename(path)}${BACKUP}`;
+  return entries.flatMap((entry) => {
+    const stamp = entry.name.startsWith(prefix) && !entry.isSymbolicLink() ? STAMP.exec(entry.name.slice(prefix.length)) : null;
+    if (!stamp) return [];
+    const [, y, mo, d, h, mi, s] = stamp;
+    return [{ path: join(folder, entry.name), date: `${y}-${mo}-${d}T${h}:${mi}:${s}Z` }];
+  }).sort((a, b) => a.date.localeCompare(b.date) || a.path.localeCompare(b.path));
+}
+
+// The file a backup is of: the backup's path without its suffix.
+export const backedUp = (backup: string) => backup.slice(0, backup.lastIndexOf(BACKUP));
