@@ -5,7 +5,8 @@
 // `updatedInput`. Shell commands only: Codex sends `tool_input.command` for apply_patch too.
 // Returns null when there is nothing to say; the caller prints the result and always exits 0.
 import { isRecord } from "../core/note-cache.ts";
-import { agentContext, denyReason, parseInput, recallFor, retryAnswer, stoppedLine, userMessage, type HookContext, type Limits } from "./core.ts";
+import { agentContext, parseInput, recallFor, userMessage, type HookContext, type Limits } from "./core.ts";
+import { denyReason, retryAnswer, stoppedLine } from "./deny.ts";
 
 // Codex limits each model-visible hook message to "roughly 2,500 tokens" and gives the model only a
 // preview of a longer one. Note text with markers can take a token for every two characters.

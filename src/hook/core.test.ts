@@ -4,7 +4,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scratchBase } from "../core/fixtures/scratch.ts";
 import { renderNote, type NewNote } from "../core/write.ts";
-import { parseInput, recallFor, retryAnswer, type HookContext } from "./core.ts";
+import { parseInput, recallFor, type HookContext } from "./core.ts";
+import { retryAnswer } from "./deny.ts";
 import { RETRY_WINDOW, retryFile } from "./retry.ts";
 
 // The agent-neutral core (decision 0036): which installs an avoid note stops, and the deny-once

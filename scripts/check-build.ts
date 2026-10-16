@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HOOK_AGENTS } from "../src/hook/agents.ts";
 
 const built = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 const source = fileURLToPath(new URL("../src/cli/main.ts", import.meta.url));
@@ -68,6 +69,7 @@ try {
     if (!same) console.log(`  built (exit ${b.status}): ${b.stdout.slice(0, 200)}${b.stderr.slice(0, 200)}\n  source (exit ${s.status}): ${s.stdout.slice(0, 200)}`);
   }
   failed += checkInlinedLicenses();
+  failed += checkHookChunks();
   failed += checkPackage(join(root, "pack"));
 } finally {
   rmSync(root, { recursive: true, force: true });
@@ -135,6 +137,33 @@ function checkInlinedLicenses(): number {
   const stale = listed.filter((entry) => !inlined.has(entry));
   return report(sdkFiles.size > 0 && !missing.length && !stale.length, `a licence notice for each library the MCP SDK inlines in the bundle (${inlined.size})`,
     [...missing.map((e) => `missing: ${e}`), ...stale.map((e) => `not bundled any more: ${e}`)].join("\n  ") || "no SDK file found in the bundle");
+}
+
+// Each hook adapter is its own chunk (src/hook/<agent>.ts → <agent>-<hash>.js), and what it loads
+// statically holds no other adapter: hook claude-code never loads the others, nor the retry record
+// (decision 0036). The command's own chunk loads the adapters only on demand.
+function checkHookChunks(): number {
+  const dist = fileURLToPath(new URL("../dist/cli/", import.meta.url));
+  const files = readdirSync(dist).filter((file) => file.endsWith(".js"));
+  const chunkOf = (agent: string) => files.find((file) => new RegExp(`^${agent}-[\\w-]{8}\\.js$`).test(file));
+  const loads = (file: string, seen = new Set<string>()): Set<string> => {
+    if (seen.has(file)) return seen;
+    seen.add(file);
+    for (const m of readFileSync(join(dist, file), "utf8").matchAll(/^(?:import|export)\b[^;]*?\bfrom "\.\/([\w.-]+\.js)"/gm)) loads(m[1], seen);
+    return seen;
+  };
+  const problems: string[] = [];
+  for (const agent of HOOK_AGENTS) {
+    const chunk = chunkOf(agent);
+    if (!chunk) {
+      problems.push(`no chunk for ${agent}`);
+      continue;
+    }
+    const graph = loads(chunk);
+    for (const other of HOOK_AGENTS.filter((a) => a !== agent)) if (graph.has(chunkOf(other) ?? "")) problems.push(`${agent} loads ${other}`);
+    if (agent === "claude-code" && [...graph].some((file) => readFileSync(join(dist, file), "utf8").includes("hook-retry.json"))) problems.push("claude-code loads the retry record");
+  }
+  return report(!problems.length, `each hook adapter is its own chunk and loads no other (${HOOK_AGENTS.join(", ")})`, problems.join("\n  "));
 }
 
 function report(ok: boolean, what: string, output: string): number {

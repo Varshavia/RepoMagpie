@@ -4,10 +4,9 @@
 // and labelled with who wrote it, cleaned and capped.
 import { sep } from "node:path";
 import { detectInstalls, type Install } from "../core/install-detect.ts";
-import { resolvePersonalJournal, type Env } from "../core/journals.ts";
+import type { Env } from "../core/journals.ts";
 import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { CAPS, clean, cut, nameConcern, quote } from "../core/text.ts";
-import { retryDecision, retryKey } from "./retry.ts";
 
 export interface HookContext {
   env: Env;
@@ -90,41 +89,16 @@ export const userMessage = (r: Recalled, limits = CLAUDE_CODE): string =>
 // For a permission prompt: the avoid notes first, each saying who says to avoid it, then the rest.
 export const askReason = (r: Recalled, limits = CLAUDE_CODE): string => withUnchecked(r, reasonBlocks(r, limits), "\n\n");
 
-const reasonBlocks = (r: Recalled, limits: Limits) =>
+// The prompt's blocks, for the deny reason too (deny.ts).
+export const reasonBlocks = (r: Recalled, limits: Limits) =>
   pack([...r.avoid, ...r.matches.filter((m) => !r.avoid.includes(m))].map((m) => ({ name: packageName(m), text: reasonBlock(m, r.avoid.includes(m), r) })), "\n\n", limits);
 
-// For the agent, when a hook that can't ask denies the first try (decision 0036): the notes as in a
-// prompt, then the hook's own advice, which always fits.
-export function denyReason(r: Recalled, limits: Limits): string {
-  const several = r.stopped.length > 1;
-  const advice = `RepoMagpie: this install was stopped once. Show the user ${r.avoid.length > 1 ? "these notes" : "this note"} and ask whether to install anyway or use an alternative; ` +
-    `don't install ${several ? "them" : "it"} again without the user's OK. If the user says to go ahead, install the same ${several ? "packages" : "package"} again within 10 minutes: ` +
-    `RepoMagpie lets ${several ? "them" : "it"} through until then.`;
-  const tail = [r.unchecked, advice].filter(Boolean).join("\n\n");
-  return `${reasonBlocks(r, { pack: limits.pack, cap: limits.cap - tail.length - 2 })}\n\n${tail}`;
-}
-
-// For the user, when the first try is denied: what was stopped and who says to avoid it.
-export function stoppedLine(r: Recalled): string {
-  const names = shortList(r.stopped.map((install) => cut(clean(install.name), CAPS.name)));
-  const why = shortList(r.avoid.map((m) => (personal(m) ? `you noted to avoid ${packageName(m)}` : `this project's journal says to avoid ${packageName(m)}`)), "; ");
-  return `RepoMagpie: stopped installing ${names}: ${why}. Your agent should ask you; the same install goes through for the next 10 minutes.`;
-}
-
-const shortList = (items: string[], separator = ", ") =>
+// At most MORE_NAMES items, then "+N more".
+export const shortList = (items: string[], separator = ", ") =>
   [...items.slice(0, MORE_NAMES), ...(items.length > MORE_NAMES ? [`+${items.length - MORE_NAMES} more`] : [])].join(separator);
 
-// Where the agent can't ask (decision 0036): "deny" the first try of an install an avoid note is
-// on, and record it; "inform" for the same install until 10 minutes after that deny, and when the
-// retry record can't be read or written (a deny without a record would stop the retry too).
-export function retryAnswer(r: Recalled, agent: string, ctx: HookContext, now = Date.now()): "deny" | "inform" {
-  if (!r.avoid.length) return "inform";
-  const journal = resolvePersonalJournal({ home: ctx.home, env: ctx.env, cwd: ctx.cwd, flag: ctx.homeFlag }).path;
-  return retryDecision(journal, retryKey(agent, r.cwd, r.stopped), now) === "deny" ? "deny" : "inform";
-}
-
 // The package being installed, as the command named it: not note text.
-const packageName = (m: RecallMatch) => cut(clean(m.query), CAPS.name);
+export const packageName = (m: RecallMatch) => cut(clean(m.query), CAPS.name);
 const notePath = (m: RecallMatch, { home }: { home: string }) =>
   cut(clean(home && m.path.startsWith(home + sep) ? `~${m.path.slice(home.length)}` : m.path), HOOK_CAPS.path);
 const quoted = (text: string, limit: number) => quote(cut(clean(text), limit));
@@ -132,7 +106,7 @@ const verdictOf = (m: RecallMatch) => (m.verdict === null ? null : quoted(m.verd
 const avoidWhenOf = (m: RecallMatch) => (m.avoid_when.length ? quoted(m.avoid_when.join("; "), HOOK_CAPS.avoidWhen) : null);
 // Alternatives (decision 0029): exact matches only; they add text and never change the decision.
 const alternatives = (m: RecallMatch) => (m.confidence === "exact" ? m.alternatives : []);
-const personal = (m: RecallMatch) => m.journal === "personal";
+export const personal = (m: RecallMatch) => m.journal === "personal";
 
 // One match for the agent (decision 0032, rules 3 and 4): who wrote the note, then its text quoted.
 function contextLine(m: RecallMatch, texts: { home: string }): string {

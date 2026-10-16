@@ -6,8 +6,6 @@ import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { journalPathProblem, takeSkipped } from "../core/note-cache.ts";
-import { hookOutput } from "../hook/claude-code.ts";
-import { codexOutput } from "../hook/codex.ts";
 import type { HookAgent } from "../hook/agents.ts";
 import type { HookContext } from "../hook/core.ts";
 import type { GlobalOptions } from "./context.ts";
@@ -17,15 +15,19 @@ export interface HookOptions extends GlobalOptions {
   informOnly?: boolean;
 }
 
-const ADAPTERS: Record<HookAgent, (input: string, ctx: HookContext) => string | null> = {
-  "claude-code": hookOutput,
-  codex: codexOutput,
+// Each adapter is its own chunk, loaded only by its subcommand: hook claude-code never loads the
+// others, nor the retry record they share.
+type Adapter = (input: string, ctx: HookContext) => string | null;
+const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
+  "claude-code": async () => (await import("../hook/claude-code.ts")).hookOutput,
+  codex: async () => (await import("../hook/codex.ts")).codexOutput,
 };
 
 export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {
   try {
     const input = io.stdin ? await io.stdin() : "";
-    const out = ADAPTERS[agent](input, {
+    const adapter = await ADAPTERS[agent]();
+    const out = adapter(input, {
       env: io.env,
       home: io.home,
       cwd: io.cwd,
