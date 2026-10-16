@@ -173,7 +173,7 @@ That is why `setup` writes the absolute `node` and the absolute entry file, neve
 
 ## Hooks: what an adapter could do
 
-"Ask" is what our Claude Code hook does on an avoid note ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)); "context on allow" is how the other notes reach the agent. Where an agent can't ask, or not reliably (Copilot CLI among them, after the pre-check), the adapter denies the first try and lets the same install through for the next 10 minutes ([decision 0036](decisions/0036-hooks-in-other-agents.md)). Rows for the five agents of that decision checked 2026-10-15 (sections above), in the docs and source and then on Windows in the pre-check (below), except Gemini CLI.
+"Ask" is what our Claude Code hook does on an avoid note ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)); "context on allow" is how the other notes reach the agent. Where an agent can't ask, or not reliably (Copilot CLI among them, after the pre-check), the adapter denies the first try and lets the same install through for the next 10 minutes ([decision 0036](decisions/0036-hooks-in-other-agents.md)). Gemini CLI asks: its source supports `ask` (checked 2026-10-16). Rows for the five agents of that decision checked 2026-10-15 (sections above), in the docs and source and then on Windows in the pre-check (below), except Gemini CLI.
 
 | Agent | Event | Ask | Context on allow | On a non-zero exit, a crash or bad output | Shell on Windows |
 |---|---|---|---|---|---|
