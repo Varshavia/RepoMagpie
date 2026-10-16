@@ -28,12 +28,18 @@ export interface Recalled {
   home: string;
 }
 
-const CAP = 10_000; // Claude Code's limit for additionalContext and systemMessage
+// A field's size: whole matches while it stays within `pack` characters, then one line names at
+// most MORE_NAMES of the rest; `cap` is the last guard. Claude Code's limit for additionalContext
+// and systemMessage is 10,000, so its worst case stays under 9,500. An agent with a lower limit
+// passes its own.
+export interface Limits {
+  pack: number;
+  cap: number;
+}
+const CLAUDE_CODE: Limits = { pack: 8_000, cap: 10_000 };
 // The hook's own caps (decision 0032, rule 2), so one match's text stays under about 3,300
-// characters; a field holds whole matches up to PACK, then one line names at most MORE_NAMES of the
-// rest. The worst case stays under 9,500.
+// characters.
 const HOOK_CAPS = { verdict: 500, avoidWhen: 500, alternativeVerdict: 150, path: 300 };
-const PACK = 8_000;
 const MORE_NAMES = 5;
 // The packages one command may have looked up. Real installs name a few; a command of 100,000 names
 // (1.8 MB) took 17 s on a 2,000-note journal, while the agent waits. The rest are named as unchecked.
@@ -74,18 +80,39 @@ export function recallFor(command: string, folder: string | null, ctx: HookConte
 const withUnchecked = (r: Recalled, text: string, separator: string) => [text, r.unchecked].filter(Boolean).join(separator);
 
 // For the agent: one line per match.
-export const agentContext = (r: Recalled): string =>
-  withUnchecked(r, pack(r.matches.map((m) => ({ name: packageName(m), text: contextLine(m, r) })), "\n"), "\n");
+export const agentContext = (r: Recalled, limits = CLAUDE_CODE): string =>
+  withUnchecked(r, pack(r.matches.map((m) => ({ name: packageName(m), text: contextLine(m, r) })), "\n", limits), "\n");
 
 // For the user: one short line per match.
-export const userMessage = (r: Recalled): string =>
-  withUnchecked(r, pack(r.matches.map((m) => ({ name: packageName(m), text: message(m) })), "\n"), "\n");
+export const userMessage = (r: Recalled, limits = CLAUDE_CODE): string =>
+  withUnchecked(r, pack(r.matches.map((m) => ({ name: packageName(m), text: message(m) })), "\n", limits), "\n");
 
 // For a permission prompt: the avoid notes first, each saying who says to avoid it, then the rest.
-export function askReason(r: Recalled): string {
-  const ordered = [...r.avoid, ...r.matches.filter((m) => !r.avoid.includes(m))];
-  return withUnchecked(r, pack(ordered.map((m) => ({ name: packageName(m), text: reasonBlock(m, r.avoid.includes(m), r) })), "\n\n"), "\n\n");
+export const askReason = (r: Recalled, limits = CLAUDE_CODE): string => withUnchecked(r, reasonBlocks(r, limits), "\n\n");
+
+const reasonBlocks = (r: Recalled, limits: Limits) =>
+  pack([...r.avoid, ...r.matches.filter((m) => !r.avoid.includes(m))].map((m) => ({ name: packageName(m), text: reasonBlock(m, r.avoid.includes(m), r) })), "\n\n", limits);
+
+// For the agent, when a hook that can't ask denies the first try (decision 0036): the notes as in a
+// prompt, then the hook's own advice, which always fits.
+export function denyReason(r: Recalled, limits: Limits): string {
+  const several = r.stopped.length > 1;
+  const advice = `RepoMagpie: this install was stopped once. Show the user ${r.avoid.length > 1 ? "these notes" : "this note"} and ask whether to install anyway or use an alternative; ` +
+    `don't install ${several ? "them" : "it"} again without the user's OK. If the user says to go ahead, install the same ${several ? "packages" : "package"} again within 10 minutes: ` +
+    `RepoMagpie lets ${several ? "them" : "it"} through until then.`;
+  const tail = [r.unchecked, advice].filter(Boolean).join("\n\n");
+  return `${reasonBlocks(r, { pack: limits.pack, cap: limits.cap - tail.length - 2 })}\n\n${tail}`;
 }
+
+// For the user, when the first try is denied: what was stopped and who says to avoid it.
+export function stoppedLine(r: Recalled): string {
+  const names = shortList(r.stopped.map((install) => cut(clean(install.name), CAPS.name)));
+  const why = shortList(r.avoid.map((m) => (personal(m) ? `you noted to avoid ${packageName(m)}` : `this project's journal says to avoid ${packageName(m)}`)), "; ");
+  return `RepoMagpie: stopped installing ${names}: ${why}. Your agent should ask you; the same install goes through for the next 10 minutes.`;
+}
+
+const shortList = (items: string[], separator = ", ") =>
+  [...items.slice(0, MORE_NAMES), ...(items.length > MORE_NAMES ? [`+${items.length - MORE_NAMES} more`] : [])].join(separator);
 
 // Where the agent can't ask (decision 0036): "deny" the first try of an install an avoid note is
 // on, and record it; "inform" for the same install until 10 minutes after that deny, and when the
@@ -170,22 +197,21 @@ function few(list: Alternative[], text: (a: Alternative) => string, separator: s
   return shown.join(separator);
 }
 
-// Whole matches while the field stays within PACK characters (the first always fits), then one line
-// for the rest; the 10,000-character cut stays as a last guard.
-function pack(parts: { name: string; text: string }[], separator: string): string {
+// Whole matches while the field stays within limits.pack characters (the first always fits), then
+// one line for the rest; the cut at limits.cap stays as a last guard.
+function pack(parts: { name: string; text: string }[], separator: string, limits: Limits): string {
   const kept: string[] = [];
   let length = 0;
   for (const part of parts) {
     const next = length + (kept.length ? separator.length : 0) + part.text.length;
-    if (kept.length && next > PACK) break;
+    if (kept.length && next > limits.pack) break;
     kept.push(part.text);
     length = next;
   }
   const rest = parts.slice(kept.length).map((part) => part.name);
   if (rest.length) {
-    const names = [...rest.slice(0, MORE_NAMES), ...(rest.length > MORE_NAMES ? [`+${rest.length - MORE_NAMES} more`] : [])].join(", ");
-    kept.push(`RepoMagpie: ${rest.length} more ${rest.length === 1 ? "note is" : "notes are"} not shown here, on ${names}. Run repomagpie recall with these names to read them.`);
+    kept.push(`RepoMagpie: ${rest.length} more ${rest.length === 1 ? "note is" : "notes are"} not shown here, on ${shortList(rest)}. Run repomagpie recall with these names to read them.`);
   }
   const text = kept.join(separator);
-  return text.length > CAP ? `${text.slice(0, CAP - 1)}…` : text;
+  return text.length > limits.cap ? `${text.slice(0, limits.cap - 1)}…` : text;
 }
