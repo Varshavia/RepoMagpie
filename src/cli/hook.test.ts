@@ -122,3 +122,32 @@ test("hook codex --help prints the hooks.json snippet, the Windows form, the tru
   assert.match(r.out, /\/hooks/);
   assert.match(r.out, /within 10 minutes goes through/);
 });
+
+// --- repomagpie hook gemini-cli (decision 0036) ----------------------------------------------
+
+const geminiInput = (command: string, cwd: string) => JSON.stringify({ hook_event_name: "BeforeTool", tool_name: "run_shell_command", tool_input: { command }, cwd });
+
+test("hook gemini-cli: an avoid note asks, --inform-only informs, nothing to say prints nothing; exit 0", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const asked = await magpie(box, ["hook", "gemini-cli"], { stdin: async () => geminiInput("npm install pdfkit", box.project) });
+  assert.deepEqual([asked.code, asked.err], [0, ""]);
+  assert.equal(JSON.parse(asked.out).decision, "ask");
+  assert.match(JSON.parse(asked.out).systemMessage, /^RepoMagpie: you noted to avoid pdfkit \(personal journal\)\n/);
+  const informed = await magpie(box, ["hook", "gemini-cli", "--inform-only"], { stdin: async () => geminiInput("npm install pdfkit", box.project) });
+  assert.deepEqual(Object.keys(JSON.parse(informed.out)), ["systemMessage"]);
+  for (const stdin of ["", "not json", geminiInput("npm i left-pad", box.project), input("npm i pdfkit", box.project)]) {
+    const silent = await magpie(box, ["hook", "gemini-cli"], { stdin: async () => stdin });
+    assert.deepEqual([silent.code, silent.out, silent.err], [0, "", ""], stdin);
+  }
+});
+
+test("hook gemini-cli --help prints the settings.json snippet, the Windows form and --inform-only", async () => {
+  const r = await magpie(sandbox(), ["hook", "gemini-cli", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /~\/\.gemini\/settings\.json/);
+  assert.match(r.out, /"BeforeTool"/);
+  assert.match(r.out, /"matcher": "run_shell_command"/);
+  assert.match(r.out, /"command": "repomagpie hook gemini-cli", "timeout": 10000/);
+  assert.match(r.out, /repomagpie\.cmd hook gemini-cli/);
+  assert.match(r.out, /--inform-only/);
+});

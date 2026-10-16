@@ -21,6 +21,7 @@ type Adapter = (input: string, ctx: HookContext) => string | null;
 const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
   "claude-code": async () => (await import("../hook/claude-code.ts")).hookOutput,
   codex: async () => (await import("../hook/codex.ts")).codexOutput,
+  "gemini-cli": async () => (await import("../hook/gemini-cli.ts")).geminiOutput,
 };
 
 export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {

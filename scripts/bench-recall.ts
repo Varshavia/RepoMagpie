@@ -19,5 +19,7 @@ for (const alternatives of [false, true]) {
     // Codex's input has the same shape (decision 0036); an avoid note reads the retry record too.
     measure(`magpie hook codex (an install with a note)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env);
     measure(`magpie hook codex (no install)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm test"), env);
+    const gemini = (command: string) => JSON.stringify({ hook_event_name: "BeforeTool", tool_name: "run_shell_command", tool_input: { command } });
+    measure(`magpie hook gemini-cli (an install with a note)${label}`, root, ["hook", "gemini-cli"], BUDGET_MS, gemini("npm install package-1500@2 && npm i left-pad"), env);
   }, true, false, alternatives);
 }

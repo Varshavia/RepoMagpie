@@ -29,6 +29,10 @@ test("the hook's fast path (no other flags) answers like the full CLI, from stdi
   }
   const silent = spawnSync(process.execPath, [main, "hook", "claude-code"], { input: "not json", env, cwd: root, encoding: "utf8" });
   assert.deepEqual([silent.status, silent.stdout], [0, ""]);
+  // hook gemini-cli takes it too: the avoid note asks.
+  const gemini = spawnSync(process.execPath, [main, "hook", "gemini-cli"], { input: JSON.stringify({ tool_name: "run_shell_command", tool_input: { command: "npm i pdfkit" }, cwd: root }), env, cwd: root, encoding: "utf8" });
+  assert.equal(gemini.status, 0, gemini.stderr);
+  assert.equal(JSON.parse(gemini.stdout).decision, "ask");
   // hook codex takes the same path: the first try is denied, the second informs.
   for (const decision of ["deny", undefined]) {
     const r = spawnSync(process.execPath, [main, "hook", "codex"], { input, env, cwd: root, encoding: "utf8" });

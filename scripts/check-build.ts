@@ -37,6 +37,7 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   // Not an avoid note: a deny would be recorded, and the second run would get the retry's answer.
   { args: ["hook", "codex"], input: hook("npm install @playwright/cli") },
   { args: ["hook", "codex"], input: hook("npm test"), quiet: true },
+  { args: ["hook", "gemini-cli"], input: JSON.stringify({ hook_event_name: "BeforeTool", tool_name: "run_shell_command", tool_input: { command: "npm install @playwright/cli" } }) },
 ];
 
 // What the package may ship: npm's own files, the licences, the built CLI and app, and the agent

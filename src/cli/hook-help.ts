@@ -40,3 +40,23 @@ stops the install's first try, and your agent should ask you; the same install
 within 10 minutes goes through. "repomagpie hook codex --inform-only": notes
 then only inform.
 `;
+
+export const GEMINI_HOOK_HELP = `
+Add this to ~/.gemini/settings.json:
+
+{
+  "hooks": {
+    "BeforeTool": [
+      { "matcher": "run_shell_command",
+        "hooks": [ { "type": "command", "name": "repomagpie", "command": "repomagpie hook gemini-cli", "timeout": 10000 } ] }
+    ]
+  }
+}
+
+On Windows, Gemini CLI runs the command in PowerShell, whose execution policy
+can block npm's repomagpie.ps1: write "repomagpie.cmd hook gemini-cli" there.
+
+A note that says to avoid a package makes Gemini CLI ask you before the install,
+with the note in its prompt. Other notes show you a line. For unattended runs
+(gemini -p), use "repomagpie hook gemini-cli --inform-only": notes then only inform.
+`;
