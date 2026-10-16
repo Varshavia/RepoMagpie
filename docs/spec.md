@@ -530,7 +530,7 @@ In a project's `.claude/settings.json` (`--project`), which teammates share, it 
 
 Either form takes the hook's flags after `claude-code` (`--inform-only`). `setup` changes older user entries (`magpie hook claude-code`, `repomagpie hook claude-code`, an exec form with other paths) to the exec form, their flags kept. <!-- check:commands allow -->
 
-**Input** (stdin): Claude Code's JSON; `repomagpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand.
+**Input** (stdin): Claude Code's JSON; `repomagpie` reads `tool_name` and `tool_input.command`. A leading UTF-8 byte-order mark is ignored: Claude Code sends none, but Windows PowerShell adds one when you pipe a test input into the hook by hand. Cursor runs the hooks in `~/.claude/settings.json` too; an input with `cursor_version`, `conversation_id`, `generation_id` or `workspace_roots`, which Claude Code never sends, gets no output, since Cursor gets its answer from its own adapter ([decision 0036](decisions/0036-hooks-in-other-agents.md)).
 
 **Detecting installs.** The command line is split the way git-guard does it ([`.claude/hooks/git-guard.mjs`](../.claude/hooks/git-guard.mjs)): chained commands (`&&`, `||`, `;`, pipes), quotes, line continuations, prefixes such as `sudo` or `env`, and nested shells. Recognised installs:
 

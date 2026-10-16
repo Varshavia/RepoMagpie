@@ -75,7 +75,9 @@ src/
                file changed (an object member or an array item), every other byte kept
   cli/         one module per command, loaded only when it runs; human and --json output; prompt.ts: setup's
                multi-select and yes/no on node:readline
-  hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
+  hook/        core.ts: command and folder → install detection → recall → the texts (agent-neutral,
+               decision 0036); claude-code.ts: tool call JSON → core → ask or inform JSON; retry.ts:
+               the retry record, for agents that can't ask
   mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
                rules, the server instructions; cli/mcp.ts serves it on stdio. The SDK is bundled into its
                own chunk, which only repomagpie mcp loads. jitless.ts: zod generates no code;

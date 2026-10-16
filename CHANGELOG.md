@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Cursor also runs the Claude Code hooks in `~/.claude/settings.json` (its "Include Third-Party Plugins, Skills, and Other Configs" setting, on by default). `repomagpie hook claude-code` now stays silent there, so Cursor gets one answer, from its own hook. Claude Code's answers are unchanged.
+
 ## [0.2.0-beta.4] - 2026-10-15
 
 The fifth pre-release: any coding agent with MCP can check your notes before an install and ask what you have, through `repomagpie mcp`; `repomagpie setup` wires that server, the agent skill and the Claude Code hook into your agents; `repomagpie doctor` shows what is wired; and `repomagpie catalog` lists your whole journal.
