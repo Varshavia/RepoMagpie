@@ -1,0 +1,11 @@
+{
+  "source": "Copilot CLI 1.0.98 on Windows 11, the pre-check of 2026-10-15 (docs/agents.md). Captured stdin, one JSON document each, no byte-order mark; the session ids and the user folder renamed.",
+  "inputs": [
+    {"sessionId":"00000000-0000-4000-8000-000000000001","timestamp":1792081273041,"cwd":"C:\\Users\\me\\hook-test","toolName":"skill","toolArgs":{"skill":"repomagpie"}},
+    {"sessionId":"00000000-0000-4000-8000-000000000001","timestamp":1792081277582,"cwd":"C:\\Users\\me\\hook-test","toolName":"powershell","toolArgs":{"command":"repomagpie recall left-pad --json","description":"Check package notes for left-pad"}},
+    {"sessionId":"00000000-0000-4000-8000-000000000001","timestamp":1792081286020,"cwd":"C:\\Users\\me\\hook-test","toolName":"powershell","toolArgs":{"command":"npm install left-pad","description":"Install left-pad in the current folder","initial_wait":120}},
+    {"sessionId":"00000000-0000-4000-8000-000000000002","timestamp":1792081533835,"cwd":"C:\\Users\\me\\hook-test","toolName":"ask_user","toolArgs":{"message":"RepoMagpie blocked `npm install left-pad` because your note says: “avoid: a pre-check test note, not a real one”. Would you like me to run the exact command anyway, or use an alternative package?","requestedSchema":{"properties":{"choice":{"type":"string","title":"Next step","oneOf":[{"const":"install_anyway","title":"Install left-pad anyway"},{"const":"alternative","title":"Use an alternative package"}]}}}}},
+    {"sessionId":"00000000-0000-4000-8000-000000000002","timestamp":1792081570034,"cwd":"C:\\Users\\me\\hook-test","toolName":"powershell","toolArgs":{"command":"npm install left-pad","description":"Install left-pad in the current folder","initial_wait":120,"mode":"sync"}},
+    {"sessionId":"00000000-0000-4000-8000-000000000003","timestamp":1792081348560,"cwd":"C:\\Users\\me\\hook-test","toolName":"powershell","toolArgs":{"command":"Get-Command repomagpie -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source","description":"Check whether RepoMagpie is available"}}
+  ]
+}

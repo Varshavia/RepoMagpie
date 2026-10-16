@@ -177,3 +177,32 @@ test("hook antigravity --help prints the hooks.json snippet and what the hook do
   assert.match(r.out, /"command": "repomagpie hook antigravity", "timeout": 10/);
   assert.match(r.out, /always allow/);
 });
+
+// --- repomagpie hook copilot (decision 0036) -------------------------------------------------
+
+const copilotInput = (command: string, cwd: string) => JSON.stringify({ sessionId: "s", timestamp: 1, cwd, toolName: "powershell", toolArgs: { command } });
+
+test("hook copilot: the first try is denied, the retry and --inform-only print nothing; an error fails open with exit 0", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const denied = await magpie(box, ["hook", "copilot"], { stdin: async () => copilotInput("npm install pdfkit", box.project) });
+  assert.deepEqual([denied.code, denied.err], [0, ""]);
+  assert.equal(JSON.parse(denied.out).permissionDecision, "deny");
+  for (const [argv, stdin] of [[["hook", "copilot"], copilotInput("npm.cmd install pdfkit", box.project)], [["hook", "copilot", "--inform-only"], copilotInput("npm i pdfkit", box.project)], [["hook", "copilot"], "not json"]] as [string[], string][]) {
+    const silent = await magpie(box, argv, { stdin: async () => stdin });
+    assert.deepEqual([silent.code, silent.out, silent.err], [0, "", ""], stdin);
+  }
+  const broken = await magpie(box, ["hook", "copilot"], { stdin: async () => { throw new Error("stdin broke"); } });
+  assert.deepEqual([broken.code, broken.out, broken.err], [0, "", ""]); // any other exit would deny every tool call
+});
+
+test("hook copilot --help prints its own hook file, the Windows form and the deny-on-failure warning", async () => {
+  const r = await magpie(sandbox(), ["hook", "copilot", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /~\/\.copilot\/hooks\/repomagpie\.json/);
+  assert.match(r.out, /"version": 1/);
+  assert.match(r.out, /"preToolUse"/);
+  assert.match(r.out, /"bash": "repomagpie hook copilot"/);
+  assert.match(r.out, /"powershell": "repomagpie\.cmd hook copilot", "timeoutSec": 10/);
+  assert.match(r.out, /denies every tool call when a hook can't start/);
+  assert.match(r.out, /VS Code/);
+});

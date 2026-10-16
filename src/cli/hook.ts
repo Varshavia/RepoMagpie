@@ -23,6 +23,7 @@ const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
   codex: async () => (await import("../hook/codex.ts")).codexOutput,
   "gemini-cli": async () => (await import("../hook/gemini-cli.ts")).geminiOutput,
   antigravity: async () => (await import("../hook/antigravity.ts")).antigravityOutput,
+  copilot: async () => (await import("../hook/copilot.ts")).copilotOutput,
 };
 
 export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {

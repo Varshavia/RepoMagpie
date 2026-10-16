@@ -40,6 +40,8 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["hook", "gemini-cli"], input: JSON.stringify({ hook_event_name: "BeforeTool", tool_name: "run_shell_command", tool_input: { command: "npm install @playwright/cli" } }) },
   // The example vault has no avoid note, and Antigravity's adapter prints only for one.
   { args: ["hook", "antigravity"], input: JSON.stringify({ toolCall: { name: "run_command", args: { CommandLine: "npm install @playwright/cli" } } }), quiet: true },
+  // Copilot CLI's adapter prints only a deny, for an avoid note.
+  { args: ["hook", "copilot"], input: JSON.stringify({ toolName: "powershell", toolArgs: { command: "npm install @playwright/cli" } }), quiet: true },
 ];
 
 // What the package may ship: npm's own files, the licences, the built CLI and app, and the agent

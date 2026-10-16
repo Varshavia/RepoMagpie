@@ -36,6 +36,9 @@ test("the hook's fast path (no other flags) answers like the full CLI, from stdi
   const antigravity = spawnSync(process.execPath, [main, "hook", "antigravity"], { input: JSON.stringify({ toolCall: { name: "run_command", args: { CommandLine: "npm i pdfkit", Cwd: root } } }), env, cwd: root, encoding: "utf8" });
   assert.equal(antigravity.status, 0, antigravity.stderr);
   assert.equal(JSON.parse(antigravity.stdout).decision, "force_ask");
+  const copilot = spawnSync(process.execPath, [main, "hook", "copilot"], { input: JSON.stringify({ cwd: root, toolName: "powershell", toolArgs: { command: "npm i pdfkit" } }), env, cwd: root, encoding: "utf8" });
+  assert.equal(copilot.status, 0, copilot.stderr);
+  assert.equal(JSON.parse(copilot.stdout).permissionDecision, "deny");
   // hook codex takes the same path: the first try is denied, the second informs.
   for (const decision of ["deny", undefined]) {
     const r = spawnSync(process.execPath, [main, "hook", "codex"], { input, env, cwd: root, encoding: "utf8" });

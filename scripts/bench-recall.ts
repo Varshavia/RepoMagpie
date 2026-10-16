@@ -23,5 +23,7 @@ for (const alternatives of [false, true]) {
     measure(`magpie hook gemini-cli (an install with a note)${label}`, root, ["hook", "gemini-cli"], BUDGET_MS, gemini("npm install package-1500@2 && npm i left-pad"), env);
     const antigravity = (command: string) => JSON.stringify({ toolCall: { name: "run_command", args: { CommandLine: command, Cwd: root } } });
     measure(`magpie hook antigravity (an install with a note)${label}`, root, ["hook", "antigravity"], BUDGET_MS, antigravity("npm install package-1500@2 && npm i left-pad"), env);
+    const copilot = (command: string) => JSON.stringify({ cwd: root, toolName: "powershell", toolArgs: { command } });
+    measure(`magpie hook copilot (an install with a note)${label}`, root, ["hook", "copilot"], BUDGET_MS, copilot("npm install package-1500@2 && npm i left-pad"), env);
   }, true, false, alternatives);
 }

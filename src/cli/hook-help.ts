@@ -81,3 +81,26 @@ A note that says to avoid a package makes Antigravity ask you before the install
 with the note in its prompt, even after you chose "always allow" for the command.
 Other notes add nothing: Antigravity shows a hook's other answers to nobody.
 `;
+
+export const COPILOT_HOOK_HELP = `
+Save this as ~/.copilot/hooks/repomagpie.json (its own file; Copilot CLI reads
+every .json file in that folder):
+
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "bash": "repomagpie hook copilot",
+        "powershell": "repomagpie.cmd hook copilot", "timeoutSec": 10 }
+    ]
+  }
+}
+
+Copilot CLI denies every tool call when a hook can't start or fails: if you move
+Node.js or RepoMagpie, fix this file or delete it.
+
+Copilot CLI doesn't ask you when a hook asks. So a note that says to avoid a
+package stops the install's first try, with the note, and your agent should ask
+you; the same install within 10 minutes goes through. Other notes add nothing.
+VS Code reads this folder too, but sends its own input, which gets no answer.
+`;

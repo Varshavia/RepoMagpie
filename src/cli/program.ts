@@ -6,7 +6,7 @@ import type { GlobalOptions } from "./context.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
-import { ANTIGRAVITY_HOOK_HELP, CODEX_HOOK_HELP, GEMINI_HOOK_HELP, HOOK_HELP } from "./hook-help.ts";
+import { ANTIGRAVITY_HOOK_HELP, CODEX_HOOK_HELP, COPILOT_HOOK_HELP, GEMINI_HOOK_HELP, HOOK_HELP } from "./hook-help.ts";
 import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
 import type { McpCommandOptions } from "./mcp.ts";
@@ -217,6 +217,14 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .addHelpText("after", ANTIGRAVITY_HOOK_HELP)
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./hook.ts")).hookCommand("antigravity", command.optsWithGlobals<HookOptions>(), io);
+    });
+  hook
+    .command("copilot")
+    .description("the Copilot CLI preToolUse hook: reads the tool call on stdin, recalls notes for package installs")
+    .option("--inform-only", "never deny (Copilot CLI shows other notes to nobody, so this prints nothing)")
+    .addHelpText("after", COPILOT_HOOK_HELP)
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./hook.ts")).hookCommand("copilot", command.optsWithGlobals<HookOptions>(), io);
     });
 
   for (const { usage, summary } of NOT_YET) {
