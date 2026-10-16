@@ -60,3 +60,24 @@ A note that says to avoid a package makes Gemini CLI ask you before the install,
 with the note in its prompt. Other notes show you a line. For unattended runs
 (gemini -p), use "repomagpie hook gemini-cli --inform-only": notes then only inform.
 `;
+
+export const ANTIGRAVITY_HOOK_HELP = `
+Add this to ~/.gemini/config/hooks.json (Antigravity CLI and the Antigravity IDE
+both read it):
+
+{
+  "repomagpie": {
+    "PreToolUse": [
+      { "matcher": "run_command",
+        "hooks": [ { "type": "command", "command": "repomagpie hook antigravity", "timeout": 10 } ] }
+    ]
+  }
+}
+
+On Windows, Antigravity CLI runs the command with cmd /c, where npm's
+repomagpie.cmd runs as is.
+
+A note that says to avoid a package makes Antigravity ask you before the install,
+with the note in its prompt, even after you chose "always allow" for the command.
+Other notes add nothing: Antigravity shows a hook's other answers to nobody.
+`;

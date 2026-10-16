@@ -151,3 +151,29 @@ test("hook gemini-cli --help prints the settings.json snippet, the Windows form 
   assert.match(r.out, /repomagpie\.cmd hook gemini-cli/);
   assert.match(r.out, /--inform-only/);
 });
+
+// --- repomagpie hook antigravity (decision 0036) ---------------------------------------------
+
+const antigravityInput = (command: string, cwd: string) => JSON.stringify({ conversationId: "c", stepIdx: 6, toolCall: { name: "run_command", args: { CommandLine: command, Cwd: cwd } }, workspacePaths: [cwd] });
+
+test("hook antigravity: an avoid note answers force_ask; --inform-only and anything else print nothing; exit 0", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const asked = await magpie(box, ["hook", "antigravity"], { stdin: async () => antigravityInput("npm install pdfkit", box.project) });
+  assert.deepEqual([asked.code, asked.err], [0, ""]);
+  assert.equal(JSON.parse(asked.out).decision, "force_ask");
+  assert.match(JSON.parse(asked.out).reason, /^RepoMagpie: you noted to avoid pdfkit \(personal journal\)\n/);
+  for (const [argv, stdin] of [[["hook", "antigravity", "--inform-only"], antigravityInput("npm install pdfkit", box.project)], [["hook", "antigravity"], ""], [["hook", "antigravity"], input("npm i pdfkit", box.project)]] as [string[], string][]) {
+    const silent = await magpie(box, argv, { stdin: async () => stdin });
+    assert.deepEqual([silent.code, silent.out, silent.err], [0, "", ""], stdin);
+  }
+});
+
+test("hook antigravity --help prints the hooks.json snippet and what the hook does", async () => {
+  const r = await magpie(sandbox(), ["hook", "antigravity", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /~\/\.gemini\/config\/hooks\.json/);
+  assert.match(r.out, /"repomagpie": \{/);
+  assert.match(r.out, /"matcher": "run_command"/);
+  assert.match(r.out, /"command": "repomagpie hook antigravity", "timeout": 10/);
+  assert.match(r.out, /always allow/);
+});

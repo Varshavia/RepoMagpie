@@ -33,6 +33,9 @@ test("the hook's fast path (no other flags) answers like the full CLI, from stdi
   const gemini = spawnSync(process.execPath, [main, "hook", "gemini-cli"], { input: JSON.stringify({ tool_name: "run_shell_command", tool_input: { command: "npm i pdfkit" }, cwd: root }), env, cwd: root, encoding: "utf8" });
   assert.equal(gemini.status, 0, gemini.stderr);
   assert.equal(JSON.parse(gemini.stdout).decision, "ask");
+  const antigravity = spawnSync(process.execPath, [main, "hook", "antigravity"], { input: JSON.stringify({ toolCall: { name: "run_command", args: { CommandLine: "npm i pdfkit", Cwd: root } } }), env, cwd: root, encoding: "utf8" });
+  assert.equal(antigravity.status, 0, antigravity.stderr);
+  assert.equal(JSON.parse(antigravity.stdout).decision, "force_ask");
   // hook codex takes the same path: the first try is denied, the second informs.
   for (const decision of ["deny", undefined]) {
     const r = spawnSync(process.execPath, [main, "hook", "codex"], { input, env, cwd: root, encoding: "utf8" });
