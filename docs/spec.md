@@ -623,7 +623,15 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **Never approves:** no `"allow"`, no `updatedInput`, no `"ask"`. `--inform-only` never denies.
 - **Length:** Codex limits each model-visible hook message to about 2,500 tokens. So each field holds whole matches while it stays within 4,000 characters, and is cut at 5,000; the advice in a deny reason is never cut.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI has it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Gemini CLI** (`repomagpie hook gemini-cli`, [decision 0036](decisions/0036-hooks-in-other-agents.md); Gemini CLI's facts in [agents](agents.md#gemini-cli)). Gemini CLI asks: its source honours a `BeforeTool` hook's `"ask"` (its docs list only `allow` and `deny`). Built from its source; not tried on a machine yet.
+- **Input:** Gemini CLI's `BeforeTool` JSON. Only `tool_name` `"run_shell_command"` is read, with `tool_input.command`; other tools and events get no output. The folder is `tool_input.dir_path` resolved against the input's `cwd`, as Gemini CLI's shell tool does, or the `cwd` alone.
+- **An exact avoid note:** `{"decision": "ask", "systemMessage": "<the permission prompt's reason, as for Claude Code>"}`. Gemini CLI then asks the user, with the note in its confirmation, before the user's saved approvals.
+- **Every other match:** `{"systemMessage": "<the systemMessage, as for Claude Code>"}`, for the user; no `BeforeTool` field reaches the agent, so the adapter prints nothing for it.
+- **Never approves:** no `"allow"` and no `hookSpecificOutput.tool_input`. `--inform-only` never asks; use it for `gemini -p`.
+- **The switch:** one constant in `src/hook/gemini-cli.ts` (`ON_AVOID`) chooses between asking and denying the first try. Set to `"deny"`, it answers as Codex's adapter does (`{"decision": "deny", "reason": …, "systemMessage": …}`, with the retry record), for the case where the live test shows Gemini CLI not prompting.
+- **Length:** Gemini CLI documents no limit, so Claude Code's are kept.
+
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI and Gemini CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 
