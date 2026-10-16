@@ -63,3 +63,22 @@ In your own settings, `setup` writes a faster form that starts Node directly ins
 ```
 
 The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, add `--inform-only` (to the command, or as the last argument), so notes inform the agent and never ask.
+
+## The Codex CLI hook
+
+Add this to `~/.codex/hooks.json` (Codex 0.159.0 or later on Windows):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash",
+        "hooks": [ { "type": "command", "command": "repomagpie hook codex", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+On Windows, Codex runs the command in Windows PowerShell, where the default execution policy can block npm's `repomagpie.ps1`: write `repomagpie.cmd hook codex` there. Codex skips a new or changed hook until you trust it: open `/hooks` in Codex and trust it. If nothing happens, check that `config.toml` doesn't turn hooks off (`[features] hooks = false`).
+
+Codex can't ask you before a command, so the hook stops the first try instead. When a note says to avoid the package, the install is stopped once, with the note for your agent and a line for you: `RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes.` If you tell the agent to go ahead, the same install goes through, in any form (`npm.cmd`, `pnpm add`), until 10 minutes after the stop. Other notes only inform. `--inform-only` never stops an install.

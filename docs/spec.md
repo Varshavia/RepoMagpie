@@ -603,7 +603,27 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **Fast:** the hook has the recall budget (section 7).
 - Each text stays under 10,000 characters, Claude Code's cap for `additionalContext` and `systemMessage`; the reason is kept to the same limit. A cut of the whole field at 10,000 stays as a last guard.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Codex CLI** (`repomagpie hook codex`, [decision 0036](decisions/0036-hooks-in-other-agents.md); Codex's facts in [agents](agents.md#codex-cli)). Codex can't ask: it doesn't support `"ask"` yet.
+- **Input:** Codex's `PreToolUse` JSON, the same shape as Claude Code's. Only `tool_name` `"Bash"` is read; that is every shell command, PowerShell ones included. `apply_patch`, MCP tools and other events get no output. The folder is the input's `cwd`.
+- **An exact avoid note, first try:** denied, and recorded in the retry record (`<personal journal>/.cache/hook-retry.json`: a SHA-256 of the agent, the folder and the packages it stopped, with the time). The reason is the permission prompt's reason above, then the hook's advice:
+
+  ```json
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "RepoMagpie: you noted to avoid pdfkit (personal journal)\nVerdict: \"avoid: async streams painful\"\nAvoid when: \"you need streams\"\n~/.magpie/notes/npm--pdfkit.md\n\nRepoMagpie: this install was stopped once. Show the user this note and ask whether to install anyway or use an alternative; don't install it again without the user's OK. If the user says to go ahead, install the same package again within 10 minutes: RepoMagpie lets it through until then."
+    },
+    "systemMessage": "RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes."
+  }
+  ```
+
+  With several stopped packages, the advice says "these notes", "them" and "the same packages", and the user's line names them all (`stopped installing pdfkit, jspdf: this project's journal says to avoid pdfkit; you noted to avoid jspdf.`), at most 5, then `+N more`.
+- **The same install** (the same folder and the same stopped packages, in any form: `npm.cmd`, `& npm`, `pnpm add`) until 10 minutes after the deny, and every other match: it informs, with `additionalContext` and `systemMessage` as for Claude Code. Codex shows `systemMessage` in the transcript and gives `additionalContext` to the model after the call. If the retry record can't be read or written, it informs instead of denying.
+- **Never approves:** no `"allow"`, no `updatedInput`, no `"ask"`. `--inform-only` never denies.
+- **Length:** Codex limits each model-visible hook message to about 2,500 tokens. So each field holds whole matches while it stays within 4,000 characters, and is cut at 5,000; the advice in a deny reason is never cut.
+
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI has it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 

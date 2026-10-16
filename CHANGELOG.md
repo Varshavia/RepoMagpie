@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `repomagpie hook codex`, the hook for Codex CLI. Codex can't ask you before a command, so when a note says to avoid a package, the hook stops the install's first try: your agent gets the note and is told to ask you, and you see `RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes.` If you say to go ahead, the same install goes through, also as `npm.cmd install pdfkit` or `pnpm add pdfkit`, until 10 minutes after the stop. To remember this, the hook keeps `.cache/hook-retry.json` in your journal: a hash and a time for each stopped install, no package names. Other notes only inform, and `--inform-only` never stops an install. `repomagpie hook codex --help` shows the entry for `~/.codex/hooks.json`; `setup` doesn't write it yet.
+
 ### Changed
 
 - Cursor also runs the Claude Code hooks in `~/.claude/settings.json` (its "Include Third-Party Plugins, Skills, and Other Configs" setting, on by default). `repomagpie hook claude-code` now stays silent there, so Cursor gets one answer, from its own hook. Claude Code's answers are unchanged.
