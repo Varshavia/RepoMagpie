@@ -29,6 +29,12 @@ test("the hook's fast path (no other flags) answers like the full CLI, from stdi
   }
   const silent = spawnSync(process.execPath, [main, "hook", "claude-code"], { input: "not json", env, cwd: root, encoding: "utf8" });
   assert.deepEqual([silent.status, silent.stdout], [0, ""]);
+  // hook codex takes the same path: the first try is denied, the second informs.
+  for (const decision of ["deny", undefined]) {
+    const r = spawnSync(process.execPath, [main, "hook", "codex"], { input, env, cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, decision);
+  }
 });
 
 test("runs from source under type stripping: magpie --version", () => {

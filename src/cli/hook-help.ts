@@ -1,5 +1,6 @@
-// The setup text after `repomagpie hook claude-code --help` (spec §6). Its own module, so the help
+// The setup text after `repomagpie hook <agent> --help` (spec §6). Its own module, so the help
 // doesn't load the hook.
+
 export const HOOK_HELP = `
 Add this to ~/.claude/settings.json or a project's .claude/settings.json
 (RepoMagpie never edits a settings file for you):
@@ -16,4 +17,26 @@ Add this to ~/.claude/settings.json or a project's .claude/settings.json
 A note that says to avoid a package makes Claude Code ask you before the install.
 For unattended runs (claude -p), where nobody can answer, use
 "repomagpie hook claude-code --inform-only": notes then only inform.
+`;
+
+export const CODEX_HOOK_HELP = `
+Add this to ~/.codex/hooks.json:
+
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash",
+        "hooks": [ { "type": "command", "command": "repomagpie hook codex", "timeout": 10 } ] }
+    ]
+  }
+}
+
+On Windows, Codex runs the command in Windows PowerShell, whose execution policy
+can block npm's repomagpie.ps1: write "repomagpie.cmd hook codex" there.
+Codex skips a new or changed hook until you trust it: open /hooks in Codex.
+
+Codex can't ask you before a command. So a note that says to avoid a package
+stops the install's first try, and your agent should ask you; the same install
+within 10 minutes goes through. "repomagpie hook codex --inform-only": notes
+then only inform.
 `;

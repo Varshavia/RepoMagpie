@@ -33,6 +33,9 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["doctor", "--json"] },
   { args: ["hook", "claude-code"], input: hook("npm install @playwright/cli") },
   { args: ["hook", "claude-code"], input: hook("npm test"), quiet: true },
+  // Not an avoid note: a deny would be recorded, and the second run would get the retry's answer.
+  { args: ["hook", "codex"], input: hook("npm install @playwright/cli") },
+  { args: ["hook", "codex"], input: hook("npm test"), quiet: true },
 ];
 
 // What the package may ship: npm's own files, the licences, the built CLI and app, and the agent

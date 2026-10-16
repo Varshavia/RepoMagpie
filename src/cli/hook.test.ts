@@ -84,3 +84,41 @@ test("--help prints the settings snippet and the --inform-only advice", async ()
   assert.match(r.out, /--inform-only/);
   assert.match(r.out, /never edits/);
 });
+
+// --- repomagpie hook codex (decision 0036) ---------------------------------------------------
+
+test("hook codex: the first try of an avoided install is denied and recorded, the next one informs; exit 0", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const first = await magpie(box, ["hook", "codex"], { stdin: async () => input("npm install pdfkit", box.project) });
+  assert.deepEqual([first.code, first.err], [0, ""]);
+  assert.equal(JSON.parse(first.out).hookSpecificOutput.permissionDecision, "deny");
+  assert.match(JSON.parse(first.out).systemMessage, /^RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit\./);
+  assert.equal(existsSync(join(box.journal, ".cache", "hook-retry.json")), true);
+  const retry = await magpie(box, ["hook", "codex"], { stdin: async () => input("npm.cmd install pdfkit", box.project) });
+  assert.equal(JSON.parse(retry.out).hookSpecificOutput.permissionDecision, undefined);
+  assert.match(JSON.parse(retry.out).hookSpecificOutput.additionalContext, /has a note on pdfkit/);
+});
+
+test("hook codex --inform-only never denies; nothing to say prints nothing; an error fails open", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const r = await magpie(box, ["hook", "codex", "--inform-only"], { stdin: async () => input("npm i pdfkit", box.project) });
+  assert.equal(JSON.parse(r.out).hookSpecificOutput.permissionDecision, undefined);
+  for (const stdin of ["", "not json", input("npm i left-pad", box.project)]) {
+    const silent = await magpie(box, ["hook", "codex"], { stdin: async () => stdin });
+    assert.deepEqual([silent.code, silent.out, silent.err], [0, "", ""], stdin);
+  }
+  const broken = await magpie(box, ["hook", "codex"], { stdin: async () => { throw new Error("stdin broke"); } });
+  assert.deepEqual([broken.code, broken.out, broken.err], [0, "", ""]);
+  assert.match(readFileSync(join(box.journal, ".cache", "hook-errors.log"), "utf8"), /Error: stdin broke/);
+});
+
+test("hook codex --help prints the hooks.json snippet, the Windows form, the trust step and what a deny does", async () => {
+  const r = await magpie(sandbox(), ["hook", "codex", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /~\/\.codex\/hooks\.json/);
+  assert.match(r.out, /"matcher": "Bash"/);
+  assert.match(r.out, /"command": "repomagpie hook codex", "timeout": 10/);
+  assert.match(r.out, /repomagpie\.cmd hook codex/);
+  assert.match(r.out, /\/hooks/);
+  assert.match(r.out, /within 10 minutes goes through/);
+});

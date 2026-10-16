@@ -16,5 +16,8 @@ for (const alternatives of [false, true]) {
     measure(`magpie recall package-1500${label}`, root, ["recall", "package-1500"], BUDGET_MS, undefined, env);
     measure(`magpie hook claude-code (an install with a note)${label}`, root, ["hook", "claude-code"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env);
     measure(`magpie hook claude-code (no install)${label}`, root, ["hook", "claude-code"], BUDGET_MS, call("npm test"), env);
+    // Codex's input has the same shape (decision 0036); an avoid note reads the retry record too.
+    measure(`magpie hook codex (an install with a note)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env);
+    measure(`magpie hook codex (no install)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm test"), env);
   }, true, false, alternatives);
 }

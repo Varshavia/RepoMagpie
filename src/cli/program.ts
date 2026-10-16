@@ -6,7 +6,7 @@ import type { GlobalOptions } from "./context.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
-import { HOOK_HELP } from "./hook-help.ts";
+import { CODEX_HOOK_HELP, HOOK_HELP } from "./hook-help.ts";
 import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
 import type { McpCommandOptions } from "./mcp.ts";
@@ -185,15 +185,22 @@ export async function run(argv: string[], io: Io): Promise<number> {
       code = await (await import("./mcp.ts")).mcpCommand(command.optsWithGlobals<McpCommandOptions>(), io);
     });
 
-  program
-    .command("hook")
-    .description("adapters that agent hooks run (not typed by people)")
+  const hook = program.command("hook").description("adapters that agent hooks run (not typed by people)");
+  hook
     .command("claude-code")
     .description("the Claude Code PreToolUse hook: reads the tool call on stdin, recalls notes for package installs")
     .option("--inform-only", "never ask, also for notes that say to avoid a package (for unattended claude -p runs)")
     .addHelpText("after", HOOK_HELP)
     .action(async (_options: unknown, command: Command) => {
-      code = await (await import("./hook.ts")).hookCommand(command.optsWithGlobals<HookOptions>(), io);
+      code = await (await import("./hook.ts")).hookCommand("claude-code", command.optsWithGlobals<HookOptions>(), io);
+    });
+  hook
+    .command("codex")
+    .description("the Codex CLI PreToolUse hook: reads the tool call on stdin, recalls notes for package installs")
+    .option("--inform-only", "never deny, also for notes that say to avoid a package (for unattended runs)")
+    .addHelpText("after", CODEX_HOOK_HELP)
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./hook.ts")).hookCommand("codex", command.optsWithGlobals<HookOptions>(), io);
     });
 
   for (const { usage, summary } of NOT_YET) {
