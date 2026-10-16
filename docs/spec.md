@@ -638,7 +638,15 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **Never approves:** no `"allow"`, no `"auto_approve"`, no `"ask"` (which respects "Always allow").
 - **Length:** Antigravity documents no limit, so Claude Code's are kept.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI, Gemini CLI and Antigravity CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Copilot CLI** (`repomagpie hook copilot`, [decision 0036](decisions/0036-hooks-in-other-agents.md); its facts in [agents](agents.md#copilot-cli)). Copilot CLI documents `ask`, but 1.0.98 ran the call unasked when a hook answered it, so the adapter never asks.
+- **Input:** Copilot CLI's camelCase `preToolUse` JSON. Only `toolName` `"powershell"` (Windows) or `"bash"` is read, with `toolArgs.command` (`toolArgs` an object, or JSON in a string); `skill`, `ask_user` and every other tool get no output. Input with `hook_event_name` (VS Code's, which runs the same file) gets none either. The folder is the input's `cwd`.
+- **An exact avoid note, first try:** `{"permissionDecision": "deny", "permissionDecisionReason": "<the deny reason, as for Codex>"}`, recorded in the retry record. Copilot CLI shows the user the reason ("Denied by preToolUse hook: …"); it has no other field for the user.
+- **The same install** until 10 minutes after the deny, every other match, and `--inform-only`: no output. Copilot CLI has no field that informs on an allowed call.
+- **Never approves:** no `"allow"`, no `"ask"`, no `modifiedArgs`.
+- **Never fails closed by mistake:** any exit but 0, or a crash, makes Copilot CLI deny the call, so the hook always exits 0 and prints nothing on an error. If node or the entry file moves, Copilot CLI denies every tool call until the hook file is fixed or deleted.
+- **Length:** Copilot CLI documents no limit here, so Claude Code's are kept.
+
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI, Gemini CLI, Antigravity CLI and Copilot CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 

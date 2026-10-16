@@ -118,3 +118,23 @@ Add this to `~/.gemini/config/hooks.json`, which Antigravity CLI and the Antigra
 ```
 
 When a note says to avoid the package, Antigravity asks you before the install, with the note in its "Run this command?" prompt, even after you chose to always allow that command. Other notes add nothing: Antigravity shows a hook's other answers to nobody, and the skill covers them.
+
+## The Copilot CLI hook
+
+Save this as its own file, `~/.copilot/hooks/repomagpie.json` (Copilot CLI reads every `.json` file in that folder; `COPILOT_HOME` moves it):
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "bash": "repomagpie hook copilot",
+        "powershell": "repomagpie.cmd hook copilot", "timeoutSec": 10 }
+    ]
+  }
+}
+```
+
+**Copilot CLI denies every tool call when a hook can't start or fails.** If you move Node.js or reinstall RepoMagpie somewhere else, fix the file or delete it.
+
+Copilot CLI doesn't ask you when a hook asks, so the hook stops the first try instead. When a note says to avoid the package, you see `Denied by preToolUse hook: RepoMagpie: you noted to avoid pdfkit (personal journal) …`, and your agent is told to ask you. If you say to go ahead, the same install goes through until 10 minutes after the stop. Other notes add nothing. VS Code reads the same folder, but sends its own input, which this hook leaves alone.
