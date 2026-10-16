@@ -631,7 +631,14 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **The switch:** one constant in `src/hook/gemini-cli.ts` (`ON_AVOID`) chooses between asking and denying the first try. Set to `"deny"`, it answers as Codex's adapter does (`{"decision": "deny", "reason": …, "systemMessage": …}`, with the retry record), for the case where the live test shows Gemini CLI not prompting.
 - **Length:** Gemini CLI documents no limit, so Claude Code's are kept.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI and Gemini CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Antigravity CLI** (`repomagpie hook antigravity`, [decision 0036](decisions/0036-hooks-in-other-agents.md); its facts in [agents](agents.md#antigravity-cli)). Antigravity asks: `force_ask` "Always prompts you for approval, ignoring cached permissions".
+- **Input:** Antigravity's `PreToolUse` JSON (camelCase, no event name). Only `toolCall.name` `"run_command"` is read, with `toolCall.args.CommandLine`; other tools get no output. The folder is `toolCall.args.Cwd`, else the first of `workspacePaths`; Antigravity starts the hook in `~/.gemini/config`, so the process's folder is never the project.
+- **An exact avoid note:** `{"decision": "force_ask", "reason": "<the permission prompt's reason, as for Claude Code>"}`. In the pre-check (1.3.5) the reason showed inside "Run this command?", and the prompt came back after "always allow in this conversation".
+- **Every other match, and `--inform-only`:** no output. An `allow` with a `reason` reached neither the agent nor the user in the pre-check, and no output left Antigravity's own prompt as it was.
+- **Never approves:** no `"allow"`, no `"auto_approve"`, no `"ask"` (which respects "Always allow").
+- **Length:** Antigravity documents no limit, so Claude Code's are kept.
+
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI, Gemini CLI and Antigravity CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 

@@ -101,3 +101,20 @@ Add this to `~/.gemini/settings.json`, next to what is there:
 On Windows, Gemini CLI runs the command in PowerShell, where the default execution policy can block npm's `repomagpie.ps1`: write `repomagpie.cmd hook gemini-cli` there. `"hooksConfig": { "enabled": false }` in the same file turns every hook off.
 
 When a note says to avoid the package, Gemini CLI asks you before the install, with the note in its prompt, even for a command you allowed before. Other notes show you a line. For unattended `gemini -p` runs, use `repomagpie hook gemini-cli --inform-only`.
+
+## The Antigravity CLI hook
+
+Add this to `~/.gemini/config/hooks.json`, which Antigravity CLI and the Antigravity IDE both read (its top-level keys are hook names):
+
+```json
+{
+  "repomagpie": {
+    "PreToolUse": [
+      { "matcher": "run_command",
+        "hooks": [ { "type": "command", "command": "repomagpie hook antigravity", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+When a note says to avoid the package, Antigravity asks you before the install, with the note in its "Run this command?" prompt, even after you chose to always allow that command. Other notes add nothing: Antigravity shows a hook's other answers to nobody, and the skill covers them.

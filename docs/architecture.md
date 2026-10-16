@@ -78,7 +78,8 @@ src/
   hook/        core.ts: command and folder → install detection → recall → the texts (agent-neutral,
                decision 0036); claude-code.ts: tool call JSON → core → ask or inform JSON; codex.ts:
                the same for Codex CLI → deny the first try or inform; gemini-cli.ts: for Gemini CLI →
-               ask or inform (one constant switches it to deny); deny.ts and retry.ts: the deny
+               ask or inform (one constant switches it to deny); antigravity.ts: force_ask or nothing;
+               deny.ts and retry.ts: the deny
                texts and the retry record, for agents that can't ask; agents.ts: the agents with an
                adapter. Each adapter is its own chunk, loaded only by its subcommand (check:build)
   mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
