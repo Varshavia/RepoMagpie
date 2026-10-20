@@ -28,7 +28,9 @@ You need Node.js 22.12 or later.
    repomagpie setup
    ```
 
-   It finds Claude Code, Codex CLI, Cursor, Gemini CLI and VS Code, lets you choose, shows what it will change in which file, and asks first. Each agent gets RepoMagpie's MCP server, so it can check your notes before an install and answer "what do I have for browser testing?"; and the agent skill, which tells it when to. Claude Code also gets the hook. Every file is backed up first. `--dry-run` only shows the plan; `--remove` takes it all out. For other agents, or to write the entries yourself, see [setting up by hand](docs/setup-by-hand.md).
+   It finds Claude Code, Codex CLI, Cursor, Gemini CLI, VS Code, Antigravity CLI and Copilot CLI, lets you choose, shows what it will change in which file, and asks first. Each agent gets RepoMagpie's MCP server, so it can check your notes before an install and answer "what do I have for browser testing?"; and the agent skill, which tells it when to. Every agent but VS Code also gets the hook, which checks each install command against your notes before it runs. Every file is backed up first. `--dry-run` only shows the plan; `--remove` takes it all out. Codex CLI runs a new hook only after you trust it in `/hooks`. For other agents, or to write the entries yourself, see [setting up by hand](docs/setup-by-hand.md).
+
+   On Windows, Codex CLI, Copilot CLI, Gemini CLI and Cursor start hooks through Windows PowerShell, which adds about 350 ms per tool call, most of it PowerShell's own start. Antigravity CLI's `cmd` adds about 90 ms. (Copilot CLI runs the hook before every tool call; the others before each shell command.)
 
    Then run `repomagpie doctor`: it shows what is wired in each agent, and what to do when something isn't.
 
@@ -41,7 +43,7 @@ You need Node.js 22.12 or later.
 
    Notes go to your personal journal in `~/.magpie`. Add `--to project` to write to the project journal, `.magpie/` in the repository, which your team shares through git.
 
-   Now when your agent runs `npm install pdfkit`, it sees your note first. In Claude Code, the hook asks you before the install and names the alternatives you noted; it never blocks one. Other agents check through the MCP server and the skill, which work as well as the agent follows them.
+   Now when your agent runs `npm install pdfkit`, it sees your note first. In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you before the install and names the alternatives you noted. Codex CLI, Cursor and Copilot CLI can't ask from a hook, so the hook stops the first try with your note, and your agent asks you; if you say to go ahead, the same install goes through for the next 10 minutes. The hook never blocks an install for good. In VS Code, and wherever the agent runs the install some other way, the MCP server and the skill check it, which works as well as the agent follows them.
 
 4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
 
@@ -102,7 +104,7 @@ $env:GITHUB_TOKEN = gh auth token
 ## Platforms
 
 - Node.js 22.12 or later. CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
-- The hook works in Claude Code. Every agent with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
+- The hook works in Claude Code, Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI. Every agent with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
 - The package has no runtime dependencies: the MCP server's libraries are bundled in it.
 
 ## Documentation

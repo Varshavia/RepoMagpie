@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Cursor also runs the Claude Code hooks in `~/.claude/settings.json` (its "Include Third-Party Plugins, Skills, and Other Configs" setting, on by default). `repomagpie hook claude-code` now stays silent there, so Cursor gets one answer, from its own hook. Claude Code's answers are unchanged.
+- The agent skill says what to do when a hook stops an install in Codex CLI, Cursor or Copilot CLI: show you the note and ask, and if you say to go ahead, install the same package again. It also says to run `repomagpie.cmd` when Windows PowerShell blocks `repomagpie` ("running scripts is disabled"), or to use the MCP tools.
 - The hooks find installs in more of the ways agents write them on Windows: `powershell -EncodedCommand …` (decoded; one that can't be decoded gets a line saying its installs weren't checked), `call npm install …`, `start`, `wsl`, `npx` or `corepack` before the command, `iex '…'`, `Invoke-Expression "…"` and `Start-Process npm -ArgumentList …`.
 
 ### Fixed

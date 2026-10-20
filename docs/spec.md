@@ -505,7 +505,28 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 
 **Search** indexes, per note: `name`, `id`, `tags`, Verdict, "Use when", "Avoid when", "What it does" and "My notes"; and each completed skill line as its own document. Prefix and fuzzy matching are on. Results rank `reviewed` (and completed skill lines) before `inbox`, then by relevance; a skill result's Verdict is its own text (section 2).
 
-## 6. Hook contract (Claude Code)
+## 6. Hook contract
+
+`repomagpie hook <agent>` runs before a shell command in six agents ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md) for Claude Code, [decision 0036](decisions/0036-hooks-in-other-agents.md) for the others; each agent's facts, with sources and dates, in [agents](agents.md)). It reads the agent's JSON on stdin, finds the package installs in the command, looks them up in the journals, and answers in the agent's own format:
+
+| Agent | Command | Reads | An exact avoid note | Any other match | Same install within 10 minutes of a deny |
+|---|---|---|---|---|---|
+| Claude Code | `hook claude-code` | `PreToolUse`, `tool_name` `Bash` or `PowerShell`, `tool_input.command`, `cwd` | `permissionDecision: "ask"` with the reason; context for the agent | context for the agent, a line for the user | (asks every time) |
+| Codex CLI | `hook codex` | `PreToolUse`, `tool_name` `Bash`, `tool_input.command`, `cwd` | `permissionDecision: "deny"` with the reason and the advice, the user's line in `systemMessage` | `additionalContext` and `systemMessage` | informs, as any other match |
+| Gemini CLI | `hook gemini-cli` | `BeforeTool`, `tool_name` `run_shell_command`, `tool_input.command`, `cwd` and `dir_path` | `decision: "ask"`, the reason in `systemMessage` | `systemMessage` | (asks every time) |
+| Antigravity CLI | `hook antigravity` | `toolCall.name` `run_command`, `toolCall.args.CommandLine`, `Cwd` | `decision: "force_ask"` with the reason | nothing | (asks every time) |
+| Copilot CLI | `hook copilot` | `toolName` `powershell` or `bash`, `toolArgs.command`, `cwd` | `permissionDecision: "deny"` with the reason and the advice | nothing | nothing |
+| Cursor | `hook cursor` | `beforeShellExecution`, `command`, `cwd`, `workspace_roots` | `permission: "deny"`, the reason and the advice in `agent_message`, the user's line in `user_message` | nothing | nothing |
+
+Rules for every adapter:
+- **Shell commands only.** Every other tool, event or input shape gets no output.
+- **Never approves.** No answer skips the agent's own confirmation: no `allow`, `auto_approve`, rewritten input, nor Copilot CLI's `ask`, which 1.0.98 treats as approval. "Nothing" above means no output at all, which leaves the agent's prompt as it was (the pre-check, [agents](agents.md#the-pre-check-on-real-agents-windows-2026-10-15)).
+- **The retry rule** (Codex CLI, Copilot CLI, Cursor; Gemini CLI too if its switch is set to deny): the first try of an install with an exact avoid note is denied, and the deny is recorded in `<personal journal>/.cache/hook-retry.json`: a SHA-256 of the agent, the folder and the stopped packages (registry and name, sorted), with the time. The same install, in any form (`npm`, `npm.cmd`, `& npm`, `pnpm add`), goes through until 10 minutes after the deny; a pass neither renews nor removes the entry. If the record can't be read or written, the adapter informs instead of denying.
+- **Fails open.** No note, an unreadable command, a missing journal or any error: no output, exit 0, the error logged in the personal journal's `.cache/hook-errors.log`. It never exits 2. The entries `setup` writes start node only when node and the entry file exist (below, "Setup, for these five agents").
+- **`--inform-only`** never asks and never denies.
+- **The texts** are Claude Code's, below: the permission prompt's reason, the context for the agent and the line for the user, each note quoted and labelled with whose journal it is ([decision 0032](decisions/0032-note-text-is-data.md)). The deny reason is the prompt's reason followed by the advice, and the user's line is `RepoMagpie: stopped installing <names>: …` (examples under Codex CLI). Each agent's caps are in its block.
+
+The rest of this section up to **Codex CLI** is Claude Code's contract; the other agents' blocks follow it.
 
 Checked against the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) on 2026-10-03, and again on 2026-10-04: the input has `tool_name`, `tool_input.command` and `cwd`; the output fields below; `permissionDecision` `"ask"`; the 10,000-character cap on `additionalContext` and `systemMessage`.
 

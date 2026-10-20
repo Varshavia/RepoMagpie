@@ -180,6 +180,8 @@ That is why `setup` writes the absolute `node` and the absolute entry file, neve
 
 "Ask" is what our Claude Code hook does on an avoid note ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)); "context on allow" is how the other notes reach the agent. Where an agent can't ask, or not reliably (Copilot CLI among them, after the pre-check), the adapter denies the first try and lets the same install through for the next 10 minutes ([decision 0036](decisions/0036-hooks-in-other-agents.md)). Gemini CLI asks: its source supports `ask` (checked 2026-10-16). Rows for the five agents of that decision checked 2026-10-15 (sections above), in the docs and source and then on Windows in the pre-check (below), except Gemini CLI.
 
+**What was built** (2026-10-20): an adapter for each of the six, `repomagpie hook <agent>`. Claude Code, Gemini CLI and Antigravity CLI ask (`force_ask` for Antigravity); Codex CLI, Cursor and Copilot CLI deny the first try. Only Codex CLI, Claude Code and Gemini CLI get a line for the other matches; the others print nothing then, since nothing they print would reach anyone. The input, output and texts of each are in the [spec](spec.md#6-hook-contract), section 6; how `setup` writes each entry, with the Windows timings, is below. Windsurf, Cline, OpenCode and Zed have no adapter: their rows are research only.
+
 | Agent | Event | Ask | Context on allow | On a non-zero exit, a crash or bad output | Shell on Windows |
 |---|---|---|---|---|---|
 | Claude Code | `PreToolUse` | yes | yes (`additionalContext`) | our hook prints nothing and exits 0 ([spec](spec.md), section 6) | none in exec form |
