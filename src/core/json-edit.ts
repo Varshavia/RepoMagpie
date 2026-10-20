@@ -31,6 +31,16 @@ export function setMember(text: string | null, [container, name]: [string, strin
   return insert(text, inner, 1, `${JSON.stringify(name)}: ${format(text, value, 2)}`);
 }
 
+// Sets the root object's member `name` to `value`, adding it last when missing. Null text (no file)
+// starts a new file.
+export function setTop(text: string | null, name: string, value: unknown): string {
+  if (text === null || !text.trim()) return `${JSON.stringify({ [name]: value }, null, 2)}\n`;
+  const root = asObject(parseRoot(text), "the root");
+  const member = root.members.find((m) => m.key === name);
+  if (member) return splice(text, member.value, format(text, value, 1));
+  return insert(text, root, 0, `${JSON.stringify(name)}: ${format(text, value, 1)}`);
+}
+
 // Appends `value` to the array at `path`.
 export function appendItem(text: string, path: Path, value: unknown): string {
   const array = locate(parseRoot(text), path);

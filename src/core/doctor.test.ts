@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { mcpEntry, readJsonc, type Platform } from "./agents.ts";
+import { codexHookHash } from "./codex-hooks.ts";
 import { runDoctor, type DoctorRequest } from "./doctor.ts";
+import { hookLaunch, hookShell, type HookSub } from "./hook-launch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { renderNote } from "./write.ts";
 
@@ -152,6 +154,52 @@ test("the hook's exec form: fine when both paths exist and code generation is of
   assert.match(hookProblems()[0], /starts .*gone.*node\.exe, which doesn't exist\. Run repomagpie setup again\.$/);
   box.write(file, settings(process.execPath, [entry, "hook", "claude-code"]));
   assert.match(hookProblems()[0], /doesn't start node with --disallow-code-generation-from-strings/);
+});
+
+test("the other agents' hooks: setup's form with its paths and flags; a broken path is a to-do, Copilot CLI's first; the shell form is one", () => {
+  const box = scratchHome();
+  const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
+  box.write(entry, "");
+  const launch = (sub: HookSub, node: string, flags: string[] = []) => hookLaunch(hookShell(sub, platform), node, entry, sub, flags) as string;
+  const field = windows ? "powershell" : "bash";
+  box.write(join(box.home, ".cursor", "hooks.json"), JSON.stringify({ version: 1, hooks: { beforeShellExecution: [{ command: launch("cursor", process.execPath, ["--inform-only"]), timeout: 10 }] } }));
+  box.write(join(box.home, ".gemini", "settings.json"), JSON.stringify({ hooks: { BeforeTool: [{ matcher: "run_shell_command", hooks: [{ type: "command", name: "repomagpie", command: "repomagpie hook gemini-cli" }] }] } }));
+  box.write(join(box.home, ".copilot", "hooks", "repomagpie.json"), JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: "command", [field]: launch("copilot", join(box.root, "moved", "node.exe")), timeoutSec: 10 }] } }));
+  const before = snapshot(box.root);
+  const report = runDoctor(box.request);
+  assert.deepEqual(snapshot(box.root), before, "read-only");
+  const by = (id: string) => report.agent_hooks.find((h) => h.id === id);
+  assert.deepEqual(report.agent_hooks.map((h) => [h.id, h.entries.length]), [["codex", 0], ["cursor", 1], ["gemini", 1], ["antigravity", 0], ["copilot", 1]]);
+  assert.deepEqual(by("cursor")?.entries[0], { form: "setup", command: launch("cursor", process.execPath, ["--inform-only"]), node: process.execPath, entry, node_found: true, entry_found: true, flags: ["--inform-only"], trust: null });
+  assert.deepEqual([by("gemini")?.entries[0].form, by("gemini")?.entries[0].node_found], ["name", false], "no repomagpie on this PATH");
+  assert.deepEqual([by("copilot")?.entries[0].node_found, by("copilot")?.entries[0].entry_found], [false, true]);
+  // Copilot CLI's broken path is the first to-do.
+  assert.match(report.problems[0], /^The Copilot CLI hook in ~[\\/]\.copilot[\\/]hooks[\\/]repomagpie\.json starts .*moved.*node\.exe, which isn't there, so it does nothing\. Run repomagpie setup again\.$/);
+  assert.ok(report.problems.some((p) => /^The Gemini CLI hook in .* starts repomagpie, which isn't there, so it fails on every shell command\./.test(p)), report.problems.join("\n"));
+  assert.ok(!report.problems.some((p) => p.includes("Cursor hook")), "Cursor's is fine");
+});
+
+test("the Codex CLI hook's trust, from config.toml: not trusted yet and changed are to-dos; trusted and turned off aren't", () => {
+  const box = scratchHome();
+  const entry = join(box.bin, "main.js");
+  box.write(entry, "");
+  const hooksFile = join(box.home, ".codex", "hooks.json");
+  const handler = { type: "command", command: hookLaunch(hookShell("codex", platform), process.execPath, entry, "codex", []) as string, timeout: 10 };
+  box.write(hooksFile, JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "./theirs.sh" }] }, { matcher: "Bash", hooks: [handler] }] } }));
+  const state = (body: string) => box.write(join(box.home, ".codex", "config.toml"), `[hooks.state.'${hooksFile}:pre_tool_use:1:0']\n${body}\n`);
+  const trust = () => {
+    const r = runDoctor(box.request);
+    return [r.agent_hooks[0].entries[0].trust, r.problems.filter((p) => /Codex CLI skips|so Codex CLI skips it/.test(p)).length];
+  };
+  assert.deepEqual(trust(), ["not trusted", 1], "no config.toml");
+  state(`trusted_hash = "${codexHookHash("Bash", handler, windows)}"`);
+  assert.deepEqual(trust(), ["trusted", 0]);
+  state('trusted_hash = "sha256:0000"');
+  assert.deepEqual(trust(), ["changed since trusted", 1]);
+  state(`trusted_hash = "${codexHookHash("Bash", handler, windows)}"\nenabled = false`);
+  assert.deepEqual(trust(), ["turned off", 0], "the user's choice");
+  box.write(join(box.home, ".codex", "config.toml"), "[features]\nhooks = false\n");
+  assert.match(runDoctor(box.request).agent_hooks[0].off ?? "", /^Codex's hooks are turned off/);
 });
 
 test("MCP entries: a broken path is found; a good one shows its version and --allow-write; env values never appear", () => {

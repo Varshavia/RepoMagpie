@@ -142,7 +142,7 @@ test("S6: a skill folder of ours with a link inside it: updating never writes th
     t.skip("no links here");
     return;
   }
-  const r = { source, shared, claude: null, root: s.home, remove: false, stamp: "20261014-120000", platform, project: false };
+  const r = { source, shared, claude: null, antigravity: null, root: s.home, remove: false, stamp: "20261014-120000", platform, project: false };
   const plan = planSkill(r);
   assert.equal(plan.shared.action, "update");
   applySkill(plan, r);
@@ -156,10 +156,14 @@ test("S7: node and entry paths with spaces, quotes, % and non-ASCII letters in t
   const userish = join(s.home, "AppData", "Roaming", "npm");
   const launch = { command: join(s.home, "nodejs", "node.exe"), args: [NO_CODEGEN, join(userish, "node_modules", "repomagpie", "dist", "cli", "main.js"), "mcp"] };
   const done = applySetup(planSetup(s.request({ launch })), s.request({ launch }));
-  assert.deepEqual(done.agents.map((a) => [a.id, a.result, a.error]), ["claude-code", "codex", "cursor", "gemini", "vscode"].map((id) => [id, "done", undefined]));
+  assert.deepEqual(done.agents.filter((a) => a.installed).map((a) => [a.id, a.result, a.error]), ["claude-code", "codex", "cursor", "gemini", "vscode"].map((id) => [id, "done", undefined]));
   assert.equal(done.hook?.result, "done");
   const hook = JSON.parse(readFileSync(s.settings, "utf8")).hooks.PreToolUse[0].hooks[0];
   assert.deepEqual(hook, { type: "command", command: launch.command, args: [NO_CODEGEN, launch.args[1], "hook", "claude-code"] });
+  // The other agents' hook entries quote both paths for their shell, and read back to them exactly.
+  assert.deepEqual(done.hooks.map((h) => [h.id, h.result, h.error]), ["codex", "cursor", "gemini"].map((id) => [id, "done", undefined]));
+  const entries = s.doctor().agent_hooks.flatMap((h) => h.entries.map((e) => [h.id, e.form, e.node, e.entry]));
+  assert.deepEqual(entries, ["codex", "cursor", "gemini"].map((id) => [id, "setup", launch.command, launch.args[1]]));
 });
 
 test("S8: a config file's permissions survive the edit, and the backup has them too", { skip: platform === "win32" && "POSIX permissions" }, () => {

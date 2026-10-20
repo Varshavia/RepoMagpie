@@ -2,13 +2,15 @@
 // report. Read-only: it writes nothing, not even a cache. Values from config files' `env` never
 // appear, only their names. Never prints.
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, isInstalled, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { backupsOf, CONFIG_LIMIT } from "./config-write.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { findHooks } from "./setup-hook.ts";
+import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
+import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
 
@@ -48,6 +50,34 @@ export interface AgentReport {
   error?: string; // the file exists but can't be read
 }
 
+// A hook entry in another agent's file (decision 0036), read as setup writes it.
+export interface AgentHookEntry {
+  // setup: node started directly, only when it and the entry file exist (what setup writes);
+  // name: `repomagpie hook <agent>` through the shell; other: anything else that runs our hook.
+  form: "setup" | "name" | "other";
+  command: string;
+  node: string | null; // for the name form, the program it starts (repomagpie.cmd)
+  entry: string | null;
+  // For the setup form, whether its node and entry file exist; for the name form, whether its
+  // program is on PATH (node_found). null otherwise.
+  node_found: boolean | null;
+  entry_found: boolean | null;
+  flags: string[];
+  // Codex CLI only: the trust Codex keeps for this entry in config.toml. null for other agents, or
+  // when config.toml can't be read.
+  trust: "trusted" | "not trusted" | "changed since trusted" | "turned off" | null;
+}
+
+export interface AgentHookReport {
+  id: Agent["id"];
+  name: string;
+  installed: boolean;
+  file: string;
+  entries: AgentHookEntry[];
+  off: string | null; // the agent's hooks are turned off, which setup leaves as it is
+  error?: string; // the file exists but can't be read
+}
+
 export interface JournalReport {
   scope: "personal" | "project";
   path: string;
@@ -64,6 +94,7 @@ export interface DoctorJson {
   commands: { name: "repomagpie" | "magpie"; found: Command[] }[]; // the first one found runs
   skills: { path: string; link: string | null; version: string | null }[]; // the folders that exist
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
+  agent_hooks: AgentHookReport[]; // Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI
   agents: AgentReport[];
   backups: { path: string; date: string }[]; // setup's backups, for the user to delete; never a problem
   journals: JournalReport[];
@@ -116,6 +147,24 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     }
   }
 
+  // The other agents' hooks. A broken Copilot CLI hook goes first: Copilot CLI denies every tool
+  // call when a hook fails, which setup's entry avoids only while its paths exist.
+  const agentHooks = HOOK_SPECS.map((spec) => agentHookReport(spec, where));
+  for (const h of agentHooks) {
+    for (const e of h.entries) {
+      const missing = e.form === "setup" ? (!e.node_found ? e.node : !e.entry_found ? e.entry : null) : e.form === "name" && !e.node_found ? e.node : null;
+      if (missing) {
+        const what = e.form === "setup" ? "so it does nothing. Run repomagpie setup again." : h.id === "copilot" ? "so Copilot CLI denies every tool call. Run repomagpie setup again." : "so it fails on every shell command. Run repomagpie setup again.";
+        const line = `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${what}`;
+        if (h.id === "copilot") problems.unshift(line);
+        else problems.push(line);
+      } else if (e.form === "name") problems.push(`The ${h.name} hook in ${tilde(h.file)} starts repomagpie through the shell. Run repomagpie setup to start node directly.`);
+      if (e.trust === "not trusted") problems.push("Codex CLI skips RepoMagpie's hook until you trust it: open /hooks in Codex and trust it.");
+      if (e.trust === "changed since trusted") problems.push("RepoMagpie's hook changed since you trusted it, so Codex CLI skips it: open /hooks in Codex and trust it again.");
+    }
+    if (h.error) problems.push(`Couldn't read ${h.name}'s ${tilde(h.file)}: ${h.error}.`);
+  }
+
   // Each agent's MCP entry.
   const agents = AGENTS.map((agent): AgentReport => {
     const config = agent.mcpFile(where);
@@ -157,8 +206,9 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   }
 
   // Setup's backups: beside each file it edits, and beside the skills folders (setup-skill.ts).
-  const backedUp = [...AGENTS.map((agent) => agent.mcpFile(where)), claudeSettings(where), join(request.home, ".agents", "repomagpie-skill"), join(request.home, ".claude", "repomagpie-skill")];
-  const backups = backedUp.flatMap((file) => backupsOf(file, request.home));
+  const backedUp = [...AGENTS.map((agent) => agent.mcpFile(where)), claudeSettings(where), ...HOOK_SPECS.map((spec) => spec.file(where)),
+    join(request.home, ".agents", "repomagpie-skill"), join(request.home, ".claude", "repomagpie-skill"), join(request.home, ".gemini", "repomagpie-skill")];
+  const backups = [...new Set(backedUp)].flatMap((file) => backupsOf(file, request.home));
 
   // The journals.
   const personal = resolvePersonalJournal({ home: request.home, env: request.env, cwd: request.cwd, flag: request.homeFlag });
@@ -170,7 +220,46 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     if (j.unreadable.length) problems.push(`${j.unreadable.length} ${j.unreadable.length === 1 ? "note has" : "notes have"} frontmatter that can't be read in the ${j.scope} journal.`);
   }
 
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, agents, backups, journals, problems };
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, agent_hooks: agentHooks, agents, backups, journals, problems };
+}
+
+// An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked
+// and, for Codex CLI, the trust config.toml keeps for each.
+function agentHookReport(spec: HookSpec, where: Where): AgentHookReport {
+  const agent = AGENTS.find((a) => a.id === spec.id) as Agent;
+  const file = spec.file(where);
+  const report: AgentHookReport = { id: spec.id, name: agent.name, installed: isInstalled(agent, where), file, entries: [], off: spec.off?.(where) ?? null };
+  if (!existsSync(file)) return report;
+  const read = readConfig(file);
+  const parsed = "error" in read ? read : readJsonc(read.text);
+  if ("error" in parsed) return { ...report, error: redactText(parsed.error) };
+  const found = findAgentHooks(spec, parsed.value, where.platform);
+  if (typeof found === "string") return { ...report, error: found };
+  const windows = where.platform === "win32";
+  // Codex's config.toml, beside hooks.json: none means nothing is trusted yet; unreadable, unknown.
+  const configToml = join(dirname(file), "config.toml");
+  const tomlRead = spec.id !== "codex" ? null : existsSync(configToml) ? readConfig(configToml) : { text: "" };
+  const toml = tomlRead && "text" in tomlRead ? tomlRead.text : null;
+  report.entries = found.map((f): AgentHookEntry => {
+    const command = String(spec.commandOf(f.value, where.platform));
+    const program = f.parsed.form === "name" ? command.trim().replace(/^&\s*/, "").split(/\s+/)[0].replace(/^['"]|['"]$/g, "") : null;
+    let trust: AgentHookEntry["trust"] = null;
+    if (spec.id === "codex" && toml !== null) {
+      const state = codexTrust(toml, file, f.group, f.handler, windows);
+      trust = state && !state.enabled ? "turned off" : !state?.trusted_hash ? "not trusted" : state.trusted_hash === codexHookHash(f.matcher, f.value, windows) ? "trusted" : "changed since trusted";
+    }
+    return {
+      form: f.parsed.form,
+      command: redactText(command),
+      node: f.parsed.node ?? program,
+      entry: f.parsed.entry,
+      node_found: f.parsed.form === "setup" ? isFile(f.parsed.node as string) : program !== null ? (isAbsolute(program) ? isFile(program) : onPath(program.replace(/\.(cmd|ps1)$/i, ""), where).length > 0) : null,
+      entry_found: f.parsed.form === "setup" ? isFile(f.parsed.entry as string) : null,
+      flags: f.parsed.flags,
+      trust,
+    };
+  });
+  return report;
 }
 
 // Claude Code's project settings, in the project root (where a .claude/ folder is).

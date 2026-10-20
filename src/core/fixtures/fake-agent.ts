@@ -1,7 +1,7 @@
 // Test helper: fake agent CLIs for repomagpie setup's tests. `node fake-agent.ts <agent> <args...>`
 // appends {agent, args} to FAKE_AGENT_LOG, then does what the real CLI's docs say (docs/agents.md)
-// to a file in the scratch home (HOME / USERPROFILE): `mcp add` and `mcp remove` for claude, codex
-// and gemini, `--add-mcp` for code. FAKE_AGENT_FAIL=<agent> makes that agent exit 1;
+// to a file in the scratch home (HOME / USERPROFILE): `mcp add` and `mcp remove` for claude, codex,
+// gemini and copilot, `--add-mcp` for code. FAKE_AGENT_FAIL=<agent> makes that agent exit 1;
 // FAKE_AGENT_MANGLE=<agent> makes it record a different command, as a CLI with a bug would.
 // Not part of the build.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -30,11 +30,13 @@ const added = () => {
   return { name, command: mangle(args[dash + 1]), rest: args.slice(dash + 2) };
 };
 
-if (agent === "claude" || agent === "gemini") {
-  const file = agent === "claude" ? join(home, ".claude.json") : join(home, ".gemini", "settings.json");
+if (agent === "claude" || agent === "gemini" || agent === "copilot") {
+  const file = agent === "claude" ? join(home, ".claude.json") : agent === "gemini" ? join(home, ".gemini", "settings.json") : join(process.env.COPILOT_HOME ?? join(home, ".copilot"), "mcp-config.json");
+  const entry = (command: string, rest: string[]) =>
+    agent === "claude" ? { type: "stdio", command, args: rest, env: {} } : agent === "copilot" ? { type: "local", command, args: rest, env: {}, tools: ["*"] } : { command, args: rest };
   if (args[0] === "mcp" && args[1] === "add") {
     const { name, command, rest } = added();
-    json(file, (root) => { root.mcpServers = { ...root.mcpServers, [name]: agent === "claude" ? { type: "stdio", command, args: rest, env: {} } : { command, args: rest } }; });
+    json(file, (root) => { root.mcpServers = { ...root.mcpServers, [name]: entry(command, rest) }; });
   } else if (args[0] === "mcp" && args[1] === "remove") {
     json(file, (root) => { delete root.mcpServers?.[args.at(-1) as string]; });
   }

@@ -18,7 +18,7 @@ export interface Where {
 export type McpFormat = "mcpServers" | "servers" | "codex-toml";
 
 export interface Agent {
-  id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode";
+  id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode" | "antigravity" | "copilot";
   name: string;
   cli: string; // the command on PATH
   marker: (w: Where) => string; // a folder or file of its own: it counts as installed when this exists (or cli is on PATH)
@@ -33,15 +33,20 @@ const vscodeUser = (w: Where) =>
 const codexHome = (w: Where) => w.env.CODEX_HOME ?? join(w.home, ".codex");
 
 const geminiSettings = (w: Where) => join(w.home, ".gemini", "settings.json");
+export const copilotHome = (w: Where) => w.env.COPILOT_HOME ?? join(w.home, ".copilot");
 
-// The first set (decision 0035), in the order setup and doctor show them. Gemini CLI's marker is its
-// settings.json, not ~/.gemini: Antigravity CLI makes that folder too (docs/agents.md).
+// The first set (decision 0035, and 0036 for Antigravity CLI and Copilot CLI), in the order setup
+// and doctor show them. Gemini CLI's marker is its settings.json, not ~/.gemini: Antigravity CLI
+// makes that folder too. Copilot CLI's is its config.json, not ~/.copilot, which VS Code reads too
+// (docs/agents.md).
 export const AGENTS: Agent[] = [
   { id: "claude-code", name: "Claude Code", cli: "claude", marker: (w) => join(w.home, ".claude"), mcpFile: (w) => join(w.home, ".claude.json"), format: "mcpServers" },
   { id: "codex", name: "Codex CLI", cli: "codex", marker: codexHome, mcpFile: (w) => join(codexHome(w), "config.toml"), format: "codex-toml" },
   { id: "cursor", name: "Cursor", cli: "cursor", marker: (w) => join(w.home, ".cursor"), mcpFile: (w) => join(w.home, ".cursor", "mcp.json"), format: "mcpServers" },
   { id: "gemini", name: "Gemini CLI", cli: "gemini", marker: geminiSettings, mcpFile: geminiSettings, format: "mcpServers" },
   { id: "vscode", name: "VS Code (GitHub Copilot)", cli: "code", marker: vscodeUser, mcpFile: (w) => join(vscodeUser(w), "mcp.json"), format: "servers" },
+  { id: "antigravity", name: "Antigravity CLI", cli: "agy", marker: (w) => join(w.home, ".gemini", "antigravity-cli"), mcpFile: (w) => join(w.home, ".gemini", "config", "mcp_config.json"), format: "mcpServers" },
+  { id: "copilot", name: "Copilot CLI", cli: "copilot", marker: (w) => join(copilotHome(w), "config.json"), mcpFile: (w) => join(copilotHome(w), "mcp-config.json"), format: "mcpServers" },
 ];
 
 // Its marker exists, or its command is in an absolute PATH folder.
@@ -56,7 +61,7 @@ export const skillFolders = (w: Where) => [
   join(w.home, ".agents", "skills", "repomagpie"),
   join(w.home, ".claude", "skills", "repomagpie"),
   join(w.home, ".cursor", "skills", "repomagpie"),
-  join(w.home, ".copilot", "skills", "repomagpie"),
+  join(copilotHome(w), "skills", "repomagpie"),
   join(w.home, ".gemini", "skills", "repomagpie"),
   join(codexHome(w), "skills", "repomagpie"),
 ];
@@ -234,7 +239,7 @@ function codexEntry(text: string, name: string): { entry: McpEntry | null } | { 
 }
 
 // A TOML basic string ("…", JSON-like escapes) or literal string ('…'); null for anything else.
-function tomlString(value: string): string | null {
+export function tomlString(value: string): string | null {
   const trimmed = value.replace(/\s+#.*$/, "");
   if (/^'[^']*'$/.test(trimmed)) return trimmed.slice(1, -1);
   if (/^"(?:[^"\\]|\\.)*"$/.test(trimmed)) {

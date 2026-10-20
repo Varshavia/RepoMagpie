@@ -1,6 +1,6 @@
 // repomagpie doctor (decision 0035): the human output of core's runDoctor. Read-only, and exits 0
 // whatever it finds, so its output can always go into a bug report.
-import { runDoctor, type AgentReport, type DoctorJson } from "../core/doctor.ts";
+import { runDoctor, type AgentHookEntry, type AgentReport, type DoctorJson } from "../core/doctor.ts";
 import type { Platform } from "../core/agents.ts";
 import { clean, cleanAll } from "../core/text.ts";
 import { packageVersion } from "../core/version.ts";
@@ -16,8 +16,8 @@ export async function doctorCommand(options: GlobalOptions, io: Io): Promise<num
   return 0;
 }
 
-// Sections in the order they are wired: the commands, the skill, the hook, each agent's MCP server,
-// the journals; then what to do. Every line is cleaned (paths and commands come from other files).
+// Sections in the order they are wired: the commands, the skill, the Claude Code hook, the other
+// agents' hooks, each agent's MCP server, the journals; then what to do. Every line is cleaned (paths and commands come from other files).
 export function render(r: DoctorJson, home: string): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
   const lines = [`RepoMagpie ${r.version}, Node.js ${r.node.version} (${tilde(r.node.path)})`, ""];
@@ -46,6 +46,14 @@ export function render(r: DoctorJson, home: string): string {
     if (h.error) lines.push(`  ${tilde(h.file)}: can't be read: ${h.error}`);
   }
 
+  lines.push("", "Hooks in other agents");
+  for (const h of r.agent_hooks) {
+    const off = h.off ? `  (${h.off.split(";")[0]})` : "";
+    if (h.error) lines.push(`  ${h.name.padEnd(15)}  can't read ${tilde(h.file)}: ${h.error}`);
+    else if (!h.entries.length) lines.push(`  ${h.name.padEnd(15)}  ${h.installed ? "none" : "not installed"}${off}`);
+    for (const e of h.entries) lines.push(`  ${h.name.padEnd(15)}  ${tilde(h.file)}: ${agentHookLine(e)}${off}`);
+  }
+
   lines.push("", "MCP server in each agent");
   for (const a of r.agents) lines.push(`  ${a.name.padEnd(12)}  ${agentLine(a, tilde)}`);
 
@@ -71,8 +79,18 @@ export function render(r: DoctorJson, home: string): string {
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }
 
+function agentHookLine(e: AgentHookEntry): string {
+  const parts = [e.form === "setup" ? `node started directly${e.node_found && e.entry_found ? "" : ", a path is missing"}`
+    : e.form === "name" ? `repomagpie through the shell${e.node_found ? "" : ", not found"}` : "runs RepoMagpie another way"];
+  if (e.flags.length) parts.push(e.flags.join(" "));
+  if (e.trust) parts.push(e.trust);
+  return parts.join(", ");
+}
+
 function agentLine(a: AgentReport, tilde: (path: string) => string): string {
   if (a.error) return `can't read ${tilde(a.config)}: ${a.error}`;
+  // Antigravity lists the servers from its own cache (docs/agents.md).
+  if (!a.mcp && a.installed && a.id === "antigravity") return `installed; no repomagpie entry in ${tilde(a.config)} (a removed entry can stay listed until ~/.gemini/antigravity-cli/mcp/ is cleared)`;
   if (!a.mcp) return a.installed ? `installed; no repomagpie entry in ${tilde(a.config)}` : "not installed";
   const m = a.mcp;
   const parts = [`${tilde(m.command ?? "(no command)")}${m.node_found ? "" : " (missing)"}`];
