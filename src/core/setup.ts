@@ -71,7 +71,8 @@ export interface SetupRequest {
 const CLI: Record<Agent["id"], { add?: (l: { command: string; args: string[] }) => string[]; remove?: string[]; edit: boolean }> = {
   "claude-code": { add: (l) => ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: false },
   codex: { add: (l) => ["mcp", "add", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", NAME], edit: false },
-  gemini: { add: (l) => ["mcp", "add", "--scope", "user", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: true },
+  // Gemini CLI's command comes before --: what follows -- only joins its args.
+  gemini: { add: (l) => ["mcp", "add", "--scope", "user", NAME, l.command, "--", ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: true },
   cursor: { edit: true },
   vscode: { add: (l) => ["--add-mcp", JSON.stringify({ name: NAME, command: l.command, args: l.args })], edit: true },
   antigravity: { edit: true },
@@ -209,7 +210,9 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
       const steps = [...(p.action !== "add" && how.remove ? [how.remove] : []), ...(wanted && how.add ? [how.add(wanted)] : [])];
       for (const args of steps) {
         const run = runCli(cli, args, { env: where.env, platform: where.platform, cwd: where.home });
-        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${redactText((run.stderr || run.stdout).trim().split("\n").slice(-3).join(" "))}`);
+        // The first lines: a CLI puts its error there, and its help after.
+        const said = (run.stderr || run.stdout).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 3).join(" ");
+        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${redactText(said)}`);
       }
     } else {
       try {

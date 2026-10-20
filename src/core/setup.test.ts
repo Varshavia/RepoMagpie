@@ -79,7 +79,7 @@ test("applying: every agent's CLI gets the exact arguments, every file holds the
   assert.deepEqual(s.calls(), [
     { agent: "claude", args: ["mcp", "add", "--scope", "user", "--transport", "stdio", "repomagpie", "--", command, ...args] },
     { agent: "codex", args: ["mcp", "add", "repomagpie", "--", command, ...args] },
-    { agent: "gemini", args: ["mcp", "add", "--scope", "user", "repomagpie", "--", command, ...args] },
+    { agent: "gemini", args: ["mcp", "add", "--scope", "user", "repomagpie", command, "--", ...args] },
     { agent: "code", args: ["--add-mcp", JSON.stringify({ name: "repomagpie", command, args })] },
   ]);
   assert.deepEqual(JSON.parse(readFileSync(s.files.cursor, "utf8")), { mcpServers: { repomagpie: { command, args } } });
@@ -138,7 +138,7 @@ test("the note tool: without a choice each entry keeps its own, a new one starts
   assert.ok(done.agents.filter((a) => a.installed).every((a) => a.result === "done"), JSON.stringify(done.agents.map((a) => a.error)));
   assert.deepEqual(JSON.parse(readFileSync(s.files.cursor, "utf8")).mcpServers.repomagpie, on);
   assert.deepEqual(JSON.parse(readFileSync(s.files.gemini, "utf8")).mcpServers.repomagpie.args, on.args);
-  assert.deepEqual(s.calls().at(-1), { agent: "gemini", args: ["mcp", "add", "--scope", "user", "repomagpie", "--", on.command, ...on.args] });
+  assert.deepEqual(s.calls().at(-1), { agent: "gemini", args: ["mcp", "add", "--scope", "user", "repomagpie", on.command, "--", ...on.args] });
   assert.deepEqual(JSON.parse(readFileSync(s.vscodeMcp, "utf8")).servers.repomagpie.args, on.args, "VS Code's CLI can't remove: its file is edited");
 
   // A snippet to paste names the same choice: Codex without its CLI, an entry that has the note tool on.
@@ -228,7 +228,8 @@ test("a failing CLI, and a CLI that records something else, are failures that sa
   const done = applySetup(planSetup(s.request()), s.request());
   const by = (id: string) => done.agents.find((a) => a.id === id);
   assert.equal(by("gemini")?.result, "failed");
-  assert.match(by("gemini")?.error ?? "", /gemini mcp add failed \(exit 1\): gemini: something went wrong/);
+  // The CLI's first lines (its error and the start of its help), not the end of its help.
+  assert.equal(by("gemini")?.error, "gemini mcp add failed (exit 1): gemini: something went wrong Usage: gemini mcp add [options] <name> <commandOrUrl> [args...] Options:");
   assert.equal(by("vscode")?.result, "failed");
   assert.match(by("vscode")?.error ?? "", /didn't record the entry as expected/);
 });

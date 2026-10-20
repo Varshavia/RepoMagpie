@@ -9,10 +9,12 @@ import { dirname, join } from "node:path";
 
 const [agent, ...args] = process.argv.slice(2);
 appendFileSync(process.env.FAKE_AGENT_LOG as string, `${JSON.stringify({ agent, args, cwd: process.cwd() })}\n`);
-if (process.env.FAKE_AGENT_FAIL === agent) {
-  process.stderr.write(`${agent}: something went wrong\n`);
+// A failure as yargs prints one: the error first, then the whole help.
+const failWithHelp = (error: string): never => {
+  process.stderr.write(`${error}\r\nUsage: ${agent} mcp add [options] <name> <commandOrUrl> [args...]\r\n\r\nOptions:\r\n  -s, --scope  [string]\r\n  -e, --env  [array]\r\n  -h, --help  Show help  [boolean]\r\n`);
   process.exit(1);
-}
+};
+if (process.env.FAKE_AGENT_FAIL === agent) failWithHelp(`${agent}: something went wrong`);
 const home = (process.platform === "win32" ? process.env.USERPROFILE : process.env.HOME) as string;
 const mangle = (command: string) => (process.env.FAKE_AGENT_MANGLE === agent ? `${command}-mangled` : command);
 
@@ -23,9 +25,15 @@ const json = (file: string, change: (root: Record<string, Record<string, unknown
   writeFileSync(file, `${JSON.stringify(root, null, 2)}\n`);
 };
 
-// "mcp add [options] <name> -- <command> [args...]"
+// "mcp add [options] <name> -- <command> [args...]"; Gemini CLI's is
+// "mcp add [options] <name> <commandOrUrl> [-- args...]": what follows -- is never its command.
 const added = () => {
   const dash = args.indexOf("--");
+  if (agent === "gemini") {
+    const positionals = args.slice(2, dash < 0 ? undefined : dash).filter((arg, i, all) => !arg.startsWith("-") && all[i - 1] !== "--scope");
+    if (positionals.length < 2) failWithHelp(`Not enough non-option arguments: got ${positionals.length}, need at least 2`);
+    return { name: positionals[0], command: mangle(positionals[1]), rest: dash < 0 ? [] : args.slice(dash + 1) };
+  }
   const name = args[dash - 1];
   return { name, command: mangle(args[dash + 1]), rest: args.slice(dash + 2) };
 };
