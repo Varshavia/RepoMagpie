@@ -4,6 +4,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, posix, resolve, win32 } from "node:path";
 import type { Env } from "./journals.ts";
+import { hasDuplicateKey } from "./json-edit.ts";
 
 export type Platform = "win32" | "darwin" | "linux";
 
@@ -145,8 +146,8 @@ function readHead(file: string, bytes: number): string {
 // --- Reading config files without changing them ---
 
 // JSON with comments and trailing commas, as VS Code, Cursor and Gemini CLI accept them: the value,
-// and whether the text had either (setup edits only plain JSON). An error message when it can't be
-// read. Strings are kept as written, so "//" inside a URL stays.
+// and whether the text had either, or a key twice (setup edits only plain JSON). An error message
+// when it can't be read. Strings are kept as written, so "//" inside a URL stays.
 export function readJsonc(text: string): { value: unknown; plain: boolean } | { error: string } {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   let out = "";
@@ -172,7 +173,8 @@ export function readJsonc(text: string): { value: unknown; plain: boolean } | { 
     } else out += ch;
   }
   try {
-    return { value: JSON.parse(out), plain };
+    const value: unknown = JSON.parse(out);
+    return { value, plain: plain && !hasDuplicateKey(out) };
   } catch (error) {
     // Node's message can quote the text around the mistake, and a config file can hold secrets, so
     // only the position is kept (the position in the text without comments).

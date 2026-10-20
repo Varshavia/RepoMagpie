@@ -11,7 +11,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { copilotHome, readJsonc, type Agent, type Platform, type Where } from "./agents.ts";
 import { codexHooksOff } from "./codex-hooks.ts";
-import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
+import { backupName, parseJson, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { hookLaunch, hookShell, parseHookCommand, type HookSub, type ParsedHook } from "./hook-launch.ts";
 import { appendItem, removeAt, replaceAt, setMember, setTop } from "./json-edit.ts";
 import type { HookPlan } from "./setup-hook.ts";
@@ -141,7 +141,7 @@ export function findAgentHooks(spec: HookSpec, root: unknown, platform: Platform
 
 export type AgentHookPlan = HookPlan & { id: Agent["id"]; sub: HookSub };
 
-const COMMENTS = "the file has comments or trailing commas, which setup doesn't edit";
+const COMMENTS = "the file has comments, trailing commas or a key written twice, which setup doesn't edit";
 
 // The handler setup wants, keeping an older entry's flags.
 function wanted(spec: HookSpec, target: { node: string; entry: string }, flags: string[], platform: Platform): { handler: Json } | { error: string } {
@@ -206,19 +206,19 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
     const config = readConfig(plan.file);
     if ("error" in config) return fail(config.error);
     let text = config.text;
-    const flags = () => (findAgentHooks(spec, JSON.parse(text ?? "{}"), platform) as FoundAgentHook[]).find((f) => f.parsed.form !== "other")?.parsed.flags ?? [];
+    const flags = () => (findAgentHooks(spec, parseJson(text ?? "{}"), platform) as FoundAgentHook[]).find((f) => f.parsed.form !== "other")?.parsed.flags ?? [];
     const wish = "error" in target ? null : wanted(spec, target, flags(), platform);
     if (wish && "error" in wish) return fail(wish.error);
     const want = wish?.handler;
     if (spec.layout === "file") {
-      if (plan.action === "remove") rmSync(plan.file);
+      if (plan.action === "remove") rmSync(plan.file, { maxRetries: 5, retryDelay: 50 }); // retries while a virus scan holds it
       else writeAtomically(plan.file, `${JSON.stringify(minimal(spec, want as Json), null, 2)}\n`);
     } else {
       if (plan.action === "add") text = add(spec, text, want as Json);
       else {
         // One change at a time, from the file as it now is, so every path is current.
         for (;;) {
-          const mine = (findAgentHooks(spec, JSON.parse(text as string), platform) as FoundAgentHook[]).filter((f) => f.parsed.form !== "other");
+          const mine = (findAgentHooks(spec, parseJson(text as string), platform) as FoundAgentHook[]).filter((f) => f.parsed.form !== "other");
           if (plan.action === "remove" || mine.length > 1) {
             if (!mine.length) break;
             text = removeAt(text as string, (plan.action === "remove" ? mine[0] : mine[1]).removal);
@@ -238,7 +238,7 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
     return fail((error as Error).message);
   }
   // Read it back.
-  const after = existsSync(plan.file) ? findAgentHooks(spec, JSON.parse(readFileSync(plan.file, "utf8")), platform) : [];
+  const after = existsSync(plan.file) ? findAgentHooks(spec, parseJson(readFileSync(plan.file, "utf8")), platform) : [];
   const left = typeof after === "string" ? [] : after.filter((f) => f.parsed.form !== "other");
   const check = plan.action === "remove" ? null : wanted(spec, target as { node: string; entry: string }, left[0]?.parsed.flags ?? [], platform);
   const ok = !check ? !left.length : "handler" in check && left.length === 1 && owned(spec, left[0].value, check.handler);
@@ -250,7 +250,7 @@ function add(spec: HookSpec, text: string | null, handler: Json): string {
   if (text === null || !text.trim()) return `${JSON.stringify(minimal(spec, handler), null, 2)}\n`;
   if (spec.layout === "named") return setTop(text, NAMED, { PreToolUse: [group(spec, handler)] });
   const item = spec.layout === "groups" ? group(spec, handler) : handler;
-  const root = JSON.parse(text) as Json;
+  const root = parseJson(text) as Json;
   const [outer, inner] = spec.container;
   const list = isObject(root[outer]) ? (root[outer] as Json)[inner] : undefined;
   return Array.isArray(list) ? appendItem(text, [outer, inner], item) : setMember(text, [outer, inner], [item]);

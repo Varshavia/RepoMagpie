@@ -7,7 +7,7 @@
 // flags kept. Only plain JSON is edited, and only our entries. Never prints.
 import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { readJsonc } from "./agents.ts";
-import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
+import { backupName, parseJson, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { appendItem, removeAt, replaceAt, setMember } from "./json-edit.ts";
 
 export const HOOK_COMMAND = "repomagpie hook claude-code";
@@ -99,7 +99,7 @@ export function planHook(file: string, root: string, remove: boolean, stamp: str
   return { ...base, action: mine.length ? "migrate" : "add", backup };
 }
 
-const COMMENTS = "the file has comments or trailing commas, which setup doesn't edit";
+const COMMENTS = "the file has comments, trailing commas or a key written twice, which setup doesn't edit";
 const group = (target: Exclude<HookTarget, { error: string }>, flags: string[]) => ({ matcher: "Bash|PowerShell", hooks: [{ type: "command", ...wanted(target, flags) }] });
 
 export function applyHook(plan: HookPlan, root: string, target: HookTarget): HookPlan {
@@ -114,14 +114,14 @@ export function applyHook(plan: HookPlan, root: string, target: HookTarget): Hoo
     if ("error" in config) return fail(config.error);
     let text = config.text;
     if (plan.action === "add") {
-      const settings = (text === null ? {} : JSON.parse(text)) as { hooks?: { PreToolUse?: unknown } };
+      const settings = (text === null ? {} : parseJson(text)) as { hooks?: { PreToolUse?: unknown } };
       const entry = group(target as Exclude<HookTarget, { error: string }>, []);
       text = Array.isArray(settings.hooks?.PreToolUse) ? appendItem(text as string, ["hooks", "PreToolUse"], entry) : setMember(text, ["hooks", "PreToolUse"], [entry]);
     } else {
       // One change at a time, from the file as it now is, so every path is current: the first of
       // our entries becomes the wanted one (its flags kept), any other goes.
       for (;;) {
-        const settings = JSON.parse(text as string) as { hooks: { PreToolUse: { hooks: Record<string, unknown>[] }[] } };
+        const settings = parseJson(text as string) as { hooks: { PreToolUse: { hooks: Record<string, unknown>[] }[] } };
         const mine = (findHooks(settings) as FoundHook[]).filter((f) => f.form !== "other");
         const at = (f: FoundHook) => ["hooks", "PreToolUse", f.group, ...(f.alone ? [] : ["hooks", f.hook])] as (string | number)[];
         if (plan.action === "remove") {
@@ -148,7 +148,7 @@ export function applyHook(plan: HookPlan, root: string, target: HookTarget): Hoo
     return fail((error as Error).message);
   }
   // Read it back.
-  const after = findHooks(JSON.parse(readFileSync(plan.file, "utf8")));
+  const after = findHooks(parseJson(readFileSync(plan.file, "utf8")));
   const left = typeof after === "string" ? [] : after.filter((f) => f.form !== "other");
   const ok = plan.action === "remove" ? !left.length : left.length === 1 && matches(left[0], wanted(target as Exclude<HookTarget, { error: string }>, left[0].flags));
   return ok ? { ...plan, result: "done" } : fail(`${plan.file} doesn't hold the hook as expected after the change.`);

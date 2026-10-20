@@ -243,7 +243,7 @@ const same = (a: Pick<McpEntry, "command" | "args">, b: { command: string; args:
 function manualReason(agent: Agent, cli: string | undefined, plain: boolean): string {
   if (!cli && agent.id === "codex") return "the codex command isn't on PATH, and setup doesn't edit TOML itself";
   if (!cli && agent.id === "claude-code") return "the claude command isn't on PATH, and setup doesn't edit ~/.claude.json, which Claude Code rewrites while it runs";
-  if (!plain) return "the file has comments or trailing commas, which setup doesn't edit";
+  if (!plain) return "the file has comments, trailing commas or a key written twice, which setup doesn't edit";
   return "its CLI can't make this change";
 }
 
