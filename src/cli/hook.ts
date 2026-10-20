@@ -24,6 +24,7 @@ const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
   "gemini-cli": async () => (await import("../hook/gemini-cli.ts")).geminiOutput,
   antigravity: async () => (await import("../hook/antigravity.ts")).antigravityOutput,
   copilot: async () => (await import("../hook/copilot.ts")).copilotOutput,
+  cursor: async () => (await import("../hook/cursor.ts")).cursorOutput,
 };
 
 export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {

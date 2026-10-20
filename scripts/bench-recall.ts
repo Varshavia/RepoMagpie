@@ -25,5 +25,7 @@ for (const alternatives of [false, true]) {
     measure(`magpie hook antigravity (an install with a note)${label}`, root, ["hook", "antigravity"], BUDGET_MS, antigravity("npm install package-1500@2 && npm i left-pad"), env);
     const copilot = (command: string) => JSON.stringify({ cwd: root, toolName: "powershell", toolArgs: { command } });
     measure(`magpie hook copilot (an install with a note)${label}`, root, ["hook", "copilot"], BUDGET_MS, copilot("npm install package-1500@2 && npm i left-pad"), env);
+    const cursor = (command: string) => JSON.stringify({ hook_event_name: "beforeShellExecution", command, cwd: root });
+    measure(`magpie hook cursor (an install with a note)${label}`, root, ["hook", "cursor"], BUDGET_MS, cursor("npm install package-1500@2 && npm i left-pad"), env);
   }, true, false, alternatives);
 }

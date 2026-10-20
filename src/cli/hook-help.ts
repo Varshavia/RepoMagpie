@@ -104,3 +104,25 @@ package stops the install's first try, with the note, and your agent should ask
 you; the same install within 10 minutes goes through. Other notes add nothing.
 VS Code reads this folder too, but sends its own input, which gets no answer.
 `;
+
+export const CURSOR_HOOK_HELP = `
+Add this to ~/.cursor/hooks.json:
+
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "repomagpie hook cursor", "timeout": 10 }
+    ]
+  }
+}
+
+On Windows, Cursor runs the command in Windows PowerShell with
+-ExecutionPolicy Bypass, so npm's repomagpie.ps1 isn't blocked there.
+
+Cursor's "ask" isn't reliable, and its default Run Mode (Auto-Review) runs
+installs without asking. So a note that says to avoid a package stops the
+install's first try, and your agent should ask you; the same install within
+10 minutes goes through. Other notes add nothing. If Cursor also runs your
+Claude Code hooks, "repomagpie hook claude-code" stays silent there.
+`;

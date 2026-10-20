@@ -68,7 +68,7 @@ test("an error with no personal journal logs nowhere and creates nothing", async
 
 test("a usage error under hook never exits 2 (exit 2 would block the tool call): a typo in the settings exits 0", async () => {
   const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
-  for (const argv of [["hook", "claude-code", "--inform-onyl"], ["hook", "cursor"], ["hook"]]) {
+  for (const argv of [["hook", "claude-code", "--inform-onyl"], ["hook", "windsurf"], ["hook"]]) {
     const r = await magpie(box, argv, { stdin: async () => input("npm i pdfkit", box.project) });
     assert.equal(r.code, 0, argv.join(" "));
     assert.equal(r.out, "");
@@ -205,4 +205,29 @@ test("hook copilot --help prints its own hook file, the Windows form and the den
   assert.match(r.out, /"powershell": "repomagpie\.cmd hook copilot", "timeoutSec": 10/);
   assert.match(r.out, /denies every tool call when a hook can't start/);
   assert.match(r.out, /VS Code/);
+});
+
+// --- repomagpie hook cursor (decision 0036) --------------------------------------------------
+
+const cursorInput = (command: string, cwd: string) => `${String.fromCharCode(0xfeff)}${JSON.stringify({ conversation_id: "c", generation_id: "g", hook_event_name: "beforeShellExecution", cursor_version: "3.24.18", command, cwd, workspace_roots: [cwd] })}`;
+
+test("hook cursor: the first try is denied, the retry and --inform-only print nothing; hook claude-code stays silent on the same input", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const denied = await magpie(box, ["hook", "cursor"], { stdin: async () => cursorInput("npm install pdfkit", box.project) });
+  assert.deepEqual([denied.code, denied.err], [0, ""]);
+  assert.deepEqual(Object.keys(JSON.parse(denied.out)), ["permission", "user_message", "agent_message"]);
+  for (const [argv, stdin] of [[["hook", "cursor"], cursorInput("npm.cmd install pdfkit", box.project)], [["hook", "cursor", "--inform-only"], cursorInput("npm i pdfkit", box.project)], [["hook", "claude-code"], cursorInput("npm i pdfkit", box.project)]] as [string[], string][]) {
+    const silent = await magpie(box, argv, { stdin: async () => stdin });
+    assert.deepEqual([silent.code, silent.out, silent.err], [0, "", ""], argv.join(" "));
+  }
+});
+
+test("hook cursor --help prints the hooks.json snippet, the Windows form and what a deny does", async () => {
+  const r = await magpie(sandbox(), ["hook", "cursor", "--help"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /~\/\.cursor\/hooks\.json/);
+  assert.match(r.out, /"beforeShellExecution"/);
+  assert.match(r.out, /"command": "repomagpie hook cursor", "timeout": 10/);
+  assert.match(r.out, /-ExecutionPolicy Bypass/);
+  assert.match(r.out, /within\s+10 minutes goes through/);
 });
