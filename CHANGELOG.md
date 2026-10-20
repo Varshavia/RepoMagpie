@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - `repomagpie setup` no longer edits a JSON file that has a key written twice: the agent reads the last copy, and `setup` changed the first, which left Cursor's `mcp.json` with an entry nobody read. It prints the snippet to paste instead, as for a file with comments.
+- `repomagpie setup` and `repomagpie doctor` read an empty or whitespace-only JSON file as an empty object, as Antigravity CLI creates its `mcp_config.json`: `setup` writes the entry there, after a backup, instead of calling the file "not valid JSON" and printing a snippet.
 - `repomagpie setup` now adds the Claude Code hook to a `settings.json` that starts with a byte-order mark (Notepad writes one), and keeps the mark; it failed before.
 
 ### Security
