@@ -19,6 +19,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Cursor also runs the Claude Code hooks in `~/.claude/settings.json` (its "Include Third-Party Plugins, Skills, and Other Configs" setting, on by default). `repomagpie hook claude-code` now stays silent there, so Cursor gets one answer, from its own hook. Claude Code's answers are unchanged.
+- The hooks find installs in more of the ways agents write them on Windows: `powershell -EncodedCommand …` (decoded; one that can't be decoded gets a line saying its installs weren't checked), `call npm install …`, `start`, `wsl`, `npx` or `corepack` before the command, `iex '…'`, `Invoke-Expression "…"` and `Start-Process npm -ArgumentList …`.
+
+### Fixed
+
+- `repomagpie setup` no longer edits a JSON file that has a key written twice: the agent reads the last copy, and `setup` changed the first, which left Cursor's `mcp.json` with an entry nobody read. It prints the snippet to paste instead, as for a file with comments.
+- `repomagpie setup` now adds the Claude Code hook to a `settings.json` that starts with a byte-order mark (Notepad writes one), and keeps the mark; it failed before.
+
+### Security
+
+- The hooks ignore a folder in the agent's input that can't be a real one (over 4,096 characters): one of 60,000 parts kept the hook busy for minutes. On Windows they no longer look for a project journal in a folder on another machine (`\\server\share`) that the input names, unless the hook already runs there: looking would connect to that machine and send it your Windows sign-in hash, and in Antigravity CLI and Gemini CLI the model chooses that folder.
+- On macOS and Linux, the hooks ignore a retry record that isn't yours or that others could write, and replace it.
 
 ## [0.2.0-beta.4] - 2026-10-15
 
