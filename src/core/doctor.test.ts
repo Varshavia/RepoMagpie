@@ -280,6 +280,10 @@ test("journals: note counts, skipped files and unreadable frontmatter", () => {
 test("readJsonc and mcpEntry: comments, trailing commas, // inside strings, wrong types", () => {
   assert.deepEqual(readJsonc('{"url": "https://x//y", /* c */ "a": [1,],}'), { value: { url: "https://x//y", a: [1] }, plain: false });
   assert.deepEqual(readJsonc('{"a": "b"}'), { value: { a: "b" }, plain: true });
+  // An empty or whitespace-only file is an empty object (Antigravity CLI creates mcp_config.json empty).
+  for (const text of ["", " \r\n\t", String.fromCharCode(0xfeff)]) assert.deepEqual(readJsonc(text), { value: {}, plain: true }, JSON.stringify(text));
+  assert.deepEqual(mcpEntry("", "mcpServers", "repomagpie"), { entry: null });
+  for (const text of ["x", "{", "// only a comment"]) assert.ok("error" in readJsonc(text), text);
   assert.deepEqual(mcpEntry('{"mcpServers": []}', "mcpServers", "repomagpie"), { error: '"mcpServers" is not an object' });
   assert.deepEqual(mcpEntry('{"mcpServers": {"repomagpie": "x"}}', "mcpServers", "repomagpie"), { error: '"mcpServers.repomagpie" is not an object' });
   assert.deepEqual(mcpEntry('{"mcpServers": {}}', "mcpServers", "repomagpie"), { entry: null });

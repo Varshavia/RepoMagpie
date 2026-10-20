@@ -147,9 +147,11 @@ function readHead(file: string, bytes: number): string {
 
 // JSON with comments and trailing commas, as VS Code, Cursor and Gemini CLI accept them: the value,
 // and whether the text had either, or a key twice (setup edits only plain JSON). An error message
-// when it can't be read. Strings are kept as written, so "//" inside a URL stays.
+// when it can't be read. Strings are kept as written, so "//" inside a URL stays. An empty or
+// whitespace-only file is an empty object: Antigravity CLI creates its mcp_config.json empty.
 export function readJsonc(text: string): { value: unknown; plain: boolean } | { error: string } {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  if (!source.trim()) return { value: {}, plain: true };
   let out = "";
   let plain = true;
   for (let i = 0; i < source.length; i++) {

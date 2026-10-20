@@ -1,7 +1,7 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { onPath, readJsonc, type Platform, type Where } from "./agents.ts";
 import { runDoctor } from "./doctor.ts";
@@ -261,6 +261,43 @@ test("S13: a hostile hook file: a folder in its place, an entry shaped like ours
   assert.equal(copilot.hooks[0].action, "refused");
   applySetup(copilot, s.request({ only: ["copilot"] }));
   assert.deepEqual(readdirSync(elsewhere), []);
+});
+
+// Live test, 2026-10-20: Antigravity CLI creates ~/.gemini/config/mcp_config.json empty, and setup
+// called it "not valid JSON" and only printed the snippet.
+test("S14: an empty or whitespace-only JSON file is an empty object: each gets its entry after a backup, and doctor reads it", () => {
+  for (const text of ["", "  \r\n\t\n", `${String.fromCharCode(0xfeff)}`, `${String.fromCharCode(0xfeff)}\n`]) {
+    const s = scratch();
+    mkdirSync(join(s.home, ".gemini", "antigravity-cli"), { recursive: true });
+    mkdirSync(join(s.home, ".codex"), { recursive: true });
+    const files = {
+      cursor: s.cursor, antigravity: join(s.home, ".gemini", "config", "mcp_config.json"), gemini: join(s.home, ".gemini", "settings.json"),
+      claude: s.settings, codexHooks: join(s.home, ".codex", "hooks.json"), cursorHooks: join(s.home, ".cursor", "hooks.json"), antigravityHooks: join(s.home, ".gemini", "config", "hooks.json"),
+    };
+    for (const file of Object.values(files)) s.write(file, text);
+    mkdirSync(join(s.home, ".claude"), { recursive: true });
+    const only = ["claude-code", "codex", "cursor", "gemini", "antigravity"] as const;
+    const plan = planSetup(s.request({ only: [...only] }));
+    const label = JSON.stringify(text);
+    assert.deepEqual(plan.agents.filter((a) => ["cursor", "gemini", "antigravity"].includes(a.id)).map((a) => [a.id, a.action, a.method]), [["cursor", "add", "json"], ["gemini", "add", "json"], ["antigravity", "add", "json"]], label);
+    assert.deepEqual([plan.hook?.action, ...plan.hooks.map((h) => h.action)], ["add", "add", "add", "add", "add"], label);
+    const done = applySetup(plan, s.request({ only: [...only] }));
+    assert.ok([...done.agents.filter((a) => a.method === "json"), done.hook, ...done.hooks].every((p) => p?.result === "done"), `${label}: ${JSON.stringify([...done.agents, done.hook, ...done.hooks].map((p) => p?.error).filter(Boolean))}`);
+    for (const [name, file] of Object.entries(files)) {
+      assert.ok(readdirSync(dirname(file)).some((f) => f.startsWith(`${basename(file)}.repomagpie-backup-`)), `${label}: ${name} backed up first`);
+      assert.match(readFileSync(file, "utf8"), /repomagpie|hook/, `${label}: ${name}`);
+    }
+    const doctor = s.doctor();
+    assert.ok(doctor.agents.every((a) => !a.error) && doctor.agent_hooks.every((h) => !h.error) && doctor.hook.every((h) => !h.error), label);
+  }
+  // Anything else that isn't JSON is still refused, with only the snippet.
+  for (const text of ["x", "{", "null x"]) {
+    const s = scratch();
+    s.write(s.cursor, text);
+    const cursor = planSetup(s.request({ only: ["cursor"] })).agents[0];
+    assert.equal(cursor.action, "refused", text);
+    assert.match(cursor.reason ?? "", /not valid JSON/, text);
+  }
 });
 
 test("S9: a malformed file's error never quotes the file (Node's JSON errors can quote the text around the mistake)", () => {

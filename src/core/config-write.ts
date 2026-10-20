@@ -40,8 +40,11 @@ export function readConfig(file: string): { text: string | null } | { error: str
 }
 
 // A plain JSON file's value. A leading byte-order mark (Notepad writes one) is dropped, as the
-// agents and the edits in json-edit.ts drop it.
-export const parseJson = (text: string): unknown => JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+// agents and the edits in json-edit.ts drop it; an empty or whitespace-only file is an empty object.
+export const parseJson = (text: string): unknown => {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  return source.trim() ? JSON.parse(source) : {};
+};
 
 // The whole file or nothing: written beside it, then renamed over it. The file keeps its permissions
 // (a config that holds another server's token is often private to its owner).
