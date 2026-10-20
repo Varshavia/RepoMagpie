@@ -41,7 +41,7 @@ For the other agents in [agents](../agents.md) (Copilot CLI, Windsurf, Cline, Ze
   |---|---|---|
   | Claude Code | `claude mcp add --scope user --transport stdio repomagpie -- <node> <args…>` | `claude mcp remove --scope user repomagpie` |
   | Codex CLI | `codex mcp add repomagpie -- <node> <args…>` | `codex mcp remove repomagpie` |
-  | Gemini CLI | `gemini mcp add --scope user repomagpie -- <node> <args…>` | `gemini mcp remove --scope user repomagpie` |
+  | Gemini CLI | `gemini mcp add --scope user repomagpie <node> -- <args…>` | `gemini mcp remove --scope user repomagpie` |
   | VS Code | `code --add-mcp '{"name":"repomagpie","command":…,"args":[…]}'` | none: a JSON edit of the user `mcp.json` |
 
   An entry that differs is removed first, then added. VS Code's CLI can't remove, so changing or removing its entry is a JSON edit of `…/Code/User/mcp.json` (the path checked on a real install, [agents](../agents.md)).
@@ -140,3 +140,5 @@ It has human output and `--json`, and exits 0 whatever it finds: it is a report,
 - The MCP entry pins one Node.js and one install. After switching Node.js versions, the user runs `repomagpie doctor`, then `repomagpie setup` again.
 - An MCP entry written for one OS doesn't work on another, so a dotfiles repository that syncs `~/.cursor/mcp.json` across machines carries a broken path to the others. `doctor` shows it; `--project` files carry the same risk and are opt-in.
 - `SECURITY.md` says what `setup` writes, its backups, `--remove`, and that MCP is local stdio only.
+
+Editorial (2026-10-21): Gemini CLI's add command corrected to `gemini mcp add --scope user repomagpie <node> -- <args…>`, the form Gemini CLI accepts ([agents](../agents.md)). Substance unchanged.
