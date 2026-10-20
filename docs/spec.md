@@ -646,7 +646,15 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **Never fails closed by mistake:** any exit but 0, or a crash, makes Copilot CLI deny the call, so the hook always exits 0 and prints nothing on an error. If node or the entry file moves, Copilot CLI denies every tool call until the hook file is fixed or deleted.
 - **Length:** Copilot CLI documents no limit here, so Claude Code's are kept.
 
-**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI, Gemini CLI, Antigravity CLI and Copilot CLI have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
+**Cursor** (`repomagpie hook cursor`, [decision 0036](decisions/0036-hooks-in-other-agents.md); its facts in [agents](agents.md#cursor)). Cursor's `ask` isn't reliable, and its default Run Mode, Auto-Review, runs an install without asking, so the adapter never asks.
+- **Input:** Cursor's `beforeShellExecution` JSON, which starts with a byte-order mark on Windows; `command`, and `hook_event_name` when present must be `beforeShellExecution`. The folder is `cwd`, else the first of `workspace_roots` (`/C:/…` on Windows becomes `C:/…`); `cwd` was empty for some first commands. Cursor starts the hook in `~/.cursor`.
+- **An exact avoid note, first try:** `{"permission": "deny", "user_message": "<the user's line, as for Codex>", "agent_message": "<the deny reason, as for Codex>"}`, recorded in the retry record. Cursor blocks on output that doesn't match its schema, so a deny has exactly these fields.
+- **The same install** until 10 minutes after the deny, every other match, and `--inform-only`: no output. Messages without a `permission` reached neither the agent nor the user in the pre-check. Never `{}`, which a forum report says Cursor counts as `allow`.
+- **Never approves:** no `"allow"`, no `"ask"`.
+- **With the Claude Code hook in Cursor:** Cursor also runs `~/.claude/settings.json`'s hooks by default; `repomagpie hook claude-code` is silent on Cursor's input (above), so a user with both entries gets one answer.
+- **Length:** Cursor documents no limit, so Claude Code's are kept.
+
+**Other clients use skill mode.** In v0.1, hook mode exists for Claude Code only ([decision 0010](decisions/0010-v0-1-scope.md)); Codex CLI, Gemini CLI, Antigravity CLI, Copilot CLI and Cursor have it now (above), and the other agents with hooks follow ([decision 0036](decisions/0036-hooks-in-other-agents.md)). In every other client, RepoMagpie's `SKILL.md` tells the agent to run `repomagpie recall <package>` before installing. Hook support in other clients is tracked in [ideas](ideas.md#hook-support-in-major-clients).
 
 **Installs without package names** (`npm install`, `pip install -r requirements.txt`) are ignored in v0.1. Recall for a whole manifest is listed for later in the [roadmap](roadmap.md).
 

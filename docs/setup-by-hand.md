@@ -138,3 +138,22 @@ Save this as its own file, `~/.copilot/hooks/repomagpie.json` (Copilot CLI reads
 **Copilot CLI denies every tool call when a hook can't start or fails.** If you move Node.js or reinstall RepoMagpie somewhere else, fix the file or delete it.
 
 Copilot CLI doesn't ask you when a hook asks, so the hook stops the first try instead. When a note says to avoid the package, you see `Denied by preToolUse hook: RepoMagpie: you noted to avoid pdfkit (personal journal) …`, and your agent is told to ask you. If you say to go ahead, the same install goes through until 10 minutes after the stop. Other notes add nothing. VS Code reads the same folder, but sends its own input, which this hook leaves alone.
+
+## The Cursor hook
+
+Add this to `~/.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "repomagpie hook cursor", "timeout": 10 }
+    ]
+  }
+}
+```
+
+On Windows, Cursor runs the command in Windows PowerShell with `-ExecutionPolicy Bypass`, so npm's `repomagpie.ps1` isn't blocked there and the entry works as written.
+
+Cursor's "ask" isn't reliable, and its default Run Mode, Auto-Review, runs an install without asking anyone, so the hook stops the first try instead. When a note says to avoid the package, you see `RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes.`, and your agent gets the note. If you say to go ahead, the same install goes through until 10 minutes after the stop. Other notes add nothing. Cursor also runs your Claude Code hooks by default ("Include Third-Party Plugins, Skills, and Other Configs"); `repomagpie hook claude-code` stays silent there, so you get one answer.
