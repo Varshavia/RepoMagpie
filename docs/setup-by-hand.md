@@ -64,6 +64,10 @@ In your own settings, `setup` writes a faster form that starts Node directly ins
 
 The hook never blocks an install. When a note says to avoid the package, Claude Code asks you first, and the prompt names the alternatives you noted ("Alternatives: puppeteer: default for PDF rendering in new projects"). When nothing matches, or anything fails, it stays silent. For unattended `claude -p` runs, add `--inform-only` (to the command, or as the last argument), so notes inform the agent and never ask.
 
+## The other agents' hooks
+
+`repomagpie setup` writes the hooks below for you. Its entries start Node directly, and only when Node and RepoMagpie are still where it found them, so after you move either the hook does nothing instead of failing; each agent's form is in [agents](agents.md#how-setup-writes-the-hook-entries). The entries here start `repomagpie` by name, which is simpler to write by hand, needs RepoMagpie on `PATH`, and has no such check.
+
 ## The Codex CLI hook
 
 Add this to `~/.codex/hooks.json` (Codex 0.159.0 or later on Windows):
@@ -135,7 +139,7 @@ Save this as its own file, `~/.copilot/hooks/repomagpie.json` (Copilot CLI reads
 }
 ```
 
-**Copilot CLI denies every tool call when a hook can't start or fails.** If you move Node.js or reinstall RepoMagpie somewhere else, fix the file or delete it.
+**Copilot CLI denies every tool call when a hook can't start or fails.** With this file, if you move Node.js or reinstall RepoMagpie somewhere else, fix the file or delete it. The file `repomagpie setup` writes checks first, and does nothing instead.
 
 Copilot CLI doesn't ask you when a hook asks, so the hook stops the first try instead. When a note says to avoid the package, you see `Denied by preToolUse hook: RepoMagpie: you noted to avoid pdfkit (personal journal) …`, and your agent is told to ask you. If you say to go ahead, the same install goes through until 10 minutes after the stop. Other notes add nothing. VS Code reads the same folder, but sends its own input, which this hook leaves alone.
 
