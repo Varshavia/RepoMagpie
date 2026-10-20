@@ -2,8 +2,8 @@
 // command and its folder → package installs → notes → the texts. Each adapter reads its agent's
 // input, calls recallFor, and writes its agent's output from the texts below. Note text is quoted
 // and labelled with who wrote it, cleaned and capped.
-import { sep } from "node:path";
-import { detectInstalls, type Install } from "../core/install-detect.ts";
+import { isAbsolute, relative, sep } from "node:path";
+import { detectCommand, type Install } from "../core/install-detect.ts";
 import type { Env } from "../core/journals.ts";
 import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { CAPS, clean, cut, nameConcern, quote } from "../core/text.ts";
@@ -43,6 +43,9 @@ const MORE_NAMES = 5;
 // The packages one command may have looked up. Real installs name a few; a command of 100,000 names
 // (1.8 MB) took 17 s on a 2,000-note journal, while the agent waits. The rest are named as unchecked.
 const LOOKUPS = 100;
+// A folder from the agent's input longer than this can't be a real one (Linux's PATH_MAX), and
+// walking up one of 60,000 parts to find a project journal took minutes: it is ignored.
+const FOLDER_LENGTH = 4096;
 
 // The input as JSON, or undefined. A leading byte-order mark is dropped, as a Windows PowerShell
 // pipe (and Cursor) sends one.
@@ -56,10 +59,12 @@ export function parseInput(input: string): unknown {
 
 // The notes on the packages a command installs; null when there is nothing to say.
 export function recallFor(command: string, folder: string | null, ctx: HookContext): Recalled | null {
-  const installs = detectInstalls(command);
-  if (!installs.length) return null; // the common case: no journal is opened
+  const { installs, unreadable } = detectCommand(command);
+  // An encoded PowerShell command that can't be decoded may install anything: say so.
+  const hidden = unreadable ? "RepoMagpie: this command runs an encoded PowerShell command that couldn't be read, so its installs weren't checked." : null;
+  if (!installs.length) return hidden ? { cwd: ctx.cwd, matches: [], avoid: [], stopped: [], unchecked: hidden, home: ctx.home } : null; // the common case: no journal is opened
 
-  const cwd = folder ?? ctx.cwd;
+  const cwd = folder && usable(folder, ctx.cwd) ? folder : ctx.cwd;
   const { sources } = openRecallSources({ home: ctx.home, env: ctx.env, cwd, homeFlag: ctx.homeFlag, projectFlag: ctx.projectFlag });
   const seen = new Set<string>();
   const stopped: Install[] = [];
@@ -68,12 +73,24 @@ export function recallFor(command: string, folder: string | null, ctx: HookConte
     if (!ctx.informOnly && found.some((m) => m.confidence === "exact" && isAvoid(m))) stopped.push(install);
     return found;
   }).filter((m) => !seen.has(m.path) && seen.add(m.path));
-  const unchecked = installs.length > LOOKUPS
+  const many = installs.length > LOOKUPS
     ? `RepoMagpie: this command installs ${installs.length.toLocaleString("en-US")} packages; only the first ${LOOKUPS} were looked up in your journals.`
     : null;
+  const unchecked = [many, hidden].filter(Boolean).join("\n") || null;
   if (!matches.length && !unchecked) return null;
   const avoid = ctx.informOnly ? [] : matches.filter((m) => m.confidence === "exact" && isAvoid(m));
   return { cwd, matches, avoid, stopped, unchecked, home: ctx.home };
+}
+
+// Whether a folder from the agent's input is looked in for a project journal: not too long, no NUL,
+// and, on Windows, not on another machine (\\server\share, //server) unless the hook already runs
+// there. Looking connects to that machine, which sends it the user's Windows sign-in hash and can
+// take seconds; the model chooses Antigravity CLI's Cwd and Gemini CLI's dir_path.
+export function usable(folder: string, start: string, platform = process.platform): boolean {
+  if (folder.length > FOLDER_LENGTH || folder.includes("\0")) return false;
+  if (platform !== "win32" || !/^[\\/]{2}/.test(folder)) return true;
+  const inside = relative(start, folder);
+  return !inside.startsWith("..") && !isAbsolute(inside) && /^[\\/]{2}/.test(start);
 }
 
 const withUnchecked = (r: Recalled, text: string, separator: string) => [text, r.unchecked].filter(Boolean).join(separator);

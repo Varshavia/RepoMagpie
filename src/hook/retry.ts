@@ -56,12 +56,15 @@ export function retryDecision(journal: string, key: string, now = Date.now()): "
 }
 
 // The record's entries; {} for a missing, oversized or malformed record (the next deny replaces
-// it), null when it exists but can't be read.
+// it), null when it exists but can't be read. On macOS and Linux, also {} for a record another user
+// owns or could have written (group or others may write it): its entries would let installs through
+// unasked. On Windows the folder's permissions decide, as for the notes.
 function read(file: string): Record<string, number> | null {
   let text: string;
   try {
     const stats = lstatSync(file);
     if (!stats.isFile() || stats.size > MAX_BYTES) return stats.isFile() ? {} : null;
+    if (process.getuid && (stats.uid !== process.getuid() || (stats.mode & 0o022) !== 0)) return {};
     text = readFileSync(file, "utf8");
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === "ENOENT" ? {} : null;
