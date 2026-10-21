@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.5] - 2026-10-21
+
+The sixth pre-release: the hook now checks your notes before an install in Codex CLI, Gemini CLI, Antigravity CLI, Copilot CLI and Cursor too, asking you where the agent can and stopping the first try where it can't; `repomagpie setup` writes each hook and `repomagpie doctor` checks it, and both now know Antigravity CLI and Copilot CLI.
+
 ### Added
 
 - `repomagpie hook codex`, the hook for Codex CLI. Codex can't ask you before a command, so when a note says to avoid a package, the hook stops the install's first try: your agent gets the note and is told to ask you, and you see `RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes.` If you say to go ahead, the same install goes through, also as `npm.cmd install pdfkit` or `pnpm add pdfkit`, until 10 minutes after the stop, and you see `RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as your go-ahead.` To remember this, the hook keeps `.cache/hook-retry.json` in your journal: a hash and a time for each stopped install, no package names. Other notes only inform, and `--inform-only` never stops an install. `repomagpie setup` writes the entry in `~/.codex/hooks.json`; `repomagpie hook codex --help` shows it.
@@ -28,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `repomagpie setup` and `repomagpie doctor` read an empty or whitespace-only JSON file as an empty object, as Antigravity CLI creates its `mcp_config.json`: `setup` writes the entry there, after a backup, instead of calling the file "not valid JSON" and printing a snippet.
 - `repomagpie setup` now adds the Claude Code hook to a `settings.json` that starts with a byte-order mark (Notepad writes one), and keeps the mark; it failed before.
 - `repomagpie setup` no longer fails to set up Gemini CLI through `gemini mcp add`: it put the `--` before Node's path, so Gemini CLI found no command and exited with an error. When an agent's command fails, `setup` now shows the first lines of what it printed, where the error is, instead of the end of its help.
+- On Windows, `repomagpie setup` waits a moment when another program, such as a virus scan, holds a file it is replacing, instead of failing.
+- `repomagpie setup --help` names every agent `--agents` takes: `antigravity` and `copilot` were missing.
 
 ### Security
 
@@ -184,7 +190,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...HEAD
+[0.2.0-beta.5]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...v0.2.0-beta.5
 [0.2.0-beta.4]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...v0.2.0-beta.4
 [0.2.0-beta.3]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...v0.2.0-beta.3
 [0.2.0-beta.2]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.1...v0.2.0-beta.2
