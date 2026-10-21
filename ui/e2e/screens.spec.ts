@@ -110,7 +110,9 @@ test("check a package", async ({ page, magpie }) => {
   await page.getByRole("button", { name: "Check a package" }).click();
   await page.getByLabel("Packages").fill("pdfkit puppeteer left-pad");
   await page.getByRole("button", { name: "Check", exact: true }).click();
-  await expect(page.getByText("Claude Code asks you before installing it.")).toBeVisible();
+  await expect(page.getByText("In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you first.")).toBeVisible();
+  await expect(page.getByText("The install goes ahead; in Claude Code, Codex CLI and Gemini CLI, the hook shows this note to the agent.")).toBeVisible();
+  await expect(page.getByText("no note in your journals. The hook stays silent.")).toBeVisible();
   await shoot(page, "08-check-package");
 });
 

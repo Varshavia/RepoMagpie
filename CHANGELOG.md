@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The app's Check a package page says what the hook does in each agent, not only in Claude Code: on an avoid note it asks you first in Claude Code, Gemini CLI and Antigravity CLI, and stops the first try in Codex CLI, Cursor and Copilot CLI, where your agent asks you.
+
 ### Fixed
 
 - On Windows, when your home folder's name has letters outside ASCII (`C:\Users\Şuat`), `repomagpie setup` no longer crashes during the skill install, or leaves a folder with a mangled name (`Åuat`) beside your home folder with the skill missing. Node's `fs.cpSync` caused it on Node 22 and older Node 24 releases; `setup` now copies the skill without it.

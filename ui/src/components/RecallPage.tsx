@@ -1,6 +1,7 @@
-// Check a package (docs/ui.md §7, Recall): what magpie recall finds, and what the Claude Code hook
-// would do with it (spec §6, decision 0024): an exact avoid note asks you first; any other match
-// informs; magpie never blocks an install.
+// Check a package (docs/ui.md §7, Recall): what magpie recall finds, and what the hook does with it
+// in each agent (spec §6, decisions 0024 and 0036): an exact avoid note asks you first, or stops the
+// first try where the agent can't ask; any other match informs where the agent shows it; the hook
+// never blocks an install for good.
 import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
@@ -39,8 +40,9 @@ export function RecallPage({ home, onOpenNote, onAdd, onSearch }: { home: string
     <div className="page">
       <h1 className="page-title">Check a package</h1>
       <p className="page-lede">
-        What your journals say before an install: the same lookup as <code>repomagpie recall</code>, and what the Claude Code hook would show.
+        What your journals say before an install: the same lookup as <code>repomagpie recall</code>, and what the hook does in each agent.
       </p>
+      <p className="field-help">VS Code gets no hook; there, the MCP server and the skill check installs.</p>
 
       <form
         className="page-section"
@@ -120,7 +122,15 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
       </p>
       <p className={ask ? "hook-line ask" : "hook-line"}>
         <Icon name={ask ? "warning" : "check"} size={14} />
-        {ask ? "Claude Code asks you before installing it." : "Claude Code shows this note to the agent; the install goes ahead."}
+        {ask ? (
+          <span>
+            In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you first.
+            <br />
+            In Codex CLI, Cursor and Copilot CLI, it stops the first try, and your agent asks you.
+          </span>
+        ) : (
+          "The install goes ahead; in Claude Code, Codex CLI and Gemini CLI, the hook shows this note to the agent."
+        )}
       </p>
       <div className="recall-line">
         <span className="section-label">Verdict</span>

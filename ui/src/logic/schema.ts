@@ -52,7 +52,8 @@ export function verdictSaysAvoid(verdict: string | null): boolean {
   return /^avoid\b/i.test(verdict ?? "");
 }
 
-// The Claude Code hook asks the user first only for an exact match on an avoid note (spec §6).
+// The hook asks the user first, or stops the first try where the agent can't ask, only for an exact
+// match on an avoid note (spec §6, decision 0036).
 export function hookWouldAsk(match: { confidence: "exact" | "name-only"; verdict: string | null; avoid_when: string[] }): boolean {
   return match.confidence === "exact" && isAvoid(match);
 }
