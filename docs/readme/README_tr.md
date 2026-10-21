@@ -8,7 +8,9 @@ _İngilizce README esas metindir; bu çeviri ondan geride kalabilir._
 
 # RepoMagpie
 
-### Bağımlılık notların, kodlama ajanın bir şey kurmadan önce kontrol edilir.
+### Kodlama ajanın bir şey kurmadan önce bağımlılık notlarına bakar.
+
+**Bir paketten neden vazgeçtiğini yaz; ajanın onu yeniden kurmadan önce notunu okur.**
 
 [![npm sürümü](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP sunucusu](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](../spec.md#repomagpie-mcp)
@@ -18,15 +20,12 @@ _İngilizce README esas metindir; bu çeviri ondan geride kalabilir._
 
 [Hızlı başlangıç](#hızlı-başlangıç) · [Nasıl çalışır](#nasıl-çalışır) · [Her ajan ne alır](#her-ajan-ne-alır) · [SSS](#sss) · [Belgeler](#belgeler)
 
-```bash
-npm install -g repomagpie@beta
-repomagpie setup
-```
+<code>npm install -g repomagpie@beta</code><br>
+<code>repomagpie setup</code>
 
 </div>
 
-> [!IMPORTANT]
-> RepoMagpie yalnızca üç yerden gelir: [bu depo](https://github.com/Varshavia/RepoMagpie), [`repomagpie`](https://www.npmjs.com/package/repomagpie) npm paketi ve [skills.sh](https://skills.sh/varshavia/repomagpie) üzerindeki ajan skill'i. Kurulum programı, `.exe` ya da başka bir indirme, başka bir paket ve başka bir web sitesi yoktur: kendine RepoMagpie diyen başka her şey bizim değildir ([SECURITY.md](../../SECURITY.md#official-channels)).
+Aylar önce pdfkit'i denemiş, sonra vazgeçmiştin. Bugün ajanın onu yeniden kurmak üzere ve RepoMagpie önce notunu gösterip sana soruyor:
 
 ```text
 $ npm install pdfkit
@@ -39,7 +38,7 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-Claude Code `npm install pdfkit` komutunu çalıştırmak üzereydi; RepoMagpie'nin hook'u kişisel günlükte bir kaçınma notu buldu ve önce sordu.
+Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 
 - **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notlar, sahibi olduğun Markdown dosyalarıdır.
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
@@ -74,6 +73,9 @@ Claude Code `npm install pdfkit` komutunu çalıştırmak üzereydi; RepoMagpie'
    ```
 
    Token olmadan GitHub saatte 60 isteğe izin verir. [GitHub CLI](https://cli.github.com/) kullanıyorsan, sınırı yükseltmek için açık kabuk oturumunda RepoMagpie'ye onun token'ını ver: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de ise `$env:GITHUB_TOKEN = gh auth token`.
+
+> [!IMPORTANT]
+> RepoMagpie yalnızca üç yerden gelir: [bu depo](https://github.com/Varshavia/RepoMagpie), [`repomagpie`](https://www.npmjs.com/package/repomagpie) npm paketi ve [skills.sh](https://skills.sh/varshavia/repomagpie) üzerindeki ajan skill'i. Kurulum programı, `.exe` ya da başka bir indirme, başka bir paket ve başka bir web sitesi yoktur: kendine RepoMagpie diyen başka her şey bizim değildir ([SECURITY.md](../../SECURITY.md#official-channels)).
 
 ## Nasıl çalışır
 

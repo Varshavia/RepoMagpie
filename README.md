@@ -8,6 +8,8 @@
 
 ### Your dependency notes, checked before your coding agent installs anything.
 
+**Write down why you dropped a package. Your agent reads it before it installs that package again.**
+
 [![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP server](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](docs/spec.md#repomagpie-mcp)
 [![Node.js 22.12 or later](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](#platforms)
@@ -16,15 +18,12 @@
 
 [Quick start](#quick-start) · [How it works](#how-it-works) · [What each agent gets](#what-each-agent-gets) · [FAQ](#faq) · [Documentation](#documentation)
 
-```bash
-npm install -g repomagpie@beta
-repomagpie setup
-```
+<code>npm install -g repomagpie@beta</code><br>
+<code>repomagpie setup</code>
 
 </div>
 
-> [!IMPORTANT]
-> RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
+Months ago you tried pdfkit and gave up on it. Today your agent is about to install it again, and RepoMagpie asks you first, with your own note:
 
 ```text
 $ npm install pdfkit
@@ -37,7 +36,7 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an avoid note in the personal journal and asked first.
+In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
 - **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
@@ -72,6 +71,9 @@ Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an av
    ```
 
    Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+
+> [!IMPORTANT]
+> RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
 
 ## How it works
 
