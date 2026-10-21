@@ -2,7 +2,7 @@
 // command and its folder → package installs → notes → the texts. Each adapter reads its agent's
 // input, calls recallFor, and writes its agent's output from the texts below. Note text is quoted
 // and labelled with who wrote it, cleaned and capped.
-import { isAbsolute, relative, sep } from "node:path";
+import { sep, win32 } from "node:path";
 import { detectCommand, type Install } from "../core/install-detect.ts";
 import type { Env } from "../core/journals.ts";
 import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
@@ -89,8 +89,8 @@ export function recallFor(command: string, folder: string | null, ctx: HookConte
 export function usable(folder: string, start: string, platform = process.platform): boolean {
   if (folder.length > FOLDER_LENGTH || folder.includes("\0")) return false;
   if (platform !== "win32" || !/^[\\/]{2}/.test(folder)) return true;
-  const inside = relative(start, folder);
-  return !inside.startsWith("..") && !isAbsolute(inside) && /^[\\/]{2}/.test(start);
+  const inside = win32.relative(start, folder); // Windows' rules, whichever system runs this
+  return !inside.startsWith("..") && !win32.isAbsolute(inside) && /^[\\/]{2}/.test(start);
 }
 
 const withUnchecked = (r: Recalled, text: string, separator: string) => [text, r.unchecked].filter(Boolean).join(separator);
