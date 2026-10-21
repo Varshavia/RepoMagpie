@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderNote } from "../../src/core/write.ts";
+import { SHOWCASE_PROJECT, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 const VAULT = join(REPO, "examples", "vault");
@@ -100,8 +101,9 @@ export interface Journal {
 }
 
 // generated: that many generated notes instead of the example notes; empty: no notes at all;
-// screens: the example notes with SCREEN_NOTES, and no unreadable note.
-export function makeJournal(options: { generated?: number; empty?: boolean; screens?: boolean } = {}): Journal {
+// screens: the example notes with SCREEN_NOTES, and no unreadable note; showcase: the README's
+// journal (showcase.ts), the screens one with about 30 more notes and a project journal of three.
+export function makeJournal(options: { generated?: number; empty?: boolean; screens?: boolean; showcase?: boolean } = {}): Journal {
   mkdirSync(SCRATCH, { recursive: true });
   const root = mkdtempSync(join(SCRATCH, "journal-"));
   mkdirSync(join(root, ".git")); // a fence: no walk for a git root or .magpie leaves the folder
@@ -114,7 +116,7 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
   mkdirSync(notes, { recursive: true });
   mkdirSync(join(project, ".git"), { recursive: true });
   mkdirSync(join(project, ".magpie", "notes"), { recursive: true });
-  writeFileSync(join(journal, "tags.md"), readFileSync(join(VAULT, "tags.md"), "utf8").replace(/\r\n/g, "\n")); // LF, like the notes below
+  writeFileSync(join(journal, "tags.md"), readFileSync(join(VAULT, "tags.md"), "utf8").replace(/\r\n/g, "\n") + (options.showcase ? SHOWCASE_TAGS : "")); // LF, like the notes below
 
   if (options.empty) {
     // tags.md only
@@ -133,16 +135,21 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
       if (TO_INBOX.includes(file)) text = text.replace(/## Verdict\n[^\n#][^\n]*\n/, "## Verdict\n").replace("status: reviewed", "status: inbox");
       writeFileSync(join(notes, file), text);
     }
-    if (options.screens) {
+    if (options.showcase) {
+      for (const [file, text] of Object.entries(showcaseNotes(SCREEN_NOTES))) writeFileSync(join(notes, file), text);
+      for (const [file, text] of Object.entries(SHOWCASE_PROJECT)) writeFileSync(join(project, ".magpie", "notes", file), text);
+    } else if (options.screens) {
       for (const [file, text] of Object.entries(SCREEN_NOTES)) writeFileSync(join(notes, file), text);
     } else {
       writeFileSync(join(notes, "npm--pdfkit.md"), PDFKIT);
       writeFileSync(join(notes, BROKEN_FILE), BROKEN);
     }
-    writeFileSync(
-      join(project, ".magpie", "notes", "npm--puppeteer.md"),
-      renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-02", kind: "library", tags: [], verdict: "default for PDF rendering in new projects" }),
-    );
+    if (!options.showcase) {
+      writeFileSync(
+        join(project, ".magpie", "notes", "npm--puppeteer.md"),
+        renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-02", kind: "library", tags: [], verdict: "default for PDF rendering in new projects" }),
+      );
+    }
   }
   return {
     root,
