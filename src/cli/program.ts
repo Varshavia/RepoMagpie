@@ -162,7 +162,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .description("set up RepoMagpie's MCP server in your coding agents: a plan, a question, then the changes, each file backed up first")
     .option("--yes", "apply the plan without asking")
     .option("--dry-run", "show the plan; change nothing")
-    .option("--agents <list>", "only these agents, comma-separated: claude-code, codex, cursor, gemini, vscode")
+    .option("--agents <list>", "only these agents, comma-separated: claude-code, codex, cursor, gemini, vscode, antigravity, copilot")
     .option("--remove", "remove RepoMagpie's entries instead")
     .option("--allow-write", "turn on the note tool in the entries (without this or --no-allow-write, each entry keeps its own; setup asks when it can)")
     .option("--no-allow-write", "turn off the note tool in the entries")

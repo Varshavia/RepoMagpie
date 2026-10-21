@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { AGENTS } from "../core/agents.ts";
 import { NO_CODEGEN } from "../core/launch.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 import type { Terminal } from "./prompt.ts";
@@ -92,6 +93,12 @@ test("without a terminal it never asks: no --yes and no --dry-run is a usage err
   assert.equal(r.code, 2);
   assert.match(r.err, /no terminal to ask in/);
   assert.equal((await magpie(b, ["setup", "--yes", "--agents", "cursor,emacs"], b.over)).code, 2);
+});
+
+test("setup --help names every agent --agents takes", async () => {
+  const r = await magpie(box(), ["setup", "--help"]);
+  const listed = r.out.replace(/\s+/g, " ").match(/comma-separated: ([a-z-]+(?:, [a-z-]+)*)/)?.[1].split(", "); // the help wraps
+  assert.deepEqual(listed?.sort(), AGENTS.map((a) => a.id).sort(), r.out);
 });
 
 test("in a terminal: choose the agents, answer the note-tool question, confirm; --allow-write goes into the entry", async () => {
