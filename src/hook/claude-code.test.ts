@@ -153,6 +153,19 @@ test("silent (null) when there is nothing to say: no install, no note, another t
   assert.equal(hookOutput("null", { env: {}, home: w.root, cwd: w.root, informOnly: false }), null);
 });
 
+test("Cursor's input (Cursor runs Claude Code's hooks too) gets no answer: the Cursor adapter gives it (decision 0036)", () => {
+  const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--puppeteer.md": PUPPETEER });
+  const ctx = { env: { MAGPIE_HOME: w.journal }, home: join(w.root, "home"), cwd: w.root, informOnly: false };
+  const claude = { session_id: "s", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "npm install pdfkit" }, cwd: w.project };
+  assert.notEqual(hookOutput(JSON.stringify(claude), ctx), null);
+  for (const field of ["cursor_version", "conversation_id", "generation_id", "workspace_roots"]) {
+    assert.equal(hookOutput(JSON.stringify({ ...claude, [field]: field === "workspace_roots" ? ["/C:/work"] : "x" }), ctx), null, field);
+  }
+  // As Cursor's own events look, with a byte-order mark: silent too.
+  const cursor = { conversation_id: "c", generation_id: "g", hook_event_name: "preToolUse", cursor_version: "3.24.18", workspace_roots: ["/C:/work"], tool_name: "Shell", tool_input: { command: "pnpm add puppeteer" }, cwd: w.project };
+  assert.equal(hookOutput(`${String.fromCharCode(0xfeff)}${JSON.stringify({ ...cursor, tool_name: "Bash" })}`, ctx), null);
+});
+
 test("input that starts with a UTF-8 byte-order mark (a Windows PowerShell pipe) gives the same output", () => {
   const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--puppeteer.md": PUPPETEER });
   for (const command of ["npm install pdfkit", "pnpm add puppeteer", "npm test"]) {

@@ -1,5 +1,5 @@
 // repomagpie setup (decision 0035): detect the agents, show a plan, ask, apply, then a summary.
-// This part sets up the MCP server in each agent; the skill and the Claude Code hook come next.
+// It sets up the MCP server, the skill and the hook in each agent (decisions 0035 and 0036).
 // Under --json, or without a terminal, it never asks: --yes applies, --dry-run only shows.
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -72,7 +72,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
       io.err(render(plan, io.home));
       return 0;
     }
-    const picked = await multiSelect(terminal, options.remove ? "Remove RepoMagpie from these agents?" : "Set up RepoMagpie's MCP server in these agents?", candidates.map((a) => ({ label: a.name })));
+    const picked = await multiSelect(terminal, options.remove ? "Remove RepoMagpie from these agents?" : "Set up RepoMagpie's MCP server and hook in these agents?", candidates.map((a) => ({ label: a.name })));
     if (picked === null || !picked.length) return cancelled(io);
     only = picked.map((i) => candidates[i].id);
     if (!options.remove && allowWrite === undefined) {
@@ -94,15 +94,15 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite ?? null, ...done }))}\n`);
   else if (!options.dryRun) io.err(summary(done, io.home, backupCounts(done, io.home, project)));
   else io.err("Dry run: nothing changed.\n");
-  const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" ||
+  const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" || done.hooks.some((h) => h.result === "failed") ||
     (!options.remove && done.launch_error !== null && done.agents.some((a) => a.installed));
   return failed && !options.dryRun ? 1 : 0;
 }
 
 const changes = (a: AgentPlan) => a.action === "add" || a.action === "update" || a.action === "remove";
 const anyChange = (plan: SetupPlan) => plan.agents.some(changes) ||
-  [plan.skill?.shared, plan.skill?.claude].some((item) => item && !["keep", "leave"].includes(item.action)) ||
-  (plan.hook !== null && ["add", "migrate", "remove"].includes(plan.hook.action));
+  [plan.skill?.shared, plan.skill?.claude, plan.skill?.antigravity].some((item) => item && !["keep", "leave"].includes(item.action)) ||
+  [plan.hook, ...plan.hooks].some((h) => h !== null && ["add", "migrate", "remove"].includes(h.action));
 
 function cancelled(io: Io): number {
   io.err("Cancelled. Nothing changed.\n");
@@ -147,9 +147,20 @@ export function render(plan: SetupPlan, home: string): string {
     if (a.action === "update" && a.current) lines.push(`                it now starts: ${[a.current.command ?? "(no command)", ...a.current.args].join(" ")}`);
     if (a.backup) lines.push(`                backup first: ${tilde(a.backup)}`);
     if (a.snippet) lines.push(`                ${a.action === "manual" && !plan.remove ? `paste into ${tilde(a.file)}:` : ""}`.trimEnd(), ...a.snippet.split("\n").map((line) => `                  ${line}`));
+    // Its hook (decision 0036), in the user's settings as the MCP entry is.
+    const h = plan.hooks.find((x) => x.id === a.id);
+    if (h) {
+      // Antigravity CLI's launcher on Windows: alone when only it changes (no backup of hooks.json).
+      const launcherOnly = h.action === "migrate" && h.launcher && !h.backup ? h.launcher : null;
+      lines.push(`                hook: ${AGENT_HOOK_WHAT[h.action]}${["add", "migrate", "remove"].includes(h.action) ? `: ${launcherOnly ? `write ${tilde(launcherOnly)}` : `edit ${tilde(h.file)}`}` : `: ${tilde(h.file)}`}${h.reason ? `: ${h.reason}` : ""}`);
+      if (h.launcher && !launcherOnly) lines.push(`                  ${h.action === "remove" ? "and delete" : "and write"} ${tilde(h.launcher)}, which the entry runs`);
+      if (h.action === "add" || h.action === "migrate") lines.push(`                  it will start node directly, then hook ${h.sub}, only when both files are there`);
+      if (h.backup) lines.push(`                  backup first: ${tilde(h.backup)}`);
+      if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                    ${line}`));
+    }
   }
-  if (plan.skill || plan.hook) lines.push("", plan.project ? `In the project ${plan.project} (the MCP entries above stay in your own settings):` : "And in your home folder:");
-  for (const item of [plan.skill?.shared, plan.skill?.claude]) {
+  if (plan.skill || plan.hook) lines.push("", plan.project ? `In the project ${plan.project} (the MCP entries and the other agents' hooks above stay in your own settings):` : "And in your home folder:");
+  for (const item of [plan.skill?.shared, plan.skill?.claude, plan.skill?.antigravity]) {
     if (!item) continue;
     lines.push(`  ${"Skill".padEnd(12)}  ${SKILL_WHAT[item.action]}: ${tilde(item.path)}${item.reason ? `: ${item.reason}` : ""}`);
     if (item.backup) lines.push(`                backup first: ${tilde(item.backup)}`);
@@ -170,6 +181,9 @@ const SKILL_WHAT: Record<SkillItem["action"], string> = {
 const HOOK_WHAT: Record<HookPlan["action"], string> = {
   add: "add the hook", migrate: "update the hook entry", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
 };
+// The other agents' hooks, on their agent's lines: the MCP entry's words.
+const AGENT_HOOK_WHAT: Record<HookPlan["action"], string> = { ...WHAT, migrate: "update" };
+const DONE: Partial<Record<HookPlan["action"], string>> = { add: "added", migrate: "updated", remove: "removed" };
 
 // For each file this run backed up, how many of setup's backups it has now (they are never deleted
 // for the user: the first is the file as it was before setup).
@@ -177,24 +191,35 @@ function backupCounts(plan: SetupPlan, home: string, project: string | undefined
   const written: { label: string; backup: string | null; root: string }[] = [
     ...plan.agents.filter((a) => a.result === "done").map((a) => ({ label: a.file, backup: a.backup, root: home })),
     ...(plan.hook?.result === "done" ? [{ label: plan.hook.file, backup: plan.hook.backup, root: project ?? home }] : []),
-    ...(plan.skill?.result === "done" ? [plan.skill.shared, plan.skill.claude].flatMap((item) => (item ? [{ label: item.path, backup: item.backup, root: project ?? home }] : [])) : []),
+    ...plan.hooks.filter((h) => h.result === "done").map((h) => ({ label: h.file, backup: h.backup, root: home })),
+    ...(plan.skill?.result === "done" ? [plan.skill.shared, plan.skill.claude, plan.skill.antigravity].flatMap((item) => (item ? [{ label: item.path, backup: item.backup, root: project ?? home }] : [])) : []),
   ];
-  return written.flatMap(({ label, backup, root }) => (backup && existsSync(backup) ? [{ label, count: backupsOf(backedUp(backup), root).length }] : []));
+  // One line per file, even when this run backed it up twice (Gemini CLI's settings.json).
+  const counts = written.flatMap(({ label, backup, root }) => (backup && existsSync(backup) ? [{ label, count: backupsOf(backedUp(backup), root).length }] : []));
+  return counts.filter((c, i) => counts.findIndex((d) => d.label === c.label) === i);
 }
 
 function summary(plan: SetupPlan, home: string, backups: { label: string; count: number }[]): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
   const lines = plan.agents.filter((a) => a.result).map((a) =>
     a.result === "done" ? `Done: ${a.name}, ${a.action === "add" ? "added" : a.action === "update" ? "updated" : "removed"}${a.backup ? ` (backup: ${tilde(a.backup)})` : ""}.` : `Failed: ${a.name}: ${a.error}`);
-  for (const item of [plan.skill?.shared, plan.skill?.claude]) {
+  for (const item of [plan.skill?.shared, plan.skill?.claude, plan.skill?.antigravity]) {
     if (!item || !plan.skill?.result || ["keep", "leave"].includes(item.action)) continue;
     lines.push(plan.skill.result === "done" ? `Done: the skill, ${SKILL_WHAT[item.action]}: ${tilde(item.path)}${item.made === "copy" && item.action !== "copy" ? " (a copy: a link couldn't be made)" : ""}.` : `Failed: the skill: ${plan.skill.error}`);
   }
   if (plan.hook?.result) lines.push(plan.hook.result === "done" ? `Done: the Claude Code hook, ${HOOK_WHAT[plan.hook.action]}${plan.hook.backup ? ` (backup: ${tilde(plan.hook.backup)})` : ""}.` : `Failed: the Claude Code hook: ${plan.hook.error}`);
+  for (const h of plan.hooks.filter((x) => x.result)) {
+    const name = AGENTS.find((a) => a.id === h.id)?.name;
+    lines.push(h.result === "done" ? `Done: the ${name} hook, ${DONE[h.action]}${h.backup ? ` (backup: ${tilde(h.backup)})` : ""}.` : `Failed: the ${name} hook: ${h.error}`);
+  }
+  // Codex skips a new or changed hook until the user trusts it there (decision 0036).
+  if (plan.hooks.some((h) => h.id === "codex" && h.result === "done" && h.action !== "remove")) lines.push("Codex CLI runs the hook only once you trust it: open /hooks in Codex and trust RepoMagpie's hook.");
+  // Antigravity keeps a cache of its MCP servers (docs/agents.md).
+  if (plan.remove && plan.agents.some((a) => a.id === "antigravity" && a.result === "done")) lines.push("Antigravity CLI may still list the MCP server until its cache, ~/.gemini/antigravity-cli/mcp/, is cleared.");
   if (!lines.length) lines.push("Nothing to change.");
   for (const b of backups) lines.push(`${tilde(b.label)} now has ${b.count} ${b.count === 1 ? "backup" : "backups"} from setup; repomagpie doctor lists them.`);
   if (plan.launch_error && !plan.remove) lines.push("No MCP entry was written.");
-  const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done";
+  const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done" || plan.hooks.some((h) => h.result === "done");
   if (changed) lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }

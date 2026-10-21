@@ -21,7 +21,7 @@ function scratch() {
   mkdirSync(home);
   const shared = join(home, ".agents", "skills", "repomagpie");
   const claude = join(home, ".claude", "skills", "repomagpie");
-  const request = (over: Partial<SkillRequest> = {}): SkillRequest => ({ source: SOURCE, shared, claude, root: home, remove: false, stamp: STAMP, platform, project: false, ...over });
+  const request = (over: Partial<SkillRequest> = {}): SkillRequest => ({ source: SOURCE, shared, claude, antigravity: null, root: home, remove: false, stamp: STAMP, platform, project: false, ...over });
   const write = (path: string, text: string) => {
     mkdirSync(join(path, ".."), { recursive: true });
     writeFileSync(path, text);

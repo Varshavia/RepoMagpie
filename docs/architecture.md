@@ -68,14 +68,24 @@ src/
                doctor: repomagpie doctor's report; read-only
                launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
                setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
-               reading each change back; setup-skill: the skill's shared folder and Claude Code's link;
-               setup-hook: the Claude Code hook, added, migrated, removed; config-write: no links, no
+               reading each change back; setup-skill: the skill's shared folder and the links from Claude
+               Code's and Antigravity CLI's; setup-hook: the Claude Code hook, added, migrated, removed;
+               setup-agent-hooks: the other agents' hook entries, the same way, read back by doctor too;
+               hook-launch: the command each of those entries runs, for its agent's shell, and reading it
+               back, with Antigravity CLI's launcher file on Windows; codex-hooks: Codex CLI's hooks switch and hook trust in config.toml; config-write: no links, no
                writes outside the home folder or project, backups, atomic writes; agent-cli: running an
                agent's CLI, with cmd.exe's escaping for .cmd shims; json-edit: one value of a plain JSON
                file changed (an object member or an array item), every other byte kept
   cli/         one module per command, loaded only when it runs; human and --json output; prompt.ts: setup's
                multi-select and yes/no on node:readline
-  hook/        claude-code.ts: tool call JSON → install detection → recall → ask or inform JSON
+  hook/        core.ts: command and folder → install detection → recall → the texts (agent-neutral,
+               decision 0036); claude-code.ts: tool call JSON → core → ask or inform JSON; codex.ts:
+               the same for Codex CLI → deny the first try or inform; gemini-cli.ts: for Gemini CLI →
+               ask or inform (one constant switches it to deny); antigravity.ts: force_ask or nothing;
+               copilot.ts and cursor.ts: deny the first try or nothing;
+               deny.ts and retry.ts: the deny
+               texts and the retry record, for agents that can't ask; agents.ts: the agents with an
+               adapter. Each adapter is its own chunk, loaded only by its subcommand (check:build)
   mcp/         server.ts: repomagpie mcp's tools over core (decision 0034): JSON Schemas, the project folder's
                rules, the server instructions; cli/mcp.ts serves it on stdio. The SDK is bundled into its
                own chunk, which only repomagpie mcp loads. jitless.ts: zod generates no code;

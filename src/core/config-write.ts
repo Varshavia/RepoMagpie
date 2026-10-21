@@ -1,8 +1,9 @@
 // Writing other tools' files for repomagpie setup (decision 0035, "Safety"): never through a link,
 // never outside the folder setup may write in (the home folder, or the project with --project), a
 // backup first, and a write that is whole or not at all. Never prints.
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { replaceFile } from "./note-cache.ts";
 
 // Why `path` can't be written: a link on its way down from `root` (decision 0032, rule 5), the path
 // itself a link unless `linkAllowed`, or a place outside `root`. null when it can.
@@ -38,6 +39,13 @@ export function readConfig(file: string): { text: string | null } | { error: str
   }
 }
 
+// A plain JSON file's value. A leading byte-order mark (Notepad writes one) is dropped, as the
+// agents and the edits in json-edit.ts drop it; an empty or whitespace-only file is an empty object.
+export const parseJson = (text: string): unknown => {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  return source.trim() ? JSON.parse(source) : {};
+};
+
 // The whole file or nothing: written beside it, then renamed over it. The file keeps its permissions
 // (a config that holds another server's token is often private to its owner).
 export function writeAtomically(file: string, text: string): void {
@@ -47,7 +55,7 @@ export function writeAtomically(file: string, text: string): void {
   try {
     writeFileSync(temporary, text, { flag: "wx", mode: mode ?? 0o666 });
     if (mode !== undefined) chmodSync(temporary, mode); // the umask may have narrowed it
-    renameSync(temporary, file);
+    replaceFile(temporary, file); // waits a little while another process (a virus scan) holds the file
   } catch (error) {
     rmSync(temporary, { force: true });
     throw error;

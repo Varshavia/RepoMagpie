@@ -62,7 +62,7 @@ Every command also offers a machine-readable mode, for example `--json`, for age
 
   > Note from your journal: left-pad 2/5 — 'abandoned, use String.prototype.padStart'.
 
-- Recall has two modes. **Hook mode** runs from an agent hook, in clients that support hooks; v0.1 ships it for Claude Code. **Skill mode** relies on `SKILL.md` telling the agent to run `repomagpie recall <package>` first; it is best effort and works in any client that supports skills. Hook support differs per client: see [ideas, idea 1](ideas.md#1-proactive-recall).
+- Recall has two modes. **Hook mode** runs from an agent hook, in clients that support hooks; v0.1 ships it for Claude Code, and v0.2 for Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI too ([decision 0036](decisions/0036-hooks-in-other-agents.md)). **Skill mode** relies on `SKILL.md` telling the agent to run `repomagpie recall <package>` first; it is best effort and works in any client that supports skills. Hook support differs per client: see [ideas, idea 1](ideas.md#1-proactive-recall).
 
 ### Journals
 

@@ -1,9 +1,10 @@
 // repomagpie setup's skill (decision 0035, "The skill"): the package's skills/repomagpie/ copied to
 // the shared folder (.agents/skills/repomagpie, read by Codex, Cursor, Gemini CLI, VS Code, Copilot
-// CLI and Zed), and a link to it from Claude Code's (.claude/skills/repomagpie): a junction on
-// Windows, a relative symlink elsewhere, a copy when a link can't be made. That is how the `skills`
-// CLI lays it out, so the two never fight. Never writes through a link, never follows one to
-// delete. Never prints.
+// CLI and Zed), and a link to it from Claude Code's (.claude/skills/repomagpie) and from the shared
+// Gemini folder Antigravity CLI reads in every workspace (.gemini/skills/repomagpie, decision
+// 0036): a junction on Windows, a relative symlink elsewhere, a copy when a link can't be made.
+// That is how the `skills` CLI lays it out, so the two never fight. Never writes through a link,
+// never follows one to delete. Never prints.
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { Platform } from "./agents.ts";
@@ -14,6 +15,7 @@ export interface SkillRequest {
   source: string; // the package's skills/repomagpie/
   shared: string; // .agents/skills/repomagpie
   claude: string | null; // .claude/skills/repomagpie, when Claude Code is set up
+  antigravity: string | null; // .gemini/skills/repomagpie, when Antigravity CLI is set up
   root: string; // the folder setup may write in: the home folder, or the project
   remove: boolean;
   stamp: string;
@@ -32,6 +34,7 @@ export interface SkillItem {
 export interface SkillPlan {
   shared: SkillItem;
   claude: SkillItem | null;
+  antigravity: SkillItem | null;
   result?: "done" | "failed";
   error?: string;
 }
@@ -67,7 +70,7 @@ function sameFiles(folder: string, source: string): boolean {
 const skillBackup = (path: string, stamp: string) => backupName(join(dirname(dirname(path)), "repomagpie-skill"), stamp);
 
 export function planSkill(r: SkillRequest): SkillPlan {
-  return { shared: planShared(r), claude: r.claude === null ? null : planClaude(r, r.claude) };
+  return { shared: planShared(r), claude: r.claude === null ? null : planLink(r, r.claude), antigravity: r.antigravity === null ? null : planLink(r, r.antigravity) };
 }
 
 function planShared(r: SkillRequest): SkillItem {
@@ -84,7 +87,8 @@ function planShared(r: SkillRequest): SkillItem {
   return item("update", npx ? "an npx skills install: updated in place; npx skills update may later replace it with the version on GitHub" : null, skillBackup(r.shared, r.stamp));
 }
 
-function planClaude(r: SkillRequest, path: string): SkillItem {
+// A folder that should be a link to the shared one.
+function planLink(r: SkillRequest, path: string): SkillItem {
   const item = (action: SkillItem["action"], reason: string | null = null, backup: string | null = null): SkillItem => ({ path, action, reason, backup });
   const copy = r.project && r.platform === "win32";
   const unsafe = pathProblem(path, r.root, true);
@@ -110,12 +114,13 @@ function planClaude(r: SkillRequest, path: string): SkillItem {
 // `link` makes the link; tests pass one that fails, to see the copy it falls back to.
 export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): SkillPlan {
   const fail = (error: string): SkillPlan => ({ ...plan, result: "failed", error });
-  const acting = [plan.shared, plan.claude].some((item) => item && !["keep", "leave"].includes(item.action));
+  const acting = [plan.shared, plan.claude, plan.antigravity].some((item) => item && !["keep", "leave"].includes(item.action));
   if (!acting) return plan;
-  let claude = plan.claude;
+  // The folders that link to the shared one: Claude Code's, then Antigravity CLI's.
+  const links = [plan.claude, plan.antigravity];
   try {
     if (r.remove) {
-      if (claude?.action === "remove") removeOne(claude.path);
+      for (const item of links) if (item?.action === "remove") removeOne(item.path);
       if (plan.shared.action === "remove") rmSync(plan.shared.path, { recursive: true });
     } else {
       if (plan.shared.action === "add" || plan.shared.action === "update") {
@@ -125,21 +130,22 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
         if (plan.shared.action === "update") rmSync(plan.shared.path, { recursive: true });
         cpSync(r.source, plan.shared.path, { recursive: true });
       }
-      if (claude && ["link", "relink", "copy"].includes(claude.action)) {
-        if (claude.backup) renameSync(claude.path, claude.backup);
-        else if (exists(claude.path)) removeOne(claude.path);
-        mkdirSync(dirname(claude.path), { recursive: true });
+      for (const [i, item] of links.entries()) {
+        if (!item || !["link", "relink", "copy"].includes(item.action)) continue;
+        if (item.backup) renameSync(item.path, item.backup);
+        else if (exists(item.path)) removeOne(item.path);
+        mkdirSync(dirname(item.path), { recursive: true });
         let made: "link" | "copy" = "copy";
-        if (claude.action !== "copy") {
+        if (item.action !== "copy") {
           try {
-            link(plan.shared.path, claude.path, r.platform);
+            link(plan.shared.path, item.path, r.platform);
             made = "link";
           } catch {
             // A file system or policy without links: a copy, which doctor checks against the other.
           }
         }
-        if (made === "copy") cpSync(r.source, claude.path, { recursive: true, force: true });
-        claude = { ...claude, made };
+        if (made === "copy") cpSync(r.source, item.path, { recursive: true, force: true });
+        links[i] = { ...item, made };
       }
     }
   } catch (error) {
@@ -147,9 +153,10 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
   }
   // Read it back.
   const ok = r.remove
-    ? (plan.shared.action !== "remove" || !exists(plan.shared.path)) && (claude?.action !== "remove" || !exists(claude.path))
-    : sameFiles(plan.shared.path, r.source) && (!claude || claude.action === "leave" || sameFiles(claude.path, r.source));
-  return ok ? { ...plan, claude, result: "done" } : { ...plan, claude, result: "failed", error: "The skill's files aren't as expected after the change." };
+    ? (plan.shared.action !== "remove" || !exists(plan.shared.path)) && links.every((item) => item?.action !== "remove" || !exists(item.path))
+    : sameFiles(plan.shared.path, r.source) && links.every((item) => !item || item.action === "leave" || sameFiles(item.path, r.source));
+  const [claude, antigravity] = links;
+  return ok ? { ...plan, claude, antigravity, result: "done" } : { ...plan, claude, antigravity, result: "failed", error: "The skill's files aren't as expected after the change." };
 }
 
 // A junction on Windows (no admin rights or Developer Mode needed), a relative symlink elsewhere,

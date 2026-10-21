@@ -68,6 +68,26 @@ const CASES: [string, string[]][] = [
   ["/usr/bin/pip3 install requests", ["pypi:requests"]],
   ["NPM Install PDFKit", ["npm:PDFKit"]], // PowerShell is case-insensitive about command names
 
+  // Forms the agents used on Windows in the pre-check (decision 0036): npm's shims by name,
+  // PowerShell's call operator, a quoted full path, and the commands around an install
+  ["npm.cmd install left-pad", ["npm:left-pad"]],
+  ["npm.ps1 install left-pad", ["npm:left-pad"]],
+  ["& npm install left-pad --no-fund", ["npm:left-pad"]],
+  ['& "C:\\Program Files\\nodejs\\npm.cmd" install left-pad', ["npm:left-pad"]],
+  ["pnpm.cmd add left-pad", ["npm:left-pad"]],
+  ["yarn.cmd add left-pad", ["npm:left-pad"]],
+  ["bun.exe add left-pad", ["npm:left-pad"]],
+  ["Set-Location app; npm.cmd i left-pad; Get-ChildItem", ["npm:left-pad"]],
+  ["npx.cmd create-vite app", []],
+  ["repomagpie.cmd recall left-pad --json", []],
+  ["Get-Content 'C:\\Users\\me\\.agents\\skills\\repomagpie\\SKILL.md'", []],
+  ["Get-ChildItem -Force | Select-Object Name,Length", []],
+  ["Get-Content package.json; npm.cmd ls pdfkit --depth=0", []], // Codex, live test: it checks without installing
+  ["npm ls pdfkit", []],
+  ["npm list pdfkit --all", []],
+  ["npm view pdfkit version", []],
+  ["npm explain pdfkit", []],
+
   // The same package twice is reported once
   ["npm i pdfkit && npm i pdfkit@2", ["npm:pdfkit"]],
 

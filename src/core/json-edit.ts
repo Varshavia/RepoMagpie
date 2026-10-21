@@ -31,6 +31,38 @@ export function setMember(text: string | null, [container, name]: [string, strin
   return insert(text, inner, 1, `${JSON.stringify(name)}: ${format(text, value, 2)}`);
 }
 
+// Sets the root object's member `name` to `value`, adding it last when missing. Null text (no file)
+// starts a new file.
+export function setTop(text: string | null, name: string, value: unknown): string {
+  if (text === null || !text.trim()) return `${JSON.stringify({ [name]: value }, null, 2)}\n`;
+  const root = asObject(parseRoot(text), "the root");
+  const member = root.members.find((m) => m.key === name);
+  if (member) return splice(text, member.value, format(text, value, 1));
+  return insert(text, root, 0, `${JSON.stringify(name)}: ${format(text, value, 1)}`);
+}
+
+// Whether an object in the text has the same key twice. JSON.parse, and so the agent, keeps the
+// last one, while these edits find the first: such a file is never edited. False for text that
+// isn't JSON.
+export function hasDuplicateKey(text: string): boolean {
+  let root: Node;
+  try {
+    root = parseValue(text, skip(text, text.charCodeAt(0) === 0xfeff ? 1 : 0));
+  } catch {
+    return false;
+  }
+  const stack: Node[] = [root];
+  while (stack.length) {
+    const node = stack.pop() as Node;
+    if (node.kind === "object") {
+      const keys = new Set(node.members.map((m) => m.key));
+      if (keys.size !== node.members.length) return true;
+      stack.push(...node.members.map((m) => m.value));
+    } else if (node.kind === "array") stack.push(...node.items);
+  }
+  return false;
+}
+
 // Appends `value` to the array at `path`.
 export function appendItem(text: string, path: Path, value: unknown): string {
   const array = locate(parseRoot(text), path);

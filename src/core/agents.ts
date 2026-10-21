@@ -4,6 +4,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, posix, resolve, win32 } from "node:path";
 import type { Env } from "./journals.ts";
+import { hasDuplicateKey } from "./json-edit.ts";
 
 export type Platform = "win32" | "darwin" | "linux";
 
@@ -18,7 +19,7 @@ export interface Where {
 export type McpFormat = "mcpServers" | "servers" | "codex-toml";
 
 export interface Agent {
-  id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode";
+  id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode" | "antigravity" | "copilot";
   name: string;
   cli: string; // the command on PATH
   marker: (w: Where) => string; // a folder or file of its own: it counts as installed when this exists (or cli is on PATH)
@@ -33,15 +34,20 @@ const vscodeUser = (w: Where) =>
 const codexHome = (w: Where) => w.env.CODEX_HOME ?? join(w.home, ".codex");
 
 const geminiSettings = (w: Where) => join(w.home, ".gemini", "settings.json");
+export const copilotHome = (w: Where) => w.env.COPILOT_HOME ?? join(w.home, ".copilot");
 
-// The first set (decision 0035), in the order setup and doctor show them. Gemini CLI's marker is its
-// settings.json, not ~/.gemini: Antigravity CLI makes that folder too (docs/agents.md).
+// The first set (decision 0035, and 0036 for Antigravity CLI and Copilot CLI), in the order setup
+// and doctor show them. Gemini CLI's marker is its settings.json, not ~/.gemini: Antigravity CLI
+// makes that folder too. Copilot CLI's is its config.json, not ~/.copilot, which VS Code reads too
+// (docs/agents.md).
 export const AGENTS: Agent[] = [
   { id: "claude-code", name: "Claude Code", cli: "claude", marker: (w) => join(w.home, ".claude"), mcpFile: (w) => join(w.home, ".claude.json"), format: "mcpServers" },
   { id: "codex", name: "Codex CLI", cli: "codex", marker: codexHome, mcpFile: (w) => join(codexHome(w), "config.toml"), format: "codex-toml" },
   { id: "cursor", name: "Cursor", cli: "cursor", marker: (w) => join(w.home, ".cursor"), mcpFile: (w) => join(w.home, ".cursor", "mcp.json"), format: "mcpServers" },
   { id: "gemini", name: "Gemini CLI", cli: "gemini", marker: geminiSettings, mcpFile: geminiSettings, format: "mcpServers" },
   { id: "vscode", name: "VS Code (GitHub Copilot)", cli: "code", marker: vscodeUser, mcpFile: (w) => join(vscodeUser(w), "mcp.json"), format: "servers" },
+  { id: "antigravity", name: "Antigravity CLI", cli: "agy", marker: (w) => join(w.home, ".gemini", "antigravity-cli"), mcpFile: (w) => join(w.home, ".gemini", "config", "mcp_config.json"), format: "mcpServers" },
+  { id: "copilot", name: "Copilot CLI", cli: "copilot", marker: (w) => join(copilotHome(w), "config.json"), mcpFile: (w) => join(copilotHome(w), "mcp-config.json"), format: "mcpServers" },
 ];
 
 // Its marker exists, or its command is in an absolute PATH folder.
@@ -56,7 +62,7 @@ export const skillFolders = (w: Where) => [
   join(w.home, ".agents", "skills", "repomagpie"),
   join(w.home, ".claude", "skills", "repomagpie"),
   join(w.home, ".cursor", "skills", "repomagpie"),
-  join(w.home, ".copilot", "skills", "repomagpie"),
+  join(copilotHome(w), "skills", "repomagpie"),
   join(w.home, ".gemini", "skills", "repomagpie"),
   join(codexHome(w), "skills", "repomagpie"),
 ];
@@ -140,10 +146,12 @@ function readHead(file: string, bytes: number): string {
 // --- Reading config files without changing them ---
 
 // JSON with comments and trailing commas, as VS Code, Cursor and Gemini CLI accept them: the value,
-// and whether the text had either (setup edits only plain JSON). An error message when it can't be
-// read. Strings are kept as written, so "//" inside a URL stays.
+// and whether the text had either, or a key twice (setup edits only plain JSON). An error message
+// when it can't be read. Strings are kept as written, so "//" inside a URL stays. An empty or
+// whitespace-only file is an empty object: Antigravity CLI creates its mcp_config.json empty.
 export function readJsonc(text: string): { value: unknown; plain: boolean } | { error: string } {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  if (!source.trim()) return { value: {}, plain: true };
   let out = "";
   let plain = true;
   for (let i = 0; i < source.length; i++) {
@@ -167,7 +175,8 @@ export function readJsonc(text: string): { value: unknown; plain: boolean } | { 
     } else out += ch;
   }
   try {
-    return { value: JSON.parse(out), plain };
+    const value: unknown = JSON.parse(out);
+    return { value, plain: plain && !hasDuplicateKey(out) };
   } catch (error) {
     // Node's message can quote the text around the mistake, and a config file can hold secrets, so
     // only the position is kept (the position in the text without comments).
@@ -234,7 +243,7 @@ function codexEntry(text: string, name: string): { entry: McpEntry | null } | { 
 }
 
 // A TOML basic string ("…", JSON-like escapes) or literal string ('…'); null for anything else.
-function tomlString(value: string): string | null {
+export function tomlString(value: string): string | null {
   const trimmed = value.replace(/\s+#.*$/, "");
   if (/^'[^']*'$/.test(trimmed)) return trimmed.slice(1, -1);
   if (/^"(?:[^"\\]|\\.)*"$/.test(trimmed)) {

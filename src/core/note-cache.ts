@@ -203,23 +203,28 @@ export function writeCache(journal: string, name: string, version: number, signa
   try {
     mkdirSync(join(journal, ".cache"), { recursive: true });
     writeFileSync(temporary, JSON.stringify({ version, files: signature, data }));
-    const started = performance.now();
-    for (let attempt = 0; ; attempt++) {
-      try {
-        renameSync(temporary, file);
-        return;
-      } catch (error) {
-        const wait = RENAME_WAITS[attempt];
-        if (!HELD.has((error as NodeJS.ErrnoException).code ?? "") || wait === undefined || performance.now() - started + wait > RENAME_BUDGET) throw error;
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait); // a synchronous pause
-      }
-    }
+    replaceFile(temporary, file);
   } catch {
     // A cache that can't be written only costs time on the next run.
     try {
       rmSync(temporary, { force: true });
     } catch {
       // The temporary file can't be removed either (no .cache folder, or it is held too).
+    }
+  }
+}
+
+// Renames temporary over file, with the waits above while another process holds it; throws after.
+export function replaceFile(temporary: string, file: string): void {
+  const started = performance.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      renameSync(temporary, file);
+      return;
+    } catch (error) {
+      const wait = RENAME_WAITS[attempt];
+      if (!HELD.has((error as NodeJS.ErrnoException).code ?? "") || wait === undefined || performance.now() - started + wait > RENAME_BUDGET) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait); // a synchronous pause
     }
   }
 }

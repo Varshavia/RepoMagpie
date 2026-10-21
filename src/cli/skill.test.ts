@@ -287,7 +287,8 @@ function has(shape: unknown, path: string): boolean {
 }
 
 const FIELD = /^[a-z][a-z0-9_]*(\[\])?(\.[a-z][a-z0-9_]*(\[\])?)*$/;
-const NOT_FIELDS = new Set(["null", "true", "false", "repomagpie"]);
+// Words in code that aren't fields: values, and the commands' Windows file names.
+const NOT_FIELDS = new Set(["null", "true", "false", "repomagpie", "repomagpie.cmd", "repomagpie.ps1"]);
 
 test("the spec's --json examples parse, for the commands the skill uses", () => {
   const shapes = specShapes();

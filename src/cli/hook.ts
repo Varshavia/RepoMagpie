@@ -1,11 +1,13 @@
-// repomagpie hook claude-code (spec §6): the command the Claude Code hook runs. Fails open: whatever
-// happens, it exits 0, and errors go to <personal journal>/.cache/hook-errors.log, never to stdout.
-// So do the files a run skipped (decision 0032, rule 5): the hook prints nothing but its answer.
+// repomagpie hook <agent> (spec §6, decision 0036): the command each agent's hook runs. Fails open:
+// whatever happens, it exits 0, and errors go to <personal journal>/.cache/hook-errors.log, never
+// to stdout. So do the files a run skipped (decision 0032, rule 5): the hook prints nothing but its
+// answer.
 import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { journalPathProblem, takeSkipped } from "../core/note-cache.ts";
-import { hookOutput } from "../hook/claude-code.ts";
+import type { HookAgent } from "../hook/agents.ts";
+import type { HookContext } from "../hook/core.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
@@ -13,10 +15,23 @@ export interface HookOptions extends GlobalOptions {
   informOnly?: boolean;
 }
 
-export async function hookCommand(options: HookOptions, io: Io): Promise<number> {
+// Each adapter is its own chunk, loaded only by its subcommand: hook claude-code never loads the
+// others, nor the retry record they share.
+type Adapter = (input: string, ctx: HookContext) => string | null;
+const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
+  "claude-code": async () => (await import("../hook/claude-code.ts")).hookOutput,
+  codex: async () => (await import("../hook/codex.ts")).codexOutput,
+  "gemini-cli": async () => (await import("../hook/gemini-cli.ts")).geminiOutput,
+  antigravity: async () => (await import("../hook/antigravity.ts")).antigravityOutput,
+  copilot: async () => (await import("../hook/copilot.ts")).copilotOutput,
+  cursor: async () => (await import("../hook/cursor.ts")).cursorOutput,
+};
+
+export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {
   try {
     const input = io.stdin ? await io.stdin() : "";
-    const out = hookOutput(input, {
+    const adapter = await ADAPTERS[agent]();
+    const out = adapter(input, {
       env: io.env,
       home: io.home,
       cwd: io.cwd,

@@ -14,11 +14,15 @@ export interface Install {
 const SEP = Symbol("separator");
 type Token = string | typeof SEP | { redirect: string };
 
-// Words that can precede the real command.
+// Words that can precede the real command. On Windows: cmd's `call` (a batch file runs npm.cmd
+// with it) and `start`, PowerShell's dot-sourcing; then wsl, and npx or corepack running a manager.
 const PREFIXES = new Set(["sudo", "env", "command", "builtin", "exec", "time", "nice", "nohup", "timeout", "stdbuf", "xargs",
-  "if", "then", "else", "elif", "do", "while", "until", "!"]);
-// Shells whose arguments are themselves a command line.
-const SHELLS = new Set(["sh", "bash", "zsh", "dash", "pwsh", "powershell", "cmd"]);
+  "if", "then", "else", "elif", "do", "while", "until", "!", "call", "start", ".", "wsl", "npx", "corepack"]);
+// Shells whose arguments are themselves a command line, and PowerShell's Invoke-Expression.
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "pwsh", "powershell", "cmd", "iex", "invoke-expression"]);
+const POWERSHELL = new Set(["pwsh", "powershell"]);
+// PowerShell takes any unambiguous start of a parameter's name, and -ec, for -EncodedCommand.
+const ENCODED = /^-(ec|e|en|enc|enco|encod|encode|encodedc|encodedco|encodedcom|encodedcomm|encodedcomma|encodedcomman|encodedcommand)$/i;
 const MAX_DEPTH = 3;
 
 // Splits a Bash or PowerShell command line into words, separators and redirections.
@@ -177,37 +181,84 @@ function registryName(word: string, type: PackageType): string | null {
 }
 
 // Every package install in the command line, in order, each package once.
-export function detectInstalls(command: string): Install[] {
+export const detectInstalls = (command: string): Install[] => detectCommand(command).installs;
+
+// The installs, and whether part of the command couldn't be read: a PowerShell -EncodedCommand that
+// isn't base64 of UTF-16 text, whose installs nobody can see.
+export function detectCommand(command: string): { installs: Install[]; unreadable: boolean } {
   const found: Install[] = [];
   const seen = new Set<string>();
+  const state = { unreadable: false };
   walk(command, 0, (type, word) => {
     const name = registryName(word, type);
     if (name === null || seen.has(`${type}:${name}`)) return;
     seen.add(`${type}:${name}`);
     found.push({ type, name, spec: word });
-  });
-  return found;
+  }, state);
+  return { installs: found, unreadable: state.unreadable };
 }
 
-function walk(cmd: string, depth: number, add: (type: PackageType, word: string) => void): void {
+// PowerShell's -EncodedCommand: base64 of the command in UTF-16LE. null when it isn't that.
+function decodePowerShell(value: string): string | null {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) return null;
+  const bytes = Buffer.from(value, "base64");
+  if (bytes.length % 2 !== 0) return null;
+  const text = bytes.toString("utf16le");
+  return /[\u0000-\u0008\u000e-\u001f�]/.test(text) ? null : text;
+}
+
+function walk(cmd: string, depth: number, add: (type: PackageType, word: string) => void, state: { unreadable: boolean }): void {
   const tokens = tokenize(cmd);
   let atCommand = true;
   let inShell = false;
+  let powershell = false;
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
-    if (t === SEP) { atCommand = true; inShell = false; continue; }
+    if (t === SEP) { atCommand = true; inShell = false; powershell = false; continue; }
     if (typeof t !== "string") continue;
-    if (inShell && /\s/.test(t) && depth < MAX_DEPTH) walk(t, depth + 1, add);
+    if (powershell && ENCODED.test(t)) {
+      const value = tokens[i + 1];
+      const decoded = typeof value === "string" ? decodePowerShell(value) : null;
+      if (decoded === null) state.unreadable = true;
+      else if (depth < MAX_DEPTH) walk(decoded, depth + 1, add, state);
+      i++;
+      continue;
+    }
+    if (inShell && /\s/.test(t) && depth < MAX_DEPTH) walk(t, depth + 1, add, state);
     if (!atCommand) continue;
     const name = (t.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "");
-    if (/^\w+=/.test(t) || t.startsWith("-") || /^\/\w$/.test(t) || /^\d/.test(t) || PREFIXES.has(name)) continue;
+    if (!t || /^\w+=/.test(t) || t.startsWith("-") || /^\/\w$/.test(t) || /^\d/.test(t) || (PREFIXES.has(name) && !(name === "start" && startProcess(argsOf(tokens, i + 1), true)))) continue;
     atCommand = false;
     if (SHELLS.has(name)) {
       inShell = true;
+      powershell = POWERSHELL.has(name);
       atCommand = true;
       continue;
     }
-    const install = packagesOf(name, argsOf(tokens, i + 1));
+    const args = argsOf(tokens, i + 1);
+    const started = name === "start-process" || name === "saps" || name === "start" ? startProcess(args, name === "start") : null;
+    const install = started ? packagesOf(started.name, started.args) : packagesOf(name, args);
     for (const word of install?.words ?? []) add(install!.type, word);
   }
+}
+
+// PowerShell's Start-Process (saps, or start as its alias): the program, from -FilePath or the first
+// positional word, and its -ArgumentList, a list of words split on commas and spaces. null without
+// an argument list, or, for `start` (also cmd's), without the -ArgumentList parameter itself.
+function startProcess(args: string[], explicit: boolean): { name: string; args: string[] } | null {
+  let file: string | undefined;
+  let list: string[] | null = null;
+  let named = false;
+  for (let k = 0; k < args.length; k++) {
+    const arg = args[k];
+    if (/^-(f|fi|fil|file|filep|filepa|filepat|filepath)$/i.test(arg)) file = args[++k];
+    else if (/^-(a|ar|arg|args|argu|argum|argume|argumen|argument|argumentl|argumentli|argumentlis|argumentlist)$/i.test(arg)) {
+      list = (args[++k] ?? "").split(/[,\s]+/).filter(Boolean);
+      named = true;
+    } else if (arg.startsWith("-")) k++; // another parameter and its value
+    else if (file === undefined) file = arg;
+    else if (list === null) list = arg.split(/[,\s]+/).filter(Boolean);
+  }
+  if (!file || list === null || (explicit && !named)) return null;
+  return { name: (file.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, ""), args: list };
 }

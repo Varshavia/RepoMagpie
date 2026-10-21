@@ -1,0 +1,8 @@
+{
+  "source": "Not captured: Gemini CLI wouldn't sign in for the pre-check (docs/agents.md). Built from Gemini CLI v0.64.0's source on 2026-10-16: hookEventHandler.ts (createBaseInput, fireBeforeToolEvent) and tools/shell.ts (ShellToolParams).",
+  "inputs": [
+    {"session_id":"00000000-0000-4000-8000-000000000001","transcript_path":"C:\\Users\\me\\.gemini\\tmp\\0000\\chats\\session-2026-10-16T10-00-00000000.json","cwd":"C:\\Users\\me\\hook-test","hook_event_name":"BeforeTool","timestamp":"2026-10-16T10:00:00.000Z","tool_name":"run_shell_command","tool_input":{"command":"npm install left-pad","description":"Install left-pad"}},
+    {"session_id":"00000000-0000-4000-8000-000000000001","transcript_path":"C:\\Users\\me\\.gemini\\tmp\\0000\\chats\\session-2026-10-16T10-00-00000000.json","cwd":"C:\\Users\\me\\hook-test","hook_event_name":"BeforeTool","timestamp":"2026-10-16T10:00:05.000Z","tool_name":"run_shell_command","tool_input":{"command":"npm.cmd install left-pad","description":"Install left-pad","dir_path":"app"}},
+    {"session_id":"00000000-0000-4000-8000-000000000001","transcript_path":"C:\\Users\\me\\.gemini\\tmp\\0000\\chats\\session-2026-10-16T10-00-00000000.json","cwd":"C:\\Users\\me\\hook-test","hook_event_name":"BeforeTool","timestamp":"2026-10-16T10:00:10.000Z","tool_name":"read_file","tool_input":{"absolute_path":"C:\\Users\\me\\hook-test\\package.json"}}
+  ]
+}

@@ -1,7 +1,8 @@
 // repomagpie setup (decision 0035): a plan per agent, then applying it. The MCP entry through the
 // agent's own CLI where it has one, otherwise a round-trip-safe edit of plain JSON, otherwise a
-// snippet for the user to paste; then the skill (setup-skill.ts) and the Claude Code hook
-// (setup-hook.ts). A backup before every change; never through a link, never outside the home
+// snippet for the user to paste; then the skill (setup-skill.ts), the Claude Code hook
+// (setup-hook.ts) and the other agents' hooks (setup-agent-hooks.ts, decision 0036). A backup
+// before every change; never through a link, never outside the home
 // folder (or the project, with --project); nothing that weakens an agent's safety (no trust or
 // auto-approve key is written). Never prints, never prompts.
 import { copyFileSync, existsSync } from "node:fs";
@@ -13,8 +14,9 @@ import { backupName, pathProblem, readConfig, writeAtomically } from "./config-w
 import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { ALLOW_WRITE, noteTool, type Launch } from "./launch.ts";
+import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookPlan, type AgentHookTarget } from "./setup-agent-hooks.ts";
 import { applyHook, planHook, type HookPlan, type HookTarget } from "./setup-hook.ts";
-import { applySkill, planSkill, type SkillPlan } from "./setup-skill.ts";
+import { applySkill, planSkill, type SkillPlan, type SkillRequest } from "./setup-skill.ts";
 
 // The package's skill: beside dist/ in the package, beside src/ in the repository.
 export const SKILL_SOURCE = fileURLToPath(new URL("../../skills/repomagpie/", import.meta.url));
@@ -49,6 +51,7 @@ export interface SetupPlan {
   agents: AgentPlan[]; // the MCP entries, always in the user's settings
   skill: SkillPlan | null; // when any agent is set up
   hook: HookPlan | null; // when Claude Code is set up
+  hooks: AgentHookPlan[]; // the other agents' hooks, for each one set up that has a hook (decision 0036)
 }
 
 export interface SetupRequest {
@@ -68,15 +71,23 @@ export interface SetupRequest {
 const CLI: Record<Agent["id"], { add?: (l: { command: string; args: string[] }) => string[]; remove?: string[]; edit: boolean }> = {
   "claude-code": { add: (l) => ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: false },
   codex: { add: (l) => ["mcp", "add", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", NAME], edit: false },
-  gemini: { add: (l) => ["mcp", "add", "--scope", "user", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: true },
+  // Gemini CLI's command comes before --: what follows -- only joins its args.
+  gemini: { add: (l) => ["mcp", "add", "--scope", "user", NAME, l.command, "--", ...l.args], remove: ["mcp", "remove", "--scope", "user", NAME], edit: true },
   cursor: { edit: true },
   vscode: { add: (l) => ["--add-mcp", JSON.stringify({ name: NAME, command: l.command, args: l.args })], edit: true },
+  antigravity: { edit: true },
+  copilot: { add: (l) => ["mcp", "add", NAME, "--", l.command, ...l.args], remove: ["mcp", "remove", NAME], edit: true },
 };
+
+// The entry as a JSON edit writes it. Copilot CLI's file names the type and the tools, as its docs
+// show (`copilot mcp add` gives every tool by default).
+const jsonEntry = (id: Agent["id"], l: { command: string; args: string[] }) =>
+  id === "copilot" ? { type: "local", command: l.command, args: l.args, tools: ["*"] } : { command: l.command, args: l.args };
 
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
   const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
-  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null };
+  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null, hooks: [] };
   for (const agent of AGENTS) {
     const installed = isInstalled(agent, where);
     const file = agent.mcpFile(where);
@@ -95,14 +106,35 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const chosen = plan.agents.filter((a) => a.action !== "skip");
   const claude = chosen.some((a) => a.id === "claude-code");
   const root = request.project ?? where.home;
-  if (chosen.length) {
-    plan.skill = planSkill({
-      source: request.skillSource ?? SKILL_SOURCE, shared: join(root, ".agents", "skills", NAME), claude: claude ? join(root, ".claude", "skills", NAME) : null,
-      root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
-    });
-  }
+  if (chosen.length) plan.skill = planSkill(skillRequest(request, plan));
   if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request));
+  // The other agents' hooks: always in the user's settings, as the MCP entries are.
+  for (const spec of HOOK_SPECS.filter((s) => chosen.some((a) => a.id === s.id))) {
+    const hook = planAgentHook(spec, where, request.remove, request.stamp, agentHookTarget(request));
+    // Gemini CLI's hook is in the file its MCP entry is in: a second backup in this run gets its own name.
+    const mcp = chosen.find((a) => a.id === spec.id);
+    if (hook.backup && hook.backup === mcp?.backup) hook.backup = `${hook.backup}-2`;
+    plan.hooks.push(hook);
+  }
   return plan;
+}
+
+// The skill's folders: Claude Code's link when it is set up, and Antigravity CLI's in the user's
+// ~/.gemini/skills (in a project, Antigravity reads the project's .agents/skills).
+function skillRequest(request: SetupRequest, plan: Pick<SetupPlan, "agents">): SkillRequest {
+  const root = ROOT(request);
+  const chosen = (id: Agent["id"]) => plan.agents.some((a) => a.id === id && a.action !== "skip");
+  return {
+    source: request.skillSource ?? SKILL_SOURCE, shared: join(root, ".agents", "skills", NAME), claude: chosen("claude-code") ? join(root, ".claude", "skills", NAME) : null,
+    antigravity: chosen("antigravity") && request.project === undefined ? join(root, ".gemini", "skills", NAME) : null,
+    root, remove: request.remove, stamp: request.stamp, platform: request.where.platform, project: request.project !== undefined,
+  };
+}
+
+// The other agents' hook entries start what the MCP entry starts: its node and entry file.
+function agentHookTarget(request: SetupRequest): AgentHookTarget {
+  if ("error" in request.launch) return { error: request.launch.error };
+  return { node: request.launch.command, entry: request.launch.args[1] };
 }
 
 // The hook entry: in a project the shell form, which a teammate's machine can run; in the user's
@@ -178,14 +210,16 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
       const steps = [...(p.action !== "add" && how.remove ? [how.remove] : []), ...(wanted && how.add ? [how.add(wanted)] : [])];
       for (const args of steps) {
         const run = runCli(cli, args, { env: where.env, platform: where.platform, cwd: where.home });
-        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${redactText((run.stderr || run.stdout).trim().split("\n").slice(-3).join(" "))}`);
+        // The first lines: a CLI puts its error there, and its help after.
+        const said = (run.stderr || run.stdout).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 3).join(" ");
+        if (run.status !== 0) return fail(`${agent.cli} ${args.slice(0, 2).join(" ")} failed (exit ${run.status}): ${redactText(said)}`);
       }
     } else {
       try {
         const read = readConfig(p.file);
         if ("error" in read) return fail(read.error);
         const container = agent.format as Exclude<McpFormat, "codex-toml">;
-        writeAtomically(p.file, setMember(read.text, [container, NAME], wanted ? { command: wanted.command, args: wanted.args } : undefined));
+        writeAtomically(p.file, setMember(read.text, [container, NAME], wanted ? jsonEntry(agent.id, wanted) : undefined));
       } catch (error) {
         return fail((error as Error).message);
       }
@@ -200,13 +234,10 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
     }
     return { ...p, result: "done" };
   });
-  const root = ROOT(request);
-  const skill = plan.skill && applySkill(plan.skill, {
-    source: request.skillSource ?? SKILL_SOURCE, shared: plan.skill.shared.path, claude: plan.skill.claude?.path ?? null,
-    root, remove: request.remove, stamp: request.stamp, platform: where.platform, project: request.project !== undefined,
-  });
-  const hook = plan.hook && applyHook(plan.hook, root, hookTarget(request));
-  return { ...plan, agents, skill, hook };
+  const skill = plan.skill && applySkill(plan.skill, skillRequest(request, plan));
+  const hook = plan.hook && applyHook(plan.hook, ROOT(request), hookTarget(request));
+  const hooks = plan.hooks.map((h) => applyAgentHook(h, HOOK_SPECS.find((s) => s.id === h.id) as (typeof HOOK_SPECS)[number], where, request.stamp, agentHookTarget(request)));
+  return { ...plan, agents, skill, hook, hooks };
 }
 
 const same = (a: Pick<McpEntry, "command" | "args">, b: { command: string; args: string[] }) =>
@@ -215,7 +246,7 @@ const same = (a: Pick<McpEntry, "command" | "args">, b: { command: string; args:
 function manualReason(agent: Agent, cli: string | undefined, plain: boolean): string {
   if (!cli && agent.id === "codex") return "the codex command isn't on PATH, and setup doesn't edit TOML itself";
   if (!cli && agent.id === "claude-code") return "the claude command isn't on PATH, and setup doesn't edit ~/.claude.json, which Claude Code rewrites while it runs";
-  if (!plain) return "the file has comments or trailing commas, which setup doesn't edit";
+  if (!plain) return "the file has comments, trailing commas or a key written twice, which setup doesn't edit";
   return "its CLI can't make this change";
 }
 
@@ -223,5 +254,5 @@ function manualReason(agent: Agent, cli: string | undefined, plain: boolean): st
 // JSON's escapes, so JSON.stringify writes valid TOML strings.)
 function snippet(agent: Agent, launch: { command: string; args: string[] }): string {
   if (agent.format === "codex-toml") return `[mcp_servers.${NAME}]\ncommand = ${JSON.stringify(launch.command)}\nargs = ${JSON.stringify(launch.args)}`;
-  return JSON.stringify({ [agent.format]: { [NAME]: { command: launch.command, args: launch.args } } }, null, 2);
+  return JSON.stringify({ [agent.format]: { [NAME]: jsonEntry(agent.id, launch) } }, null, 2);
 }

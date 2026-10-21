@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
 import { createInterface } from "node:readline/promises";
+import { HOOK_AGENTS } from "../hook/agents.ts";
 import type { Io } from "./program.ts";
 
 const io: Io = {
@@ -35,7 +36,7 @@ const io: Io = {
 // The hook runs before every shell command in Claude Code, so its usual command line skips the
 // command-line parser and the other commands (spec §7 budget). Any other form takes the full CLI.
 const argv = process.argv.slice(2);
-const hookOnly = argv[0] === "hook" && argv[1] === "claude-code" && argv.slice(2).every((arg) => arg === "--inform-only");
-process.exitCode = hookOnly
-  ? await (await import("./hook.ts")).hookCommand({ informOnly: argv.length > 2 }, io)
+const hookAgent = argv[0] === "hook" && argv.slice(2).every((arg) => arg === "--inform-only") ? HOOK_AGENTS.find((agent) => agent === argv[1]) : undefined;
+process.exitCode = hookAgent
+  ? await (await import("./hook.ts")).hookCommand(hookAgent, { informOnly: argv.length > 2 }, io)
   : await (await import("./program.ts")).run(argv, io);
