@@ -47,7 +47,12 @@ Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an av
 
 ## Quick start
 
-1. Install the `repomagpie` command and set it up in your coding agents with the two commands [at the top](#repomagpie). You need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+1. Install the `repomagpie` command and set it up in your coding agents. You need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+
+   ```bash
+   npm install -g repomagpie@beta
+   repomagpie setup
+   ```
 
    `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
 
@@ -75,12 +80,6 @@ Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an av
 Before an install, the skill tells your agent to look the package up with the MCP server's `recall` tool, or the `repomagpie recall` command. RepoMagpie reads both journals on your machine and returns your notes; when one says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step. Without a hook, the check works as well as the agent follows the skill.
 
 ## Ask your agent
-
-```text
-What do I have for browser testing?
-Install pdfkit.
-Which of my tools fit this project?
-```
 
 - **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first; on a small journal it can read every note in one list.
 - **Install pdfkit.** Your agent recalls pdfkit before the install. Your avoid note comes back with its alternatives, and your agent asks you before it installs anything.

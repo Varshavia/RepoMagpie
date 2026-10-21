@@ -49,7 +49,12 @@ Claude Code `npm install pdfkit` komutunu çalıştırmak üzereydi; RepoMagpie'
 
 ## Hızlı başlangıç
 
-1. `repomagpie` komutunu yükle ve [en üstteki](#repomagpie) iki komutla kodlama ajanlarında ayarla. Node.js 22.12 veya üstü gerekir. `PATH`'inde başka bir `magpie` komutu yoksa `magpie` kısa takma ad olarak çalışır. <!-- check:commands allow -->
+1. `repomagpie` komutunu yükle ve kodlama ajanlarında ayarla. Node.js 22.12 veya üstü gerekir. `PATH`'inde başka bir `magpie` komutu yoksa `magpie` kısa takma ad olarak çalışır. <!-- check:commands allow -->
+
+   ```bash
+   npm install -g repomagpie@beta
+   repomagpie setup
+   ```
 
    `setup` ajanlarını bulur, hangi dosyada neyi değiştireceğini gösterir, önce sorar ve düzenlediği her dosyanın yedeğini alır; `repomagpie setup --dry-run` yalnızca planı gösterir. [Ajanlar](../agents.md) ya da [elle kurulum](../setup-by-hand.md) sayfasına bak.
 
@@ -77,12 +82,6 @@ Claude Code `npm install pdfkit` komutunu çalıştırmak üzereydi; RepoMagpie'
 Bir kurulumdan önce skill, ajanına paketi MCP sunucusunun `recall` aracıyla ya da `repomagpie recall` komutuyla aramasını söyler. RepoMagpie makinendeki iki günlüğü de okur ve notlarını döndürür; biri paketten kaçınmanı söylüyorsa ajanın notu sana gösterir ve önce sorar. Ajan bu adımı atlarsa diye hook, kurulum komutunun kendisini kontrol eder. Hook yoksa kontrol, ajanın skill'e uyduğu kadar işe yarar.
 
 ## Ajanına sor
-
-```text
-What do I have for browser testing?
-Install pdfkit.
-Which of my tools fit this project?
-```
 
 - **What do I have for browser testing?** (Tarayıcı testi için elimde ne var?) Ajanın günlüklerinde arar ve bulduğu notlarla, Verdict'i başta olmak üzere yanıt verir; küçük bir günlükte her notu tek bir listede okuyabilir.
 - **Install pdfkit.** (pdfkit'i kur.) Ajanın kurulumdan önce pdfkit'e dair notlarına bakar. Kaçınma notun alternatifleriyle birlikte gelir ve ajanın bir şey kurmadan önce sana sorar.
