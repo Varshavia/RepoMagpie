@@ -41,12 +41,30 @@ function world(files: Record<string, string>) {
   return { root, journal, project, input, run, path: (file: string) => join(journal, "notes", file) };
 }
 
-test("the captured inputs: only the installs get an answer; the first is denied, the npm.cmd retry informs", () => {
+test("the captured inputs: only the installs get an answer; the first is denied, the npm.cmd retry is let through", () => {
   const w = world({ "journal/notes/npm--left-pad.md": LEFT_PAD });
   const answers = CAPTURED.map((input, i) => w.run(JSON.stringify({ ...input, cwd: w.project }), { at: T0 + i }));
   assert.deepEqual(answers.map((a) => a?.hookSpecificOutput.permissionDecision ?? (a ? "inform" : null)), [null, null, null, "deny", "inform", null]);
   assert.equal(answers[3].systemMessage, "RepoMagpie: stopped installing left-pad: you noted to avoid left-pad. Your agent should ask you; the same install goes through for the next 10 minutes.");
-  assert.match(answers[4].hookSpecificOutput.additionalContext, /^RepoMagpie: your personal journal has a note on left-pad \(/);
+  assert.match(answers[4].systemMessage, /^RepoMagpie: let this install of left-pad through: /);
+});
+
+// Live test: the retry's line repeated the note ("RepoMagpie: pdfkit (personal journal): "avoid: …""),
+// and when PowerShell then blocked npm.ps1, Codex told the user the hook had blocked the retry.
+test("a retry let through says so, without the note, to the user and to the agent; other matches still inform", () => {
+  const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--chalk.md": note({ id: "pkg:npm/chalk", verdict: "colours" }) });
+  assert.equal(w.run(w.input("npm install pdfkit")).hookSpecificOutput.permissionDecision, "deny");
+  assert.deepEqual(w.run(w.input("npm.cmd install pdfkit"), { at: T0 + 1 }), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as the user's go-ahead. RepoMagpie doesn't block it; if it fails, the cause is elsewhere.",
+    },
+    systemMessage: "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as your go-ahead.",
+  });
+  const withOther = w.run(w.input("npm i pdfkit chalk"), { at: T0 + 2 });
+  assert.equal(withOther.systemMessage, "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as your go-ahead.\nRepoMagpie: chalk (personal journal): \"colours\"");
+  assert.match(withOther.hookSpecificOutput.additionalContext, /taken as the user's go-ahead\. RepoMagpie doesn't block it; if it fails, the cause is elsewhere\.\nRepoMagpie: your personal journal has a note on chalk \(/);
+  for (const field of [withOther.systemMessage, withOther.hookSpecificOutput.additionalContext]) assert.doesNotMatch(field, /async streams painful|has a note on pdfkit/);
 });
 
 test("a personal avoid note: the deny reason has the note, then the advice; the user gets one line", () => {
@@ -85,7 +103,7 @@ test("any other match informs: context for the model, a line for the user, no de
   assert.equal(existsSync(retryFile(w.journal)), false); // nothing denied, nothing recorded
 });
 
-test("the retry: the same install in any form informs until 10 minutes after the deny, then is denied again", () => {
+test("the retry: the same install in any form is let through until 10 minutes after the deny, then is denied again", () => {
   const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT });
   const decision = (command: string, at: number, fields = {}) => w.run(w.input(command, fields), { at }).hookSpecificOutput.permissionDecision ?? "inform";
   assert.equal(decision("npm install pdfkit", T0), "deny");
@@ -94,9 +112,8 @@ test("the retry: the same install in any form informs until 10 minutes after the
   assert.equal(decision("& npm install pdfkit --no-fund", T0 + 120_000), "inform");
   assert.equal(decision("npm install pdfkit", T0 + 1, { cwd: w.root }), "deny"); // another folder
   assert.equal(decision("npm install pdfkit", T0 + RETRY_WINDOW), "deny");
-  const informed = w.run(w.input("npm install pdfkit"), { at: T0 + RETRY_WINDOW + 1 });
-  assert.match(informed.hookSpecificOutput.additionalContext, /Offer them to the user instead of pdfkit/);
-  assert.match(informed.systemMessage, /^RepoMagpie: pdfkit \(personal journal\): "avoid: async streams painful"/);
+  const passed = w.run(w.input("npm install pdfkit"), { at: T0 + RETRY_WINDOW + 1 }); // the second deny's window
+  assert.match(passed.systemMessage, /^RepoMagpie: let this install of pdfkit through: /);
 });
 
 test("--inform-only never denies and records nothing", () => {

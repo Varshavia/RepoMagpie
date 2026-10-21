@@ -8,7 +8,7 @@
 import { resolve } from "node:path";
 import { isRecord } from "../core/note-cache.ts";
 import { askReason, parseInput, recallFor, userMessage, type HookContext } from "./core.ts";
-import { denyReason, retryAnswer, stoppedLine } from "./deny.ts";
+import { denyReason, passed, retryAnswer, stoppedLine } from "./deny.ts";
 
 // What an exact avoid note does. If the live test shows Gemini CLI running the command without a
 // prompt, change this one line to "deny": the first try is then denied and the same install goes
@@ -25,10 +25,9 @@ export function geminiOutput(input: string, ctx: HookContext, now = Date.now(), 
   const r = recallFor(call.tool_input.command, folder(call.cwd, call.tool_input.dir_path), ctx);
   if (!r) return null;
   if (r.avoid.length && onAvoid === "ask") return JSON.stringify({ decision: "ask", systemMessage: askReason(r, LIMITS) });
-  if (r.avoid.length && retryAnswer(r, "gemini-cli", ctx, now) === "deny") {
-    return JSON.stringify({ decision: "deny", reason: denyReason(r, LIMITS), systemMessage: stoppedLine(r) });
-  }
-  return JSON.stringify({ systemMessage: userMessage(r, LIMITS) });
+  const answer = r.avoid.length ? retryAnswer(r, "gemini-cli", ctx, now) : "inform";
+  if (answer === "deny") return JSON.stringify({ decision: "deny", reason: denyReason(r, LIMITS), systemMessage: stoppedLine(r) });
+  return JSON.stringify({ systemMessage: answer === "pass" ? passed(r, LIMITS).message : userMessage(r, LIMITS) });
 }
 
 // The shell command's folder: dir_path, resolved against Gemini CLI's working folder (the input's

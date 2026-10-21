@@ -87,7 +87,7 @@ test("--help prints the settings snippet and the --inform-only advice", async ()
 
 // --- repomagpie hook codex (decision 0036) ---------------------------------------------------
 
-test("hook codex: the first try of an avoided install is denied and recorded, the next one informs; exit 0", async () => {
+test("hook codex: the first try of an avoided install is denied and recorded, the next one is let through; exit 0", async () => {
   const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
   const first = await magpie(box, ["hook", "codex"], { stdin: async () => input("npm install pdfkit", box.project) });
   assert.deepEqual([first.code, first.err], [0, ""]);
@@ -96,7 +96,7 @@ test("hook codex: the first try of an avoided install is denied and recorded, th
   assert.equal(existsSync(join(box.journal, ".cache", "hook-retry.json")), true);
   const retry = await magpie(box, ["hook", "codex"], { stdin: async () => input("npm.cmd install pdfkit", box.project) });
   assert.equal(JSON.parse(retry.out).hookSpecificOutput.permissionDecision, undefined);
-  assert.match(JSON.parse(retry.out).hookSpecificOutput.additionalContext, /has a note on pdfkit/);
+  assert.match(JSON.parse(retry.out).systemMessage, /^RepoMagpie: let this install of pdfkit through: /);
 });
 
 test("hook codex --inform-only never denies; nothing to say prints nothing; an error fails open", async () => {

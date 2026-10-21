@@ -3,16 +3,33 @@
 // user. Its own module, with the retry record, so the Claude Code hook never loads it.
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { CAPS, clean, cut } from "../core/text.ts";
-import { packageName, personal, reasonBlocks, shortList, type HookContext, type Limits, type Recalled } from "./core.ts";
+import { agentContext, packageName, personal, reasonBlocks, shortList, userMessage, type HookContext, type Limits, type Recalled } from "./core.ts";
 import { retryDecision, retryKey } from "./retry.ts";
 
-// "deny" the first try, and record it; "inform" for the same install until 10 minutes after that
-// deny, and when the retry record can't be read or written (a deny without a record would stop the
-// retry too).
-export function retryAnswer(r: Recalled, agent: string, ctx: HookContext, now = Date.now()): "deny" | "inform" {
+// "deny" the first try, and record it; "pass" for the same install until 10 minutes after that
+// deny; "inform" with no avoid note, and when the retry record can't be read or written (a deny
+// without a record would stop the retry too).
+export function retryAnswer(r: Recalled, agent: string, ctx: HookContext, now = Date.now()): "deny" | "pass" | "inform" {
   if (!r.avoid.length) return "inform";
   const journal = resolvePersonalJournal({ home: ctx.home, env: ctx.env, cwd: ctx.cwd, flag: ctx.homeFlag }).path;
-  return retryDecision(journal, retryKey(agent, r.cwd, r.stopped), now) === "deny" ? "deny" : "inform";
+  const decision = retryDecision(journal, retryKey(agent, r.cwd, r.stopped), now);
+  return decision === "unavailable" ? "inform" : decision;
+}
+
+// The texts for a retry let through: that it was let through, said plainly and without the avoid
+// notes, which the deny already gave (live test: a repeated note read as a second stop); then the
+// other matches as usual.
+export function passed(r: Recalled, limits: Limits): { context: string; message: string } {
+  const names = shortList(r.stopped.map((install) => cut(clean(install.name), CAPS.name)));
+  const head = `RepoMagpie: let this install of ${names} through: it is the retry within 10 minutes of the stop,`;
+  const forAgent = `${head} taken as the user's go-ahead. RepoMagpie doesn't block it; if it fails, the cause is elsewhere.`;
+  const forUser = `${head} taken as your go-ahead.`;
+  const rest: Recalled = { ...r, matches: r.matches.filter((m) => !r.avoid.includes(m)), avoid: [] };
+  const room = (line: string): Limits => ({ pack: limits.pack - line.length - 1, cap: limits.cap - line.length - 1 });
+  return {
+    context: [forAgent, agentContext(rest, room(forAgent))].filter(Boolean).join("\n"),
+    message: [forUser, userMessage(rest, room(forUser))].filter(Boolean).join("\n"),
+  };
 }
 
 // For the agent: the notes as in a prompt, then the hook's own advice, which always fits.

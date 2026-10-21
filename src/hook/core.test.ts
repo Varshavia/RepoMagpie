@@ -49,12 +49,12 @@ test("recallFor with --inform-only stops nothing", () => {
   assert.equal(readFileSafe(retryFile(w.journal)), null);
 });
 
-test("retryAnswer: deny the first try; the same install in another form informs until 10 minutes after the deny", () => {
+test("retryAnswer: deny the first try; the same install in another form passes until 10 minutes after the deny", () => {
   const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--chalk.md": CHALK });
   const answer = (command: string, at: number, agent = "codex", folder = w.project) => retryAnswer(recallFor(command, folder, w.ctx)!, agent, w.ctx, at);
   assert.equal(answer("npm install pdfkit", T0), "deny");
   for (const [i, command] of ["npm.cmd install pdfkit", "& npm install pdfkit --no-fund", "npm.ps1 i pdfkit@1.2.0", "npm i pdfkit chalk", "pnpm add pdfkit"].entries()) {
-    assert.equal(answer(command, T0 + i + 1), "inform", command); // the same stopped install: pdfkit from npm
+    assert.equal(answer(command, T0 + i + 1), "pass", command); // the same stopped install: pdfkit from npm
   }
   assert.equal(answer("npm install pdfkit", T0 + 1, "cursor"), "deny"); // another agent
   assert.equal(answer("npm install pdfkit", T0 + 1, "codex", join(w.root, "other")), "deny"); // another folder

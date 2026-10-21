@@ -70,7 +70,7 @@ test("--inform-only never asks: the avoid note is a line for the user", () => {
   });
 });
 
-test("the switch to deny (one constant): the first try is denied and recorded, the same install informs for 10 minutes", () => {
+test("the switch to deny (one constant): the first try is denied and recorded, the same install is let through for 10 minutes", () => {
   const w = world({ "journal/notes/npm--pdfkit.md": PDFKIT });
   const denied = w.run(w.input("npm install pdfkit"), { onAvoid: "deny" });
   assert.equal(denied.decision, "deny");
@@ -79,7 +79,7 @@ test("the switch to deny (one constant): the first try is denied and recorded, t
   assert.equal(denied.systemMessage, "RepoMagpie: stopped installing pdfkit: you noted to avoid pdfkit. Your agent should ask you; the same install goes through for the next 10 minutes.");
   assert.equal(existsSync(retryFile(w.journal)), true);
   const retried = w.run(w.input("& npm.cmd install pdfkit"), { at: T0 + 60_000, onAvoid: "deny" });
-  assert.deepEqual(Object.keys(retried), ["systemMessage"]);
+  assert.deepEqual(retried, { systemMessage: "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as your go-ahead." });
   assert.equal(w.run(w.input("npm install pdfkit"), { at: T0 + RETRY_WINDOW, onAvoid: "deny" }).decision, "deny");
   // A record that can't be written: inform, never deny.
   const blocked = world({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/.cache": "a file" });
