@@ -82,6 +82,11 @@ const CASES: [string, string[]][] = [
   ["repomagpie.cmd recall left-pad --json", []],
   ["Get-Content 'C:\\Users\\me\\.agents\\skills\\repomagpie\\SKILL.md'", []],
   ["Get-ChildItem -Force | Select-Object Name,Length", []],
+  ["Get-Content package.json; npm.cmd ls pdfkit --depth=0", []], // Codex, live test: it checks without installing
+  ["npm ls pdfkit", []],
+  ["npm list pdfkit --all", []],
+  ["npm view pdfkit version", []],
+  ["npm explain pdfkit", []],
 
   // The same package twice is reported once
   ["npm i pdfkit && npm i pdfkit@2", ["npm:pdfkit"]],
