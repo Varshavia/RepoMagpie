@@ -4,35 +4,34 @@
 
 > RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
 
+```text
+npm install pdfkit
+
+RepoMagpie: you noted to avoid pdfkit (personal journal)
+Verdict: "avoid: async streams painful; use puppeteer"
+Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF rendering")
+~\.magpie\notes\npm--pdfkit.md
+
+Do you want to proceed?
+```
+
+Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an avoid note in the personal journal and asked first.
+
 - **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
-- **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes Claude Code ask you.
+- **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes your agent ask you before the install.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
-**Status:** pre-release `0.2.0-beta.5`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.6`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
-You need Node.js 22.12 or later.
-
-1. Install the `repomagpie` command:
+1. Install the `repomagpie` command; you need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
 
    ```bash
    npm install -g repomagpie@beta
    ```
 
-   `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
-
-2. Set it up in your coding agents:
-
-   ```bash
-   repomagpie setup
-   ```
-
-   It finds Claude Code, Codex CLI, Cursor, Gemini CLI, VS Code, Antigravity CLI and Copilot CLI, lets you choose, shows what it will change in which file, and asks first. Each agent gets RepoMagpie's MCP server, so it can check your notes before an install and answer "what do I have for browser testing?"; and the agent skill, which tells it when to. Every agent but VS Code also gets the hook, which checks each install command against your notes before it runs. Every file is backed up first. `--dry-run` only shows the plan; `--remove` takes it all out. Codex CLI runs a new hook only after you trust it in `/hooks`. For other agents, or to write the entries yourself, see [setting up by hand](docs/setup-by-hand.md).
-
-   On Windows, Codex CLI, Copilot CLI, Gemini CLI and Cursor start hooks through Windows PowerShell, which adds about 350 ms per tool call, most of it PowerShell's own start. Antigravity CLI's `cmd` adds about 90 ms. (Copilot CLI runs the hook before every tool call; the others before each shell command.)
-
-   Then run `repomagpie doctor`: it shows what is wired in each agent, and what to do when something isn't.
+2. `repomagpie setup` finds your coding agents, lets you choose, shows what it will change in which file and asks first; it backs up every file before it edits one (`--dry-run` only shows the plan, `--remove` takes it all out). Then `repomagpie doctor` shows what is wired in each agent, and what to do when something isn't. For each agent's details, see [agents](docs/agents.md); to write the entries yourself, see [setting up by hand](docs/setup-by-hand.md).
 
 3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
@@ -41,37 +40,44 @@ You need Node.js 22.12 or later.
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
    ```
 
-   Notes go to your personal journal in `~/.magpie`. Add `--to project` to write to the project journal, `.magpie/` in the repository, which your team shares through git.
+   Notes go to your personal journal in `~/.magpie`; `--to project` writes to the repository's `.magpie/`, which your team shares through git. The next time your agent runs `npm install pdfkit`, it sees your note first.
 
-   Now when your agent runs `npm install pdfkit`, it sees your note first. In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you before the install and names the alternatives you noted. Codex CLI, Cursor and Copilot CLI can't ask from a hook, so the hook stops the first try with your note, and your agent asks you; if you say to go ahead, the same install goes through for the next 10 minutes. The hook never blocks an install for good. In VS Code, and wherever the agent runs the install some other way, the MCP server and the skill check it, which works as well as the agent follows them.
+More commands: `repomagpie ui`, `repomagpie search`, `repomagpie recall`, `repomagpie catalog`, `repomagpie adopt` and `repomagpie import`. Run `repomagpie --help`, or read the [spec](docs/spec.md).
 
-4. Open your journals in the browser to review inbox notes, search, edit, link notes and see them as a graph:
+## What each agent gets
 
-   ```bash
-   repomagpie ui
-   ```
+The MCP server lets your agent check your notes before an install and answer "what do I have for browser testing?"; the skill tells it when to. The hook checks each install command against your notes before it runs. Without a hook, the check works as well as the agent follows the skill.
 
-More commands: `repomagpie search`, `repomagpie recall`, `repomagpie catalog`, `repomagpie adopt` and `repomagpie import`. Run `repomagpie --help`, or read the [spec](docs/spec.md).
+| Agent | MCP | Skill | Hook | When a note says to avoid a package |
+|---|---|---|---|---|
+| Claude Code | yes | yes | yes | the hook asks you |
+| Codex CLI | yes | yes | yes | the hook stops the first try; your agent asks you; the same install then goes through for 10 minutes |
+| Cursor | yes | yes | yes | the hook stops the first try; your agent asks you; the same install then goes through for 10 minutes |
+| Gemini CLI | yes | yes | yes | the hook asks you |
+| VS Code (GitHub Copilot) | yes | yes | no | no hook; the MCP server and the skill check it |
+| Antigravity CLI | yes | yes | yes | the hook asks you |
+| Copilot CLI | yes | yes | yes | the hook stops the first try; your agent asks you; the same install then goes through for 10 minutes |
+
+- Codex CLI runs a new hook only after you trust it in `/hooks`.
+- The hook never blocks an install for good, and never approves one.
 
 ## The local app
 
-Review an inbox note: write the Verdict, set kind, tags and rating, and press Ctrl+Enter.
+`repomagpie ui` opens your journals in the browser. Review an inbox note: write the Verdict, set kind, tags and rating, and press Ctrl+Enter.
 
-![The inbox review in repomagpie ui: the note's description and Use when above the Verdict editor](docs/assets/screen-inbox-review.png)
+![The inbox review in repomagpie ui: a GitHub repository's description and Use when drafts above the Verdict being typed, with tags to pick below](docs/assets/screen-inbox-review.png)
 
-Check a package: what your journals say before an install, and what the Claude Code hook would do.
+Check a package: what your journals say before an install, and what the hook does in each agent.
 
-![Check a package in repomagpie ui: pdfkit has an avoid note, so Claude Code asks first; puppeteer has a note; left-pad has none](docs/assets/screen-check-package.png)
+![Check a package in repomagpie ui: pdfkit's avoid note says the hook asks first or stops the first try, depending on the agent; left-pad has no note; puppeteer has a note in the project journal](docs/assets/screen-check-package.png)
 
 Suggest for this project: the notes that fit, and why each one is a candidate.
 
-![Suggest in repomagpie ui: candidates with a why line, and pdfkit listed apart as in use with an avoid note](docs/assets/screen-suggest.png)
+![Suggest in repomagpie ui: microsoft/playwright first, matched on the @playwright/test dependency; pdfkit listed apart as in use with an avoid note, with pdf-lib and puppeteer instead](docs/assets/screen-suggest.png)
 
-Link notes: write `[[puppeteer]]` in any section to link to that note, and add alternatives under the Verdict. "Linked from" at the end of a note lists the notes that link to it. A repository's GitHub topics show as tags you can add with one click.
+See a journal as a graph: notes, their tags, `[[links]]` and alternatives. Click a note to read and edit it beside the graph.
 
-See a journal as a graph: notes, the tags they carry, their links and alternatives. Click a note to read and edit it beside the graph, or filter by kind, tag and status.
-
-![The graph page in repomagpie ui: 800 notes around their tags, with the most connected tags listed beside the graph](docs/assets/screen-graph.png)
+![The graph page in repomagpie ui: 42 notes around tags such as #self-hosting, #ai-agents and #pdf, with pdfkit linked to its alternatives pdf-lib and puppeteer, and the most connected tags listed beside the graph](docs/assets/screen-graph.png)
 
 ## How it compares
 
@@ -91,20 +97,14 @@ RepoMagpie never sends your notes anywhere. The personal journal is a folder of 
 
 The only network requests are to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry.
 
-Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit:
-
-```bash
-export GITHUB_TOKEN=$(gh auth token)
-```
-
-```powershell
-$env:GITHUB_TOKEN = gh auth token
-```
+Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
 
 ## Platforms
 
 - Node.js 22.12 or later. CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
-- The hook works in Claude Code, Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI. Every agent with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
+- On Windows, Codex CLI, Copilot CLI, Gemini CLI and Cursor start the hook through Windows PowerShell, which adds about 350 ms each time; Antigravity CLI's `cmd` adds about 90 ms. Copilot CLI runs the hook before every tool call, the others before each shell command.
+- Paths with letters outside ASCII, such as a home folder named `C:\Users\Şuat`, are supported.
+- Other agents with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
 - The package has no runtime dependencies: the MCP server's libraries are bundled in it.
 
 ## Documentation
