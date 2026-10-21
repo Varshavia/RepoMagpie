@@ -61,6 +61,9 @@ const run = (file: string, args: string[], input: string, verbatim = false) => n
   child.stdout.on("data", (chunk) => { out += chunk; });
   child.stderr.on("data", (chunk) => { err += chunk; });
   child.on("close", (code) => done({ code, out, err }));
+  // With node or the entry file moved, nothing reads the input: the shell may exit before the write
+  // (EPIPE, seen on Linux in CI). The exit code and the output are what the test checks.
+  child.stdin.on("error", () => {});
   child.stdin.end(input);
 });
 const ECHO = "let s = ''; process.stdin.on('data', (d) => { s += d; }).on('end', () => process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), input: s.replace(/^\\uFEFF/, '').trim() })));\n";
