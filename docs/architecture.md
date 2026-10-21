@@ -98,7 +98,7 @@ ui/            the local app (decision 0022): React and Vite, built into dist/ui
                logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette, graph);
                the graph page (components/GraphPage.tsx) is its own lazy chunk, and layout.worker.ts
                runs its ForceAtlas2 layout (decision 0028)
-  e2e/         @playwright/test against repomagpie ui on a temporary journal; screenshots with SCREENS=1
+  e2e/         @playwright/test against repomagpie ui on a temporary journal; screenshots with SCREENS=1, the README's with README_SHOTS=1
 skills/
   repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
                SKILL.md, and references/json.md (the --json fields it reads); src/cli/skill.test.ts
