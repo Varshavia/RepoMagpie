@@ -150,7 +150,10 @@ export function render(plan: SetupPlan, home: string): string {
     // Its hook (decision 0036), in the user's settings as the MCP entry is.
     const h = plan.hooks.find((x) => x.id === a.id);
     if (h) {
-      lines.push(`                hook: ${AGENT_HOOK_WHAT[h.action]}${["add", "migrate", "remove"].includes(h.action) ? `: edit ${tilde(h.file)}` : `: ${tilde(h.file)}`}${h.reason ? `: ${h.reason}` : ""}`);
+      // Antigravity CLI's launcher on Windows: alone when only it changes (no backup of hooks.json).
+      const launcherOnly = h.action === "migrate" && h.launcher && !h.backup ? h.launcher : null;
+      lines.push(`                hook: ${AGENT_HOOK_WHAT[h.action]}${["add", "migrate", "remove"].includes(h.action) ? `: ${launcherOnly ? `write ${tilde(launcherOnly)}` : `edit ${tilde(h.file)}`}` : `: ${tilde(h.file)}`}${h.reason ? `: ${h.reason}` : ""}`);
+      if (h.launcher && !launcherOnly) lines.push(`                  ${h.action === "remove" ? "and delete" : "and write"} ${tilde(h.launcher)}, which the entry runs`);
       if (h.action === "add" || h.action === "migrate") lines.push(`                  it will start node directly, then hook ${h.sub}, only when both files are there`);
       if (h.backup) lines.push(`                  backup first: ${tilde(h.backup)}`);
       if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                    ${line}`));

@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Platform, Where } from "./agents.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
-import { hookLaunch, hookShell } from "./hook-launch.ts";
+import { hookLaunch, hookShell, LAUNCHER, launcherText } from "./hook-launch.ts";
 import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookTarget } from "./setup-agent-hooks.ts";
 
 // The hook entries setup writes for Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI
@@ -29,9 +29,12 @@ function scratch() {
   const read = (id: string) => readFileSync(file(id), "utf8");
   const plan = (id: string, remove = false, t: AgentHookTarget = target) => planAgentHook(spec(id), where, remove, STAMP, t);
   const run = (id: string, remove = false, t: AgentHookTarget = target) => applyAgentHook(plan(id, remove, t), spec(id), where, STAMP, t);
-  const command = (sub: Parameters<typeof hookLaunch>[3], flags: string[] = []) => hookLaunch(hookShell(sub, platform), target.node, target.entry, sub, flags) as string;
+  // Antigravity CLI's launcher on Windows, which its entry names.
+  const launcher = join(home, ".gemini", "config", LAUNCHER);
+  const line = (sub: Parameters<typeof hookLaunch>[3], flags: string[] = [], t = target as { node: string; entry: string }) => hookLaunch(hookShell(sub, platform), t.node, t.entry, sub, flags) as string;
+  const command = (sub: Parameters<typeof hookLaunch>[3], flags: string[] = []) => (hookShell(sub, platform) === "cmd" ? launcher : line(sub, flags));
   const backups = (id: string) => readdirSync(dirname(file(id))).filter((name) => name.includes(".repomagpie-backup-"));
-  return { root, home, where, target, file, write, read, plan, run, command, backups };
+  return { root, home, where, target, file, write, read, plan, run, line, command, launcher, backups };
 }
 
 test("a new file for each agent: its own shape, our entry only, a 10-second timeout", () => {
@@ -145,6 +148,49 @@ test("left alone, and said so: comments (a snippet instead), wrong types, a link
   assert.equal(existsSync(join(elsewhere, "hooks.json")), false);
   // No launch (npx's cache): nothing is written; --remove still works.
   assert.deepEqual([t.plan("codex", false, { error: "npx" }).action, t.plan("codex", false, { error: "npx" }).reason], ["refused", "npx"]);
+});
+
+// Live test C4: agy writes each " of the command as \" for cmd, so on Windows the entry names a
+// launcher of ours beside hooks.json (hook-launch.ts), which setup writes, checks and removes.
+test("Antigravity CLI on Windows: the entry names the launcher; node moved rewrites only the launcher; an old entry migrates; --remove deletes it", { skip: platform !== "win32" && "Windows only" }, () => {
+  const s = scratch();
+  const plan = s.plan("antigravity");
+  assert.deepEqual([plan.action, plan.launcher], ["add", s.launcher]);
+  assert.equal(s.run("antigravity").result, "done");
+  assert.equal(JSON.parse(s.read("antigravity")).repomagpie.PreToolUse[0].hooks[0].command, s.launcher);
+  assert.doesNotMatch(s.read("antigravity"), /\\"/, "no quote in the command");
+  assert.equal(readFileSync(s.launcher, "utf8"), launcherText(s.launcher, s.target.node, s.target.entry, s.line("antigravity")));
+  assert.equal(s.plan("antigravity").action, "keep");
+  // Node moved: only the launcher changes; hooks.json isn't backed up or touched.
+  const hooks = s.read("antigravity");
+  const moved = { node: join(s.root, "nvm", "node.exe"), entry: s.target.entry };
+  const again = s.plan("antigravity", false, moved);
+  assert.deepEqual([again.action, again.backup, again.launcher], ["migrate", null, s.launcher]);
+  assert.equal(applyAgentHook(again, HOOK_SPECS.find((x) => x.id === "antigravity") as (typeof HOOK_SPECS)[number], s.where, STAMP, moved).result, "done");
+  assert.equal(s.read("antigravity"), hooks);
+  assert.ok(readFileSync(s.launcher, "utf8").includes(moved.node));
+  assert.deepEqual(s.backups("antigravity"), []);
+  // The launcher gone: setup writes it again.
+  rmSync(s.launcher);
+  assert.equal(s.plan("antigravity").action, "migrate");
+  s.run("antigravity");
+  assert.equal(s.plan("antigravity").action, "keep");
+  // The entry before the launcher (if exist "…" in hooks.json), with its flag: it becomes the launcher's.
+  s.write("antigravity", JSON.stringify({ repomagpie: { PreToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: s.line("antigravity", ["--inform-only"]), timeout: 10 }] }] } }));
+  rmSync(s.launcher);
+  assert.equal(s.plan("antigravity").action, "migrate");
+  s.run("antigravity");
+  assert.equal(JSON.parse(s.read("antigravity")).repomagpie.PreToolUse[0].hooks[0].command, s.launcher);
+  assert.match(readFileSync(s.launcher, "utf8"), / hook antigravity --inform-only\r\n$/);
+  // --remove: the entry, then the launcher.
+  const remove = s.plan("antigravity", true);
+  assert.deepEqual([remove.action, remove.launcher], ["remove", s.launcher]);
+  assert.equal(s.run("antigravity", true).result, "done");
+  assert.equal(existsSync(s.launcher), false);
+  // A launcher setup didn't write is left alone.
+  writeFileSync(s.launcher, "@echo off\r\nnode mine.js\r\n");
+  assert.deepEqual([s.plan("antigravity").action, s.plan("antigravity").reason], ["refused", `${s.launcher} holds something else; setup leaves it`]);
+  assert.equal(readFileSync(s.launcher, "utf8"), "@echo off\r\nnode mine.js\r\n");
 });
 
 test("an agent's hooks turned off stay off: setup says so and writes nothing (Codex's [features], Gemini CLI's hooksConfig)", () => {

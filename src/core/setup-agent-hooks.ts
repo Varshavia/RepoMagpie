@@ -5,14 +5,17 @@
 // Edited as the Claude Code hook is (setup-hook.ts): a backup first, plain JSON only, our entries
 // only, read back after; older entries of ours become the current one, their flags kept. Codex's
 // entry is appended last and nothing is reordered: Codex keeps its trust by position. Never turns
-// an agent's hooks on, never writes a trust. Doctor reads the entries back with findAgentHooks.
+// an agent's hooks on, never writes a trust. Antigravity CLI's entry on Windows names a launcher
+// file of ours beside hooks.json (hook-launch.ts): written before the entry, deleted after it,
+// rewritten without a backup (it holds only setup's command), never one setup didn't write. Doctor
+// reads the entries back with findAgentHooks.
 // Never prints.
 import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { copilotHome, readJsonc, type Agent, type Platform, type Where } from "./agents.ts";
 import { codexHooksOff } from "./codex-hooks.ts";
 import { backupName, parseJson, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
-import { hookLaunch, hookShell, parseHookCommand, type HookSub, type ParsedHook } from "./hook-launch.ts";
+import { hookLaunch, hookShell, LAUNCHER, launcherText, parseHookCommand, readLauncher, type HookSub, type ParsedHook } from "./hook-launch.ts";
 import { appendItem, removeAt, replaceAt, setMember, setTop } from "./json-edit.ts";
 import type { HookPlan } from "./setup-hook.ts";
 
@@ -139,14 +142,25 @@ export function findAgentHooks(spec: HookSpec, root: unknown, platform: Platform
   return found;
 }
 
-export type AgentHookPlan = HookPlan & { id: Agent["id"]; sub: HookSub };
+// launcher: Antigravity CLI's launcher on Windows, which setup writes, or deletes with --remove.
+export type AgentHookPlan = HookPlan & { id: Agent["id"]; sub: HookSub; launcher?: string };
 
 const COMMENTS = "the file has comments, trailing commas or a key written twice, which setup doesn't edit";
 
-// The handler setup wants, keeping an older entry's flags.
-function wanted(spec: HookSpec, target: { node: string; entry: string }, flags: string[], platform: Platform): { handler: Json } | { error: string } {
-  const command = hookLaunch(hookShell(spec.sub, platform), target.node, target.entry, spec.sub, flags);
-  return typeof command === "string" ? { handler: spec.handler(command, platform) } : command;
+type Launcher = { file: string; text: string };
+
+// Antigravity CLI's launcher on Windows (hook-launch.ts), beside its hooks.json; null elsewhere.
+const launcherFile = (spec: HookSpec, where: Where) => (hookShell(spec.sub, where.platform) === "cmd" ? join(dirname(spec.file(where)), LAUNCHER) : null);
+const textOf = (file: string) => (existsSync(file) ? readFileSync(file, "utf8") : null);
+
+// The handler setup wants, keeping an older entry's flags, and the launcher it names.
+function wanted(spec: HookSpec, target: { node: string; entry: string }, flags: string[], where: Where): { handler: Json; launcher: Launcher | null } | { error: string } {
+  const command = hookLaunch(hookShell(spec.sub, where.platform), target.node, target.entry, spec.sub, flags);
+  if (typeof command !== "string") return command;
+  const file = launcherFile(spec, where);
+  if (!file) return { handler: spec.handler(command, where.platform), launcher: null };
+  const text = launcherText(file, target.node, target.entry, command);
+  return typeof text === "string" ? { handler: spec.handler(file, where.platform), launcher: { file, text } } : text;
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -173,22 +187,37 @@ export function planAgentHook(spec: HookSpec, where: Where, remove: boolean, sta
   const backup = text === null ? null : backupName(file, stamp);
   // Our own file, or our own hook name, holding something that isn't ours.
   const taken = spec.layout === "file" ? text !== null && !mine.length : spec.layout === "named" && isObject(read.value) && read.value[NAMED] !== undefined && !mine.some((f) => f.path[0] === NAMED);
+  const launcher = launcherFile(spec, where);
+  const onDisk = launcher ? textOf(launcher) : null;
   if (remove) {
     if (!mine.length) return base;
-    return read.plain ? { ...base, action: "remove", backup } : { ...base, action: "manual", reason: COMMENTS, snippet: `Delete the hook entries that run hook ${spec.sub} in ${file}.` };
+    const ours = launcher && readLauncher(launcher) !== null ? { launcher } : {};
+    return read.plain ? { ...base, ...ours, action: "remove", backup } : { ...base, action: "manual", reason: COMMENTS, snippet: `Delete the hook entries that run hook ${spec.sub} in ${file}.` };
   }
   if ("error" in target) return { ...base, action: "refused", reason: target.error };
   const off = spec.off?.(where);
   if (off) return { ...base, action: "refused", reason: off };
-  const wish = wanted(spec, target, mine[0]?.parsed.flags ?? [], where.platform);
+  if (launcher) {
+    const unsafeLauncher = pathProblem(launcher, where.home);
+    if (unsafeLauncher) return { ...base, action: "refused", reason: unsafeLauncher };
+    if (onDisk !== null && readLauncher(launcher) === null) return { ...base, action: "refused", reason: `${launcher} holds something else; setup leaves it` };
+  }
+  const wish = wanted(spec, target, mine[0]?.parsed.flags ?? [], where);
   if ("error" in wish) return { ...base, action: "refused", reason: `${wish.error}, so setup can't write this entry` };
   const want = wish.handler;
   const fileDone = spec.layout !== "file" || same(read.value, minimal(spec, want));
-  if (mine.length === 1 && owned(spec, mine[0].value, want) && fileDone) return base;
+  const also = wish.launcher ? { launcher: wish.launcher.file } : {};
+  if (mine.length === 1 && owned(spec, mine[0].value, want) && fileDone) {
+    // Only the launcher changes (node moved, a reinstall elsewhere): hooks.json isn't touched.
+    return !wish.launcher || onDisk === wish.launcher.text ? base : { ...base, ...also, action: "migrate" };
+  }
   if (taken) return { ...base, action: "refused", reason: spec.layout === "file" ? `${file} holds something else; setup leaves it` : `a hook named ${NAMED} that runs something else is in ${file}; setup leaves it` };
   if (!mine.length && found.length) return { ...base, reason: "a hook entry already runs RepoMagpie another way; setup keeps it" };
-  if (!read.plain) return { ...base, action: "manual", reason: COMMENTS, snippet: JSON.stringify(minimal(spec, want), null, 2) };
-  return { ...base, action: mine.length ? "migrate" : "add", backup };
+  if (!read.plain) {
+    const snippet = JSON.stringify(minimal(spec, want), null, 2) + (wish.launcher ? `\n\nand save this as ${wish.launcher.file}:\n${wish.launcher.text.trimEnd()}` : "");
+    return { ...base, action: "manual", reason: COMMENTS, snippet };
+  }
+  return { ...base, ...also, action: mine.length ? "migrate" : "add", backup };
 }
 
 export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where, stamp: string, target: AgentHookTarget): AgentHookPlan {
@@ -207,9 +236,11 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
     if ("error" in config) return fail(config.error);
     let text = config.text;
     const flags = () => (findAgentHooks(spec, parseJson(text ?? "{}"), platform) as FoundAgentHook[]).find((f) => f.parsed.form !== "other")?.parsed.flags ?? [];
-    const wish = "error" in target ? null : wanted(spec, target, flags(), platform);
+    const wish = "error" in target ? null : wanted(spec, target, flags(), where);
     if (wish && "error" in wish) return fail(wish.error);
     const want = wish?.handler;
+    // The launcher first, so the entry never names a file that isn't there.
+    if (wish?.launcher && textOf(wish.launcher.file) !== wish.launcher.text) writeAtomically(wish.launcher.file, wish.launcher.text);
     if (spec.layout === "file") {
       if (plan.action === "remove") rmSync(plan.file, { maxRetries: 5, retryDelay: 50 }); // retries while a virus scan holds it
       else writeAtomically(plan.file, `${JSON.stringify(minimal(spec, want as Json), null, 2)}\n`);
@@ -232,16 +263,19 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
           break;
         }
       }
-      writeAtomically(plan.file, text as string);
+      if (text !== config.text) writeAtomically(plan.file, text as string);
     }
+    // After the entry, so it never names a file that isn't there; only a launcher setup wrote.
+    if (plan.action === "remove" && plan.launcher && readLauncher(plan.launcher) !== null) rmSync(plan.launcher, { maxRetries: 5, retryDelay: 50 });
   } catch (error) {
     return fail((error as Error).message);
   }
   // Read it back.
   const after = existsSync(plan.file) ? findAgentHooks(spec, parseJson(readFileSync(plan.file, "utf8")), platform) : [];
   const left = typeof after === "string" ? [] : after.filter((f) => f.parsed.form !== "other");
-  const check = plan.action === "remove" ? null : wanted(spec, target as { node: string; entry: string }, left[0]?.parsed.flags ?? [], platform);
-  const ok = !check ? !left.length : "handler" in check && left.length === 1 && owned(spec, left[0].value, check.handler);
+  const check = plan.action === "remove" ? null : wanted(spec, target as { node: string; entry: string }, left[0]?.parsed.flags ?? [], where);
+  const ok = !check ? !left.length && !(plan.launcher && existsSync(plan.launcher))
+    : "handler" in check && left.length === 1 && owned(spec, left[0].value, check.handler) && (!check.launcher || textOf(check.launcher.file) === check.launcher.text);
   return ok ? { ...plan, backup, result: "done" } : { ...plan, backup, result: "failed", error: `${plan.file} doesn't hold the hook as expected after the change.` };
 }
 

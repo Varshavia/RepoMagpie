@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { mcpEntry, readJsonc, type Platform } from "./agents.ts";
 import { codexHookHash } from "./codex-hooks.ts";
 import { runDoctor, type DoctorRequest } from "./doctor.ts";
-import { hookLaunch, hookShell, type HookSub } from "./hook-launch.ts";
+import { hookLaunch, hookShell, LAUNCHER, launcherText, type HookSub } from "./hook-launch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { renderNote } from "./write.ts";
 
@@ -177,6 +177,20 @@ test("the other agents' hooks: setup's form with its paths and flags; a broken p
   assert.match(report.problems[0], /^The Copilot CLI hook in ~[\\/]\.copilot[\\/]hooks[\\/]repomagpie\.json starts .*moved.*node\.exe, which isn't there, so it does nothing\. Run repomagpie setup again\.$/);
   assert.ok(report.problems.some((p) => /^The Gemini CLI hook in .* starts repomagpie, which isn't there, so it fails on every shell command\./.test(p)), report.problems.join("\n"));
   assert.ok(!report.problems.some((p) => p.includes("Cursor hook")), "Cursor's is fine");
+});
+
+test("Antigravity CLI's hook on Windows: node and the entry file read from the launcher; a launcher that is gone is a to-do", { skip: !windows && "Windows only" }, () => {
+  const box = scratchHome();
+  const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
+  box.write(entry, "");
+  const launcher = join(box.home, ".gemini", "config", LAUNCHER);
+  box.write(launcher, launcherText(launcher, process.execPath, entry, hookLaunch("cmd", process.execPath, entry, "antigravity", ["--inform-only"]) as string) as string);
+  box.write(join(box.home, ".gemini", "config", "hooks.json"), JSON.stringify({ repomagpie: { PreToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: launcher, timeout: 10 }] }] } }));
+  const hook = () => runDoctor(box.request).agent_hooks.find((h) => h.id === "antigravity")?.entries[0];
+  assert.deepEqual(hook(), { form: "setup", command: launcher, node: process.execPath, entry, node_found: true, entry_found: true, flags: ["--inform-only"], trust: null });
+  rmSync(launcher);
+  assert.deepEqual([hook()?.form, hook()?.node, hook()?.node_found], ["setup", null, false]);
+  assert.ok(runDoctor(box.request).problems.some((p) => p === `The Antigravity CLI hook in ~\\.gemini\\config\\hooks.json starts ${launcher}, which isn't there, so it does nothing. Run repomagpie setup again.`));
 });
 
 test("the Codex CLI hook's trust, from config.toml: not trusted yet and changed are to-dos; trusted and turned off aren't", () => {

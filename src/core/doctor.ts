@@ -152,7 +152,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   const agentHooks = HOOK_SPECS.map((spec) => agentHookReport(spec, where));
   for (const h of agentHooks) {
     for (const e of h.entries) {
-      const missing = e.form === "setup" ? (!e.node_found ? e.node : !e.entry_found ? e.entry : null) : e.form === "name" && !e.node_found ? e.node : null;
+      // No node in setup's form: Antigravity CLI's launcher (the entry's command) is missing or not ours.
+      const missing = e.form === "setup" ? (!e.node_found ? e.node ?? e.command : !e.entry_found ? e.entry : null) : e.form === "name" && !e.node_found ? e.node : null;
       if (missing) {
         const what = e.form === "setup" ? "so it does nothing. Run repomagpie setup again." : h.id === "copilot" ? "so Copilot CLI denies every tool call. Run repomagpie setup again." : "so it fails on every shell command. Run repomagpie setup again.";
         const line = `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${what}`;
@@ -253,8 +254,8 @@ function agentHookReport(spec: HookSpec, where: Where): AgentHookReport {
       command: redactText(command),
       node: f.parsed.node ?? program,
       entry: f.parsed.entry,
-      node_found: f.parsed.form === "setup" ? isFile(f.parsed.node as string) : program !== null ? (isAbsolute(program) ? isFile(program) : onPath(program.replace(/\.(cmd|ps1)$/i, ""), where).length > 0) : null,
-      entry_found: f.parsed.form === "setup" ? isFile(f.parsed.entry as string) : null,
+      node_found: f.parsed.form === "setup" ? f.parsed.node !== null && isFile(f.parsed.node) : program !== null ? (isAbsolute(program) ? isFile(program) : onPath(program.replace(/\.(cmd|ps1)$/i, ""), where).length > 0) : null,
+      entry_found: f.parsed.form === "setup" ? f.parsed.entry !== null && isFile(f.parsed.entry) : null,
       flags: f.parsed.flags,
       trust,
     };
