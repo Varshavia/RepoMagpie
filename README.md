@@ -38,7 +38,7 @@ Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an av
    repomagpie doctor
    ```
 
-   `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits. `doctor` shows what is wired in each agent. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
+   `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits. `doctor` shows what is wired in each agent. Each backup is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets: `doctor` lists the backups, so you can delete the ones you no longer need. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
 
 3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
@@ -83,7 +83,7 @@ Suggest for this project: the notes that fit, and why each one is a candidate.
 
 See a journal as a graph: notes, their tags, `[[links]]` and alternatives. Click a note to read and edit it beside the graph.
 
-![The graph page in repomagpie ui: 42 notes around tags such as #self-hosting, #ai-agents and #pdf, with pdfkit linked to its alternatives pdf-lib and puppeteer, and the most connected tags listed beside the graph](docs/assets/screen-graph.png)
+![The graph page in repomagpie ui on the maintainer's own journal: 39 notes, 67 tags and 157 connections, with the most connected tags and notes, such as #llm, #ai, #mcp and #claude-code, listed beside the graph](docs/assets/screen-graph.png)
 
 ## How it compares
 
@@ -97,7 +97,7 @@ RepoMagpie doesn't replace a scanner: it never claims to detect malware, and it 
 
 ## Privacy
 
-RepoMagpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `repomagpie ui` listens on `127.0.0.1` only.
+RepoMagpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `repomagpie ui` listens on `127.0.0.1` only. `repomagpie mcp` never opens a network connection or a port: it talks to the agent over stdio.
 
 The only network requests are to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry. Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
 
