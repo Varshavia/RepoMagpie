@@ -69,7 +69,8 @@ src/
                launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
                setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
                reading each change back; setup-skill: the skill's shared folder and the links from Claude
-               Code's and Antigravity CLI's; setup-hook: the Claude Code hook, added, migrated, removed;
+               Code's and Antigravity CLI's, copied with copy-folder (fs.cpSync in plain JS: cpSync in
+               Node 22 and older Node 24 breaks paths with letters outside ASCII on Windows); setup-hook: the Claude Code hook, added, migrated, removed;
                setup-agent-hooks: the other agents' hook entries, the same way, read back by doctor too;
                hook-launch: the command each of those entries runs, for its agent's shell, and reading it
                back, with Antigravity CLI's launcher file on Windows; codex-hooks: Codex CLI's hooks switch and hook trust in config.toml; config-write: no links, no
