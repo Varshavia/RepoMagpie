@@ -129,7 +129,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   }
 
   // The Claude Code hook.
-  const hookFiles = [claudeSettings(where), ...projectSettings(request)].filter((file) => existsSync(file));
+  // Run in the home folder, ~/.claude/settings.json is the user's settings and the project's: listed once.
+  const hookFiles = [claudeSettings(where), ...projectSettings(request).filter((file) => !samePath(file, claudeSettings(where)))].filter((file) => existsSync(file));
   const hook = hookFiles.map((file) => {
     const read = readConfig(file);
     if ("error" in read) return { file, entries: [], error: redactText(read.error) };
@@ -271,7 +272,8 @@ function projectSettings(request: DoctorRequest): string[] {
 // Our hook entries, read as setup reads them (setup-hook.ts), with the exec form's paths checked.
 function hookEntries(settings: unknown, where: Where): HookEntry[] {
   const found = findHooks(settings);
-  if (typeof found === "string") return [];
+  // No hooks, no PreToolUse, or one that isn't a list: no entries. Found ones mean PreToolUse is a list.
+  if (typeof found === "string" || !found.length) return [];
   const groups = (settings as { hooks: { PreToolUse: { matcher?: unknown }[] } }).hooks.PreToolUse;
   return found.map((f) => {
     const matcher = groups[f.group]?.matcher;
