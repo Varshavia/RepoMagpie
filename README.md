@@ -1,8 +1,30 @@
-<p><img src="docs/assets/logo.svg" width="72" height="72" alt="RepoMagpie logo: a magpie in profile"></p>
+<div align="center">
+
+**English** · [Türkçe](docs/readme/README_tr.md)
+
+<img src="docs/assets/logo.svg" width="96" height="96" alt="RepoMagpie logo: a magpie in profile">
 
 # RepoMagpie
 
-> RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
+### Your dependency notes, checked before your coding agent installs anything.
+
+[![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square)](https://www.npmjs.com/package/repomagpie)
+[![CI status](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
+[![Node.js version](https://img.shields.io/node/v/repomagpie?style=flat-square)](#platforms)
+[![skills.sh](https://skills.sh/b/varshavia/repomagpie?style=flat-square)](https://skills.sh/varshavia/repomagpie)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
+
+[Quick start](#quick-start) · [How it works](#how-it-works) · [What each agent gets](#what-each-agent-gets) · [FAQ](#faq) · [Documentation](#documentation)
+
+```bash
+npm install -g repomagpie@beta
+repomagpie setup
+```
+
+</div>
+
+> [!IMPORTANT]
+> RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
 
 ```text
 $ npm install pdfkit
@@ -18,27 +40,24 @@ Do you want to proceed?
 Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an avoid note in the personal journal and asked first.
 
 - **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
-- **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first. A note that says to avoid the package makes your agent ask you before the install.
+- **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
 **Status:** pre-release `0.2.0-beta.6`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
-1. Install the `repomagpie` command; you need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+1. Install the `repomagpie` command and set it up in your coding agents with the two commands [at the top](#repomagpie). You need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+
+   `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
+
+2. Check what is wired in each agent:
 
    ```bash
-   npm install -g repomagpie@beta
-   ```
-
-2. Set it up in your coding agents, then check it:
-
-   ```bash
-   repomagpie setup    # --dry-run only shows the plan; --remove takes it all out
    repomagpie doctor
    ```
 
-   `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits. `doctor` shows what is wired in each agent. Each backup is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets: `doctor` lists the backups, so you can delete the ones you no longer need. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
+   `doctor` also lists `setup`'s backups. Each is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets: delete the ones you no longer need.
 
 3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
@@ -47,11 +66,29 @@ Claude Code was about to run `npm install pdfkit`; RepoMagpie's hook found an av
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
    ```
 
-   Notes go to your personal journal in `~/.magpie`; `--to project` writes to the repository's `.magpie/`, which your team shares through git. The next time your agent runs `npm install pdfkit`, it sees your note first.
+   Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+
+## How it works
+
+![How RepoMagpie works: your agent is about to run npm install pdfkit; the skill or the MCP tool recall checks first, and the hook checks the install command as a backstop; both read your personal journal in ~/.magpie and the project journal in .magpie/; your Verdict, "avoid: async streams painful; use puppeteer", comes back, and your agent asks you before the install.](docs/assets/how-it-works.svg)
+
+Before an install, the skill tells your agent to look the package up with the MCP server's `recall` tool, or the `repomagpie recall` command. RepoMagpie reads both journals on your machine and returns your notes; when one says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step. Without a hook, the check works as well as the agent follows the skill.
+
+## Ask your agent
+
+```text
+What do I have for browser testing?
+Install pdfkit.
+Which of my tools fit this project?
+```
+
+- **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first; on a small journal it can read every note in one list.
+- **Install pdfkit.** Your agent recalls pdfkit before the install. Your avoid note comes back with its alternatives, and your agent asks you before it installs anything.
+- **Which of my tools fit this project?** `suggest` reads the project's manifests and README and returns the notes that match; your agent picks the ones that fit, says why, and names any dependency in use that you noted to avoid.
 
 ## What each agent gets
 
-The MCP server lets your agent check your notes before an install and answer "what do I have for browser testing?"; the skill tells it when to. The hook checks each install command against your notes before it runs. Without a hook, the check works as well as the agent follows the skill. Other agents with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill ([agents](docs/agents.md)).
+What `repomagpie setup` sets up in each agent ([agents](docs/agents.md)):
 
 | Agent | MCP | Skill | Hook | When a note says to avoid a package |
 |---|---|---|---|---|
@@ -63,9 +100,7 @@ The MCP server lets your agent check your notes before an install and answer "wh
 | Antigravity CLI | yes | yes | yes | the hook asks you |
 | Copilot CLI | yes | yes | yes | the hook stops the first try; your agent asks you |
 
-- Where the hook stops the first try, the same install then goes through for 10 minutes.
-- Codex CLI runs a new hook only after you trust it in `/hooks`.
-- The hook never blocks an install for good, and never approves one.
+Codex CLI runs a new hook only after you trust it in `/hooks`.
 
 ## The local app
 
@@ -93,19 +128,64 @@ See a journal as a graph: notes, their tags, `[[links]]` and alternatives. Click
 | Supply-chain scanners, such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | Malware, vulnerabilities and popularity, from global data | Before an install |
 | RepoMagpie | Your verdicts and your team's | Before an install, when you search, and when you start a project |
 
-RepoMagpie doesn't replace a scanner: it never claims to detect malware, and it never installs anything. Run a scanner such as Socket Firewall Free next to it. A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install.
-
-## Privacy
-
-RepoMagpie never sends your notes anywhere. The personal journal is a folder of Markdown files on your machine, and a project journal is as visible as its repository. `repomagpie ui` listens on `127.0.0.1` only. `repomagpie mcp` never opens a network connection or a port: it talks to the agent over stdio.
-
-The only network requests are to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests. They send `GITHUB_TOKEN` if you set it, and nothing from your journals. There is no telemetry. Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install.
 
 ## Platforms
 
 - Node.js 22.12 or later; the package has no runtime dependencies (the MCP server's libraries are bundled in it). CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
 - On Windows, Codex CLI, Copilot CLI, Gemini CLI and Cursor start the hook through Windows PowerShell, which adds about 350 ms each time; Antigravity CLI's `cmd` adds about 90 ms. Copilot CLI runs the hook before every tool call, the others before each shell command.
 - Paths with letters outside ASCII, such as a home folder named `C:\Users\Şuat`, are supported.
+
+## FAQ
+
+<details>
+<summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
+
+No. Your personal journal is a folder of Markdown files on your machine, a project journal is as visible as its repository, and there is no telemetry. The only network requests go to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests, and send `GITHUB_TOKEN` if you set it, never anything from your journals. `repomagpie ui` listens on `127.0.0.1` only, and `repomagpie mcp` never opens a network connection or a port: it talks to your agent over stdio. Your agent sees the notes it reads, and its model provider gets them as part of the conversation. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+
+</details>
+
+<details>
+<summary><strong>Does the hook block installs?</strong></summary>
+
+Never for good, and it never approves one. When a note says to avoid the package, the hook asks you in Claude Code, Gemini CLI and Antigravity CLI; in Codex CLI, Cursor and Copilot CLI it stops the first try, your agent asks you, and the same install then goes through for 10 minutes. A note that doesn't say to avoid the package never stops an install, and neither does an error in RepoMagpie: the hook then does nothing. See the [hook contract](docs/spec.md#6-hook-contract) and [decision 0036](docs/decisions/0036-hooks-in-other-agents.md).
+
+</details>
+
+<details>
+<summary><strong>Is it a security scanner?</strong></summary>
+
+No. RepoMagpie shows what you and your team wrote down: it never claims to detect malware or vulnerabilities, and it never installs anything. Run a scanner such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) next to it ([vision](docs/vision.md#non-goals), [competitors](docs/competitors.md)).
+
+</details>
+
+<details>
+<summary><strong>Which agents does it work with?</strong></summary>
+
+`repomagpie setup` sets up the seven in [What each agent gets](#what-each-agent-gets). Other agents with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill: [setting up by hand](docs/setup-by-hand.md) has the entries to write, and [agents](docs/agents.md) what each agent supports.
+
+</details>
+
+<details>
+<summary><strong>How do I remove it?</strong></summary>
+
+Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. It leaves your journals (`~/.magpie` and any project's `.magpie/`) and `setup`'s backups: run `repomagpie doctor` to list the backups and delete the ones you no longer need, then `npm uninstall -g repomagpie`. Antigravity CLI can keep listing a removed entry until you clear `~/.gemini/antigravity-cli/mcp/` ([agents](docs/agents.md#antigravity-cli)).
+
+</details>
+
+<details>
+<summary><strong>Where are my notes, and can I edit them by hand?</strong></summary>
+
+Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`.
+
+</details>
+
+<details>
+<summary><strong>How do I share notes with my team?</strong></summary>
+
+Write a note with `--to project`, or copy one from your personal journal with `repomagpie adopt <name>`: both go to the repository's `.magpie/`. Commit it, and your teammates' agents see the note when they recall, search and suggest, as yours do. A project journal is as visible as its repository: anyone who can read the repository can read its notes ([decision 0013](docs/decisions/0013-two-journal-scopes.md)).
+
+</details>
 
 ## Documentation
 
@@ -117,8 +197,6 @@ The only network requests are to GitHub's API, when you give `repomagpie note`, 
 - [Vision](docs/vision.md), [competitors](docs/competitors.md) and [decisions](docs/decisions/)
 
 Open an issue for bugs and ideas. The project doesn't take pull requests yet ([CONTRIBUTING.md](CONTRIBUTING.md)). To report a vulnerability, see [SECURITY.md](SECURITY.md).
-
-**Official channels:** this repository, the npm package `repomagpie` and its skills.sh listing. There are no installers or `.exe` downloads; anything else is not ours ([SECURITY.md](SECURITY.md#official-channels)).
 
 ## Licence
 

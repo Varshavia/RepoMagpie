@@ -58,7 +58,8 @@ Socket's "URL strings" alert (low) on the npm package says it holds fragments of
 | `https://react.dev/errors/` | the bundled React | Text in React's error messages, which link to an explanation of the error code |
 | `developer.mozilla.org`, `tc39.es`, `caniuse.com`, `www.typescriptlang.org` | comments in the bundled `minisearch`, `yaml` and `commander` | Comments |
 | `github.com/phosphor-icons/core`, `www.sigmajs.org` | the app's third-party licence files | Licence text |
-| `agentskills.io`, `cli.github.com`, and GitHub repositories (`microsoft/playwright-cli`, `AmintaCCCP/GithubStarsManager`, `starcat-app/Starcat`, `SocketDev/sfw-free`) | `README.md` | Links for the reader |
+| `agentskills.io`, `cli.github.com`, `www.npmjs.com/package/repomagpie`, `skills.sh`, this repository's Actions page, and GitHub repositories (`microsoft/playwright-cli`, `AmintaCCCP/GithubStarsManager`, `starcat-app/Starcat`, `SocketDev/sfw-free`) | `README.md` | Links for the reader |
+| `img.shields.io`, `skills.sh/b/…` | `README.md` | Badge images, which GitHub and npm load when they show the README; RepoMagpie never fetches them |
 
 The app's Content-Security-Policy allows connections to its own origin only ([docs/ui.md](docs/ui.md#3-security)), so the browser side can't reach any of these hosts either; GitHub's API is called by the server.
 

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 888 300" width="888" height="300" role="img" aria-labelledby="title desc">
+  <title id="title">How RepoMagpie works</title>
+  <desc id="desc">Your agent is about to run npm install pdfkit. The skill or the MCP tool recall checks first, and the hook checks the install command as a backstop. Both read your journals: the personal one in ~/.magpie and the project one in .magpie/. Your Verdict comes back, and your agent asks you before the install.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8A949E"/>
+    </marker>
+  </defs>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">
+    <!-- The tile: canvas, so the figure reads the same on light and dark pages -->
+    <rect x="0.5" y="0.5" width="887" height="299" rx="12" fill="#0E1012" stroke="#2A3036"/>
+
+    <!-- Arrows: link grey; the hook's path is dashed -->
+    <g fill="none" stroke="#8A949E" stroke-width="1.5">
+      <path d="M204 150 H224 V79 H242" marker-end="url(#arrow)"/>
+      <path d="M224 150 V221 H242" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+      <path d="M424 79 H444 V150 H462" marker-end="url(#arrow)"/>
+      <path d="M424 221 H444 V150" stroke-dasharray="5 4"/>
+      <path d="M644 150 H682" marker-end="url(#arrow)"/>
+    </g>
+
+    <!-- 1. Your agent -->
+    <rect x="24" y="95" width="180" height="110" rx="8" fill="#15181B" stroke="#3B434B"/>
+    <text x="114" y="126" font-size="16" font-weight="600" fill="#E6E8EB">Your agent</text>
+    <text x="114" y="150" font-size="13" fill="#A8AFB7">is about to run</text>
+    <rect x="36" y="164" width="156" height="26" rx="4" fill="#1C2024"/>
+    <text x="114" y="182" font-size="13" fill="#E6E8EB" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace">npm install pdfkit</text>
+
+    <!-- 2. The skill or the MCP tool -->
+    <rect x="244" y="24" width="180" height="110" rx="8" fill="#15181B" stroke="#3B434B"/>
+    <text x="334" y="55" font-size="16" font-weight="600" fill="#E6E8EB">Skill or MCP tool</text>
+    <text x="334" y="79" font-size="13" fill="#A8AFB7">checks first</text>
+    <rect x="266" y="93" width="136" height="26" rx="4" fill="#1C2024"/>
+    <text x="334" y="111" font-size="13" fill="#E6E8EB" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace">recall pdfkit</text>
+
+    <!-- 3. The hook, the backstop -->
+    <rect x="244" y="166" width="180" height="110" rx="8" fill="#15181B" stroke="#5F6973" stroke-dasharray="5 4"/>
+    <text x="334" y="197" font-size="16" font-weight="600" fill="#E6E8EB">Hook</text>
+    <text x="334" y="221" font-size="13" fill="#A8AFB7">the backstop: checks</text>
+    <text x="334" y="239" font-size="13" fill="#A8AFB7">the install command</text>
+    <text x="334" y="257" font-size="13" fill="#A8AFB7">if the agent skips it</text>
+
+    <!-- 4. Your journals -->
+    <rect x="464" y="80" width="180" height="140" rx="8" fill="#15181B" stroke="#3B434B"/>
+    <text x="554" y="111" font-size="16" font-weight="600" fill="#E6E8EB">Your journals</text>
+    <text x="554" y="141" font-size="13" fill="#E6E8EB" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace">~/.magpie</text>
+    <text x="554" y="159" font-size="13" fill="#A8AFB7">personal</text>
+    <text x="554" y="186" font-size="13" fill="#E6E8EB" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace">.magpie/</text>
+    <text x="554" y="204" font-size="13" fill="#A8AFB7">project, in git</text>
+
+    <!-- 5. Your Verdict, with the Verdict hero's accent edge -->
+    <rect x="684" y="60" width="180" height="180" rx="8" fill="#15181B" stroke="#3B434B"/>
+    <rect x="684" y="68" width="3" height="164" fill="#3CC8B4"/>
+    <text x="774" y="91" font-size="16" font-weight="600" fill="#E6E8EB">Your Verdict</text>
+    <text x="774" y="119" font-size="14" font-weight="500" fill="#E6E8EB">“avoid: async streams</text>
+    <text x="774" y="139" font-size="14" font-weight="500" fill="#E6E8EB">painful; use puppeteer”</text>
+    <path d="M700 160 H848" stroke="#2A3036"/>
+    <text x="774" y="188" font-size="14" font-weight="600" fill="#5FD6C4">Your agent asks you</text>
+    <text x="774" y="208" font-size="13" fill="#A8AFB7">before the install</text>
+  </g>
+</svg>
