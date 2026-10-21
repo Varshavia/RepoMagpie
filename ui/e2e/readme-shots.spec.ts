@@ -25,7 +25,7 @@ test("inbox review", async ({ page, magpie }) => {
 test("check a package", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Check a package" }).click();
-  await page.getByLabel("Packages").fill("pdfkit left-pad puppeteer");
+  await page.getByLabel("Packages").fill("pdfkit left-pad");
   await page.getByRole("button", { name: "Check", exact: true }).click();
   await expect(page.getByText("In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you first.")).toBeVisible();
   await shoot(page, "screen-check-package");
