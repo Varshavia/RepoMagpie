@@ -1,5 +1,6 @@
 // npm run check:links: checks every relative link in the repository's Markdown files (tracked and
-// new ones, not git-ignored), including #anchors into Markdown headings. Exits 1 if any is broken.
+// new ones, not git-ignored), Markdown links and HTML src and href alike, including #anchors into
+// Markdown headings. Exits 1 if any is broken.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -28,14 +29,22 @@ const anchors = (file: string) => {
   return out;
 };
 
+// The targets of a Markdown file's links: [text](target), and src="…" and href="…" in HTML tags.
+// Code blocks and code spans are left out.
+export function linkTargets(markdown: string): string[] {
+  const text = markdown.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+  const markdownLinks = [...text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)].map(([, target]) => target);
+  const htmlLinks = [...text.matchAll(/<[a-z][^>]*>/gi)].flatMap(([tag]) => [...tag.matchAll(/\s(?:src|href)="([^"]+)"/gi)].map(([, target]) => target));
+  return [...markdownLinks, ...htmlLinks];
+}
+
 const main = () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const files = markdownFiles(root);
   let checked = 0;
   const broken: string[] = [];
   for (const file of files) {
-    const text = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-    for (const [, target] of text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    for (const target of linkTargets(readFileSync(file, "utf8"))) {
       if (/^[a-z]+:/i.test(target)) continue; // https:, mailto: and other schemes
       checked++;
       const [path, anchor] = target.split("#");
