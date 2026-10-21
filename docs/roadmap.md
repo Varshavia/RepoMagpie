@@ -195,7 +195,8 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 
 ### Agent skill
 - [x] Ship a `SKILL.md` that teaches agents to use the CLI: note, search, suggest, adopt, recall (`skills/repomagpie/`, installed with `npx skills add Varshavia/RepoMagpie`). Tests check its frontmatter against the Agent Skills format, and every command, flag and `--json` field it names against `repomagpie --help` and the spec.
-- [x] Publish it to skills.sh and add the badge to the README. (Listed at <https://skills.sh/varshavia/repomagpie>; the badge is in the README's hero since `docs/readme-hero`, 2026-10-21.)
+- [x] Publish it to skills.sh and add the badge to the README. (Listed at <https://skills.sh/varshavia/repomagpie>, linked from the README's callout and FAQ. The badge was in the hero on `docs/readme-hero`, then taken out: its install count, 3 on 2026-10-21, reads as "nobody uses it".)
+- [ ] Bring the skills.sh badge back to the README hero (both READMEs) once its install count is worth showing.
 
 **Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `repomagpie search` and returned the maintainer's playwright-cli note.)
 
@@ -244,7 +245,7 @@ See [marketing.md](marketing.md).
 - [x] Review the landing page with `web-design-guidelines` from `vercel-labs/agent-skills`. (On `docs/readme-pass`, 2026-10-21: the README and its screenshots.)
 - [x] End-to-end check and screenshots of the landing page, and screenshots for the README, with `microsoft/playwright-cli`. (On `docs/readme-pass`: the four screenshots retaken from a showcase journal with `@playwright/test`, as before (`README_SHOTS=1`, `ui/e2e/readme-shots.spec.ts`), not `playwright-cli`. The README is the landing page.)
 - [x] README rewrite for the accepted positioning, with one line about suggest; edit README and docs copy with `writing-guidelines` from `vercel-labs/agent-skills`.
-- [x] README hero (`docs/readme-hero`, 2026-10-21): a centred hero (the language line, the logo, the tagline, badges for npm, CI, Node.js, skills.sh and the licence, quick links, the two-line install), the official channels as a callout, a "How it works" figure (`docs/assets/how-it-works.svg`), "Ask your agent" and an FAQ; Privacy and the scanner paragraph moved into the FAQ.
+- [x] README hero (`docs/readme-hero`, 2026-10-21): a centred hero (the language line, the logo, the tagline, badges for npm, the MCP server, Node.js, CI and the licence, quick links, the two-line install), the official channels as a callout, a "How it works" figure (`docs/assets/how-it-works.svg`), "Ask your agent" and an FAQ; Privacy and the scanner paragraph moved into the FAQ.
 - [x] Turkish README (`docs/readme/README_tr.md`), a full translation; the English README is the reference. Other languages after launch ([marketing](marketing.md)).
 - [x] `v0.1.0-beta.N` pre-release for early testers ([release process](release.md)); it also tests H1 ([decision 0014](decisions/0014-step-1-5-desk-research.md)). Prepared on `feat/launch-prep`: version `0.1.0-beta.1`, its CHANGELOG section, and the npm name `repomagpie` checked free on 2026-10-06. Published 2026-10-07: the GitHub pre-release `v0.1.0-beta.1` and `repomagpie@0.1.0-beta.1` on npm.
 - [ ] Write the 30-second demo scenario (moved from step 1.5)
