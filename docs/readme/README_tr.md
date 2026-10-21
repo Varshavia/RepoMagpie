@@ -10,11 +10,11 @@ _İngilizce README esas metindir; bu çeviri ondan geride kalabilir._
 
 ### Bağımlılık notların, kodlama ajanın bir şey kurmadan önce kontrol edilir.
 
-[![npm sürümü](https://img.shields.io/npm/v/repomagpie?style=flat-square)](https://www.npmjs.com/package/repomagpie)
-[![CI durumu](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
-[![Node.js sürümü](https://img.shields.io/node/v/repomagpie?style=flat-square)](#platformlar)
-[![skills.sh](https://skills.sh/b/varshavia/repomagpie?style=flat-square)](https://skills.sh/varshavia/repomagpie)
-[![MIT lisansı](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](../../LICENSE)
+[![npm sürümü](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
+[![MCP sunucusu](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](../spec.md#repomagpie-mcp)
+[![Node.js 22.12 veya üstü](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](#platformlar)
+[![CI durumu](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
+[![MIT lisansı](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](../../LICENSE)
 
 [Hızlı başlangıç](#hızlı-başlangıç) · [Nasıl çalışır](#nasıl-çalışır) · [Her ajan ne alır](#her-ajan-ne-alır) · [SSS](#sss) · [Belgeler](#belgeler)
 
@@ -143,7 +143,7 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <details>
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
-Hayır. Kişisel günlüğün, makinende Markdown dosyalarından oluşan bir klasördür; bir proje günlüğü, deposu kadar görünürdür ve telemetri yoktur. Tek ağ istekleri, `repomagpie note`, `repomagpie import` ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde GitHub'ın API'sine gider: deponun meta verilerini, dosya listesini ve kökteki manifest dosyalarını okur, ayarladıysan `GITHUB_TOKEN`'ı gönderir, günlüklerinden hiçbir şey göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler; `repomagpie mcp` ise hiçbir ağ bağlantısı ya da port açmaz: ajanınla stdio üzerinden konuşur. Ajanın okuduğu notları görür ve ajanın model sağlayıcısı da onları konuşmanın bir parçası olarak alır. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+Hayır. Kişisel günlüğün, makinende Markdown dosyalarından oluşan bir klasördür; bir proje günlüğü, deposu kadar görünürdür ve telemetri yoktur. Tek ağ istekleri, `repomagpie note`, `repomagpie import` ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde GitHub'ın API'sine gider: deponun meta verilerini, dosya listesini ve kökteki manifest dosyalarını okur, ayarladıysan `GITHUB_TOKEN`'ı gönderir, günlüklerinden hiçbir şey göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler; `repomagpie mcp` ise hiçbir ağ bağlantısı ya da port açmaz: ajanınla stdio üzerinden konuşur. Ajanının okuduğu notlar, konuşmanın bir parçası olarak ajanın model sağlayıcısına da gider. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
 
 </details>
 

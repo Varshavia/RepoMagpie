@@ -8,11 +8,11 @@
 
 ### Your dependency notes, checked before your coding agent installs anything.
 
-[![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square)](https://www.npmjs.com/package/repomagpie)
-[![CI status](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
-[![Node.js version](https://img.shields.io/node/v/repomagpie?style=flat-square)](#platforms)
-[![skills.sh](https://skills.sh/b/varshavia/repomagpie?style=flat-square)](https://skills.sh/varshavia/repomagpie)
-[![MIT licence](https://img.shields.io/badge/licence-MIT-blue?style=flat-square)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
+[![MCP server](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](docs/spec.md#repomagpie-mcp)
+[![Node.js 22.12 or later](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](#platforms)
+[![CI status](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](LICENSE)
 
 [Quick start](#quick-start) · [How it works](#how-it-works) · [What each agent gets](#what-each-agent-gets) · [FAQ](#faq) · [Documentation](#documentation)
 
