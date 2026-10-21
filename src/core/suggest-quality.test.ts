@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { runSuggest } from "./suggest.ts";
 
@@ -12,7 +13,7 @@ import { runSuggest } from "./suggest.ts";
 // any project.
 const vault = fileURLToPath(new URL("../../examples/vault/notes/", import.meta.url));
 const root = scratchBase("suggest-quality");
-cpSync(vault, join(root, "journal", "notes"), { recursive: true });
+copyFolder(vault, join(root, "journal", "notes"));
 const place = { home: join(root, "home"), env: { MAGPIE_HOME: join(root, "journal") }, cwd: root };
 const top = (description: string, n: number) => runSuggest({ description, limit: n }, place).document.candidates.map((c) => c.id);
 

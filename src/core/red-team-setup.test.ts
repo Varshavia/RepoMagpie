@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { onPath, readJsonc, type Platform, type Where } from "./agents.ts";
+import { AGENTS, onPath, readJsonc, type Platform, type Where } from "./agents.ts";
 import { runDoctor } from "./doctor.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { applySetup, planSetup, type SetupRequest } from "./setup.ts";
+import { HOOK_SPECS } from "./setup-agent-hooks.ts";
 import { applySkill, planSkill } from "./setup-skill.ts";
 
 // The red-team pass on setup and doctor (feat/mcp-setup brief §3.8): hostile agent config files,
@@ -297,6 +298,29 @@ test("S14: an empty or whitespace-only JSON file is an empty object: each gets i
     const cursor = planSetup(s.request({ only: ["cursor"] })).agents[0];
     assert.equal(cursor.action, "refused", text);
     assert.match(cursor.reason ?? "", /not valid JSON/, text);
+  }
+});
+
+// 0.2.0-beta.5: doctor crashed in the home folder, where ~/.claude/settings.local.json (read as the
+// project's settings) had no hooks.PreToolUse.
+test("S15: doctor never crashes on a config file's shape: odd but valid JSON in every file it reads, from a project and from the home folder", () => {
+  const ODD: unknown[] = [null, [], "a string", 42, true, {}, { hooks: null }, { hooks: [] }, { hooks: "x" }, { hooks: {} }, { hooks: { PreToolUse: {} } }, { hooks: { PreToolUse: null } },
+    { hooks: { PreToolUse: [null, 1, "x", [], { hooks: null }, { hooks: {} }, { hooks: [null, 1, "x", [], { command: 5 }, { command: null, args: "x" }, { command: "x", args: [1] }] }] } },
+    { hooks: { beforeShellExecution: {} } }, { hooks: { beforeShellExecution: [null, 1, { command: [] }] } }, { hooks: { BeforeTool: {} } }, { hooks: { preToolUse: "x" } }, { hooks: { preToolUse: [{ powershell: 1, bash: {} }] } },
+    { repomagpie: null }, { repomagpie: [] }, { repomagpie: { PreToolUse: {} } }, { repomagpie: { PreToolUse: [{ hooks: [{ command: {} }] }] } }, { hooksConfig: null }, { hooksConfig: [] },
+    { mcpServers: null }, { mcpServers: [] }, { mcpServers: { repomagpie: "x" } }, { mcpServers: { repomagpie: { command: 1, args: "x", env: [] } } }, { servers: { repomagpie: null } }];
+  const s = scratch();
+  for (const dir of [".claude", ".codex", ".cursor", ".gemini/antigravity-cli", ".copilot"]) mkdirSync(join(s.home, dir), { recursive: true });
+  const files = [...new Set([s.settings, join(s.root, ".claude", "settings.json"), join(s.root, ".claude", "settings.local.json"), join(s.home, ".claude", "settings.local.json"),
+    ...HOOK_SPECS.map((spec) => spec.file(s.where)), ...AGENTS.filter((a) => a.format !== "codex-toml").map((a) => a.mcpFile(s.where))])];
+  for (const value of ODD) {
+    for (const file of files) s.write(file, JSON.stringify(value));
+    for (const cwd of [s.root, s.home]) {
+      const label = `${JSON.stringify(value)} from ${cwd === s.home ? "the home folder" : "a project"}`;
+      let report: ReturnType<typeof runDoctor> | undefined;
+      assert.doesNotThrow(() => { report = runDoctor({ home: s.home, env: s.where.env, cwd, platform, version: "0.2.0", node: { path: process.execPath, version: "24" } }); }, label);
+      assert.ok(report?.hook.every((h) => !h.entries.length), label);
+    }
   }
 });
 

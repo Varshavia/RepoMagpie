@@ -156,6 +156,28 @@ test("the hook's exec form: fine when both paths exist and code generation is of
   assert.match(hookProblems()[0], /doesn't start node with --disallow-code-generation-from-strings/);
 });
 
+// 0.2.0-beta.5 crashed here: run in the home folder, ~/.claude/settings.local.json had no hooks.PreToolUse.
+test("Claude Code settings without our hook's place: no hooks, no PreToolUse, or a PreToolUse that isn't a list are no entries, never a crash", () => {
+  const box = scratchHome();
+  for (const settings of [{ permissions: { allow: ["Bash(npm test)"] } }, { hooks: {} }, { hooks: { PostToolUse: [] } }, { hooks: { PreToolUse: {} } }, { hooks: { PreToolUse: "x" } }, { hooks: { PreToolUse: null } }, { hooks: { PreToolUse: [] } }]) {
+    box.write(join(box.home, ".claude", "settings.local.json"), JSON.stringify(settings));
+    box.write(join(box.request.cwd, ".claude", "settings.json"), JSON.stringify(settings));
+    for (const cwd of [box.home, box.request.cwd]) {
+      const report = runDoctor({ ...box.request, cwd });
+      assert.ok(report.hook.length > 0 && report.hook.every((h) => !h.entries.length && !h.error), `${JSON.stringify(settings)} from ${cwd}`);
+    }
+  }
+});
+
+test("run in the home folder, ~/.claude/settings.json is the user's settings and the project's: listed once, with the user's checks", () => {
+  const box = scratchHome();
+  box.write(join(box.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [{ type: "command", command: "repomagpie hook claude-code" }] }] } }));
+  box.write(join(box.home, ".claude", "settings.local.json"), JSON.stringify({ permissions: {} }));
+  const report = runDoctor({ ...box.request, cwd: box.home });
+  assert.deepEqual(report.hook.map((h) => h.file), [join(box.home, ".claude", "settings.json"), join(box.home, ".claude", "settings.local.json")]);
+  assert.equal(report.problems.filter((p) => p.includes("starts through a shell")).length, 1);
+});
+
 test("the other agents' hooks: setup's form with its paths and flags; a broken path is a to-do, Copilot CLI's first; the shell form is one", () => {
   const box = scratchHome();
   const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");

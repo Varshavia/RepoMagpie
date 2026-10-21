@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, when your home folder's name has letters outside ASCII (`C:\Users\Şuat`), `repomagpie setup` no longer crashes during the skill install, or leaves a folder with a mangled name (`Åuat`) beside your home folder with the skill missing. Node's `fs.cpSync` caused it on Node 22 and older Node 24 releases; `setup` now copies the skill without it.
+- `repomagpie doctor` no longer crashes with "Cannot read properties of undefined (reading 'PreToolUse')" when a Claude Code settings file it reads has no hook list, for example `~/.claude/settings.local.json` when you run it in your home folder. Run there, it also lists `~/.claude/settings.json` once instead of twice.
+
 ## [0.2.0-beta.5] - 2026-10-21
 
 The sixth pre-release: the hook now checks your notes before an install in Codex CLI, Gemini CLI, Antigravity CLI, Copilot CLI and Cursor too, asking you where the agent can and stopping the first try where it can't; `repomagpie setup` writes each hook and `repomagpie doctor` checks it, and both now know Antigravity CLI and Copilot CLI.

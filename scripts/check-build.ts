@@ -6,9 +6,10 @@
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
 // runs the one named like the package, and fails when none is. Run npm run build first.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyFolder } from "../src/core/copy-folder.ts";
 import { HOOK_AGENTS } from "../src/hook/agents.ts";
 
 const built = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
@@ -59,7 +60,7 @@ const SHIPPED = [
 let failed = 0;
 try {
   mkdirSync(join(root, ".git"));
-  cpSync(fileURLToPath(new URL("../examples/vault/notes/", import.meta.url)), join(root, "journal", "notes"), { recursive: true });
+  copyFolder(fileURLToPath(new URL("../examples/vault/notes/", import.meta.url)), join(root, "journal", "notes"));
   const project = join(root, "project");
   mkdirSync(project);
   writeFileSync(join(project, "package.json"), JSON.stringify({ description: "Let an agent test a web app in a browser", devDependencies: { "@playwright/test": "*" } }));
