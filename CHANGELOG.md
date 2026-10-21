@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.6] - 2026-10-21
+
+The seventh pre-release, with the fixes testers hit first: `repomagpie setup` now works on Windows when your home folder's name has letters outside ASCII, and `repomagpie doctor` no longer crashes on a Claude Code settings file without hooks; the app's Check a package page also says what the hook does in each agent.
+
 ### Changed
 
 - The app's Check a package page says what the hook does in each agent, not only in Claude Code: on an avoid note it asks you first in Claude Code, Gemini CLI and Antigravity CLI, and stops the first try in Codex CLI, Cursor and Copilot CLI, where your agent asks you.
@@ -199,7 +203,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...HEAD
+[0.2.0-beta.6]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...v0.2.0-beta.6
 [0.2.0-beta.5]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...v0.2.0-beta.5
 [0.2.0-beta.4]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...v0.2.0-beta.4
 [0.2.0-beta.3]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.2...v0.2.0-beta.3
