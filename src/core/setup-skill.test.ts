@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Platform } from "./agents.ts";
+import { copyFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { applySkill, planSkill, type SkillRequest } from "./setup-skill.ts";
 
@@ -119,6 +120,36 @@ test("a link that can't be made becomes a copy, and the summary says so", () => 
   assert.equal(done.claude?.made, "copy");
   assert.ok(!isLink(s.claude));
   assert.equal(readFileSync(join(s.claude, "SKILL.md"), "utf8"), SKILL);
+});
+
+// On Windows, fs.cpSync wrote a copy to `C:\Users\Şuat\…` under a mangled `Åuat…` folder beside it,
+// and a copy from such a path (the npm folder of that user) killed the process (copy-folder.ts).
+test("a home folder and an npm folder under a name with Ş, ı and ü: install, update with a backup, a copy when no link can be made; nothing appears beside the home", () => {
+  const root = scratchBase("skill");
+  const home = join(root, "Şuat Işık Über");
+  const source = join(home, "AppData", "Roaming", "npm", "node_modules", "repomagpie", "skills", "repomagpie");
+  copyFolder(SOURCE, source);
+  const shared = join(home, ".agents", "skills", "repomagpie");
+  const claude = join(home, ".claude", "skills", "repomagpie");
+  const antigravity = join(home, ".gemini", "skills", "repomagpie");
+  const request = (): SkillRequest => ({ source, shared, claude, antigravity, root: home, remove: false, stamp: STAMP, platform, project: false });
+
+  const installed = applySkill(planSkill(request()), request());
+  assert.equal(installed.result, "done", installed.error);
+  assert.equal(readFileSync(join(shared, "SKILL.md"), "utf8"), SKILL);
+  for (const link of [claude, antigravity]) assert.equal(realpathSync(link), realpathSync(shared));
+
+  writeFileSync(join(shared, "SKILL.md"), SKILL.replace(/version: "[^"]+"/, 'version: "0.1.0"'));
+  const plan = planSkill(request());
+  assert.equal(plan.shared.action, "update");
+  assert.equal(applySkill(plan, request()).result, "done");
+  assert.equal(readFileSync(join(shared, "SKILL.md"), "utf8"), SKILL);
+  assert.match(readFileSync(join(plan.shared.backup as string, "SKILL.md"), "utf8"), /version: "0\.1\.0"/);
+
+  const copied = applySkill(planSkill({ ...request(), claude: join(home, ".claude2", "skills", "repomagpie") }), { ...request(), claude: join(home, ".claude2", "skills", "repomagpie") }, () => { throw new Error("EPERM"); });
+  assert.deepEqual([copied.result, copied.claude?.made], ["done", "copy"], copied.error);
+  assert.equal(readFileSync(join(home, ".claude2", "skills", "repomagpie", "SKILL.md"), "utf8"), SKILL);
+  assert.deepEqual(readdirSync(root).sort(), [".git", "Şuat Işık Über"], "no folder with a mangled name beside the home");
 });
 
 test("in a project on Windows the Claude Code folder gets a copy: a junction can't be committed", () => {

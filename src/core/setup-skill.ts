@@ -5,10 +5,11 @@
 // 0036): a junction on Windows, a relative symlink elsewhere, a copy when a link can't be made.
 // That is how the `skills` CLI lays it out, so the two never fight. Never writes through a link,
 // never follows one to delete. Never prints.
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { Platform } from "./agents.ts";
 import { backupName, pathProblem } from "./config-write.ts";
+import { copyFolder } from "./copy-folder.ts";
 import { readNote } from "./note.ts";
 
 export interface SkillRequest {
@@ -126,9 +127,9 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
       if (plan.shared.action === "add" || plan.shared.action === "update") {
         // An update starts from an empty folder: copying over the old one would write through any
         // link inside it (references/ as a junction to somewhere else). rm removes links, never follows.
-        if (plan.shared.backup) cpSync(plan.shared.path, plan.shared.backup, { recursive: true, errorOnExist: true, force: false });
+        if (plan.shared.backup) copyFolder(plan.shared.path, plan.shared.backup, { errorOnExist: true });
         if (plan.shared.action === "update") rmSync(plan.shared.path, { recursive: true });
-        cpSync(r.source, plan.shared.path, { recursive: true });
+        copyFolder(r.source, plan.shared.path);
       }
       for (const [i, item] of links.entries()) {
         if (!item || !["link", "relink", "copy"].includes(item.action)) continue;
@@ -144,7 +145,7 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
             // A file system or policy without links: a copy, which doctor checks against the other.
           }
         }
-        if (made === "copy") cpSync(r.source, item.path, { recursive: true, force: true });
+        if (made === "copy") copyFolder(r.source, item.path);
         links[i] = { ...item, made };
       }
     }
