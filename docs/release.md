@@ -41,7 +41,8 @@ The maintainer creates the branch `release/vX.Y.Z` (or `release/vX.Y.Z-beta.N`) 
 - [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), and in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's; `npm test` fails until the three agree);
 - [ ] moves the Unreleased entries in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`, with a one-line summary, leaves an empty `## [Unreleased]`, and updates the compare links at the end of the file;
 - [ ] checks that the section covers everything merged since the last release (`git log --oneline vPREVIOUS..HEAD`);
-- [ ] updates the README's status line and the roadmap's Now and Next;
+- [ ] updates the status line in both READMEs (`README.md` and `docs/readme/README_tr.md`) and the roadmap's Now and Next;
+- [ ] checks that the static Node.js badge in both READMEs names `package.json`'s `engines.node` floor (`22.12+` for `>=22.12.0`); shields.io doesn't read it;
 - [ ] drafts the GitHub release notes and the pull request's description in `.scratch/`.
 
 ### 2. Check (agent, on the release branch)

@@ -18,6 +18,7 @@ Lead with the habit, not the features: *every day, find one repo worth keeping, 
 | Logo | Before launch | A magpie. Simple, works at 16px. |
 | "Good first issue" set | Before launch | 5 small, well-described issues. |
 | skills.sh badge | v0.1 (agent skill) | Install-count social proof. |
+| README translations | Before launch: Turkish | Translations start with Turkish (`docs/readme/README_tr.md`); other languages come after launch. The English README is the reference. |
 
 ## The daily content engine: "Magpie find of the day"
 
