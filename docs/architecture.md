@@ -72,7 +72,7 @@ src/
                Code's and Antigravity CLI's; setup-hook: the Claude Code hook, added, migrated, removed;
                setup-agent-hooks: the other agents' hook entries, the same way, read back by doctor too;
                hook-launch: the command each of those entries runs, for its agent's shell, and reading it
-               back; codex-hooks: Codex CLI's hooks switch and hook trust in config.toml; config-write: no links, no
+               back, with Antigravity CLI's launcher file on Windows; codex-hooks: Codex CLI's hooks switch and hook trust in config.toml; config-write: no links, no
                writes outside the home folder or project, backups, atomic writes; agent-cli: running an
                agent's CLI, with cmd.exe's escaping for .cmd shims; json-edit: one value of a plain JSON
                file changed (an object member or an array item), every other byte kept
