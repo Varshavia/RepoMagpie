@@ -513,7 +513,7 @@ Any other input (articles, gists, loose Markdown files) is rejected with exit 2 
 | Agent | Command | Reads | An exact avoid note | Any other match | Same install within 10 minutes of a deny |
 |---|---|---|---|---|---|
 | Claude Code | `hook claude-code` | `PreToolUse`, `tool_name` `Bash` or `PowerShell`, `tool_input.command`, `cwd` | `permissionDecision: "ask"` with the reason; context for the agent | context for the agent, a line for the user | (asks every time) |
-| Codex CLI | `hook codex` | `PreToolUse`, `tool_name` `Bash`, `tool_input.command`, `cwd` | `permissionDecision: "deny"` with the reason and the advice, the user's line in `systemMessage` | `additionalContext` and `systemMessage` | informs, as any other match |
+| Codex CLI | `hook codex` | `PreToolUse`, `tool_name` `Bash`, `tool_input.command`, `cwd` | `permissionDecision: "deny"` with the reason and the advice, the user's line in `systemMessage` | `additionalContext` and `systemMessage` | `additionalContext` and `systemMessage` say it was let through, without the note |
 | Gemini CLI | `hook gemini-cli` | `BeforeTool`, `tool_name` `run_shell_command`, `tool_input.command`, `cwd` and `dir_path` | `decision: "ask"`, the reason in `systemMessage` | `systemMessage` | (asks every time) |
 | Antigravity CLI | `hook antigravity` | `toolCall.name` `run_command`, `toolCall.args.CommandLine`, `Cwd` | `decision: "force_ask"` with the reason | nothing | (asks every time) |
 | Copilot CLI | `hook copilot` | `toolName` `powershell` or `bash`, `toolArgs.command`, `cwd` | `permissionDecision: "deny"` with the reason and the advice | nothing | nothing |
@@ -647,7 +647,20 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
   ```
 
   With several stopped packages, the advice says "these notes", "them" and "the same packages", and the user's line names them all (`stopped installing pdfkit, jspdf: this project's journal says to avoid pdfkit; you noted to avoid jspdf.`), at most 5, then `+N more`.
-- **The same install** (the same folder and the same stopped packages, in any form: `npm.cmd`, `& npm`, `pnpm add`) until 10 minutes after the deny, and every other match: it informs, with `additionalContext` and `systemMessage` as for Claude Code. Codex shows `systemMessage` in the transcript and gives `additionalContext` to the model after the call. If the retry record can't be read or written, it informs instead of denying.
+- **The same install** (the same folder and the same stopped packages, in any form: `npm.cmd`, `& npm`, `pnpm add`) until 10 minutes after the deny: it goes through, and both fields say so, without the avoid notes, which the deny already gave. A repeated note read as a second stop: in the live test, when PowerShell then blocked `npm.ps1`, Codex told the user the hook had blocked the retry.
+
+  ```json
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "additionalContext": "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as the user's go-ahead. RepoMagpie doesn't block it; if it fails, the cause is elsewhere."
+    },
+    "systemMessage": "RepoMagpie: let this install of pdfkit through: it is the retry within 10 minutes of the stop, taken as your go-ahead."
+  }
+  ```
+
+  Other notes in the same command follow, one line each, as below.
+- **Every other match:** it informs, with `additionalContext` and `systemMessage` as for Claude Code. Codex shows `systemMessage` in the transcript and gives `additionalContext` to the model after the call. If the retry record can't be read or written, an avoid note informs too, instead of denying.
 - **Never approves:** no `"allow"`, no `updatedInput`, no `"ask"`. `--inform-only` never denies.
 - **Length:** Codex limits each model-visible hook message to about 2,500 tokens. So each field holds whole matches while it stays within 4,000 characters, and is cut at 5,000; the advice in a deny reason is never cut.
 
@@ -656,7 +669,7 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
 - **An exact avoid note:** `{"decision": "ask", "systemMessage": "<the permission prompt's reason, as for Claude Code>"}`. Gemini CLI then asks the user, with the note in its confirmation, before the user's saved approvals.
 - **Every other match:** `{"systemMessage": "<the systemMessage, as for Claude Code>"}`, for the user; no `BeforeTool` field reaches the agent, so the adapter prints nothing for it.
 - **Never approves:** no `"allow"` and no `hookSpecificOutput.tool_input`. `--inform-only` never asks; use it for `gemini -p`.
-- **The switch:** one constant in `src/hook/gemini-cli.ts` (`ON_AVOID`) chooses between asking and denying the first try. Set to `"deny"`, it answers as Codex's adapter does (`{"decision": "deny", "reason": …, "systemMessage": …}`, with the retry record), for the case where the live test shows Gemini CLI not prompting.
+- **The switch:** one constant in `src/hook/gemini-cli.ts` (`ON_AVOID`) chooses between asking and denying the first try. Set to `"deny"`, it answers as Codex's adapter does (`{"decision": "deny", "reason": …, "systemMessage": …}`, with the retry record; a retry let through gets Codex's `systemMessage` for it), for the case where the live test shows Gemini CLI not prompting.
 - **Length:** Gemini CLI documents no limit, so Claude Code's are kept.
 
 **Antigravity CLI** (`repomagpie hook antigravity`, [decision 0036](decisions/0036-hooks-in-other-agents.md); its facts in [agents](agents.md#antigravity-cli)). Antigravity asks: `force_ask` "Always prompts you for approval, ignoring cached permissions".
@@ -689,6 +702,8 @@ The same note in a project journal ([decision 0032](decisions/0032-note-text-is-
   "hooks": [ { "type": "command", "timeout": 10,
                "command": "if ([IO.File]::Exists('C:\\Program Files\\nodejs\\node.exe') -and [IO.File]::Exists('C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\repomagpie\\dist\\cli\\main.js')) { & 'C:\\Program Files\\nodejs\\node.exe' --disallow-code-generation-from-strings 'C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\repomagpie\\dist\\cli\\main.js' hook codex }" } ] }
 ```
+
+Antigravity CLI on Windows is the exception: `agy` writes each `"` of the command as `\"` for `cmd /c`, which `cmd` doesn't read, so its entry is the absolute path of `~\.gemini\config\repomagpie-hook.cmd`, a launcher `setup` writes before the entry and deletes after it on `--remove`. The launcher holds the `if exist "<node>" if exist "<entry>" …` command, with its paths below the home folder written from `%~dp0`, since `cmd` reads the file in the console's code page. It is rewritten without a backup when node or the entry file moved (`hooks.json` is then left as it is); one `setup` didn't write is left alone, and named. `doctor` reads node and the entry file from it, and a missing launcher is a to-do.
 
 An older entry of ours (`repomagpie hook <agent>`, `repomagpie.cmd hook <agent>`, `magpie hook <agent>`, or `setup`'s form with other paths) becomes this one in place, its flags (`--inform-only`) and its other keys kept, except a Codex `commandWindows`, which would override it; a second entry of ours is removed. An entry that runs RepoMagpie another way is kept. <!-- check:commands allow -->
 
