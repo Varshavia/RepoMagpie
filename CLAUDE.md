@@ -80,10 +80,10 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | Path | What it is |
 |---|---|
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
-| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) and `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old). |
+| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old) and `ISSUE_TEMPLATE/beta-feedback.yml` (the testers' day-7 form, [TESTING.md](TESTING.md)). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
-| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), the coding agents' config formats (`agents.md`), research, `decisions/` (decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
+| `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), the coding agents' config formats (`agents.md`), the Turkish READMEs and tester guide (`readme/`, `testing/`), research, `decisions/` (decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
 | `examples/vault/` | Example vault: the only place notes live in this repo. `_templates/` holds the note template. |
 | `src/` | Product code (TypeScript): `core/`, `cli/`, `hook/`, `mcp/` (`repomagpie mcp`), `server/` (`repomagpie ui`), with `*.test.ts` next to the code they test ([architecture](docs/architecture.md)). |
 | `ui/` | The local app (React, Vite): `src/` (components, the API client, and `logic/` with unit tests), `e2e/` (Playwright), its `tsconfig.json`, `vite.config.ts` and `playwright.config.ts`. Built into `dist/ui/`, which `repomagpie ui` serves ([UI](docs/ui.md)). |
@@ -102,6 +102,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `LICENSE` | MIT. |
 | `README.md` | Landing page: what RepoMagpie is and how it will work. |
 | `SECURITY.md` | How to report a vulnerability privately (GitHub private vulnerability reporting). |
+| `TESTING.md` | The beta testers' guide: day 1, days 2–7, the feedback form, removing RepoMagpie. |
 
 ## 5. Working principles
 
