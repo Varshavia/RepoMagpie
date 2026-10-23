@@ -125,8 +125,6 @@ npm uninstall -g repomagpie
 
 `setup --remove` yalnızca RepoMagpie'nin kendi MCP kayıtlarını, hook'larını ve skill klasörlerini çıkarır; sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez. `npm uninstall`'dan önce çalıştır.
 
-Windows'ta, ev klasörünün adında ASCII dışı harfler varsa (örneğin `C:\Users\Şuat`), `setup --remove` 0.2.0-beta.7'de çalışmaz. Bir sonraki sürümde düzeltilecek.
-
 Şunları bırakır:
 - notlarını, `~/.magpie` ve her projenin `.magpie/` klasöründe;
 - `setup`'ın yedeklerini. Kaldırmadan önce onları listelemek için `repomagpie doctor` çalıştır ve artık gerekmeyenleri sil. `~/.claude.json` kopyaları oturum token'ları içerebilir.
