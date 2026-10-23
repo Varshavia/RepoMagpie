@@ -5,8 +5,9 @@
 // Also the file rules of decision 0032 (rules 5 and 6), here because every read of a journal's notes
 // lists them through noteSignature: a link inside a journal is never followed nor written through,
 // and a note file over 256 KB is skipped. What was skipped is kept for the command to report once.
-import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
+import { removeFolder } from "./copy-folder.ts";
 
 export type Signature = Record<string, [number, number]>; // note file name → [mtimeMs, size]
 
@@ -208,7 +209,7 @@ export function writeCache(journal: string, name: string, version: number, signa
   } catch {
     // A cache that can't be written only costs time on the next run.
     try {
-      rmSync(temporary, { force: true });
+      removeFolder(temporary);
     } catch {
       // The temporary file can't be removed either (no .cache folder, or it is held too).
     }

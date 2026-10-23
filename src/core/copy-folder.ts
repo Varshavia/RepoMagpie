@@ -41,6 +41,46 @@ function copyEntry(from: string, to: string, errorOnExist: boolean): void {
   } else throw new Error(`can't copy ${from}: it isn't a file, a folder or a link`);
 }
 
+// fs.rmSync(path, { recursive: true, force: true }) in plain JS, for a file, a link or a folder. On
+// Windows, Node 23.x, 24.0 to 24.13.0 and 25.0 return from rmSync without an error and remove
+// nothing when the path has letters outside ASCII; rmdirSync({ recursive }) is the same call. Seen
+// on 23.11.1, 24.0.2, 24.13.0 and 25.0.0; not on 22.12.0, 22.23.4, 24.13.1, 24.14.x, 24.22.1,
+// 25.4.0, 25.9.0 or 26.12.1 (Windows, code page 1254, tested 2026-10-23). Upstream:
+// https://github.com/nodejs/node/issues/65578; https://github.com/nodejs/node/issues/58759 is its
+// crash form. CI's Node 22, 24 and 26 run releases without it, so only a test run on an affected
+// Node catches a return to rmSync. unlinkSync and rmdirSync were right on every one of them. A link
+// (a junction too) is removed as a link, never followed; a folder is emptied, then removed; a
+// missing path is nothing to do. While another process holds an entry (a virus scan), each step is
+// tried again, as rmSync's maxRetries: 5, retryDelay: 50 did. Afterwards the path must be gone, or
+// it throws.
+export function removeFolder(path: string): void {
+  removeEntry(path);
+  if (lstatSync(path, { throwIfNoEntry: false })) throw new Error(`${path} is still there after removing it.`);
+}
+
+function removeEntry(path: string): void {
+  const entry = lstatSync(path, { throwIfNoEntry: false });
+  if (!entry) return;
+  if (entry.isSymbolicLink()) retried(() => removeLink(path));
+  else if (entry.isDirectory()) {
+    for (const name of readdirSync(path)) removeEntry(join(path, name));
+    retried(() => rmdirSync(path));
+  } else retried(() => unlinkSync(path));
+}
+
+const HELD = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EMFILE", "ENFILE"]);
+
+function retried(step: () => void): void {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return step();
+    } catch (error) {
+      if (!HELD.has((error as NodeJS.ErrnoException).code ?? "") || attempt > 5) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt); // a synchronous pause
+    }
+  }
+}
+
 // An existing link in the copy's place, without following it (a Windows junction needs rmdir).
 function removeLink(path: string): void {
   try {

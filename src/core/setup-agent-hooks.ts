@@ -10,11 +10,12 @@
 // rewritten without a backup (it holds only setup's command), never one setup didn't write. Doctor
 // reads the entries back with findAgentHooks.
 // Never prints.
-import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { copilotHome, readJsonc, type Agent, type Platform, type Where } from "./agents.ts";
 import { codexHooksOff } from "./codex-hooks.ts";
 import { backupName, parseJson, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
+import { removeFolder } from "./copy-folder.ts";
 import { hookLaunch, hookShell, LAUNCHER, launcherText, parseHookCommand, readLauncher, type HookSub, type ParsedHook } from "./hook-launch.ts";
 import { appendItem, removeAt, replaceAt, setMember, setTop } from "./json-edit.ts";
 import type { HookPlan } from "./setup-hook.ts";
@@ -242,7 +243,7 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
     // The launcher first, so the entry never names a file that isn't there.
     if (wish?.launcher && textOf(wish.launcher.file) !== wish.launcher.text) writeAtomically(wish.launcher.file, wish.launcher.text);
     if (spec.layout === "file") {
-      if (plan.action === "remove") rmSync(plan.file, { maxRetries: 5, retryDelay: 50 }); // retries while a virus scan holds it
+      if (plan.action === "remove") removeFolder(plan.file); // retries while a virus scan holds it
       else writeAtomically(plan.file, `${JSON.stringify(minimal(spec, want as Json), null, 2)}\n`);
     } else {
       if (plan.action === "add") text = add(spec, text, want as Json);
@@ -266,7 +267,7 @@ export function applyAgentHook(plan: AgentHookPlan, spec: HookSpec, where: Where
       if (text !== config.text) writeAtomically(plan.file, text as string);
     }
     // After the entry, so it never names a file that isn't there; only a launcher setup wrote.
-    if (plan.action === "remove" && plan.launcher && readLauncher(plan.launcher) !== null) rmSync(plan.launcher, { maxRetries: 5, retryDelay: 50 });
+    if (plan.action === "remove" && plan.launcher && readLauncher(plan.launcher) !== null) removeFolder(plan.launcher);
   } catch (error) {
     return fail((error as Error).message);
   }

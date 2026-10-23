@@ -5,11 +5,11 @@
 // 0036): a junction on Windows, a relative symlink elsewhere, a copy when a link can't be made.
 // That is how the `skills` CLI lays it out, so the two never fight. Never writes through a link,
 // never follows one to delete. Never prints.
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { Platform } from "./agents.ts";
 import { backupName, pathProblem } from "./config-write.ts";
-import { copyFolder } from "./copy-folder.ts";
+import { copyFolder, removeFolder } from "./copy-folder.ts";
 import { readNote } from "./note.ts";
 
 export interface SkillRequest {
@@ -121,20 +121,21 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
   const links = [plan.claude, plan.antigravity];
   try {
     if (r.remove) {
-      for (const item of links) if (item?.action === "remove") removeOne(item.path);
-      if (plan.shared.action === "remove") rmSync(plan.shared.path, { recursive: true });
+      for (const item of links) if (item?.action === "remove") removeFolder(item.path);
+      if (plan.shared.action === "remove") removeFolder(plan.shared.path);
     } else {
       if (plan.shared.action === "add" || plan.shared.action === "update") {
         // An update starts from an empty folder: copying over the old one would write through any
-        // link inside it (references/ as a junction to somewhere else). rm removes links, never follows.
+        // link inside it (references/ as a junction to somewhere else). removeFolder removes links,
+        // never follows.
         if (plan.shared.backup) copyFolder(plan.shared.path, plan.shared.backup, { errorOnExist: true });
-        if (plan.shared.action === "update") rmSync(plan.shared.path, { recursive: true });
+        if (plan.shared.action === "update") removeFolder(plan.shared.path);
         copyFolder(r.source, plan.shared.path);
       }
       for (const [i, item] of links.entries()) {
         if (!item || !["link", "relink", "copy"].includes(item.action)) continue;
         if (item.backup) renameSync(item.path, item.backup);
-        else if (exists(item.path)) removeOne(item.path);
+        else if (exists(item.path)) removeFolder(item.path);
         mkdirSync(dirname(item.path), { recursive: true });
         let made: "link" | "copy" = "copy";
         if (item.action !== "copy") {
@@ -165,15 +166,4 @@ export function applySkill(plan: SkillPlan, r: SkillRequest, link = makeLink): S
 function makeLink(target: string, path: string, platform: Platform): void {
   if (platform === "win32") symlinkSync(target, path, "junction");
   else symlinkSync(relative(dirname(path), target), path, "dir");
-}
-
-// Removes a link without following it, or our own real folder.
-function removeOne(path: string): void {
-  if (isLink(path)) {
-    try {
-      unlinkSync(path);
-    } catch {
-      rmdirSync(path); // a Windows junction
-    }
-  } else rmSync(path, { recursive: true });
 }
