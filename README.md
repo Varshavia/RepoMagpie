@@ -179,6 +179,8 @@ Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries,
 
 Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`.
 
+`repomagpie delete <name>`, or Delete in the app, moves a note to the journal's `.trash/`.
+
 </details>
 
 <details>
@@ -190,7 +192,7 @@ Write a note with `--to project`, or copy one from your personal journal with `r
 
 ## Documentation
 
-- [Spec](docs/spec.md): every command (`search`, `recall`, `catalog`, `adopt`, `import` and the rest; `repomagpie --help` lists them), flag and `--json` document
+- [Spec](docs/spec.md): every command (`search`, `recall`, `catalog`, `adopt`, `import`, `delete` and the rest; `repomagpie --help` lists them), flag and `--json` document
 - [Agents](docs/agents.md): what each coding agent supports, and [setting up by hand](docs/setup-by-hand.md)
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules

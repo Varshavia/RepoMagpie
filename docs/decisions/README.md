@@ -45,3 +45,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
 | 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036) |
 | 0036 | [The hook in agents that can't ask](0036-hooks-in-other-agents.md) | accepted (refines 0024 and 0035) |
+| 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |

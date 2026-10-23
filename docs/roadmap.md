@@ -15,6 +15,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: [agents everywhere](#agents-everywhere-mcp-setup-and-doctor-featmcp-setup) (`repomagpie mcp`, `catalog`, `setup` and `doctor`; [decision 0034](decisions/0034-the-mcp-server.md), [decision 0035](decisions/0035-setup-and-doctor.md)) is merged (#33, after a live test on Windows) and released in `0.2.0-beta.4` (2026-10-15); next is the tester round with `repomagpie setup`.
   Also now: [the hook in every agent](#the-hook-in-every-agent-that-has-one-featagent-hooks) (`feat/agent-hooks`): hook adapters for Codex CLI, Gemini CLI, Antigravity CLI, Copilot CLI and Cursor ([decision 0036](decisions/0036-hooks-in-other-agents.md)), and Antigravity CLI and Copilot CLI in `setup` and `doctor`. Merged (#36, with the fixes from the maintainer's live test on Windows) and released in `0.2.0-beta.5` (2026-10-21); next is the tester round with the hooks.
   Also now: `0.2.0-beta.6` (2026-10-21), the build for the tester round: `setup` on a Windows home folder with letters outside ASCII and `doctor` on Claude Code settings without hooks are fixed (#39), and Check a package and the README say what the hook does in each agent (#40, #41).
+  Also now: [deleting a note](#deleting-a-note-featdelete-note) (`feat/delete-note`, [decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)): `repomagpie delete` and Delete note in the app move a note to the journal's `.trash/`, with Undo in the app. Built on its branch; next is the maintainer's review.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
 
@@ -363,6 +364,15 @@ The hook is the backstop when an agent skips the check before an install. Today 
 - [x] A live test with all five agents (the maintainer, on Windows, 2026-10-20 and 2026-10-21: passed in Claude Code (unchanged), Codex CLI, Cursor, Gemini CLI (with an API key; the ask held after "allow this session"), Antigravity CLI (after the launcher fix) and Copilot CLI (the deny, then the agent asked through `ask_user`). Fixed on the branch from it: an empty `mcp_config.json`, Gemini CLI's `mcp add` arguments, Antigravity CLI's launcher on Windows, and the Codex retry's let-through line.)
 
 **Done when:** every agent with a hook gets `repomagpie hook <agent>` from `setup`, which asks where the agent can and denies the first try where it can't, never approves and never blocks on its own errors; `doctor` reports each hook; the hook's chunk grows by the adapters only and keeps the recall budget; all checks pass, and the live test passes in all five agents.
+
+### Deleting a note (`feat/delete-note`)
+Testers will write test notes on their first day and want them gone. A delete moves the note to the journal's `.trash/`, only the person deletes, and only the version they saw ([decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)).
+- [x] Core: `deleteNote` (by id or file name, with a dry run, the version check and the notes that link to it), the Undo's `restoreNote`, and `.trash/` in a project journal's `.gitignore`, old ones included. A test proves nothing reads `.trash/` as notes.
+- [x] `repomagpie delete <name> [--journal] [--yes] [--json]`: shows the note and what links to it, then asks; without a terminal it needs `--yes`.
+- [x] The app: "Delete note" in the note view, a dialog with the notes that link to it, and a toast with Undo (`POST /api/note/delete`, `POST /api/note/restore`), with end-to-end tests.
+- [x] Docs: decision 0037, the spec, the UI doc, the skill (never delete unless the user asked for that note by name) and the READMEs. No MCP tool deletes.
+
+**Done when:** a note can be moved to the trash from the CLI and from the app, disappears from everything that reads notes, and comes back with Undo in the app; no agent tool can delete; all checks pass.
 
 ## v0.3 Trust
 - [ ] `repomagpie init`, if it missed v0.1.
