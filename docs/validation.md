@@ -118,6 +118,28 @@ What came up in more than one interview, and what it means for the [ideas](ideas
 
 -
 
+## Beta tester round
+
+Two people test `0.2.0-beta.7` for a week, one on macOS and one on Windows, following [TESTING.md](../TESTING.md). On day 7 they answer the "Beta feedback" issue form (`.github/ISSUE_TEMPLATE/beta-feedback.yml`), or send the same answers privately. Unlike the desk research, this is first-hand use of RepoMagpie. Two testers show what can happen, not how often: record what they did, and read it against the hypotheses above.
+
+Which hypothesis each question tests:
+
+| # | Form question | Tests | What to look for |
+|---|---|---|---|
+| 1 | OS and version | none | Context for the other answers. |
+| 2 | Agents used | none | Context; whether the agent had a hook (VS Code has none). |
+| 3 | Where setup got stuck | none (a precondition for all four) | A tester stuck at setup never reaches note-taking or recall, so the other answers can't count. |
+| 4 | Notes after a week | H1 | Only the three day-1 notes, or fewer, leans to confirm; notes added on days 2–7 lean to reject. |
+| 5 | Recall on its own | H2 | Whether proactive recall happened in real work and changed what the tester did. A useful recall weighs against H2; none in a week, for it. |
+| 6 | The hook in the way | H2 | The cost of recall before install: a hook that slows or annoys weakens the recall side. |
+| 7 | The README | none | Whether the positioning ([decision 0009](decisions/0009-positioning-dependency-memory.md)) is understood without help. |
+| 8 | Liked most, missing | H2, H4 | Asking for vetting or warnings on unknown packages points to H2; the graph as what they liked most counts against H4, never opening it for it. |
+| 9 | Keep using it | H1 | Read with question 4: "yes" with few notes says the notes aren't the value they got. |
+
+H3 (bigger pain for teams) isn't tested: each tester works alone, and no question asks about a team.
+
+**Results:** none yet.
+
 ## Competitor review
 
 Try each tool hands-on, except where noted. Background: [competitive landscape](competitors.md).

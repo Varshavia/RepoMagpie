@@ -68,9 +68,11 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 3. İlk notunu yaz. Bir paket adı ver ya da deponun lisansını, konularını (topics) ve ajan skill'lerini de çekmek için bir GitHub URL'si ver:
 
    ```bash
-   repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
+   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
    ```
+
+   `--type npm`, adın bir npm paketi olduğunu söyler. Bir projenin içinde RepoMagpie bunu manifest dosyasından okur; başka bir yerde sorar.
 
    Token olmadan GitHub saatte 60 isteğe izin verir. [GitHub CLI](https://cli.github.com/) kullanıyorsan, sınırı yükseltmek için açık kabuk oturumunda RepoMagpie'ye onun token'ını ver: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de ise `$env:GITHUB_TOKEN = gh auth token`.
 
@@ -201,6 +203,7 @@ Belgeler İngilizcedir.
 - [Not şeması](../note-schema.md): bir notun biçimi
 - [Yerel uygulama](../ui.md): ekranlar, API ve güvenlik kuralları
 - [Yol haritası](../roadmap.md) ve [değişiklik kaydı](../../CHANGELOG.md)
+- [Betayı test etmek](../testing/TESTING_tr.md): beta ile bir haftanın adımları ve geri bildirimin nasıl gönderileceği
 - [Vizyon](../vision.md), [rakipler](../competitors.md) ve [kararlar](../decisions/)
 
 Hatalar ve fikirler için bir issue aç. Proje henüz pull request kabul etmiyor ([CONTRIBUTING.md](../../CONTRIBUTING.md)). Bir güvenlik açığı bildirmek için [SECURITY.md](../../SECURITY.md) sayfasına bak.

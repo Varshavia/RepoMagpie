@@ -66,9 +66,11 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
    ```bash
-   repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
+   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
    ```
+
+   `--type npm` says the name is an npm package. Inside a project, RepoMagpie reads that from its manifest; elsewhere it asks.
 
    Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
 
@@ -197,6 +199,7 @@ Write a note with `--to project`, or copy one from your personal journal with `r
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules
 - [Roadmap](docs/roadmap.md) and [changelog](CHANGELOG.md)
+- [Testing the beta](TESTING.md): the steps for a week with the beta, and how to send feedback
 - [Vision](docs/vision.md), [competitors](docs/competitors.md) and [decisions](docs/decisions/)
 
 Open an issue for bugs and ideas. The project doesn't take pull requests yet ([CONTRIBUTING.md](CONTRIBUTING.md)). To report a vulnerability, see [SECURITY.md](SECURITY.md).
