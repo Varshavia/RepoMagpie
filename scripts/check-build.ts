@@ -6,7 +6,7 @@
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
 // runs the one named like the package, and fails when none is. Run npm run build first.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyFolder } from "../src/core/copy-folder.ts";
@@ -23,8 +23,10 @@ const base = fileURLToPath(new URL("../.scratch/check-build/", import.meta.url))
 mkdirSync(base, { recursive: true });
 const root = mkdtempSync(join(base, "run-"));
 const hook = (command: string) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } });
-// quiet: the command prints nothing (the hook on a command that installs nothing).
-const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
+// quiet: the command prints nothing (the hook on a command that installs nothing). restores: the
+// example note the command moves to the trash, put back before each run; the trash name's UTC stamp
+// may differ between the two runs, so it isn't compared.
+const CASES: { args: string[]; input?: string; quiet?: boolean; restores?: string }[] = [
   { args: ["--version"] },
   { args: ["--help"] },
   { args: ["recall", "@playwright/cli", "--type", "npm", "--json"] },
@@ -45,7 +47,9 @@ const CASES: { args: string[]; input?: string; quiet?: boolean }[] = [
   { args: ["hook", "copilot"], input: JSON.stringify({ toolName: "powershell", toolArgs: { command: "npm install @playwright/cli" } }), quiet: true },
   // So does Cursor's.
   { args: ["hook", "cursor"], input: JSON.stringify({ hook_event_name: "beforeShellExecution", command: "npm install @playwright/cli" }), quiet: true },
+  { args: ["delete", "https://github.com/mattpocock/skills", "--yes", "--json"], restores: "github--mattpocock--skills.md" },
 ];
+const vault = fileURLToPath(new URL("../examples/vault/notes/", import.meta.url));
 
 // What the package may ship: npm's own files, the licences, the built CLI and app, and the agent
 // skill that repomagpie setup installs (decision 0035).
@@ -60,7 +64,7 @@ const SHIPPED = [
 let failed = 0;
 try {
   mkdirSync(join(root, ".git"));
-  copyFolder(fileURLToPath(new URL("../examples/vault/notes/", import.meta.url)), join(root, "journal", "notes"));
+  copyFolder(vault, join(root, "journal", "notes"));
   const project = join(root, "project");
   mkdirSync(project);
   writeFileSync(join(project, "package.json"), JSON.stringify({ description: "Let an agent test a web app in a browser", devDependencies: { "@playwright/test": "*" } }));
@@ -68,8 +72,15 @@ try {
   const home = join(root, "home");
   mkdirSync(home);
   const env = { ...process.env, MAGPIE_HOME: join(root, "journal"), NO_COLOR: "1", HOME: home, USERPROFILE: home, APPDATA: join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(home, ".config"), CODEX_HOME: join(home, ".codex") };
-  for (const { args, input, quiet } of CASES) {
-    const run = (main: string) => spawnSync(process.execPath, [main, ...args], { cwd: project, input, encoding: "utf8", env });
+  for (const { args, input, quiet, restores } of CASES) {
+    const run = (main: string) => {
+      if (restores) {
+        rmSync(join(root, "journal", ".trash"), { recursive: true, force: true });
+        copyFileSync(join(vault, restores), join(root, "journal", "notes", restores));
+      }
+      const result = spawnSync(process.execPath, [main, ...args], { cwd: project, input, encoding: "utf8", env });
+      return restores ? { ...result, stdout: result.stdout.replace(/\.\d{8}-\d{6}Z\.md/g, ".<stamp>.md") } : result;
+    };
     const [b, s] = [run(built), run(source)];
     const same = b.status === s.status && b.stdout === s.stdout && (b.stdout === "") === Boolean(quiet);
     if (!same) failed++;
