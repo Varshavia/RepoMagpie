@@ -181,6 +181,8 @@ Hayır. RepoMagpie senin ve ekibinin not ettiklerini gösterir: kötü amaçlı 
 
 Her not, YAML frontmatter'ı olan bir Markdown dosyasıdır: kişisel günlüğün için `~/.magpie/notes/` içinde, bir projeninki için `.magpie/notes/` içinde ([not şeması](../note-schema.md)). Onları herhangi bir editörde düzenle: RepoMagpie, alanları ya da bölümleri eksik olsa da elle yazılmış notları okur ve senin bölümlerini asla yeniden yazmaz. `repomagpie ui` aynı dosyaları tarayıcıda düzenler. Kişisel günlüğü başka bir yerde tutmak için `MAGPIE_HOME`'u ayarla ya da `--home` ver.
 
+`repomagpie delete <name>` ya da uygulamadaki Delete, bir notu günlüğün `.trash/` klasörüne taşır.
+
 </details>
 
 <details>
@@ -194,7 +196,7 @@ Bir notu `--to project` ile yaz ya da kişisel günlüğündeki bir notu `repoma
 
 Belgeler İngilizcedir.
 
-- [Spec](../spec.md): her komut (`search`, `recall`, `catalog`, `adopt`, `import` ve diğerleri; `repomagpie --help` hepsini listeler), bayrak ve `--json` belgesi
+- [Spec](../spec.md): her komut (`search`, `recall`, `catalog`, `adopt`, `import`, `delete` ve diğerleri; `repomagpie --help` hepsini listeler), bayrak ve `--json` belgesi
 - [Ajanlar](../agents.md): her kodlama ajanının neyi desteklediği ve [elle kurulum](../setup-by-hand.md)
 - [Not şeması](../note-schema.md): bir notun biçimi
 - [Yerel uygulama](../ui.md): ekranlar, API ve güvenlik kuralları

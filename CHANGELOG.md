@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `repomagpie delete <name>` moves a note to its journal's trash, `.trash/`, as `npm--pdfkit.20261023-093900Z.md`. In a terminal it shows the note, the notes that link to it and where it goes, then asks "Move it to the trash? [y/N]"; without a terminal it needs `--yes`. `--journal` picks the journal when both have the note, and `--json` prints what moved. Nothing reads `.trash/` as notes, and nothing empties it: delete a file there to remove it for good. A project journal's `.gitignore` gets `.trash/`, also one written by an earlier version.
+- "Delete note" in the app's note view. A dialog says where the note goes and lists the notes that link to it; after the move, the next note opens and a toast offers Undo for 10 seconds. A note that changed on disk since you opened it isn't moved.
+- The agent skill says never to run `repomagpie delete` unless you asked to delete that note, by name. The MCP server has no tool that deletes, and hooks never delete.
+
 ## [0.2.0-beta.6] - 2026-10-21
 
 The seventh pre-release, with the fixes testers hit first: `repomagpie setup` now works on Windows when your home folder's name has letters outside ASCII, and `repomagpie doctor` no longer crashes on a Claude Code settings file without hooks; the app's Check a package page also says what the hook does in each agent.

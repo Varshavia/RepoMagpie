@@ -139,16 +139,22 @@ export function SkeletonNote() {
 export interface ToastItem {
   id: number;
   text: string;
+  action?: { label: string; run: () => void }; // Undo after a delete
 }
 
-// Short confirmations, bottom right, 4 s. Never the only place an error appears.
+// Short confirmations, bottom right, 4 s (10 s with an action). Never the only place an error appears.
 export function Toasts({ toasts }: { toasts: ToastItem[] }) {
   return (
     <div className="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
         <div className="toast" key={t.id}>
           <Icon name="check" />
-          {t.text}
+          <span>{t.text}</span>
+          {t.action ? (
+            <button type="button" className="button ghost toast-action" onClick={t.action.run}>
+              {t.action.label}
+            </button>
+          ) : null}
         </div>
       ))}
     </div>

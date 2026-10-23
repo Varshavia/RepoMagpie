@@ -327,6 +327,73 @@ test("PATCH /api/note edits through core and returns the Note document; an old v
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), after);
 });
 
+test("POST /api/note/delete: a dry run moves nothing; then the note moves to the trash, as magpie delete --json does", async (t) => {
+  const { http, box, fetch } = await start(t);
+  const version = noteVersion(PDFKIT);
+  const request = { journal: "personal", id: "pkg:npm/pdfkit", version };
+  const dry = parsed(await http.write("POST", "/api/note/delete", { ...request, dry_run: true }));
+  assert.equal(dry.status, 200);
+  assert.equal((dry.document as { deleted: boolean }).deleted, false);
+  assert.equal((dry.document as { trash: string }).trash, join(box.journal, ".trash"), "the folder: the stamp is the time of the move");
+  assert.ok(existsSync(box.note("npm--pdfkit.md")));
+
+  const done = parsed(await http.write("POST", "/api/note/delete", request));
+  assert.equal(done.status, 200);
+  const document = done.document as { deleted: boolean; trash: string };
+  assert.equal(document.deleted, true);
+  assert.ok(existsSync(document.trash) && !existsSync(box.note("npm--pdfkit.md")));
+  assert.deepEqual({ ...(dry.document as object), deleted: true, trash: document.trash }, document);
+  assert.match(document.trash, /[\\/]\.trash[\\/]npm--pdfkit\.\d{8}-\d{6}Z\.md$/);
+  assert.equal((await http.get("/api/note?journal=personal&id=pkg%3Anpm%2Fpdfkit")).status, 404);
+
+  // The CLI's document for the same note, once it is back.
+  writeFileSync(box.note("npm--pdfkit.md"), PDFKIT);
+  const expected = await cli(box, ["delete", "pkg:npm/pdfkit", "--journal", "personal", "--yes"], fetch);
+  const stamp = (d: unknown) => JSON.stringify(d).replace(/\.\d{8}-\d{6}Z(-\d+)?\.md/g, ".<stamp>.md");
+  assert.equal(stamp(expected.document), stamp(document));
+});
+
+test("POST /api/note/delete: an old version gets 409 and nothing moves; bad requests 400; a read-only note by file", async (t) => {
+  const { http, box } = await start(t);
+  const stale = parsed(await http.write("POST", "/api/note/delete", { journal: "personal", id: "pkg:npm/pdfkit", version: "sha256:0" }));
+  assert.equal(stale.status, 409);
+  assert.match((stale.document as { error: string }).error, /changed on disk/);
+  assert.ok(existsSync(box.note("npm--pdfkit.md")));
+  for (const body of [
+    { journal: "both", id: "pkg:npm/pdfkit", version: "x" },
+    { journal: "personal", id: "pkg:npm/pdfkit" },
+    { journal: "personal", id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", version: "x" },
+    { journal: "personal", version: "x" },
+    { journal: "personal", id: "pkg:npm/pdfkit", version: "x", dry_run: "yes" },
+  ]) assert.equal((await http.write("POST", "/api/note/delete", body)).status, 400, JSON.stringify(body));
+  assert.equal((await http.write("POST", "/api/note/delete", { journal: "personal", id: "pkg:npm/nothing", version: "x" })).status, 404);
+  const broken = parsed(await http.write("POST", "/api/note/delete", { journal: "personal", file: "npm--broken.md", version: noteVersion("no frontmatter\n") }));
+  assert.equal(broken.status, 200);
+  assert.ok(!existsSync(box.note("npm--broken.md")));
+  assert.ok(existsSync(box.note("npm--pdfkit.md")));
+});
+
+test("POST /api/note/restore puts the file back; 422 when a note has its name now, 404 for a name not in the trash", async (t) => {
+  const { http, box } = await start(t);
+  const deleted = parsed(await http.write("POST", "/api/note/delete", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(PDFKIT) })).document as { trash: string };
+  const trash = deleted.trash.split(/[\\/]/).pop();
+  const restored = parsed(await http.write("POST", "/api/note/restore", { journal: "personal", trash }));
+  assert.equal(restored.status, 200);
+  assert.deepEqual(restored.document, { journal: "personal", trash: deleted.trash, path: box.note("npm--pdfkit.md"), id: "pkg:npm/pdfkit", name: "pdfkit", restored: true });
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), PDFKIT);
+  assert.equal((await http.write("POST", "/api/note/restore", { journal: "personal", trash })).status, 404);
+
+  const again = parsed(await http.write("POST", "/api/note/delete", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(PDFKIT) })).document as { trash: string };
+  writeFileSync(box.note("npm--pdfkit.md"), LEFT_PAD.replace("left-pad", "pdfkit"));
+  const blocked = parsed(await http.write("POST", "/api/note/restore", { journal: "personal", trash: again.trash.split(/[\\/]/).pop() }));
+  assert.equal(blocked.status, 422);
+  assert.match((blocked.document as { error: string }).error, /stays in the trash/);
+  assert.ok(existsSync(again.trash));
+  for (const body of [{ journal: "personal" }, { journal: "both", trash }, { journal: "personal", trash: 1 }]) {
+    assert.equal((await http.write("POST", "/api/note/restore", body)).status, 400, JSON.stringify(body));
+  }
+});
+
 test("POST /api/open opens the note's file in the default editor", async (t) => {
   const { http, box, opened } = await start(t);
   assert.deepEqual(parsed(await http.write("POST", "/api/open", { journal: "personal", id: "pkg:npm/pdfkit" })), { status: 200, document: { opened: true, path: box.note("npm--pdfkit.md") } });

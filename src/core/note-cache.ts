@@ -69,9 +69,10 @@ export function takeSkipped(): string[] {
 
 // The note files of a journal that may be read, sorted, and their signature. A notes/ folder that
 // is a link gives none; a note that is a link or over the size limit is left out. Both are skipped
-// for the report, and listed in `skipped` for the local app.
-export function noteSignature(journal: string): { files: string[]; signature: Signature; skipped: string[] } {
-  const folder = join(journal, "notes");
+// for the report, and listed in `skipped` for the local app. `folderName` lists another flat folder of
+// the journal by the same rules: the trash (decision 0037).
+export function noteSignature(journal: string, folderName = "notes"): { files: string[]; signature: Signature; skipped: string[] } {
+  const folder = join(journal, folderName);
   const files: string[] = [];
   const signature: Signature = {};
   const skipped: string[] = [];

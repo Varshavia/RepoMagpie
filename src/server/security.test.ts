@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
+import { noteVersion } from "../core/edit.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import { client, send, type Reply } from "./fixtures/http.ts";
 import { startServer } from "./server.ts";
@@ -89,6 +90,10 @@ test("a write with the cookie but without a matching X-Magpie-Token header gets 
   assert.equal(patch.status, 403);
   const adopt = await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { "x-magpie-token": undefined });
   assert.equal(adopt.status, 403);
+  for (const token of [undefined, "0".repeat(64)]) {
+    assert.equal((await http.write("POST", "/api/note/delete", { journal: "personal", file: "github--acme--widget.md", version: noteVersion(WIDGET) }, { "x-magpie-token": token })).status, 403, `delete ${token}`);
+    assert.equal((await http.write("POST", "/api/note/restore", { journal: "personal", trash: "x.20261023-093900Z.md" }, { "x-magpie-token": token })).status, 403, `restore ${token}`);
+  }
   assert.equal(existsSync(join(box.project, ".magpie")), false);
   const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
   for (const token of [undefined, "0".repeat(64)]) {
@@ -126,6 +131,10 @@ test("cross-origin and Origin-less writes get 403", async (t) => {
   const tags = readFileSync(join(box.journal, "tags.md"), "utf8");
   for (const origin of origins) assert.equal((await http.write("POST", "/api/tags", { journal: "personal", add: ["cli"] }, { origin })).status, 403, `tags add ${origin}`);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/tags/from-topics", { journal: "personal", dry_run: false }, { origin })).status, 403, `from-topics ${origin}`);
+  for (const origin of origins) {
+    assert.equal((await http.write("POST", "/api/note/delete", { journal: "personal", file: "github--acme--widget.md", version: noteVersion(WIDGET) }, { origin })).status, 403, `delete ${origin}`);
+    assert.equal((await http.write("POST", "/api/note/restore", { journal: "personal", trash: "x.20261023-093900Z.md" }, { origin })).status, 403, `restore ${origin}`);
+  }
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), tags);
   assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), WIDGET);
   for (const origin of origins) assert.equal((await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }, { origin })).status, 403, `adopt ${origin}`);
@@ -210,6 +219,11 @@ test("no path from a request reaches the file system: traversal in every paramet
     ok(await http.write("POST", "/api/note", { target: p, text: "x", to: "personal" }), `note target ${p}`);
     ok(await http.write("POST", "/api/note", { target: "pkg:npm/left-pad", to: p }), `note to ${p}`);
     ok(await http.write("POST", "/api/adopt", { target: p }), `adopt target ${p}`);
+    ok(await http.write("POST", "/api/note/delete", { journal: "personal", file: p, version: "sha256:0", dry_run: true }), `delete file ${p}`);
+    ok(await http.write("POST", "/api/note/delete", { journal: "personal", id: p, version: "sha256:0" }), `delete id ${p}`);
+    ok(await http.write("POST", "/api/note/delete", { journal: p, id: "pkg:npm/pdfkit", version: "sha256:0" }), `delete journal ${p}`);
+    ok(await http.write("POST", "/api/note/restore", { journal: "personal", trash: p }), `restore trash ${p}`);
+    ok(await http.write("POST", "/api/note/restore", { journal: p, trash: "x.20261023-093900Z.md" }), `restore journal ${p}`);
     ok(await http.get(`/api/suggest?journal=${q}`), `suggest journal ${p}`);
     ok(await http.get(`/api/graph?journal=${q}`), `graph journal ${p}`);
     ok(await http.get(`/api/graph?journal=personal&ghosts=${q}`), `graph ghosts ${p}`);

@@ -143,7 +143,7 @@ The tag list for this journal. Use only these tags in notes; add a line here bef
 `;
 
 // Prepares a journal for a note (spec §3): notes/, and for a project journal a .gitignore for
-// .cache/. A journal created now (no notes/ yet) also gets the starter tag list, unless it has a
+// .cache/ and .trash/ (decision 0037). A journal created now (no notes/ yet) also gets the starter tag list, unless it has a
 // tags.md. Existing files are never overwritten. Returns true when the journal folder was created.
 // Never writes through a link (decision 0032, rule 5): a project journal that is a link, or a link
 // at notes/, tags.md or .gitignore, throws.
@@ -157,7 +157,7 @@ export function createJournal(path: string, scope: "personal" | "project"): bool
   const isNew = !existsSync(notes);
   mkdirSync(notes, { recursive: true });
   if (isNew && !existsSync(tags)) writeFileSync(tags, STARTER_TAGS);
-  if (scope === "project" && !existsSync(ignore)) writeFileSync(ignore, ".cache/\n");
+  if (scope === "project" && !existsSync(ignore)) writeFileSync(ignore, ".cache/\n.trash/\n");
   return created;
 }
 

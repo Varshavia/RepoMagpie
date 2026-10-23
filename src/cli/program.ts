@@ -3,6 +3,7 @@ import type { Fetch } from "../core/github.ts";
 import type { AdoptOptions } from "./adopt.ts";
 import type { CatalogOptions } from "./catalog.ts";
 import type { GlobalOptions } from "./context.ts";
+import type { DeleteOptions } from "./delete.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
@@ -42,7 +43,7 @@ export interface Io {
   self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
 }
 
-const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt"]);
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt", "delete"]);
 
 // The v0.1 commands not built yet (spec section 2).
 const NOT_YET = [
@@ -146,6 +147,16 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .addOption(new Option("--type <type>", "the package type of a bare name").choices(["npm", "pypi", "cargo"]))
     .action(async (target: string, _options: unknown, command: Command) => {
       code = await (await import("./adopt.ts")).adoptCommand(target, command.optsWithGlobals<AdoptOptions>(), io);
+    });
+
+  program
+    .command("delete")
+    .description("move a note to its journal's trash")
+    .argument("<name>", "a package name, a PURL or a URL that has a note")
+    .addOption(new Option("--journal <journal>", "the journal of the note, when both have one").choices(["personal", "project"]))
+    .option("--yes", "don't ask; needed when there is no terminal")
+    .action(async (target: string, _options: unknown, command: Command) => {
+      code = await (await import("./delete.ts")).deleteCommand(target, command.optsWithGlobals<DeleteOptions>(), io);
     });
 
   program

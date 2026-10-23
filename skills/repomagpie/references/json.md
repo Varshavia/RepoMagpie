@@ -85,3 +85,11 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `to`: the copy in the project journal.
 - `install`: the install command for this project's package manager, or `null` when there is none or several, or when the note's Verdict says to avoid the package.
 - `install_choices`: the commands to choose from when the repository publishes several packages; `[]` otherwise.
+
+## `repomagpie delete <name-or-purl> --yes --json`
+
+- `deleted`: `true` when the note moved to the trash.
+- `trash`: where the file is now, in the journal's `.trash/`.
+- `journal`: `"personal"` or `"project"`.
+- `backlinks`: the notes that link to it. `backlinks[].name` is the note's name; `backlinks[].from` is the section the link is in, or `"alternatives"` when it lists the deleted note as an alternative.
+- No note matched: `deleted` is `false` and `id` is `null`, with no `error`.

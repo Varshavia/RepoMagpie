@@ -2,6 +2,7 @@
 // cookie (the browser sends it); writes also carry the X-Magpie-Token header from the page's meta tag.
 // Every document type comes from core, so the app reads exactly what the CLI's --json prints.
 import type { AdoptJson } from "../../src/core/adopt.ts";
+import type { DeleteJson, RestoreJson } from "../../src/core/delete.ts";
 import type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
 import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
@@ -10,7 +11,7 @@ import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { TagsFromTopicsJson } from "../../src/core/tags-from-topics.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson };
+export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -81,4 +82,9 @@ export const api = {
   recall: (packages: string[], type?: PackageType) => get<RecallJson>("/api/recall", { package: packages, type }),
   suggest: (params: { description?: string; limit: number }) => get<SuggestJson>("/api/suggest", { description: params.description, limit: String(params.limit) }),
   adopt: (target: string) => write<AdoptJson>("POST", "/api/adopt", { target }),
+  // Delete note (decision 0037): a dry run for the confirm dialog, then the move to the trash.
+  deleteNote: (journal: Scope, address: Address, version: string, dryRun: boolean) =>
+    write<DeleteJson>("POST", "/api/note/delete", { journal, ...addressParams(address), version, dry_run: dryRun }),
+  // Undo: `trash` is the file's name in the journal's .trash/.
+  restoreNote: (journal: Scope, trash: string) => write<RestoreJson>("POST", "/api/note/restore", { journal, trash }),
 };

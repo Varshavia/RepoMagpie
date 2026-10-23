@@ -127,6 +127,26 @@ test("the note view's alternative chips flag look-alike and invalid names, as Ch
   await expect(chip("pad kit")).toContainText("(not a valid package name)");
 });
 
+test("delete: a name with HTML and a bidi control shows as text with a marker, in the dialog and the toast", async ({ page, magpie }) => {
+  const name = `<img src=x onerror=document.title="pwned">pdf${ch(0x202e)}kit`;
+  const shown = `<img src=x onerror=document.title="pwned">pdf${marker(0x202e)}kit`;
+  writeFileSync(magpie.note("npm--hostile.md"), `---\nid: pkg:npm/hostile\nname: '${name}'\nexplored: 2026-10-04\nkind: library\ntags: []\ntried: false\nstatus: reviewed\n---\n\n## Verdict\nfine\n`);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "onerror" }).click();
+  await page.getByRole("button", { name: "Delete note" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("heading")).toHaveText(`Move ${shown} to the trash?`);
+  await expect(dialog.getByRole("button", { name: "Move to trash" })).toBeEnabled();
+  expect(await dialog.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+  await dialog.getByRole("button", { name: "Move to trash" }).click();
+  const toast = page.locator(".toast").filter({ hasText: "to the trash" });
+  await expect(toast).toContainText(`Moved ${shown} to the trash`);
+  expect(await toast.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+  await expect(page.locator("img")).toHaveCount(0);
+  await expect(page).not.toHaveTitle("pwned");
+});
+
 // Red-team R6 (a web page): the session token never leaves the app through a link.
 test("R6: after the first load the token isn't in the address bar; pages send no Referer; note links open with noreferrer", async ({ page, magpie }) => {
   writeFileSync(magpie.note("npm--hostile.md"), HOSTILE);

@@ -55,6 +55,8 @@ src/
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
                suggest: suggest's keywords, scoring and the project's dependencies left out
                adopt: copying a personal note into the project journal; the install command
+               delete: moving a note to <journal>/.trash/ and back (Undo), the version check, the notes
+               that link to it, .trash/ in a project's .gitignore (decision 0037)
                github: repository metadata and SKILL.md detection
                capture: what note and import write for one item
                topic-tags: which GitHub topics become tags, ranked; the stop list (decision 0030)
@@ -127,7 +129,8 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 
 - **Notes** are the only source of truth: plain Markdown with YAML frontmatter ([decision 0001](decisions/0001-plain-markdown-storage.md)).
 - **Journals:** a personal journal outside any repository, and a project journal in `.magpie/` inside a project repository, with the same format ([decision 0013](decisions/0013-two-journal-scopes.md)). Layout: `<journal>/notes/<file>.md` for notes, with the file name derived from the note's PURL (`npm--pdfkit.md`, `github--owner--repo.md`), and `<journal>/tags.md` for the tag list ([note schema](note-schema.md), [decision 0017](decisions/0017-package-identity-purl.md)).
-- **Search index:** a derived cache in `<journal>/.cache/`, one per journal, git-ignored (the project journal gets a `.magpie/.gitignore` with `.cache/`). It is rebuilt when a note file is newer than the index, and can be deleted at any time (decision 0001).
+- **Trash:** `<journal>/.trash/` holds deleted notes, with a stamp in their names. Nothing reads it as notes, and nothing empties it ([decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)).
+- **Search index:** a derived cache in `<journal>/.cache/`, one per journal, git-ignored (the project journal gets a `.magpie/.gitignore` with `.cache/` and `.trash/`). It is rebuilt when a note file is newer than the index, and can be deleted at any time (decision 0001).
 - **Embeddings:** not in v0.1 ([spec](spec.md), section 10). Semantic search is planned for v0.4; the default must work offline.
 
 ## Data flow: recall before an install

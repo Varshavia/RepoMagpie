@@ -2,6 +2,7 @@
 // returns core's document with the status for its outcome; no logic of its own (decision 0023).
 // Security checks happen before a request gets here (server.ts).
 import { runAdopt } from "../core/adopt.ts";
+import { deleteNote, emptyDelete, restoreNote } from "../core/delete.ts";
 import {
   addTags,
   createTagList,
@@ -131,6 +132,32 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const tags = optionalTags(body.tags);
         if (tags === null) return bad(empty, "tags must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
         return reply(await runNote({ target: body.target, text, type: packageType, to, tags }, context));
+      },
+    },
+
+    // Delete note (decision 0037): first with dry_run true (what the confirm dialog shows), then the
+    // move to the trash. The version the app read is required; a changed note gets 409.
+    "/api/note/delete": {
+      POST: ({ body }) => {
+        const journal = scope(body.journal);
+        if (!journal) return bad({ ...emptyDelete("personal"), journal: null }, JOURNAL);
+        const address = addressOf(body.id, body.file);
+        if (!address) return bad(emptyDelete(journal), "Give either id or file.");
+        if (typeof body.version !== "string") return bad(emptyDelete(journal), "version must be the version the note was read with.");
+        if (body.dry_run !== undefined && typeof body.dry_run !== "boolean") return bad(emptyDelete(journal), "dry_run must be true or false.");
+        return reply(deleteNote({ journal, address, version: body.version, dryRun: body.dry_run === true }, context));
+      },
+    },
+
+    // Undo of a delete: `trash` is the file's name in the journal's .trash/ (the Delete document's
+    // trash path, without its folder), matched against the trash's listing.
+    "/api/note/restore": {
+      POST: ({ body }) => {
+        const journal = scope(body.journal);
+        const empty = { journal, trash: null, path: null, id: null, name: null, restored: false };
+        if (!journal) return bad(empty, JOURNAL);
+        if (typeof body.trash !== "string") return bad(empty, "trash must be the file's name in the journal's trash.");
+        return reply(restoreNote({ journal, trash: body.trash }, context));
       },
     },
 

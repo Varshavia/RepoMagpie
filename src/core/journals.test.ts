@@ -248,14 +248,14 @@ test("the example vault's tag list parses to its ten tags", () => {
 });
 
 // Creating a journal (spec §2 note step 5, §3): notes/, the starter tag list, and for a project
-// journal a .gitignore for .cache/
+// journal a .gitignore for .cache/ and .trash/
 
-test("createJournal makes a project journal: notes/, a .gitignore for .cache/ and the starter tag list", () => {
+test("createJournal makes a project journal: notes/, a .gitignore for .cache/ and .trash/, and the starter tag list", () => {
   const root = fixture({ ".git/": null });
   const journal = join(root, ".magpie");
   assert.equal(createJournal(journal, "project"), true);
   assert.ok(existsSync(join(journal, "notes")));
-  assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n");
+  assert.equal(readFileSync(join(journal, ".gitignore"), "utf8"), ".cache/\n.trash/\n");
   assert.equal(readFileSync(join(journal, "tags.md"), "utf8"), STARTER_TAGS);
   assert.equal(createJournal(journal, "project"), false);
 });

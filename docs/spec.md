@@ -67,7 +67,7 @@ Behaviour:
    - One skill line per `SKILL.md`, named after the folder that holds it.
    - The GitHub token, if any, comes from the `GITHUB_TOKEN` environment variable. It is never printed or logged.
 4. If the network fails (offline, timeout after 10 seconds, rate limit, a server error), write the note without metadata and warn on stderr. Exit 0. If GitHub says the repository doesn't exist (404) or rejects the token (401), write nothing and exit 1; for 401 the message says `GITHUB_TOKEN` may be invalid or expired.
-5. `--to project` without a project journal creates `.magpie/` (with a `.gitignore` for `.cache/`) at the git root, or in the working directory outside git, and says so.
+5. `--to project` without a project journal creates `.magpie/` (with a `.gitignore` for `.cache/` and `.trash/`) at the git root, or in the working directory outside git, and says so.
 6. `--alternative <target>` ([decision 0029](decisions/0029-recall-names-alternatives.md)) adds a target to the note's `alternatives`, in the same write as the rest: with a new note, or alone on an existing one (without text it changes nothing else). Like the Verdict, it is written only from the user's own words. A Verdict already there is still never replaced: with text, step 2's exit 1 applies and nothing is written.
    - The target is a name, a PURL or a file stem, without `[[ ]]`, `|` or `#` (otherwise exit 2; a PURL that doesn't parse too). It resolves in the journal written to, by the link rules (file stem, then a unique name); a PURL by the note with that `id` or package. A target with a note is written as `"[[<its file stem>]]"`. A PURL without a note is written as the file stem its note would have (section 4: `pkg:npm/puppeteer` as `"[[npm--puppeteer]]"`, `pkg:npm/@babel/core` as `"[[npm--babel--core]]"`), so a note created later resolves it. A name or file stem without a note is written as given: `"[[<target>]]"`.
    - New entries go at the end of the field; every other entry, and the rest of the file, stay byte for byte (the round-trip-safe frontmatter edit). A field that isn't a list is left alone: exit 1, nothing written.
@@ -206,6 +206,29 @@ Copies a note from the personal journal into the project journal and prints the 
 Output: the copy's path and `Install with: <command>` on stdout; for several packages, `This repository publishes 2 packages; install the one you need:` and one command per line; for a repository without packages, `No install command for a GitHub repository: <url>`; for a Verdict that says to avoid, `Your note says to avoid <name>; no install command.` Messages on stderr.
 
 `--json`: `{"id": "...", "from": "...", "to": "...", "install": "npm install commander", "install_choices": []}`. `id` is the note's own. `install` is the one command, or `null` when there is none, several, or the Verdict says to avoid; `install_choices` lists the commands when there are several, and is `[]` otherwise.
+
+### `repomagpie delete <name>`
+
+Moves a note to its journal's trash, `<journal>/.trash/`, after the person's OK ([decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)). It never removes a file, and never edits another note.
+
+- Flags: `--journal personal|project` (only that journal), `--yes` (no question), `--json`.
+- **Which note:** `<name>` (a name, a PURL, or a URL) resolves as for `recall`: the notes with an exact match, in both journals unless `--journal` says which. Name-only matches are never deleted.
+  - No exact match: nothing moves, `No note on <name>.` on stderr, exit 0, as `recall`'s empty case. When some notes match by name only, it lists them by PURL: `These match it by name only; to delete one, name it by its PURL:`.
+  - Several exact matches: in a terminal, it lists them and asks `Which one? (1-N, Enter to cancel)`. Otherwise exit 2: `pdfkit matches 2 notes. Add --journal personal or --journal project.` (one in each journal), or `Name it by its PURL: …` (several in one journal).
+- **The OK:** in a terminal, it shows the note's name and journal, its Verdict and its path, the notes that link to it (`Linked from: puppeteer (in My notes), pdf-lib (as an alternative). Those links will show as unresolved; the notes stay as they are.`), and where it goes (`It goes to ~/.magpie/.trash/ (as npm--pdfkit.<time>.md). Nothing empties the trash; delete the file there to remove it for good.`). The preview names the folder, not the file: the stamp is the time of the move, after the answer. Then it asks `Move it to the trash? [y/N]`; anything but `y` or `yes` prints `Cancelled. Nothing moved.` (exit 0). Without a terminal, or with `--json`, it needs `--yes`; otherwise exit 2: `Moving a note to the trash needs your OK: run this in a terminal, or add --yes.`
+- **The move:** the file keeps its name, with a UTC stamp before `.md`: `npm--pdfkit.20261023-093900Z.md`; a name already in the trash gets `-2`, `-3` and so on after the stamp. It moves the version the prompt showed: a file changed meanwhile is refused (exit 1) with `This note changed on disk since you opened it. Reload to see the new version.` A note that is a link, a `.trash` that is a link, or a move another program blocks for longer than the retry (section 7, "Caches") fails with exit 1 and moves nothing. In a project journal, `.gitignore` gets `.trash/` first, when it doesn't list it (section 3).
+
+Output: `✔ Moved to the trash: pdfkit` on stderr (with `--yes`, also the `Linked from:` line), and the trash path on stdout. Messages on stderr.
+
+`--json`: `{"id": "pkg:npm/pdfkit", "name": "pdfkit", "journal": "personal", "file": "npm--pdfkit.md", "path": "/home/ana/.magpie/notes/npm--pdfkit.md", "version": "sha256:9f2c…", "trash": "/home/ana/.magpie/.trash/npm--pdfkit.20261023-093900Z.md", "deleted": true, "backlinks": [{"id": "pkg:npm/puppeteer", "name": "puppeteer", "from": "My notes"}, {"id": "pkg:npm/pdf-lib", "name": "pdf-lib", "from": "alternatives"}], "warnings": []}`
+
+- `version` is the version moved (or, in the app's dry run, the one that would move); `deleted` is `false` in a dry run and on any failure.
+- `trash` is the file's path in the trash after the move. When nothing moved yet (the app's dry run, or `--json` without `--yes`), it is the trash folder, `/home/ana/.magpie/.trash`: the stamped name is made at the move.
+- `backlinks` is the Note document's: the notes that link here, and `from: "alternatives"` for the notes that list it as an alternative.
+- Text fields carry markers for hidden characters, as `note --json`'s do ([decision 0032](decisions/0032-note-text-is-data.md)).
+- No exact match: the document with every field `null`, `deleted: false`, `[]`, and no `error`. A failure adds `error`.
+
+**In the local app** ([UI](ui.md), sections 6 and 7): `POST /api/note/delete` with `{"journal", "id"}` (or `"file"` for a read-only note), `"version"` (required) and `"dry_run"`, answering this document; and `POST /api/note/restore`, the app's Undo, answering the Restore document ("Shared JSON documents", below). The MCP server has no delete tool, and hooks never delete.
 
 ### `repomagpie recall <package>...`
 
@@ -416,6 +439,16 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 - `accept_drafts`: section names whose draft marker is removed; the text stays.
 - The answer is the Note document after the edit. Everything outside the edited parts stays byte for byte.
 
+**Restore.** The app's Undo after a delete (`POST /api/note/restore` with `{"journal", "trash": "<file name in .trash/>"}`, [decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)): the file goes back to `notes/` under its name without the stamp.
+
+```json
+{"journal": "personal", "trash": "/home/ana/.magpie/.trash/npm--pdfkit.20261023-093900Z.md",
+ "path": "/home/ana/.magpie/notes/npm--pdfkit.md", "id": "pkg:npm/pdfkit", "name": "pdfkit", "restored": true}
+```
+
+- `trash` must be a stamped name in that journal's `.trash/` listing; it is never joined to a path. Any other name answers 404.
+- When `notes/` has a file of that name again, nothing moves: 422, `restored: false`, and `"error": "A note named npm--pdfkit.md is in notes/ now, so pdfkit stays in the trash: <trash path>"`.
+
 **Note preview.** What `repomagpie note <target>` would write, without writing anything. For a GitHub URL it fetches the metadata, read-only.
 
 ```json
@@ -442,9 +475,12 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
   notes/          one note per subject (note schema)
   tags.md         the journal's tag list
   .cache/         the caches (section 7); rebuildable, never committed
+  .trash/         deleted notes (repomagpie delete); never read as notes, never committed
   config.yaml     personal journal only
-  .gitignore      project journal only; contains ".cache/"
+  .gitignore      project journal only; contains ".cache/" and ".trash/"
 ```
+
+**The trash** ([decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)): `repomagpie delete` and the app's Delete note move a note into `.trash/`, with a UTC stamp in its name. Notes are read from `notes/` only, so search, recall, the hook, catalog, suggest, the graph, the note list and `doctor`'s counts never see the trash. Nothing empties it: delete a file there to remove it for good, or move it back to `notes/` without its stamp to restore it. A project journal whose `.gitignore` was written before `.trash/` was added to it gets the line on the first delete there.
 
 **Creating a journal:** `repomagpie` creates a journal when it writes the first note into it: the `notes/` folder, a `.gitignore` for a project journal, and a starter `tags.md` with ten tags (the same as `examples/vault/tags.md`) when there is no `tags.md` yet. Existing files are never overwritten, and a journal that already has `notes/` doesn't get a `tags.md` again. Tags for that first note are drafted from the starter list.
 
@@ -460,7 +496,7 @@ Two folders are never a project journal:
 
 **Links and size** ([decision 0032](decisions/0032-note-text-is-data.md), rules 5 and 6):
 - The personal journal's folder may be a link (a symbolic link or junction) the user made. A project journal's `.magpie` that is a link is never used: reads skip it, and a write to the project journal fails (exit 1) with an error that names it.
-- Inside any journal, a file or folder that is a link (`notes/`, a note, `tags.md`, `.cache/`) is never followed: reads skip it, as if it weren't there, and every write that would go through it fails with `Won't write <path>: <path> is a link (a symbolic link or junction); RepoMagpie never follows a link inside a journal.` (`note`, `import`, `adopt`, `tags --from-topics` and every write of the local app's API). A `.cache/` that is a link is neither read nor written; commands still work, only slower.
+- Inside any journal, a file or folder that is a link (`notes/`, a note, `tags.md`, `.cache/`, `.trash/`) is never followed: reads skip it, as if it weren't there, and every write that would go through it fails with `Won't write <path>: <path> is a link (a symbolic link or junction); RepoMagpie never follows a link inside a journal.` (`note`, `import`, `adopt`, `tags --from-topics` and every write of the local app's API). `delete` says `Won't move <path> to the trash: …` instead. A `.cache/` that is a link is neither read nor written; commands still work, only slower.
 - A note file or `tags.md` over 256 KB is skipped by every read and index, and a write to it fails the same way (`… is over 256 KB.`). The example vault's largest note is 1.5 KB.
 - Each skipped path is reported once per command on stderr: `warning: skipped: <path> is a link …`. The hook writes it to `<personal journal>/.cache/hook-errors.log` instead, and never through a link.
 - YAML is parsed with the `yaml` library's alias limit (100), so a few lines of anchors and aliases can't expand into millions of nodes; such frontmatter can't be read, and the note is read-only, as any note whose frontmatter can't be read.
