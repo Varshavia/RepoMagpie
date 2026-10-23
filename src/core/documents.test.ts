@@ -1,8 +1,9 @@
 import { mock, test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import fs, { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { dirname, join } from "node:path";
+import { removeFolder } from "./copy-folder.ts";
 import { editNote, noteVersion } from "./edit.ts";
 import { fakeFetch, recorded } from "./fixtures/fake-fetch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
@@ -236,7 +237,7 @@ test("Note list cache: .cache/note-list.json; unchanged notes come from it, chan
   // A changed file is read again; a new one is read; a deleted one is gone.
   writeFileSync(s.note("npm--pdfkit.md"), PDFKIT.replace("name: pdfkit", "name: pdfkit-renamed"));
   writeFileSync(s.note("npm--puppeteer.md"), PUPPETEER);
-  rmSync(s.note("npm--broken.md"));
+  removeFolder(s.note("npm--broken.md"));
   const next = noteListDocument("personal", {}, s.context).document;
   assert.deepEqual(next.notes.map((n) => n.name), ["microsoft/playwright-cli", "pdfkit-renamed", "puppeteer"]);
   assert.deepEqual(Object.keys(JSON.parse(readFileSync(cacheFile, "utf8")).data).sort(), ["github--microsoft--playwright-cli.md", "npm--pdfkit.md", "npm--puppeteer.md"]);
@@ -244,7 +245,7 @@ test("Note list cache: .cache/note-list.json; unchanged notes come from it, chan
   // Without the cache, or with one that can't be read, the same document.
   writeFileSync(cacheFile, "{not json");
   assert.deepEqual(noteListDocument("personal", {}, s.context).document, next);
-  rmSync(cacheFile);
+  removeFolder(cacheFile);
   assert.deepEqual(noteListDocument("personal", {}, s.context).document, next);
 });
 

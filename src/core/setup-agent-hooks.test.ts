@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Platform, Where } from "./agents.ts";
+import { removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { hookLaunch, hookShell, LAUNCHER, launcherText } from "./hook-launch.ts";
 import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookTarget } from "./setup-agent-hooks.ts";
@@ -171,13 +172,13 @@ test("Antigravity CLI on Windows: the entry names the launcher; node moved rewri
   assert.ok(readFileSync(s.launcher, "utf8").includes(moved.node));
   assert.deepEqual(s.backups("antigravity"), []);
   // The launcher gone: setup writes it again.
-  rmSync(s.launcher);
+  removeFolder(s.launcher);
   assert.equal(s.plan("antigravity").action, "migrate");
   s.run("antigravity");
   assert.equal(s.plan("antigravity").action, "keep");
   // The entry before the launcher (if exist "…" in hooks.json), with its flag: it becomes the launcher's.
   s.write("antigravity", JSON.stringify({ repomagpie: { PreToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: s.line("antigravity", ["--inform-only"]), timeout: 10 }] }] } }));
-  rmSync(s.launcher);
+  removeFolder(s.launcher);
   assert.equal(s.plan("antigravity").action, "migrate");
   s.run("antigravity");
   assert.equal(JSON.parse(s.read("antigravity")).repomagpie.PreToolUse[0].hooks[0].command, s.launcher);

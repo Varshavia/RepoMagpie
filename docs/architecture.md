@@ -72,7 +72,10 @@ src/
                setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
                reading each change back; setup-skill: the skill's shared folder and the links from Claude
                Code's and Antigravity CLI's, copied with copy-folder (fs.cpSync in plain JS: cpSync in
-               Node 22 and older Node 24 breaks paths with letters outside ASCII on Windows); setup-hook: the Claude Code hook, added, migrated, removed;
+               Node 22 and older Node 24 breaks paths with letters outside ASCII on Windows); copy-folder's
+               removeFolder removes every file and folder in src/ and scripts/ (fs.rmSync in plain JS:
+               rmSync in Node 23, 24.0 to 24.13.0 and 25.0 removes nothing on such paths), then checks
+               the path is gone; setup-hook: the Claude Code hook, added, migrated, removed;
                setup-agent-hooks: the other agents' hook entries, the same way, read back by doctor too;
                hook-launch: the command each of those entries runs, for its agent's shell, and reading it
                back, with Antigravity CLI's launcher file on Windows; codex-hooks: Codex CLI's hooks switch and hook trust in config.toml; config-write: no links, no

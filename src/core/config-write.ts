@@ -1,8 +1,9 @@
 // Writing other tools' files for repomagpie setup (decision 0035, "Safety"): never through a link,
 // never outside the folder setup may write in (the home folder, or the project with --project), a
 // backup first, and a write that is whole or not at all. Never prints.
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { removeFolder } from "./copy-folder.ts";
 import { replaceFile } from "./note-cache.ts";
 
 // Why `path` can't be written: a link on its way down from `root` (decision 0032, rule 5), the path
@@ -57,7 +58,11 @@ export function writeAtomically(file: string, text: string): void {
     if (mode !== undefined) chmodSync(temporary, mode); // the umask may have narrowed it
     replaceFile(temporary, file); // waits a little while another process (a virus scan) holds the file
   } catch (error) {
-    rmSync(temporary, { force: true });
+    try {
+      removeFolder(temporary);
+    } catch {
+      // The write's error says more than the clean-up's.
+    }
     throw error;
   }
 }

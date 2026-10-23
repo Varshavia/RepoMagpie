@@ -6,10 +6,10 @@
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
 // runs the one named like the package, and fails when none is. Run npm run build first.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { copyFolder } from "../src/core/copy-folder.ts";
+import { copyFolder, removeFolder } from "../src/core/copy-folder.ts";
 import { HOOK_AGENTS } from "../src/hook/agents.ts";
 
 const built = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
@@ -75,7 +75,7 @@ try {
   for (const { args, input, quiet, restores } of CASES) {
     const run = (main: string) => {
       if (restores) {
-        rmSync(join(root, "journal", ".trash"), { recursive: true, force: true });
+        removeFolder(join(root, "journal", ".trash"));
         copyFileSync(join(vault, restores), join(root, "journal", "notes", restores));
       }
       const result = spawnSync(process.execPath, [main, ...args], { cwd: project, input, encoding: "utf8", env });
@@ -91,7 +91,7 @@ try {
   failed += checkHookChunks();
   failed += checkPackage(join(root, "pack"));
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  removeFolder(root);
 }
 if (failed) {
   console.error(`${failed} checks failed: commands that answer differently from the source, or the packed package.`);

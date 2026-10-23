@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { CACHE_FILE, loadIndex, noteDocuments } from "./search-index.ts";
 
@@ -142,7 +143,7 @@ test("an edited, added or deleted note invalidates the cache", () => {
   writeFileSync(join(path, "notes", "npm--chalk.md"), INBOX);
   assert.equal(loadIndex(path).index.search("colours")[0]?.id, "npm--chalk.md");
 
-  rmSync(join(path, "notes", "npm--chalk.md"));
+  removeFolder(join(path, "notes", "npm--chalk.md"));
   const removed = loadIndex(path);
   assert.equal(removed.rebuilt, true);
   assert.equal(removed.index.search("colours").length, 0);
@@ -160,7 +161,7 @@ test("an edit that keeps the size but changes the modification time invalidates 
 test("the cache is safe to delete", () => {
   const path = journal({ "npm--pdfkit.md": PDFKIT });
   loadIndex(path);
-  rmSync(join(path, ".cache"), { recursive: true });
+  removeFolder(join(path, ".cache"));
   const r = loadIndex(path);
   assert.equal(r.rebuilt, true);
   assert.equal(r.index.search("puppeteer").length > 0, true);

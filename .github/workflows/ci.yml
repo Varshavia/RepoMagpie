@@ -67,6 +67,8 @@ jobs:
         run: npm run check:commands
       - name: No file holds a bidi control or a zero-width character
         run: npm run check:characters
+      - name: No code calls fs.rmSync, fs.rm, rmdirSync with recursive, fs.cpSync or fs.cp
+        run: npm run check:fs-calls
       - run: npm run build
       - name: Search benchmark (report only)
         run: node scripts/bench-search.ts --report-only

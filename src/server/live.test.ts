@@ -1,9 +1,10 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdirSync, rmSync, writeFileSync, type watch } from "node:fs";
+import { mkdirSync, writeFileSync, type watch } from "node:fs";
 import { join } from "node:path";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
+import { removeFolder } from "../core/copy-folder.ts";
 import { fakeFetch } from "../core/fixtures/fake-fetch.ts";
 import { events } from "./fixtures/http.ts";
 import { changedFiles, type LiveOptions } from "./live.ts";
@@ -41,7 +42,7 @@ test("changes in the project journal are reported as project; deleted notes too"
   const { box, stream } = await start(t, { pollMs: 200 });
   writeFileSync(join(box.project, ".magpie", "notes", "npm--chalk.md"), NOTE);
   await stream.until((text) => text.includes(changed("project", ["npm--chalk.md"])), 5000);
-  rmSync(box.note("npm--pdfkit.md"));
+  removeFolder(box.note("npm--pdfkit.md"));
   await stream.until((text) => text.includes(changed("personal", ["npm--pdfkit.md"])), 5000);
 });
 

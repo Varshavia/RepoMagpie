@@ -152,7 +152,7 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
 // Words that say nothing about what a project does.
 const STOP_WORDS = new Set(("a all also an and any are as at be but by can do for from has have how i if in into is it its just let lets me more " +
   "my no not of on only or our so that the their them then there these this to up us use used uses using via was we what when which while " +
-  "who will with you your").split(" "));
+  "who will with you your aka etc").split(" "));
 
 // Words common to almost any project's manifests and README, so they say nothing about this one:
 // as keywords they only bring coincidences (a README's "before it installs one", @types/*, *-js).
@@ -162,12 +162,20 @@ const COMMON_WORDS = new Set(("about after again before both does each end every
   "library libraries lightweight modern package packages plugin plugins project projects run runs simple small support supports " +
   "tool tools ts type types").split(" "));
 
-// The keywords of some texts: lowercase words, each once, in order; no stop words, no common words,
-// no numbers. Package names split into their words (@types/node → node).
-// A hidden character's marker (decision 0032, rule 1) is a word break, not a word.
+// The two-letter words that are keywords: each names a field. js and ts are common words too (above),
+// which leaves them out.
+const SHORT_KEYWORDS = new Set(["ai", "ui", "ux", "db", "js", "ts", "ml", "ci"]);
+
+// The keywords of some texts: lowercase words of 3 letters or more, or SHORT_KEYWORDS, each once, in
+// order; no stop words, no common words, no numbers. Package names split into their words
+// (@types/node → node).
+// A hidden character's marker (decision 0032, rule 1) is a word break, not a word. A possessive
+// keeps its word (user's → user); any other contraction (doesn't, I'm) is no keyword, and the
+// length leaves out the letters of an abbreviation (e.g., i.e.).
 export function keywordsOf(texts: string[]): string[] {
-  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4}>/g, " ").split(/[^a-z0-9]+/));
-  return [...new Set(words.filter((word) => word && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
+  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4}>/g, " ")
+    .replace(/['’]s\b/g, "").replace(/[a-z]+['’][a-z]+/g, " ").split(/[^a-z0-9]+/));
+  return [...new Set(words.filter((word) => (word.length >= 3 || SHORT_KEYWORDS.has(word)) && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
 }
 
 // A keyword as suggest looks it up: one trailing "s" dropped from words of four letters or more.

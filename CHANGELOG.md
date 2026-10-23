@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, when your home folder's name has letters outside ASCII (`C:\Users\Şuat`), `repomagpie setup --remove` now removes the skill folder, Copilot CLI's hook file and Antigravity CLI's launcher, instead of failing with "The skill's files aren't as expected after the change". Node's `fs.rmSync` caused it on Node 23, Node 24.0 to 24.13.0 and Node 25.0: it removed nothing on such paths and reported no error. RepoMagpie now removes files without it, and checks each one is gone.
+- `repomagpie suggest` no longer takes single letters and word fragments as keywords. "it doesn't render, e.g. invoices" gave `doesn`, `t`, `e` and `g`, and a note could rank for matching `t, e, g`; now its keywords are `render` and `invoices`. Words under 3 letters, contractions (`doesn't`, `I'm`) and abbreviations (`e.g.`, `etc.`) are left out; a possessive keeps its word (`user's` → `user`). Six two-letter words that name a field stay keywords: `ai`, `ui`, `ux`, `db`, `ml` and `ci`.
+
 ## [0.2.0-beta.7] - 2026-10-23
 
 The eighth pre-release: you can delete a note. `repomagpie delete` and the app's Delete note move a note to its journal's trash, `.trash/`, after your OK, and the app offers Undo; nothing is removed for good, and no agent tool deletes.

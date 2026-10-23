@@ -46,6 +46,7 @@
     "check:links": "node scripts/check-links.ts",
     "check:commands": "node scripts/check-commands.ts",
     "check:characters": "node scripts/check-characters.ts",
+    "check:fs-calls": "node scripts/check-fs-calls.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

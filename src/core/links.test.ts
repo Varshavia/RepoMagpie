@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { alternativeLinks, findLinks, linkIndex } from "./links.ts";
 
@@ -146,7 +147,7 @@ test("linkIndex: an unreadable note has no links and is skipped; it doesn't brea
 
 test("linkIndex: a deleted target makes its links missing and its backlinks go", () => {
   const j = journal();
-  rmSync(j.note("npm--puppeteer.md"));
+  removeFolder(j.note("npm--puppeteer.md"));
   const index = linkIndex(j.root);
   assert.deepEqual(index.outgoing["npm--pdfkit.md"][0], { target: "puppeteer", label: null, id: null, name: null, reason: "missing", from: "Verdict" });
   assert.deepEqual(index.incoming["npm--pdfkit.md"], [{ id: "pkg:github/microsoft/playwright", name: "playwright", from: "Hand-written" }]);
@@ -180,7 +181,7 @@ test("link cache: .cache/links.json; unchanged notes come from it, changed and n
   // Without the cache, or with one that can't be read, the same index.
   writeFileSync(cacheFile, "{not json");
   assert.deepEqual(linkIndex(j.root), next);
-  rmSync(cacheFile);
+  removeFolder(cacheFile);
   assert.deepEqual(linkIndex(j.root), next);
 });
 

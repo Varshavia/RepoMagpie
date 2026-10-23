@@ -5,8 +5,9 @@
 // is written whole, then renamed into place. Two hooks writing at the same moment: the last one
 // wins, and the other's install is denied once more.
 import { createHash, randomBytes } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeFolder } from "../core/copy-folder.ts";
 import { isRecord, journalPathProblem, replaceFile } from "../core/note-cache.ts";
 
 export const RETRY_WINDOW = 10 * 60_000; // ms
@@ -47,7 +48,7 @@ export function retryDecision(journal: string, key: string, now = Date.now()): "
     return "deny";
   } catch {
     try {
-      rmSync(temporary, { force: true });
+      removeFolder(temporary);
     } catch {
       // Nothing more to do.
     }

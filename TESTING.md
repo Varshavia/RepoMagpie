@@ -123,8 +123,6 @@ npm uninstall -g repomagpie
 
 `setup --remove` takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. Run it before `npm uninstall`.
 
-On Windows, with a home folder name outside ASCII (such as `C:\Users\Şuat`), `setup --remove` doesn't work in 0.2.0-beta.7. It will be fixed in the next release.
-
 It leaves:
 - your notes, in `~/.magpie` and any project's `.magpie/`;
 - `setup`'s backups. Run `repomagpie doctor` before the uninstall to list them, and delete the ones you no longer need. Copies of `~/.claude.json` can hold sign-in tokens.
