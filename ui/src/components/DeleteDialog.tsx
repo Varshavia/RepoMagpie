@@ -63,7 +63,8 @@ export function DeleteDialog({ journal, address, version, name, home, onCancel, 
   }
 
   const plan = state.step === "ready" || state.step === "moving" ? state.plan : null;
-  const folder = plan?.trash ? homePath(plan.trash.replace(/[\\/][^\\/]*$/, ""), home) : null;
+  // The dry run names the trash folder; the file's stamp comes with the move.
+  const folder = plan?.trash ? homePath(plan.trash, home) : null;
   const linked = plan ? backlinkGroups(plan.backlinks) : [];
   const where = journal === "personal" ? "your personal journal" : "the project journal";
 

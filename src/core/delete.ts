@@ -32,7 +32,7 @@ export interface DeleteJson {
   file: string | null;
   path: string | null;
   version: string | null; // the version that was (or, in a dry run, would be) deleted
-  trash: string | null; // where the file went, or would go
+  trash: string | null; // where the file went; in a dry run, the trash folder it would go to
   deleted: boolean; // false in a dry run and on failure
   backlinks: Backlink[]; // the notes that link to it; "from": "alternatives" lists it as an alternative
   warnings: string[];
@@ -76,8 +76,9 @@ export function deleteNote(request: DeleteRequest, place: Place, now = new Date(
   const trashFolder = join(journal.path, TRASH);
   const blocked = journalPathProblem(journal.path, join(trashFolder, file), false); // .trash/ as a link
   if (blocked) return fail("failed", `Won't move ${path} to the trash: ${blocked.message}.`, found);
+  // A dry run names the folder only: the stamp is the time of the move, which comes later.
+  if (request.dryRun) return { outcome: "ok", document: forDocument({ ...emptyDelete(request.journal), warnings: journal.warnings, ...found, trash: trashFolder }) };
   const trash = join(trashFolder, freeName(trashFolder, trashName(file, now)));
-  if (request.dryRun) return { outcome: "ok", document: forDocument({ ...emptyDelete(request.journal), warnings: journal.warnings, ...found, trash }) };
 
   const warnings = [...journal.warnings];
   if (request.journal === "project") {

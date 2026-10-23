@@ -334,6 +334,7 @@ test("POST /api/note/delete: a dry run moves nothing; then the note moves to the
   const dry = parsed(await http.write("POST", "/api/note/delete", { ...request, dry_run: true }));
   assert.equal(dry.status, 200);
   assert.equal((dry.document as { deleted: boolean }).deleted, false);
+  assert.equal((dry.document as { trash: string }).trash, join(box.journal, ".trash"), "the folder: the stamp is the time of the move");
   assert.ok(existsSync(box.note("npm--pdfkit.md")));
 
   const done = parsed(await http.write("POST", "/api/note/delete", request));
@@ -341,7 +342,8 @@ test("POST /api/note/delete: a dry run moves nothing; then the note moves to the
   const document = done.document as { deleted: boolean; trash: string };
   assert.equal(document.deleted, true);
   assert.ok(existsSync(document.trash) && !existsSync(box.note("npm--pdfkit.md")));
-  assert.deepEqual({ ...(dry.document as object), deleted: true }, document);
+  assert.deepEqual({ ...(dry.document as object), deleted: true, trash: document.trash }, document);
+  assert.match(document.trash, /[\\/]\.trash[\\/]npm--pdfkit\.\d{8}-\d{6}Z\.md$/);
   assert.equal((await http.get("/api/note?journal=personal&id=pkg%3Anpm%2Fpdfkit")).status, 404);
 
   // The CLI's document for the same note, once it is back.

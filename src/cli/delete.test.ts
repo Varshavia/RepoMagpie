@@ -36,7 +36,9 @@ test("in a terminal it shows the note, its links and where it goes, then asks; o
     assert.deepEqual(asked, ["Move it to the trash? [y/N] "]);
     assert.match(r.err, /^pdfkit · personal journal\n {2}Verdict {2}avoid: async streams painful\n {2}.*npm--pdfkit\.md$/m);
     assert.match(r.err, /^Linked from: puppeteer \(in Related\)\. Those links will show as unresolved; the notes stay as they are\.$/m);
-    assert.match(r.err, /^It goes to .*\.trash[\\/]npm--pdfkit\.\d{8}-\d{6}Z\.md\. Nothing empties the trash; delete the file there to remove it for good\.$/m);
+    // The folder only: the stamp is the time of the move, after the answer.
+    assert.match(r.err, /^It goes to .*\.trash[\\/] \(as npm--pdfkit\.<time>\.md\)\. Nothing empties the trash; delete the file there to remove it for good\.$/m);
+    assert.doesNotMatch(r.err, STAMPED);
     assert.match(r.err, /Cancelled\. Nothing moved\./);
     assert.equal(r.out, "");
     assert.ok(existsSync(b.note("npm--pdfkit.md")), JSON.stringify(answer));
@@ -58,6 +60,7 @@ test("without a terminal and without --yes: exit 2, nothing moved; --json too, w
   const document = JSON.parse(json.out);
   assert.equal(document.deleted, false);
   assert.equal(document.id, "pkg:npm/pdfkit");
+  assert.equal(document.trash, join(b.journal, ".trash"), "nothing moved: the folder, no stamped name");
   assert.match(document.error, /needs your OK/);
   assert.ok(existsSync(b.note("npm--pdfkit.md")));
 });

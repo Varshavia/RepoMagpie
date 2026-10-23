@@ -61,7 +61,8 @@ export async function deleteCommand(target: string, options: DeleteOptions, term
     if (!asks) return stop("usage", "Moving a note to the trash needs your OK: run this in a terminal, or add --yes.", plan.document);
     io.err(`${chosen.name} · ${chosen.journal} journal\n  Verdict  ${chosen.verdict ?? "[inbox] no verdict yet"}\n  ${short(plan.document.path)}\n`);
     if (backlinks.length) io.err(`Linked from: ${linkedFrom}. Those links will show as unresolved; the notes stay as they are.\n`);
-    io.err(`It goes to ${short(plan.document.trash)}. Nothing empties the trash; delete the file there to remove it for good.\n`);
+    // The folder, not the file: the stamp is the time of the move, after the answer.
+    io.err(`It goes to ${short(plan.document.trash)}${sep} (as ${(plan.document.file ?? chosen.file).replace(/\.md$/, "")}.<time>.md). Nothing empties the trash; delete the file there to remove it for good.\n`);
     if (!/^y(es)?$/i.test((await io.ask("Move it to the trash? [y/N] ")).trim())) {
       io.err("Cancelled. Nothing moved.\n");
       return 0;

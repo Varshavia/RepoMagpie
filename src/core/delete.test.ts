@@ -77,12 +77,13 @@ test("a dry run returns the same document and moves nothing", () => {
   const dry = deleteNote({ journal: "personal", address: { id: "pkg:npm/pdfkit" }, dryRun: true }, s.place, NOW);
   assert.equal(dry.outcome, "ok");
   assert.equal(dry.document.deleted, false);
-  assert.equal(dry.document.trash, s.trash("npm--pdfkit.20261023-093900Z.md"));
+  assert.equal(dry.document.trash, join(s.journal, ".trash"), "the folder: the stamp is the time of the move");
   assert.equal(dry.document.backlinks.length, 2);
   assert.ok(existsSync(s.note("npm--pdfkit.md")));
   assert.ok(!existsSync(join(s.journal, ".trash")), "not even the trash folder");
   const real = deleteNote({ journal: "personal", address: { id: "pkg:npm/pdfkit" }, version: dry.document.version ?? "" }, s.place, NOW);
-  assert.deepEqual({ ...real.document, deleted: false }, dry.document);
+  assert.deepEqual({ ...real.document, deleted: false, trash: join(s.journal, ".trash") }, dry.document);
+  assert.equal(real.document.trash, s.trash("npm--pdfkit.20261023-093900Z.md"));
 });
 
 test("a read-only note is addressed by its file name; an id or file not in notes/ is not found", () => {
