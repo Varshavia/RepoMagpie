@@ -42,7 +42,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
-**Status:** pre-release `0.2.0-beta.6`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.7`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
