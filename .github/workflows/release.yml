@@ -48,6 +48,7 @@ jobs:
       - run: npm run check:links
       - run: npm run check:commands
       - run: npm run check:characters
+      - run: npm run check:fs-calls
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
