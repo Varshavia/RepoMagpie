@@ -3,7 +3,7 @@
 // metadata and actions. Every write sends the version the note was read with; a 409 shows the
 // conflict banner. [[Links]] open the note they resolve to, as core resolved them.
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type Address, type AdoptJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
+import { api, ApiError, type Address, type AdoptJson, type DeleteJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
@@ -13,6 +13,7 @@ import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, plainClick, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
 import { Alternatives } from "./Alternatives.tsx";
+import { DeleteDialog } from "./DeleteDialog.tsx";
 import { LinkTextarea } from "./LinkTextarea.tsx";
 import { ReviewForm } from "./ReviewForm.tsx";
 
@@ -45,6 +46,8 @@ export interface NotePaneProps {
   onSearchName: (name: string) => void; // an ambiguous link: Search, with its name
   onTagList: (doc: TagListJson) => void; // tags.md changed ("From GitHub topics")
   onShowInGraph?: (file: string) => void; // not in the graph's own note pane
+  onDeleted?: (doc: DeleteJson) => void; // "Delete note"; not in the graph's own note pane
+  onModal: (open: boolean) => void; // the delete dialog is open: what is behind it is inert
 }
 
 type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
@@ -59,7 +62,7 @@ const CONTEXT = ["What it does", "Use when"];
 const EDITABLE = ["Use when", "Avoid when", "What it does", "How to use", "My notes", "Related"];
 
 export function NotePane(props: NotePaneProps) {
-  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onSearchName, onTagList, onShowInGraph } = props;
+  const { journal, address, noteKey, home, review, focusRequest, editRequest, live, tagList, noTagList, onCreateTagList, drafts, onSaved, onLeave, onToast, onBack, project, onAdopted, onOpenNote, linkNotes, onFollowLink, onAddNote, onSearchName, onTagList, onShowInGraph, onDeleted, onModal } = props;
   const [note, setNote] = useState<NoteJson | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -71,9 +74,11 @@ export function NotePane(props: NotePaneProps) {
   const [section, setSection] = useState<{ name: string; text: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<Adopting>(null);
+  const [deleting, setDeleting] = useState(false);
   const verdictRef = useRef<HTMLTextAreaElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const focusHandled = useRef(0);
+  const deleted = useRef(false);
   const editHandled = useRef(editRequest);
   const latest = useRef({ note, form, section });
   latest.current = { note, form, section };
@@ -98,10 +103,10 @@ export function NotePane(props: NotePaneProps) {
     };
   }, [journal, addressKey]); // the address, as a string
 
-  // Keep an unsaved form when the pane closes (moving to another note).
+  // Keep an unsaved form when the pane closes (moving to another note); not for a note moved to the trash.
   useEffect(() => () => {
     const { note: n, form: f } = latest.current;
-    if (n && f && patchFor(n, f)) drafts.set(noteKey, f);
+    if (n && f && patchFor(n, f) && !deleted.current) drafts.set(noteKey, f);
     else drafts.delete(noteKey);
   }, [drafts, noteKey]);
 
@@ -148,6 +153,12 @@ export function NotePane(props: NotePaneProps) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [note, form, section]);
+
+  // The pane closes with the delete dialog open (a live update changed the list): the app is usable again.
+  useEffect(() => {
+    if (!deleting) return;
+    return () => onModal(false);
+  }, [deleting]);
 
   // The e key: open the Verdict editor.
   useEffect(() => {
@@ -273,6 +284,22 @@ export function NotePane(props: NotePaneProps) {
     }
   }
 
+  // The delete dialog is modal: the app makes what is behind it inert in the same render.
+  function showDelete(open: boolean) {
+    setDeleting(open);
+    onModal(open);
+  }
+
+  // The note changed on disk since it was read: nothing moved; the conflict banner shows the new version.
+  async function deleteConflict() {
+    showDelete(false);
+    try {
+      setConflict(await api.note(journal, address));
+    } catch (error) {
+      setActionError((error as ApiError).message);
+    }
+  }
+
   async function copyPurl() {
     if (!note?.id) return;
     try {
@@ -375,7 +402,29 @@ export function NotePane(props: NotePaneProps) {
                 Adopt to project
               </button>
             ) : null}
+            {onDeleted && note.version ? (
+              <button type="button" className="button ghost danger" onClick={() => showDelete(true)} aria-haspopup="dialog">
+                Delete note
+              </button>
+            ) : null}
           </div>
+          {deleting && onDeleted && note.version ? (
+            <DeleteDialog
+              journal={journal}
+              address={address}
+              version={note.version}
+              name={name}
+              home={home}
+              onCancel={() => showDelete(false)}
+              onDeleted={(doc) => {
+                deleted.current = true;
+                showDelete(false);
+                onDeleted(doc);
+              }}
+              onConflict={deleteConflict}
+              onOpenNote={onOpenNote}
+            />
+          ) : null}
         </header>
 
         <div className="stack">

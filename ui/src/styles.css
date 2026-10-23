@@ -352,6 +352,11 @@ kbd {
 .button.secondary:hover:not(:disabled) { background: var(--surface-3); }
 .button.ghost { padding: 0 var(--sm); background: transparent; color: var(--ink-muted); }
 .button.ghost:hover:not(:disabled) { background: var(--surface-1); color: var(--ink); }
+/* Delete note and Move to trash: danger text, never a filled red (DESIGN.md, Danger). */
+.button.danger { background: var(--surface-2); color: var(--danger); }
+.button.danger:hover:not(:disabled) { background: var(--surface-3); }
+.button.ghost.danger { background: transparent; color: var(--danger); }
+.button.ghost.danger:hover:not(:disabled) { background: var(--surface-1); }
 .button kbd { margin-left: var(--xs); }
 .button.primary kbd { background: transparent; color: var(--on-accent); opacity: 0.8; }
 
@@ -782,6 +787,7 @@ button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 .banner-strip .text { color: var(--ink); }
+.banner-strip .button { margin-left: auto; }
 
 .stack { display: flex; flex-direction: column; gap: var(--sm); }
 .note .stack + .verdict-block,
@@ -812,6 +818,7 @@ button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 .toast .icon { color: var(--success); }
+.toast-action { pointer-events: auto; margin-left: var(--xs); color: var(--ink); text-decoration: underline; }
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(4px); }
@@ -863,6 +870,13 @@ button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
   padding: var(--md) var(--lg);
   border-bottom: 1px solid var(--hairline-strong);
 }
+
+/* The delete dialog: what moves where, the notes that link to it, then the buttons. */
+.delete-dialog { width: min(480px, 100%); }
+.delete-dialog .pane-title { overflow-wrap: anywhere; }
+.dialog-body { display: flex; flex-direction: column; gap: var(--md); padding: var(--lg); overflow-y: auto; font-size: 14px; line-height: 1.5; }
+.dialog-body .mono { overflow-wrap: anywhere; }
+.dialog-actions { padding: 0 var(--lg) var(--lg); }
 
 .palette-input {
   flex: 1;

@@ -837,6 +837,173 @@ test("adopt: a note the project already has is refused and left as it is", async
   expect(readFileSync(magpie.note("npm--puppeteer.md", "project"), "utf8")).toBe(team);
 });
 
+// Delete note (decision 0037): the note moves to the journal's .trash/; nothing else changes.
+const STAMPED = /^npm--pdfkit\.\d{8}-\d{6}Z\.md$/;
+const trashed = (magpie: { journal: string }) => (existsSync(join(magpie.journal, ".trash")) ? readdirSync(join(magpie.journal, ".trash")) : []);
+
+async function openPdfkit(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+}
+
+test("delete: the dialog names the journal and the trash folder; Move to trash moves the file; the list, the count and the pane move on", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  const all = page.getByRole("button", { name: /^All notes, \d+ notes$/ });
+  const before = Number((await all.getAttribute("aria-label"))?.match(/(\d+) notes/)?.[1]);
+  const names = await page.getByRole("listbox", { name: "All notes" }).getByRole("option").allInnerTexts();
+  await page.getByRole("button", { name: "Delete note" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Move pdfkit to the trash?" });
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await expect(dialog).toContainText(`It moves from your personal journal to its trash folder, ~${sep}.magpie${sep}.trash.`);
+  await expect(dialog.getByRole("button", { name: "Move to trash" })).toBeEnabled();
+  await expect(dialog).not.toContainText("link"); // no note links to it: nothing about links
+  await expect(page.locator("main")).toHaveAttribute("inert", "");
+  await dialog.getByRole("button", { name: "Move to trash" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
+  expect(existsSync(magpie.note("npm--pdfkit.md"))).toBe(false);
+  const [file] = trashed(magpie);
+  expect(file).toMatch(STAMPED);
+  expect(readFileSync(join(magpie.journal, ".trash", file), "utf8")).toBe(PDFKIT);
+  await expect(page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: `All notes, ${before - 1} notes` })).toBeVisible();
+  // The next row in the list opens.
+  const at = names.findIndex((n) => n.startsWith("pdfkit"));
+  const next = (names[at + 1] ?? names[at - 1]).split("\n")[0];
+  await expect(page.locator(".note-head h2")).toHaveText(next);
+});
+
+test("delete: the dialog lists the notes that link to it, as links; after the move they show the link as unresolved and stay as they were", async ({ page, magpie }) => {
+  const puppeteer = renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-04", kind: "library", tags: [], verdict: "prints HTML to PDF", myNotes: "Replaced [[pdfkit]] for invoices." });
+  const pdfLib = renderNote({ id: "pkg:npm/pdf-lib", name: "pdf-lib", explored: "2026-10-04", kind: "library", tags: [], verdict: "edits existing PDFs" }).replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[npm--pdfkit]]"]\n');
+  writeFileSync(magpie.note("npm--puppeteer.md"), puppeteer);
+  writeFileSync(magpie.note("npm--pdf-lib.md"), pdfLib);
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Move pdfkit to the trash?" });
+  await expect(dialog).toContainText("2 notes link to it. Those links will show as unresolved; the notes stay as they are.");
+  await expect(dialog.getByRole("listitem")).toHaveText(["pdf-libas an alternative", "puppeteerin My notes"]);
+  await expect(dialog.getByRole("link", { name: "puppeteer" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Move to trash" }).click();
+  await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
+
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^puppeteer / }).click();
+  await expect(page.getByRole("region", { name: "My notes" }).getByRole("button", { name: /^pdfkit/ })).toHaveAttribute("title", "No note named “pdfkit” in this journal");
+  expect(readFileSync(magpie.note("npm--puppeteer.md"), "utf8")).toBe(puppeteer);
+  expect(readFileSync(magpie.note("npm--pdf-lib.md"), "utf8")).toBe(pdfLib);
+});
+
+test("delete: Esc and Cancel close the dialog, nothing moves, and focus returns to Delete note", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  const remove = page.getByRole("button", { name: "Delete note" });
+  const dialog = page.getByRole("alertdialog", { name: "Move pdfkit to the trash?" });
+  await remove.click();
+  await expect(dialog.getByRole("button", { name: "Move to trash" })).toBeEnabled();
+  await page.keyboard.press("j"); // the list behind doesn't move
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await expect(page.locator(".note-head h2")).toHaveText("pdfkit");
+  await remove.click();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  expect(readFileSync(magpie.note("npm--pdfkit.md"), "utf8")).toBe(PDFKIT);
+  expect(trashed(magpie)).toEqual([]);
+});
+
+test("delete: an unsaved Verdict edit goes with the note; leaving the page no longer asks", async ({ page, magpie }) => {
+  const asks = () => page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.keyboard.press("e");
+  await page.getByRole("textbox", { name: "Verdict" }).fill("an edit never saved");
+  expect(await asks()).toBe(true);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Move to trash" }).click();
+  await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
+  expect(await asks()).toBe(false);
+});
+
+test("delete: Undo puts the file back under its name, as it was", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Move to trash" }).click();
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByRole("status").getByText("Restored pdfkit")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md"), "utf8")).toBe(PDFKIT);
+  expect(trashed(magpie)).toEqual([]);
+  await expect(page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / })).toHaveCount(1);
+  await expect(page.getByRole("status").getByRole("button", { name: "Undo" })).toHaveCount(0);
+});
+
+test("delete: Undo after a new note took the name says so and leaves the file in the trash", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Move to trash" }).click();
+  await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
+  const fresh = PDFKIT.replace("avoid: async streams painful; use puppeteer", "a new take");
+  writeFileSync(magpie.note("npm--pdfkit.md"), fresh);
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  const [file] = trashed(magpie);
+  await expect(page.getByRole("alert")).toContainText(`A note named npm--pdfkit.md is in notes/ now, so pdfkit stays in the trash: ~${sep}.magpie${sep}.trash${sep}${file}`);
+  expect(readFileSync(magpie.note("npm--pdfkit.md"), "utf8")).toBe(fresh);
+  expect(readFileSync(join(magpie.journal, ".trash", file), "utf8")).toBe(PDFKIT);
+  await page.getByRole("alert").getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("delete: a note that changed on disk since it was opened isn't moved; the conflict banner shows", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Move pdfkit to the trash?" });
+  await expect(dialog.getByRole("button", { name: "Move to trash" })).toBeEnabled();
+  const changed = PDFKIT.replace("## My notes\n", "## My notes\nchanged in another editor\n");
+  writeFileSync(magpie.note("npm--pdfkit.md"), changed);
+  await dialog.getByRole("button", { name: "Move to trash" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("This note changed on disk since you opened it.")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md"), "utf8")).toBe(changed);
+  expect(trashed(magpie)).toEqual([]);
+});
+
+test("delete: the note is gone from search, the graph and Check a package", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await openPdfkit(page);
+  await page.getByRole("button", { name: "Delete note" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Move to trash" }).click();
+  await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
+
+  await page.keyboard.press("/");
+  await page.getByRole("searchbox", { name: "Search both journals" }).fill("pdfkit");
+  await expect(page.getByText("No notes match")).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option", { name: /^pdfkit/ })).toHaveCount(0);
+
+  await page.getByRole("navigation").getByRole("button", { name: "Graph" }).click();
+  const find = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  await find.fill("taste");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option")).toHaveCount(1);
+  await find.fill("pdfkit");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Check a package" }).click();
+  await page.getByLabel("Packages").fill("pdfkit");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByText(": no note in your journals. The hook stays silent.")).toBeVisible();
+});
+
 test.describe("2,000 notes", () => {
   test.use({ generated: 2000 });
   // From the URL magpie ui printed to the first rows on screen. The budget is for a warm cache, as

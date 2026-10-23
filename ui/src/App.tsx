@@ -1,7 +1,7 @@
 // The local app (docs/ui.md §7): three panes, the command palette, the keyboard map, live updates
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type ApiError, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
+import { api, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { ProjectState } from "./components/fields.tsx";
@@ -53,6 +53,8 @@ export function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [help, setHelp] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [modal, setModal] = useState(false); // the delete dialog is open
+  const [notice, setNotice] = useState<string | null>(null); // an Undo that couldn't put the note back
   const [pane, setPane] = useState<"list" | "note">("list");
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const [search, setSearch] = useState<SearchState>(NO_SEARCH);
@@ -63,10 +65,13 @@ export function App() {
   const listRef = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
 
-  const toast = useCallback((text: string) => {
+  // A toast with an action (Undo) stays 10 s, and goes once the action runs.
+  const toast = useCallback((text: string, action?: ToastItem["action"]) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    const dismiss = () => setToasts((t) => t.filter((x) => x.id !== id));
+    const run = action && (() => (dismiss(), action.run()));
+    setToasts((t) => [...t, { id, text, action: action && run && { label: action.label, run } }]);
+    setTimeout(dismiss, action ? 10000 : 4000);
   }, []);
 
   const loadList = useCallback((scope: Scope, quiet = false) => {
@@ -419,6 +424,43 @@ export function App() {
     go({ page: "graph", focus: `note:${file}` });
   };
 
+  // Undo after a delete (decision 0037): the file goes back to notes/ under its original name. A note
+  // that has that name now keeps it in the trash; the strip at the top says so, with the path.
+  const undoDelete = (doc: DeleteJson) => {
+    if (!doc.trash) return;
+    api.restoreNote(doc.journal, doc.trash.split(/[\\/]/).pop() ?? "").then(
+      (back) => {
+        setNotice(null);
+        toast(`Restored ${visible(back.name ?? doc.name ?? "the note")}`);
+        loadList(doc.journal, true);
+        if (back.id && list && doc.journal === journal) select(`${doc.journal} id ${back.id}`, { focus: true });
+      },
+      (error: ApiError) => setNotice(error.message),
+    );
+  };
+
+  // After a delete: the note leaves the list and the counts, the next one opens, and the toast offers Undo.
+  const onDeleted = (scope: Scope, key: string, doc: DeleteJson) => {
+    toast(`Moved ${visible(doc.name ?? doc.file ?? "the note")} to the trash`, { label: "Undo", run: () => undoDelete(doc) });
+    const was = lists[scope];
+    if (was.status === "ready") setLists((l) => ({ ...l, [scope]: { ...was, notes: was.notes.filter((n) => n.file !== doc.file) } }));
+    loadList(scope, true);
+    // Other rows of the same note (a skill line in search) go too; the next row is one that stays.
+    const gone = (r: { journal: Scope; id: string | null }) => r.journal === scope && r.id !== null && r.id === doc.id;
+    if (view.page === "search" || view.page === "suggest") {
+      const rows = view.page === "search" ? shown.map((r) => ({ key: resultKey(r), gone: gone(r) })) : suggestions.map((s) => ({ key: suggestKey(s), gone: gone(s) }));
+      const next = nextAfter(rows.filter((r) => r.key === key || !r.gone).map((r) => r.key), key);
+      if (view.page === "search") setResults((rs) => rs.filter((r) => !gone(r)));
+      else setSuggestions((ss) => ss.filter((s) => !gone(s)));
+      if (next) openResult(next, true);
+      else setHit(null);
+      return;
+    }
+    const next = nextAfter(items.map(keyOf), key);
+    select(next, { focus: true });
+    if (!next) requestAnimationFrame(() => listRef.current?.focus());
+  };
+
   // `over`: the graph's note pane, where a [[link]] selects the note in the graph.
   const notePane = (scope: Scope, address: { id: string } | { file: string }, key: string, over: Partial<NotePaneProps> = {}) => (
     <NotePane
@@ -451,6 +493,8 @@ export function App() {
       onSearchName={searchName}
       onTagList={showTags}
       onShowInGraph={(file) => showInGraph(scope, file)}
+      onDeleted={(doc) => onDeleted(scope, key, doc)}
+      onModal={setModal}
       {...over}
     />
   );
@@ -593,7 +637,7 @@ export function App() {
           onAdd={addMissing}
           onSearch={searchName}
           renderNote={(note, open) =>
-            notePane(journal, { id: note.id }, `${journal} id ${note.id}`, { onOpenNote: (_scope, id) => open(id), onFollowLink: (_scope, _from, to) => open(to), onShowInGraph: undefined })
+            notePane(journal, { id: note.id }, `${journal} id ${note.id}`, { onOpenNote: (_scope, id) => open(id), onFollowLink: (_scope, _from, to) => open(to), onShowInGraph: undefined, onDeleted: undefined })
           }
         />
       </Suspense>
@@ -622,7 +666,7 @@ export function App() {
   }
 
   // A dialog is modal: what is behind it can't take focus.
-  const behind = palette || help;
+  const behind = palette || help || modal;
 
   return (
     <div className="app">
@@ -633,6 +677,15 @@ export function App() {
         <div className="banner-strip" role="alert">
           <Icon name="warning" />
           <span className="text">Lost the connection to repomagpie ui. Your notes are safe on disk. Start repomagpie ui again, then open the URL it prints.</span>
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="banner-strip" role="alert" inert={behind}>
+          <Icon name="warning" />
+          <span className="text">{visible(home ? notice.split(home).join("~") : notice)}</span>
+          <button type="button" className="button ghost" onClick={() => setNotice(null)}>
+            Close
+          </button>
         </div>
       ) : null}
       <Sidebar
