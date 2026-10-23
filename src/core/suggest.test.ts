@@ -240,6 +240,25 @@ test("keywords: lowercase words, each once, without stop words and numbers; pack
   assert.deepEqual(keywordsOf(["Let an agent test all of it, and also just more"]), ["agent", "test"]);
 });
 
+test("keywords: no word under 3 letters, nothing from a contraction or an abbreviation; a possessive keeps its word", () => {
+  assert.deepEqual(keywordsOf(["it doesn't render, e.g. invoices"]), ["render", "invoices"]);
+  assert.deepEqual(keywordsOf(["I'm sure we're stuck: can't won’t shouldn't, i.e. vs. a.k.a. etc."]), ["sure", "stuck"]);
+  assert.deepEqual(keywordsOf(["the user's guide, the browser’s tabs"]), ["user", "guide", "browser", "tabs"]);
+  assert.deepEqual(keywordsOf(["pdf to go", "@vitejs/plugin-react"]), ["pdf", "vitejs", "react"]);
+});
+
+test("keywords: a few two-letter words that name a field stay: ai, ui, ux, db, ml, ci; js and ts are common words", () => {
+  assert.deepEqual(keywordsOf(["An AI agent with a UI and UX, a DB, ML in CI; go", "ts-node", "packageurl-js"]), ["ai", "agent", "ui", "ux", "db", "ml", "ci", "node", "packageurl"]);
+  assert.equal(tagPoints(["ai-agents", "ui"], keywordsOf(["AI agents with a UI"])), 2);
+});
+
+test("why: a contraction's or an abbreviation's letters never match a note", () => {
+  const p = place({ "journal/notes/github--microsoft--playwright.md": note({ id: "pkg:github/microsoft/playwright", name: "microsoft/playwright", verdict: "test it, e.g. the web app's tabs; don't mock the browser" }) });
+  const run = runSuggest({ description: "it doesn't render, e.g. invoices", limit: 5 }, { ...p, cwd: p.root });
+  assert.deepEqual(run.document.keywords, ["render", "invoices"]);
+  assert.deepEqual(run.document.candidates, []);
+});
+
 test("keywords: words common to any project say nothing about this one and are left out", () => {
   const readme = "Remembers what you learned about every dependency, and tells your coding agent before it installs one. Code for end-to-end tests.";
   assert.deepEqual(keywordsOf([readme, "packageurl-js", "actions/checkout", "@vitejs/plugin-react", "@types/node"]),
