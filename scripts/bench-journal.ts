@@ -2,9 +2,10 @@
 // timing of the built CLI as separate processes. No network; the folder is deleted afterwards.
 // `--report-only` prints the numbers but never fails on timing (CI runners vary too much).
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { removeFolder } from "../src/core/copy-folder.ts";
 import { renderNote } from "../src/core/write.ts";
 
 export const NOTES = 2_000;
@@ -76,7 +77,7 @@ export async function withJournal(name: string, body: (root: string, journal: st
     writeFileSync(join(journal, "notes", "npm--oversized.md"), renderNote({ id: "pkg:npm/oversized", name: "oversized", explored: "2026-10-04", kind: "library", tags: [] }) + "x".repeat(300 * 1024));
     await body(root, journal);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeFolder(root);
   }
 }
 

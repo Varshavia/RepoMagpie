@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeFolder } from "../core/copy-folder.ts";
 import { detectCommand, detectInstalls } from "../core/install-detect.ts";
 import { scratchBase } from "../core/fixtures/scratch.ts";
 import { renderNote, type NewNote } from "../core/write.ts";
@@ -42,7 +43,7 @@ function world(files: Record<string, string> = {}) {
   const ctx: HookContext = { env: { MAGPIE_HOME: journal }, home: join(root, "home"), cwd: root, informOnly: false };
   // Each agent's answer, parsed; the retry record is new for each, so each sees a first try.
   const each = (raw: (agent: string) => string, at = T0) => Object.fromEntries(Object.keys(AGENTS).map((agent) => {
-    rmSync(retryFile(journal), { force: true });
+    removeFolder(retryFile(journal));
     const out = AGENTS[agent].out(raw(agent), ctx, at);
     return [agent, out === null ? null : JSON.parse(out)];
   }));

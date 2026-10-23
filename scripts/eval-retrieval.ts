@@ -4,11 +4,12 @@
 // Use when, the worst case. For each need, the rank of its first expected repository in `search`
 // and in `suggest` with that need; then recall@5 and recall@10, and the catalog's size for the
 // journal. Reports only: no threshold yet. Not in CI. No network; a scratch journal, deleted after.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureNote } from "../src/core/capture.ts";
 import { catalogForAgent, compactForAgent, runCatalog } from "../src/core/catalog.ts";
+import { removeFolder } from "../src/core/copy-folder.ts";
 import { countSkillFolders, type RepoMetadata } from "../src/core/github.ts";
 import { fileNameFor, resolveTarget } from "../src/core/identity.ts";
 import { carried, parseTagList, STARTER_TAGS, type Place } from "../src/core/journals.ts";
@@ -82,5 +83,5 @@ try {
   const full = JSON.stringify(catalogForAgent(catalog.document));
   console.log(`\ncatalog --json for these ${catalog.document.total} notes: ${compact.length.toLocaleString("en")} characters (${Math.round(compact.length / catalog.document.total)} a row); --full ${full.length.toLocaleString("en")} (${Math.round(full.length / catalog.document.total)} a row)`);
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  removeFolder(root);
 }

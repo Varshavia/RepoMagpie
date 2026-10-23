@@ -3,14 +3,15 @@
 // never reach the real home directory or its ~/.magpie. Removed when the test file ends.
 // Not part of the build (it bundles only what src/cli/main.ts imports).
 import { after } from "node:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { removeFolder } from "../copy-folder.ts";
 
 export const SCRATCH_TESTS = fileURLToPath(new URL("../../../.scratch/tests/", import.meta.url));
 
 const bases: string[] = [];
-after(() => { for (const base of bases) rmSync(base, { recursive: true, force: true }); });
+after(() => { for (const base of bases) removeFolder(base); });
 
 // A new folder <repo>/.scratch/tests/<prefix>-XXXXXX/ with .git/ in it; returns its path.
 export function scratchBase(prefix: string): string {

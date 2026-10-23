@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { mcpEntry, readJsonc, type Platform } from "./agents.ts";
 import { codexHookHash } from "./codex-hooks.ts";
+import { removeFolder } from "./copy-folder.ts";
 import { runDoctor, type DoctorRequest } from "./doctor.ts";
 import { hookLaunch, hookShell, LAUNCHER, launcherText, type HookSub } from "./hook-launch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
@@ -210,7 +211,7 @@ test("Antigravity CLI's hook on Windows: node and the entry file read from the l
   box.write(join(box.home, ".gemini", "config", "hooks.json"), JSON.stringify({ repomagpie: { PreToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: launcher, timeout: 10 }] }] } }));
   const hook = () => runDoctor(box.request).agent_hooks.find((h) => h.id === "antigravity")?.entries[0];
   assert.deepEqual(hook(), { form: "setup", command: launcher, node: process.execPath, entry, node_found: true, entry_found: true, flags: ["--inform-only"], trust: null });
-  rmSync(launcher);
+  removeFolder(launcher);
   assert.deepEqual([hook()?.form, hook()?.node, hook()?.node_found], ["setup", null, false]);
   assert.ok(runDoctor(box.request).problems.some((p) => p === `The Antigravity CLI hook in ~\\.gemini\\config\\hooks.json starts ${launcher}, which isn't there, so it does nothing. Run repomagpie setup again.`));
 });

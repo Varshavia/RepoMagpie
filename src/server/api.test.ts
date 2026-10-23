@@ -1,9 +1,10 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
+import { removeFolder } from "../core/copy-folder.ts";
 import { graphDocument, noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
 import { noteVersion } from "../core/edit.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
@@ -122,7 +123,7 @@ test("POST /api/adopt returns exactly magpie adopt --json and writes the same no
   const expected = await cli(box, ["adopt", "pkg:npm/left-pad"], fetch);
   assert.equal(expected.code, 0);
   const written = readFileSync(copy, "utf8");
-  rmSync(copy);
+  removeFolder(copy);
   assert.deepEqual(parsed(await http.write("POST", "/api/adopt", { target: "pkg:npm/left-pad" })), { status: 200, document: expected.document });
   assert.equal(readFileSync(copy, "utf8"), written);
   assert.match(written, /\nadopted: 2026-10-04\n/);
@@ -138,7 +139,7 @@ test("POST /api/adopt returns exactly magpie adopt --json and writes the same no
     assert.deepEqual(parsed(await http.write("POST", "/api/adopt", body)), { status: STATUS_FOR_EXIT[cliResult.code], document: cliResult.document }, JSON.stringify(body));
   }
   // The personal pdfkit note's Verdict says to avoid: copied, with no install command (spec §2).
-  rmSync(join(box.project, ".magpie", "notes", "npm--pdfkit.md"));
+  removeFolder(join(box.project, ".magpie", "notes", "npm--pdfkit.md"));
   const avoid = parsed(await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }));
   assert.equal(avoid.status, 200);
   assert.deepEqual(avoid.document, { id: "pkg:npm/pdfkit", from: box.note("npm--pdfkit.md"), to: join(box.project, ".magpie", "notes", "npm--pdfkit.md"), install: null, install_choices: [] });
@@ -165,13 +166,13 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
     const expected = await cli(box, argv, fetch);
     const written = file ? readFileSync(box.note(file), "utf8") : null;
     const tagsWritten = readFileSync(tagsMd, "utf8");
-    if (file) rmSync(box.note(file));
+    if (file) removeFolder(box.note(file));
     writeFileSync(tagsMd, tagsBefore);
     assert.deepEqual(parsed(await http.write("POST", "/api/note", body)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, JSON.stringify(body));
     assert.equal(readFileSync(tagsMd, "utf8"), tagsWritten);
     if (file) {
       assert.equal(readFileSync(box.note(file), "utf8"), written);
-      rmSync(box.note(file)); // the next case starts without it
+      removeFolder(box.note(file)); // the next case starts without it
     }
     writeFileSync(tagsMd, tagsBefore);
   }
@@ -231,7 +232,7 @@ test("POST /api/import returns exactly magpie import --json", async (t) => {
   assert.deepEqual(parsed(await http.write("POST", "/api/import", { text, to: "personal", dry_run: true })), { status: STATUS_FOR_EXIT[dry.code], document: dry.document });
   const real = await cli(box, ["import", join(box.root, "list.md")], fetch);
   const written = readFileSync(box.note("npm--chalk.md"), "utf8");
-  rmSync(box.note("npm--chalk.md"));
+  removeFolder(box.note("npm--chalk.md"));
   assert.deepEqual(parsed(await http.write("POST", "/api/import", { text, to: "personal" })), { status: 422, document: real.document });
   assert.equal(readFileSync(box.note("npm--chalk.md"), "utf8"), written);
   assert.deepEqual(parsed(await http.write("POST", "/api/import", { text: "nothing here", to: "project" })), { status: 200, document: { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [] } });
