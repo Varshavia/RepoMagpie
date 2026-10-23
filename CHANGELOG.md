@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.7] - 2026-10-23
+
+The eighth pre-release: you can delete a note. `repomagpie delete` and the app's Delete note move a note to its journal's trash, `.trash/`, after your OK, and the app offers Undo; nothing is removed for good, and no agent tool deletes.
+
 ### Added
 
 - `repomagpie delete <name>` moves a note to its journal's trash, `.trash/`, as `npm--pdfkit.20261023-093900Z.md`. In a terminal it shows the note, the notes that link to it and where it goes, then asks "Move it to the trash? [y/N]"; without a terminal it needs `--yes`. `--journal` picks the journal when both have the note, and `--json` prints what moved. Nothing reads `.trash/` as notes, and nothing empties it: delete a file there to remove it for good. A project journal's `.gitignore` gets `.trash/`, also one written by an earlier version.
@@ -209,7 +213,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...HEAD
+[0.2.0-beta.7]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...v0.2.0-beta.7
 [0.2.0-beta.6]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...v0.2.0-beta.6
 [0.2.0-beta.5]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...v0.2.0-beta.5
 [0.2.0-beta.4]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.3...v0.2.0-beta.4
