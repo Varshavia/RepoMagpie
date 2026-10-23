@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.8] - 2026-10-23
+
+The ninth pre-release, the build for the tester round: `repomagpie setup --remove` now works on Windows when your home folder's name has letters outside ASCII, and `repomagpie suggest` no longer matches notes on single letters such as the `t` of "doesn't".
+
 ### Fixed
 
 - On Windows, when your home folder's name has letters outside ASCII (`C:\Users\Şuat`), `repomagpie setup --remove` now removes the skill folder, Copilot CLI's hook file and Antigravity CLI's launcher, instead of failing with "The skill's files aren't as expected after the change". Node's `fs.rmSync` caused it on Node 23, Node 24.0 to 24.13.0 and Node 25.0: it removed nothing on such paths and reported no error. RepoMagpie now removes files without it, and checks each one is gone.
@@ -218,7 +222,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...HEAD
+[0.2.0-beta.8]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...v0.2.0-beta.8
 [0.2.0-beta.7]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...v0.2.0-beta.7
 [0.2.0-beta.6]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...v0.2.0-beta.6
 [0.2.0-beta.5]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.4...v0.2.0-beta.5
