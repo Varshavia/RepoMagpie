@@ -42,7 +42,7 @@ test("copies the note unchanged except adopted: <today>, and creates the project
   assert.deepEqual(run.document, { id: "pkg:npm/pdfkit", from: p.personal("npm--pdfkit.md"), to: p.copy("npm--pdfkit.md"), install: "npm install pdfkit", install_choices: [] });
   assert.equal(readFileSync(p.copy("npm--pdfkit.md"), "utf8"), adopted(PDFKIT));
   assert.equal(readFileSync(p.personal("npm--pdfkit.md"), "utf8"), PDFKIT, "the personal note is unchanged");
-  assert.equal(readFileSync(join(p.project, ".magpie", ".gitignore"), "utf8"), ".cache/\n");
+  assert.equal(readFileSync(join(p.project, ".magpie", ".gitignore"), "utf8"), ".cache/\n.trash/\n");
   assert.ok(existsSync(join(p.project, ".magpie", "tags.md")), "a new journal gets the starter tag list");
   assert.deepEqual(run.notices, [`Created the project journal: ${join(p.project, ".magpie")}`]);
   assert.equal(run.name, "pdfkit");
