@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { AGENTS } from "../core/agents.ts";
@@ -9,12 +9,15 @@ import { magpie, sandbox } from "./fixtures/sandbox.ts";
 import type { Terminal } from "./prompt.ts";
 
 // repomagpie setup (decision 0035) with Cursor, whose file setup edits itself; core's tests cover the
-// agent CLIs. The home is a scratch folder, PATH is empty, and `self` names a scratch node and entry.
+// agent CLIs. The home is a scratch folder, PATH holds only a `cursor` command (setup chooses agents
+// found by command or app, decision 0038; it never runs Cursor's, which can't add an entry), and
+// `self` names a scratch node and entry.
 
 function box(env: Record<string, string> = {}) {
-  const b = sandbox({ "home/.cursor/": null });
+  const b = sandbox({ "home/.cursor/": null, [process.platform === "win32" ? "bin/cursor.cmd" : "bin/cursor"]: "exit 1\n" });
+  if (process.platform !== "win32") chmodSync(join(b.root, "bin", "cursor"), 0o755);
   const self = { execPath: join(b.root, "nodejs", "node.exe"), entry: join(b.root, "npm", "node_modules", "repomagpie", "dist", "cli", "main.js") };
-  const over = { env: { PATH: "", APPDATA: join(b.home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(b.home, ".config"), ...env }, self };
+  const over = { env: { PATH: join(b.root, "bin"), APPDATA: join(b.home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(b.home, ".config"), ...env }, self };
   const cursor = join(b.home, ".cursor", "mcp.json");
   return { ...b, self, over, cursor, entry: () => JSON.parse(readFileSync(cursor, "utf8")).mcpServers.repomagpie };
 }
@@ -154,7 +157,7 @@ test("the note tool, mixed: with neither flag Cursor's and Gemini CLI's entries 
   const launch = { command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "mcp"] };
   writeFileSync(b.cursor, JSON.stringify({ mcpServers: { repomagpie: { ...launch, args: [...launch.args, "--allow-write"] } } }));
   writeFileSync(gemini, JSON.stringify({ mcpServers: { repomagpie: launch } }));
-  const r = await magpie(b, ["setup", "--yes"], b.over);
+  const r = await magpie(b, ["setup", "--yes", "--agents", "cursor,gemini"], b.over);
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(b.entry().args, [...launch.args, "--allow-write"]);
   assert.deepEqual(JSON.parse(readFileSync(gemini, "utf8")).mcpServers.repomagpie.args, launch.args);
@@ -180,7 +183,8 @@ test("the note-tool question says what it is now; Enter keeps it on only when ev
     const entry = (on: boolean | null) => (on === null ? {} : { repomagpie: { ...launch(b), args: [...launch(b).args, ...(on ? ["--allow-write"] : [])] } });
     writeFileSync(b.cursor, JSON.stringify({ mcpServers: entry(state.cursor) }));
     writeFileSync(gemini, JSON.stringify({ mcpServers: entry(state.gemini) }));
-    const t = terminal("\r", "\r", "\r");
+    // A: choose all, Gemini CLI too, found by its settings.json only.
+    const t = terminal("a\r", "\r", "\r");
     const r = await magpie(b, ["setup"], { ...b.over, interactive: true, terminal: t });
     assert.equal(r.code, 0, r.err);
     assert.match(t.drawn(), state.asks, state.name);
@@ -242,7 +246,7 @@ test("--remove takes out only our entry, after a backup", async () => {
 test("--project: the skill and the Claude Code hook go into the project; the MCP entries stay in the user's settings", async () => {
   const b = box();
   mkdirSync(join(b.home, ".claude"));
-  const r = await magpie(b, ["--project", b.project, "setup", "--yes"], b.over);
+  const r = await magpie(b, ["--project", b.project, "setup", "--yes", "--agents", "cursor,claude-code"], b.over);
   assert.equal(r.code, 0, r.err);
   assert.match(r.err, /In the project .* \(the MCP entries and the other agents' hooks above stay in your own settings\):/);
   assert.ok(existsSync(join(b.home, ".cursor", "hooks.json")), "Cursor's hook names this machine's paths: the user's settings");
@@ -257,13 +261,13 @@ test("--project: the skill and the Claude Code hook go into the project; the MCP
 test("the hooks: each on its agent's lines in the plan, then in the summary; Codex CLI's says how to trust it", async () => {
   const b = box();
   mkdirSync(join(b.home, ".codex"));
-  const r = await magpie(b, ["setup", "--yes"], b.over);
+  const r = await magpie(b, ["setup", "--yes", "--agents", "cursor,codex"], b.over);
   assert.equal(r.code, 0, r.err);
   assert.match(r.err, /^ {16}hook: add: edit ~[\\/]\.codex[\\/]hooks\.json\n {18}it will start node directly, then hook codex, only when both files are there$/m);
   assert.match(r.err, /^Done: the Cursor hook, added\.$/m);
   assert.match(r.err, /^Done: the Codex CLI hook, added\.$/m);
   assert.match(r.err, /^Codex CLI runs the hook only once you trust it: open \/hooks in Codex and trust RepoMagpie's hook\.$/m);
-  const again = await magpie(b, ["setup", "--yes"], b.over);
+  const again = await magpie(b, ["setup", "--yes", "--agents", "cursor,codex"], b.over);
   assert.match(again.err, /^ {16}hook: already set up: ~[\\/]\.codex[\\/]hooks\.json$/m);
   assert.doesNotMatch(again.err, /trust/, "nothing new to trust");
 });
@@ -273,4 +277,115 @@ test("a journal chosen with MAGPIE_HOME goes into the entry, since the agent won
   mkdirSync(join(b.project, "x"), { recursive: true });
   await magpie(b, ["setup", "--yes"], b.over);
   assert.deepEqual(b.entry().args.slice(-2), ["--home", join(b.project, "x", "journal")]);
+});
+
+// --- The macOS test (2026-10-24, decision 0038) ---
+
+test("an agent found by its folder only is listed unchosen, with how each was found; --yes leaves it, --agents and --remove take it", async () => {
+  const b = box();
+  mkdirSync(join(b.home, ".codex"));
+  const t = terminal("\u0003");
+  await magpie(b, ["setup"], { ...b.over, interactive: true, terminal: t });
+  assert.match(t.drawn(), /^> \[ \] Codex CLI \(found ~[\\/]\.codex only\)\n {2}\[x\] Cursor \(the cursor command\)$/m);
+
+  const yes = await magpie(b, ["setup", "--yes"], b.over);
+  assert.equal(yes.code, 0, yes.err);
+  assert.match(yes.err, /^ {2}Codex CLI {5}not chosen: found ~[\\/]\.codex only \(--agents codex sets it up\)$/m);
+  assert.equal(existsSync(join(b.home, ".codex", "hooks.json")), false, "no hook for an agent found by its folder only");
+  const json = JSON.parse((await magpie(b, ["setup", "--dry-run", "--json"], b.over)).out);
+  const by = (id: string) => json.agents.find((a: { id: string }) => a.id === id);
+  assert.deepEqual([by("codex").action, by("codex").found, by("codex").installed], ["skip", { by: "folder", path: join(b.home, ".codex") }, true]);
+  assert.deepEqual(by("cursor").found.by, "command");
+
+  assert.equal((await magpie(b, ["setup", "--yes", "--agents", "codex"], b.over)).code, 0);
+  assert.ok(existsSync(join(b.home, ".codex", "hooks.json")), "--agents chooses exactly");
+  // --remove chooses every agent found: setup may have written to one found by its folder only.
+  const removed = await magpie(b, ["setup", "--remove", "--yes"], b.over);
+  assert.match(removed.err, /^Done: the Codex CLI hook, removed/m);
+});
+
+test("--yes says once that new entries start without the note tool; not with a flag, an answer, or an entry kept", async () => {
+  const b = box();
+  const line = "Note tool: off (repomagpie setup --allow-write turns it on).";
+  const dry = await magpie(b, ["setup", "--dry-run"], b.over);
+  assert.equal(dry.err.split("\n").filter((l) => l === line).length, 1, dry.err);
+  const yes = await magpie(b, ["setup", "--yes"], b.over);
+  assert.equal(yes.err.split("\n").filter((l) => l === line).length, 2, "in the plan and the summary");
+  assert.doesNotMatch((await magpie(b, ["setup", "--yes"], b.over)).err, /Note tool: off/, "the entry is kept as it is");
+
+  const flag = box();
+  assert.doesNotMatch((await magpie(flag, ["setup", "--yes", "--no-allow-write"], flag.over)).err, /Note tool: off/);
+  const asked = box();
+  assert.doesNotMatch((await magpie(asked, ["setup"], { ...asked.over, interactive: true, terminal: terminal("\r", "n", "\r") })).err, /Note tool: off/);
+
+  // Only some entries are new: those are named.
+  const mixed = box();
+  writeFileSync(mixed.cursor, JSON.stringify({ mcpServers: { repomagpie: { command: mixed.self.execPath, args: [NO_CODEGEN, mixed.self.entry, "mcp", "--allow-write"] } } }));
+  mkdirSync(join(mixed.home, ".gemini"));
+  writeFileSync(join(mixed.home, ".gemini", "settings.json"), "{}");
+  const r = await magpie(mixed, ["setup", "--yes", "--agents", "cursor,gemini"], mixed.over);
+  assert.match(r.err, /^Note tool: off in Gemini CLI \(repomagpie setup --allow-write turns it on\)\.$/m);
+});
+
+test("--remove where nothing of RepoMagpie's is there says so: nothing to remove, never already set up", async () => {
+  const b = box();
+  mkdirSync(join(b.home, ".claude"));
+  const r = await magpie(b, ["setup", "--remove", "--dry-run", "--agents", "cursor,claude-code"], b.over);
+  assert.equal(r.code, 0, r.err);
+  assert.doesNotMatch(r.err, /already/);
+  assert.match(r.err, /^ {2}Cursor {8}nothing to remove\n {16}hook: nothing to remove: ~[\\/]\.cursor[\\/]hooks\.json$/m);
+  assert.match(r.err, /^ {2}Claude Code {3}nothing to remove$/m);
+  assert.match(r.err, /^ {2}Skill {9}nothing to remove: ~[\\/]\.agents[\\/]skills[\\/]repomagpie$/m);
+  assert.match(r.err, /^ {2}Hook {10}nothing to remove: ~[\\/]\.claude[\\/]settings\.json$/m);
+});
+
+test("--delete-backups: lists them, asks with no as the default, deletes only after yes; --yes without a terminal; --keep-latest; --json", async () => {
+  const b = box();
+  // Two runs that write backups: Cursor's mcp.json gets one each time, hooks.json the first time.
+  writeFileSync(b.cursor, "{}");
+  writeFileSync(join(b.home, ".cursor", "hooks.json"), "{}");
+  const first = await magpie(b, ["setup", "--yes"], b.over);
+  assert.match(first.err, /^repomagpie setup --delete-backups deletes them; with --keep-latest it keeps the newest of each file\.$/m);
+  await magpie(b, ["setup", "--yes", "--allow-write"], b.over);
+  const folder = join(b.home, ".cursor");
+  assert.equal(backups(folder), 3, "mcp.json twice, hooks.json once");
+  writeFileSync(join(folder, "mcp.json.bak"), "{}"); // not one of setup's
+
+  const no = terminal("\r");
+  const kept = await magpie(b, ["setup", "--delete-backups"], { ...b.over, interactive: true, terminal: no });
+  assert.match(no.drawn(), /Delete these 3 backups\? \(y\/N\) no/);
+  assert.match(kept.err, /^Backups from setup to delete:\n {2}~[\\/]\.cursor[\\/]mcp\.json\.repomagpie-backup-\d{8}-\d{6}Z(-\d+)? {2}\d{4}-\d\d-\d\d \d\d:\d\d UTC$/m);
+  assert.match(kept.err, /Cancelled\. Nothing changed\./);
+  assert.equal(backups(folder), 3);
+
+  assert.equal((await magpie(b, ["setup", "--delete-backups"], b.over)).code, 2, "no terminal: --yes or --dry-run");
+  assert.equal((await magpie(b, ["setup", "--delete-backups", "--remove", "--yes"], b.over)).code, 2);
+  assert.equal((await magpie(b, ["setup", "--keep-latest", "--yes"], b.over)).code, 2);
+  const dry = JSON.parse((await magpie(b, ["setup", "--delete-backups", "--keep-latest", "--dry-run", "--json"], b.over)).out);
+  assert.deepEqual([dry.dry_run, dry.keep_latest, dry.delete.length, dry.keep.length], [true, true, 1, 2]);
+  assert.equal(backups(folder), 3);
+
+  const latest = await magpie(b, ["setup", "--delete-backups", "--keep-latest", "--yes"], b.over);
+  assert.equal(latest.code, 0, latest.err);
+  assert.match(latest.err, /^Kept, the newest of each file:$/m);
+  assert.match(latest.err, /^Deleted 1 of 1 backup\.$/m);
+  assert.equal(backups(folder), 2, "the newest of mcp.json and of hooks.json");
+
+  const yes = terminal("y");
+  const all = await magpie(b, ["setup", "--delete-backups"], { ...b.over, interactive: true, terminal: yes });
+  assert.equal(all.code, 0, all.err);
+  assert.match(all.err, /^Deleted: ~[\\/]\.cursor[\\/]hooks\.json\.repomagpie-backup-/m);
+  assert.equal(backups(folder), 0);
+  assert.ok(existsSync(join(folder, "mcp.json.bak")) && existsSync(b.cursor), "only setup's backups go");
+  assert.match((await magpie(b, ["setup", "--delete-backups", "--yes"], b.over)).err, /^No backups from setup\.$/m);
+});
+
+test("--delete-backups never follows a link named like a backup", { skip: process.platform === "win32" && "a junction needs no rights, but this checks a file link" }, async () => {
+  const b = box();
+  const target = join(b.root, "elsewhere.json");
+  writeFileSync(target, "{}");
+  symlinkSync(target, `${b.cursor}.repomagpie-backup-20261024-101010Z`);
+  const r = JSON.parse((await magpie(b, ["setup", "--delete-backups", "--yes", "--json"], b.over)).out);
+  assert.deepEqual(r.delete, []);
+  assert.ok(existsSync(target) && existsSync(`${b.cursor}.repomagpie-backup-20261024-101010Z`));
 });

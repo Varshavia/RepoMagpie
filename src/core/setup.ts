@@ -9,7 +9,7 @@ import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
-import { AGENTS, isInstalled, mcpEntry, onPath, readJsonc, type Agent, type McpEntry, type McpFormat, type Where } from "./agents.ts";
+import { AGENTS, foundBy, mcpEntry, onPath, readJsonc, type Agent, type Found, type McpEntry, type McpFormat, type Where } from "./agents.ts";
 import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
@@ -29,6 +29,7 @@ export interface AgentPlan {
   id: Agent["id"];
   name: string;
   installed: boolean;
+  found: Found | null; // how it was found: its command, its app, or only its folder
   file: string; // the file that holds its MCP entry
   action: Action;
   method: "cli" | "json" | null; // how an add, update or remove is made
@@ -61,7 +62,9 @@ export interface SetupRequest {
   // its own and a new one starts without the note tool.
   noteTool?: boolean;
   remove: boolean;
-  only?: Agent["id"][]; // --agents; default: every installed agent
+  // --agents; default: every agent found by its command or app, and with remove every agent found,
+  // since an earlier setup may have written to one found by its folder only.
+  only?: Agent["id"][];
   stamp: string; // for backup names: YYYYMMDD-HHMMSSZ, in UTC
   project?: string; // --project: the project root, for the skill and the hook
   skillSource?: string; // default: the package's
@@ -89,11 +92,12 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
   const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null, hooks: [] };
   for (const agent of AGENTS) {
-    const installed = isInstalled(agent, where);
+    const found = foundBy(agent, where);
+    const installed = found !== null;
     const file = agent.mcpFile(where);
-    const base: AgentPlan = { id: agent.id, name: agent.name, installed, file, action: "skip", method: null, reason: null, current: null, note_tool: null, backup: null, snippet: null };
-    if (request.only ? !request.only.includes(agent.id) : !installed) {
-      if (!request.only) plan.agents.push({ ...base, reason: "not installed" });
+    const base: AgentPlan = { id: agent.id, name: agent.name, installed, found, file, action: "skip", method: null, reason: null, current: null, note_tool: null, backup: null, snippet: null };
+    if (request.only ? !request.only.includes(agent.id) : !found || (found.by === "folder" && !request.remove)) {
+      if (!request.only) plan.agents.push({ ...base, reason: found ? `found ${found.path} only` : "not installed" });
       continue;
     }
     if (!installed) {
@@ -159,7 +163,7 @@ function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch:
   if ("error" in config) return refuse(config.error);
   const text = config.text;
   const read = text === null ? { entry: null } : mcpEntry(text, agent.format, NAME);
-  const plain = text === null || agent.format === "codex-toml" || (() => { const r = readJsonc(text); return !("error" in r) && r.plain; })();
+  const plain = isPlain(agent, text);
   const entry = "entry" in read ? read.entry : null;
   // Shown in the plan with secrets redacted (another server's command can hold a token); compared raw.
   const current = entry ? { command: entry.command === null ? null : redactText(entry.command), args: redactArgs(entry.args) } : null;
@@ -183,11 +187,34 @@ function planAgent(agent: Agent, base: AgentPlan, request: SetupRequest, launch:
   const planned = { ...withCurrent, note_tool: tool };
   if (entry && same(entry, wanted)) return { ...planned, action: "keep", backup: null };
   const action: Action = current ? "update" : "add";
-  // An update through a CLI needs it to remove the old entry first.
-  if (cli && how.add && (!current || how.remove)) return { ...planned, action, method: "cli" };
+  const method = writeMethod(agent, cli, plain, current !== null);
+  if (method === "cli") return { ...planned, action, method };
   if ("error" in read) return { ...planned, action: "refused", backup: null, reason: `${base.file} can't be read: ${read.error}`, snippet: snippet(agent, wanted) };
-  if (how.edit && plain) return { ...planned, action, method: "json" };
+  if (method === "json") return { ...planned, action, method };
   return { ...planned, action: "manual", backup: null, reason: manualReason(agent, cli, plain), snippet: snippet(agent, wanted) };
+}
+
+// The JSON file has no comments, trailing commas or a key written twice (Codex's TOML is never edited).
+const isPlain = (agent: Agent, text: string | null) =>
+  text === null || agent.format === "codex-toml" || (() => { const r = readJsonc(text); return !("error" in r) && r.plain; })();
+
+// How setup adds or updates an entry: through the agent's CLI (an update needs it to remove the old
+// entry first), by a JSON edit, or not at all (by hand).
+function writeMethod(agent: Agent, cli: string | undefined, plain: boolean, hasEntry: boolean): "cli" | "json" | null {
+  const how = CLI[agent.id];
+  if (cli && how.add && (!hasEntry || how.remove)) return "cli";
+  return how.edit && plain ? "json" : null;
+}
+
+// Why setup can only print this agent's entry for the user to paste, or null when it writes the entry
+// itself; for doctor's to-dos (decision 0035), which then name the action that works. `text` is the
+// file's text, null when it doesn't exist.
+export function mcpByHand(agent: Agent, where: Where, text: string | null, hasEntry: boolean): string | null {
+  const unsafe = pathProblem(agent.mcpFile(where), where.home);
+  if (unsafe) return unsafe.replace(/\.$/, "");
+  const cli = onPath(agent.cli, where)[0];
+  const plain = isPlain(agent, text);
+  return writeMethod(agent, cli, plain, hasEntry) ? null : manualReason(agent, cli, plain);
 }
 
 export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {

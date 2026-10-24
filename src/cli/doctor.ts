@@ -50,7 +50,7 @@ export function render(r: DoctorJson, home: string): string {
   for (const h of r.agent_hooks) {
     const off = h.off ? `  (${h.off.split(";")[0]})` : "";
     if (h.error) lines.push(`  ${h.name.padEnd(15)}  can't read ${tilde(h.file)}: ${h.error}`);
-    else if (!h.entries.length) lines.push(`  ${h.name.padEnd(15)}  ${h.installed ? "none" : "not installed"}${off}`);
+    else if (!h.entries.length) lines.push(`  ${h.name.padEnd(15)}  ${!h.found ? "not installed" : h.found.by === "folder" ? `none (found ${tilde(h.found.path)} only)` : "none"}${off}`);
     for (const e of h.entries) lines.push(`  ${h.name.padEnd(15)}  ${tilde(h.file)}: ${agentHookLine(e)}${off}`);
   }
 
@@ -62,7 +62,7 @@ export function render(r: DoctorJson, home: string): string {
   lines.push("", "Backups from setup");
   if (!r.backups.length) lines.push("  none");
   for (const b of r.backups) lines.push(`  ${tilde(b.path)}  ${b.date.slice(0, 10)} ${b.date.slice(11, 16)} UTC`);
-  if (r.backups.length) lines.push(`  Each is a whole copy of the file: those of ~${r.platform === "win32" ? "\\" : "/"}.claude.json can hold sign-in tokens and MCP servers' secrets. Delete the backups you no longer need.`);
+  if (r.backups.length) lines.push(`  Each is a whole copy of the file: those of ~${r.platform === "win32" ? "\\" : "/"}.claude.json can hold sign-in tokens and MCP servers' secrets. repomagpie setup --delete-backups deletes them, after asking; with --keep-latest it keeps the newest of each file.`);
 
   lines.push("", "Journals");
   for (const j of r.journals) {
@@ -89,9 +89,11 @@ function agentHookLine(e: AgentHookEntry): string {
 
 function agentLine(a: AgentReport, tilde: (path: string) => string): string {
   if (a.error) return `can't read ${tilde(a.config)}: ${a.error}`;
+  // Found by its folder only: setup doesn't choose it, so it isn't called installed.
+  const state = a.found?.by === "folder" ? `found ${tilde(a.found.path)} only` : "installed";
   // Antigravity lists the servers from its own cache (docs/agents.md).
-  if (!a.mcp && a.installed && a.id === "antigravity") return `installed; no repomagpie entry in ${tilde(a.config)} (a removed entry can stay listed until ~/.gemini/antigravity-cli/mcp/ is cleared)`;
-  if (!a.mcp) return a.installed ? `installed; no repomagpie entry in ${tilde(a.config)}` : "not installed";
+  if (!a.mcp && a.installed && a.id === "antigravity") return `${state}; no repomagpie entry in ${tilde(a.config)} (a removed entry can stay listed until ~/.gemini/antigravity-cli/mcp/ is cleared)`;
+  if (!a.mcp) return a.installed ? `${state}; no repomagpie entry in ${tilde(a.config)}` : "not installed";
   const m = a.mcp;
   const parts = [`${tilde(m.command ?? "(no command)")}${m.node_found ? "" : " (missing)"}`];
   if (m.entry) parts.push(`${tilde(m.entry)}${m.entry_found ? "" : " (missing)"}`);

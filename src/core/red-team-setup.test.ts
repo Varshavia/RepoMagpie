@@ -157,7 +157,9 @@ test("S7: node and entry paths with spaces, quotes, % and non-ASCII letters in t
   mkdirSync(join(s.home, ".cursor"));
   const userish = join(s.home, "AppData", "Roaming", "npm");
   const launch = { command: join(s.home, "nodejs", "node.exe"), args: [NO_CODEGEN, join(userish, "node_modules", "repomagpie", "dist", "cli", "main.js"), "mcp"] };
-  const done = applySetup(planSetup(s.request({ launch })), s.request({ launch }));
+  // Cursor is found by its folder only here, so it is named (decision 0038).
+  const only: SetupRequest["only"] = ["claude-code", "codex", "cursor", "gemini", "vscode"];
+  const done = applySetup(planSetup(s.request({ launch, only })), s.request({ launch, only }));
   assert.deepEqual(done.agents.filter((a) => a.installed).map((a) => [a.id, a.result, a.error]), ["claude-code", "codex", "cursor", "gemini", "vscode"].map((id) => [id, "done", undefined]));
   assert.equal(done.hook?.result, "done");
   const hook = JSON.parse(readFileSync(s.settings, "utf8")).hooks.PreToolUse[0].hooks[0];

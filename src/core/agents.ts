@@ -22,7 +22,7 @@ export interface Agent {
   id: "claude-code" | "codex" | "cursor" | "gemini" | "vscode" | "antigravity" | "copilot";
   name: string;
   cli: string; // the command on PATH
-  marker: (w: Where) => string; // a folder or file of its own: it counts as installed when this exists (or cli is on PATH)
+  marker: (w: Where) => string; // a folder or file of its own: it is found when this exists (or cli is on PATH, or its app is there)
   mcpFile: (w: Where) => string;
   format: McpFormat;
 }
@@ -51,7 +51,31 @@ export const AGENTS: Agent[] = [
 ];
 
 // Its marker exists, or its command is in an absolute PATH folder.
-export const isInstalled = (agent: Agent, w: Where): boolean => existsSync(agent.marker(w)) || onPath(agent.cli, w).length > 0;
+export const isInstalled = (agent: Agent, w: Where): boolean => foundBy(agent, w) !== null;
+
+// How an agent was found: its command on PATH, its app (macOS's Applications folders), or only its
+// folder. A folder alone can be left behind by an uninstall, or made by another tool (VS Code reads
+// ~/.copilot), so setup chooses only agents found by command or app (macOS test, 2026-10-24).
+export interface Found {
+  by: "command" | "app" | "folder";
+  path: string;
+}
+
+// The apps that bring the agent along. Their command is on PATH only once the user installs it from
+// the app ("Shell Command: Install 'code' command in PATH"). The Windows installers put it on PATH.
+const APPS: Partial<Record<Agent["id"], string>> = { cursor: "Cursor.app", vscode: "Visual Studio Code.app" };
+
+export function foundBy(agent: Agent, w: Where): Found | null {
+  const command = onPath(agent.cli, w)[0];
+  if (command) return { by: "command", path: command };
+  const app = APPS[agent.id];
+  if (app && w.platform === "darwin") {
+    for (const folder of ["/Applications", join(w.home, "Applications")]) {
+      if (existsSync(join(folder, app))) return { by: "app", path: join(folder, app) };
+    }
+  }
+  return existsSync(agent.marker(w)) ? { by: "folder", path: agent.marker(w) } : null;
+}
 
 // Claude Code's user settings, which hold the hook (spec §6).
 export const claudeSettings = (w: Where) => join(w.home, ".claude", "settings.json");
