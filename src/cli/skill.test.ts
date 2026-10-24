@@ -93,6 +93,24 @@ test("instructions in a note, and hidden-character markers, are named in the fir
   assert.match(rule, /U\+202E/);
 });
 
+// The capture offer (feat/capture-nudge): once, at the end of a task that decided on a dependency.
+// The Verdict stays the user's words (decision 0018), and "avoid" only comes from the user (decision 0024).
+test("after a dependency decision, the skill offers once at the end, in the user's words, with a command like the others", () => {
+  const text = readFileSync(skillFile, "utf8");
+  const section = /^## After a dependency decision\n([\s\S]*?)^## /m.exec(text)?.[1];
+  assert.ok(section, "SKILL.md has an \"After a dependency decision\" section");
+  assert.ok(text.indexOf("## Recording an opinion") < text.indexOf("## After a dependency decision"), "it follows \"Recording an opinion\"");
+  assert.match(section, /offer once/);
+  assert.match(section, /task is done/);
+  assert.match(section, /Don't offer mid-task/);
+  assert.match(section, /Never write the Verdict for them/);
+  assert.match(section, /never ask again after a no/);
+  assert.match(section, /"Avoid" goes in only from the user/);
+  const commands = commandLines("repomagpie").filter(({ usage }) => usage.includes(" ") && section.includes(usage));
+  assert.deepEqual(commands.map(({ usage }) => usage), ['repomagpie note <name> --type npm "<the user\'s words>" --alternative <chosen> --json']);
+  assert.ok(section.split("\n").length <= 16, "the section stays within 15 lines (the skill is read on every task)");
+});
+
 test("the skill's links stay inside the skill folder, one level deep, and exist", () => {
   for (const file of skillFiles()) {
     for (const m of withoutFences(readFileSync(file, "utf8")).matchAll(/\]\(([^)\s]+)\)/g)) {

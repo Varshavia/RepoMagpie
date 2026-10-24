@@ -1,6 +1,6 @@
 ---
 name: repomagpie
-description: Reads and records the user's own notes on dependencies and tools with RepoMagpie's MCP tools or its repomagpie CLI. Use before adding or installing any package (npm, pnpm, yarn, bun, pip, uv, cargo), when the user asks what they have or know for a task ("what do I have for browser testing?"), when choosing libraries or tools for a project, and when the user gives an opinion on a tool worth remembering.
+description: Reads and records the user's own notes on dependencies and tools with RepoMagpie's MCP tools or its repomagpie CLI. Use before adding or installing any package (npm, pnpm, yarn, bun, pip, uv, cargo), when the user asks what they have or know for a task ("what do I have for browser testing?"), when choosing libraries or tools for a project, when the user gives an opinion on a tool worth remembering, and at the end of a task that chose, replaced or dropped a dependency.
 license: MIT
 compatibility: Needs the repomagpie MCP server, or a shell and the repomagpie command; both come from the npm package repomagpie (source and releases at github.com/Varshavia/RepoMagpie; Node.js 22.12 or later).
 metadata:
@@ -83,6 +83,21 @@ repomagpie note <name-or-url> "<the user's words>" --json
 - The note goes to the personal journal. `--to project` only with the user's explicit OK.
 - Exit 1 with "already has a Verdict": RepoMagpie never overwrites one. Give the user the note's path; they edit it themselves.
 - With the user's OK, you may draft "What it does" and "Use when" in the note's file (its `path`), when that section is empty. Make `<!-- magpie:draft -->` the first line of the section, then your text; the user accepts a draft by deleting that line. Never draft the Verdict or "Avoid when", and don't change other sections or the frontmatter.
+
+## After a dependency decision
+
+When the task is done (finished, or the user moved on) and in it the user chose a package over another, replaced one, dropped one after trouble or for a reason, pinned or avoided a version, or answered a RepoMagpie note, offer once to save that decision. A switch you proposed counts once the user accepted it. Don't offer mid-task, in reply to a hook, for a routine install with no choice, for a package you dropped without the user, or when the user asked not to be asked. With no user to answer (`claude -p`, CI), list the decisions in one line of your final output and save nothing.
+
+- First recall the packages. Skip one the user already declined in this conversation, or whose exact note's `verdict` already says it; when unsure, offer and quote that Verdict.
+- One message, after your summary, in the user's language: each decision in a few words (at most 3, then "+N more"), that it goes to their personal journal, and why, in their words. "We dropped moment for date-fns. Save that to your RepoMagpie journal? In a few words, why?" Never write the Verdict for them, and never ask again after a no.
+- A reason: save their words, unchanged, as in "Recording an opinion", on the package the reason is about, with `--alternative` only for a package they chose or named. Give the type (`--type`, or a PURL such as `pkg:npm/moment` as the MCP `target`):
+
+```
+repomagpie note <name> --type npm "<the user's words>" --alternative <chosen> --json
+```
+
+- "Avoid" goes in only from the user: their own "avoid", or a yes to "Should RepoMagpie ask before installing it again?", which you may ask once, before saving, when their words reject the package (a saved Verdict is never overwritten). Then the Verdict is "avoid: <their words>".
+- "Yes" without a reason saves the note without text, to the inbox. "No" saves nothing. The chosen package gets its own note only if the user says something about it.
 
 ## When the user names an alternative
 
