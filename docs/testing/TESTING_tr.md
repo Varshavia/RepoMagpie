@@ -101,6 +101,7 @@ Uygulamayı kendi terminalinde Ctrl+C ile durdur.
 
 - Her zamanki gibi çalış.
 - Bir paketi seçtiğinde ya da bıraktığında tek satır yaz (`repomagpie note <ad> "<neden>" --type npm`) ya da ajanından onu RepoMagpie'ye kaydetmesini iste.
+- Bir paketi seçtiğin, değiştirdiğin ya da bıraktığın bir işin sonunda ajanın bu kararı kaydetmeyi bir kez önerebilir. Birkaç kelimeyle nedenini söylemen yeterli; "hayır" demek de olur.
 - Başka hiçbir şey gerekmiyor.
 
 ## 7. gün: geri bildirimini gönder

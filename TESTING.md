@@ -99,6 +99,7 @@ Stop the app with Ctrl+C in its terminal.
 
 - Work as usual.
 - When you pick or drop a package, write one line (`repomagpie note <name> "<why>" --type npm`), or ask your agent to save it to RepoMagpie.
+- At the end of a task where you picked, replaced or dropped a package, your agent may offer once to save that decision. Answering with your reason, in a few words, is enough; "no" is fine too.
 - Nothing else is required.
 
 ## Day 7: send your feedback

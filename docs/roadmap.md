@@ -18,6 +18,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: [deleting a note](#deleting-a-note-featdelete-note) (`feat/delete-note`, [decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)): `repomagpie delete` and Delete note in the app move a note to the journal's `.trash/`, with Undo in the app. Merged (#44) and released in `0.2.0-beta.7` (2026-10-23), with the README rework (#43); next is the tester round.
   Also now: `0.2.0-beta.8` (2026-10-23), the build for the tester round: `setup --remove` on a Windows home folder with letters outside ASCII and suggest's single-letter keywords are fixed, and a check keeps the fs calls that broke out of the code (#47); the tester guide and the feedback form are in (#46).
   Also now: `0.2.0-beta.9` (2026-10-24), the fixes from the maintainer's macOS test (#49, [decision 0038](decisions/0038-setup-chooses-found-agents-and-deletes-backups-on-request.md), [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)): `setup` chooses agents found by their command or app, `repomagpie setup --delete-backups`, `doctor` to-dos that name a working action, the note-tool line, "nothing to remove", `library` for a registry package note, and the app following the system theme.
+  Also now: [the capture offer](#the-capture-offer-featcapture-nudge) (`feat/capture-nudge`): at the end of a task, the agent offers once to save a dependency decision made in it, with the user's reason as the Verdict; `doctor`'s to-do for entries left in an agent found by its folder only names both ways out; the maintainer's ideas of 2026-10-24 assessed in [ideas](ideas.md). Built; the maintainer runs the live scenarios on macOS after `0.2.0-beta.10`, with the real install and a scratch journal.
   Also now: the tester round on `0.2.0-beta.9`: two people, one on macOS and one on Windows, for a week. They follow [TESTING.md](../TESTING.md) and answer the "Beta feedback" issue form; [validation](validation.md#beta-tester-round) maps each question to the hypothesis it tests.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
 - **Later:** v0.3 Trust, v0.4 Share.
@@ -376,6 +377,16 @@ Testers will write test notes on their first day and want them gone. A delete mo
 - [x] Docs: decision 0037, the spec, the UI doc, the skill (never delete unless the user asked for that note by name) and the READMEs. No MCP tool deletes.
 
 **Done when:** a note can be moved to the trash from the CLI and from the app, disappears from everything that reads notes, and comes back with Undo in the app; no agent tool can delete; all checks pass.
+
+### The capture offer (`feat/capture-nudge`)
+H1 asks whether people will write notes ([validation](validation.md)). The commonest moment for a note is a dependency decision made during a task, which nobody phrases as an opinion. The agent already in the conversation saw it, so it offers once, at the end of the task, to save it; the Verdict stays the user's words ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)). No new model, process, network call or hook ([ideas](ideas.md), idea 12, step 1).
+- [x] The skill's "After a dependency decision": when it offers (the task is done, a decision involving the user, not already noted), when it doesn't, what the offer says, and what it saves (the user's reason as the Verdict, the chosen package as the alternative, "avoid" only from the user). `src/cli/skill.test.ts` checks the section.
+- [x] `repomagpie doctor`: for an agent found by its folder only, one to-do per agent that names both ways out (fix the entries, or `repomagpie setup --remove --agents <id>`); an agent that isn't installed names the file to edit by hand.
+- [x] [Ideas](ideas.md) 12 to 18, the maintainer's of 2026-10-24, assessed: auto-extraction, taxonomy and semantic search, just-in-time context, team sync, a community hub, measuring skill compliance, Hugging Face notes.
+- [x] Docs: the spec, the changelog, validation (H1), the tester guides, and the READMEs ("Remember", no extra model, "Does RepoMagpie use AI?").
+- [ ] The five live scenarios in Claude Code on a scratch journal, run by the maintainer on macOS after `0.2.0-beta.10`, with the real install (the script is in the pull request).
+
+**Done when:** the skill offers once, at the end, when a dependency decision happened, and never writes the Verdict; the five live scenarios behave as expected; `doctor` names both ways out for a folder-only agent's entries; all checks pass.
 
 ## v0.3 Trust
 - [ ] `repomagpie init`, if it missed v0.1.

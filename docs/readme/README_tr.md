@@ -40,7 +40,7 @@ Do you want to proceed?
 
 Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 
-- **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notlar, sahibi olduğun Markdown dosyalarıdır.
+- **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ajanın da bir işin sonunda, o işte verilen bir bağımlılık kararını, senin nedeninle, senin sözlerinle Verdict olarak kaydetmeyi bir kez önerir. Notlar, sahibi olduğun Markdown dosyalarıdır.
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
 
@@ -83,7 +83,9 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 
 ![RepoMagpie nasıl çalışır: ajanın npm install pdfkit çalıştırmak üzere; önce skill ya da MCP aracı recall kontrol eder, hook ise kurulum komutunu son güvence olarak kontrol eder; ikisi de ~/.magpie'deki kişisel günlüğünü ve .magpie/ içindeki proje günlüğünü okur; Verdict'in, "avoid: async streams painful; use puppeteer", geri gelir ve ajanın kurmadan önce sana sorar.](../assets/how-it-works.svg)
 
-Bir kurulumdan önce skill, ajanına paketi MCP sunucusunun `recall` aracıyla ya da `repomagpie recall` komutuyla aramasını söyler. RepoMagpie makinendeki iki günlüğü de okur ve notlarını döndürür; biri paketten kaçınmanı söylüyorsa ajanın notu sana gösterir ve önce sorar. Ajan bu adımı atlarsa diye hook, kurulum komutunun kendisini kontrol eder. Hook yoksa kontrol, ajanın skill'e uyduğu kadar işe yarar.
+Bir kurulumdan önce skill, ajanına paketi MCP sunucusunun `recall` aracıyla ya da `repomagpie recall` komutuyla aramasını söyler. RepoMagpie makinendeki iki günlüğü de okur ve notlarını döndürür; biri paketten kaçınmanı söylüyorsa ajanın notu sana gösterir ve önce sorar. Ajan bu adımı atlarsa diye hook, kurulum komutunun kendisini kontrol eder.
+
+Ek bir model, API anahtarı ya da telemetri yoktur. RepoMagpie zaten kullandığın ajan üzerinden çalışır; bu yüzden o ajanın skill'e uyduğu kadar işe yarar: hook yoksa bu, kurulumdan önceki kontrol için de geçerlidir.
 
 ## Ajanına sor
 
@@ -147,6 +149,13 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
 Hayır. Kişisel günlüğün, makinende Markdown dosyalarından oluşan bir klasördür; bir proje günlüğü, deposu kadar görünürdür ve telemetri yoktur. Tek ağ istekleri, `repomagpie note`, `repomagpie import` ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde GitHub'ın API'sine gider: deponun meta verilerini, dosya listesini ve kökteki manifest dosyalarını okur, ayarladıysan `GITHUB_TOKEN`'ı gönderir, günlüklerinden hiçbir şey göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler; `repomagpie mcp` ise hiçbir ağ bağlantısı ya da port açmaz: ajanınla stdio üzerinden konuşur. Ajanının okuduğu notlar, konuşmanın bir parçası olarak ajanın model sağlayıcısına da gider. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+
+</details>
+
+<details>
+<summary><strong>RepoMagpie yapay zekâ kullanıyor mu?</strong></summary>
+
+Kendine ait bir model kullanmaz. RepoMagpie'nin komutları paket adlarını ve kelimeleri eşleştirir, hiçbir modeli çağırmaz. Yapay zekâ, zaten kullandığın kodlama ajanıdır: skill ve MCP araçları üzerinden bir kurulumdan önce notlarını hatırlatır, elinde ne olduğunu sorduğunda onlarda arar ve bir işin sonunda bir bağımlılık kararını kaydetmeyi bir kez önerir. Skill ona Verdict'ini asla senin yerine yazmamasını (yalnızca senin sözlerin ya da hiçbir şey), sen o notu adıyla istemedikçe asla bir notu silmemesini ve kaçınmayı not ettiğin bir paketi sana sormadan asla kurmamasını söyler; ajanında hook varsa bu sonuncusunu hook da kontrol eder. RepoMagpie'nin kendisi günlüklerinden hiçbir şeyi bir yere göndermez. Yukarıdaki yanıtta dendiği gibi, ajanının okuduğunu ajanının model sağlayıcısı da görür.
 
 </details>
 
