@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.9] - 2026-10-24
+
+The tenth pre-release, with the fixes from a macOS test: `repomagpie setup` now chooses only the agents it finds by their command or app, and `repomagpie setup --delete-backups` deletes the backups `setup` made. If you ran `setup` with an earlier beta, run `repomagpie setup --delete-backups` once: copies of `~/.claude.json` can hold sign-in tokens.
+
 ### Added
 
 - `repomagpie setup --delete-backups` deletes `setup`'s backups. It lists them with their dates, asks "Delete these 3 backups? (y/N)", and prints each one it deleted; without a terminal it needs `--yes`. `--keep-latest` keeps the newest backup of each file. It deletes only the backups `repomagpie doctor` lists, never through a link. `setup`'s summary and `doctor` name the command.
@@ -238,7 +242,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...HEAD
+[0.2.0-beta.9]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...v0.2.0-beta.9
 [0.2.0-beta.8]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...v0.2.0-beta.8
 [0.2.0-beta.7]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...v0.2.0-beta.7
 [0.2.0-beta.6]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.5...v0.2.0-beta.6
