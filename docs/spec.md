@@ -36,6 +36,8 @@ Captures a verdict in one line, or creates a note from a URL.
 | `--type npm\|pypi\|cargo` | The package type for a bare name, when the nearest manifest doesn't settle it |
 | `--to personal\|project` | Which journal to write to. Default: `personal` |
 | `--alternative <target>` | A package the user named to use instead, added to `alternatives` (step 6). Repeatable |
+| `--use-when <text>` | One "Use when" item, in the user's words (step 7). Repeatable |
+| `--avoid-when <text>` | One "Avoid when" item, in the user's words (step 7). Repeatable |
 
 Behaviour:
 1. Resolve the target to a PURL (section 4).
@@ -45,7 +47,7 @@ Behaviour:
    - without text and without a URL: change nothing, print the note's path, exit 0 (`"created": false`);
    - for a URL: refresh the tool-owned fields (schema rule 2) and append skill lines for newly detected skills only.
 3. Otherwise create the note. For a GitHub URL, fetch the repository's metadata and file list (no README) and draft from them ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)):
-   - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty; an agent may draft more later through the skill.
+   - "What it does": the repository's GitHub description, marked as a draft. "Use when" stays empty unless the user gives items (step 7); an agent may draft more later through the skill.
    - `kind`: the first rule that matches ([decision 0030](decisions/0030-github-topics-become-tags.md), which gives the reason for each place):
      1. `awesome-list`: the topic `awesome-list`;
      2. `template`: the topic `template`, `starter` or `boilerplate`, or GitHub's template flag;
@@ -73,6 +75,13 @@ Behaviour:
    - New entries go at the end of the field; every other entry, and the rest of the file, stay byte for byte (the round-trip-safe frontmatter edit). A field that isn't a list is left alone: exit 1, nothing written.
    - A target already there, by its note or by its text (ignoring case), isn't added again: stderr says `Already an alternative: <target>`, exit 0.
    - A note can't be its own alternative: exit 1, nothing written.
+7. `--use-when <text>` and `--avoid-when <text>` write the user's own items to "Use when" and "Avoid when", one bullet per flag, in the same write as the rest. Like the Verdict, they are written only from the user's words, never an agent's summary, and never marked as a draft ([note schema](note-schema.md), rule 7).
+   - Each item is trimmed and must be one line of at most 500 characters, with at most 20 items per flag: the caps of section 1 (`CAPS.item` and `CAPS.items` in `src/core/text.ts`). Otherwise exit 2, nothing written. Hidden and control characters are kept in the file as typed, as in a Verdict, and shown as markers in `--json` and on stderr.
+   - A new note gets the items as a plain list. An existing note: an empty section gets them; a section that holds only a draft is replaced by them (stderr: `Your items replaced the draft in Use when.`); a section with the user's own items keeps them and gets the new items after the last one, with its own bullet marker and line endings. An item the section already has (ignoring case) isn't added again: stderr says `Already in the note: <item>`. A GitHub URL still drafts "What it does".
+   - A section RepoMagpie can't edit safely (it appears twice, or an unclosed code fence or comment is in the note) stops the save: exit 1, the message names the file, and the note stays as it was.
+   - Without text, the items are added to a note that already has a Verdict. With text and an existing Verdict, step 2's exit 1 applies and nothing is written, items included.
+   - With `--avoid-when`, stderr says `RepoMagpie will ask before <name> is installed.`: an "Avoid when" item makes it an avoid note for the hook ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md)).
+   - `--to project` follows the same rules.
 
 ```
 $ repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
@@ -81,12 +90,16 @@ $ repomagpie note pdfkit "avoid: async streams painful; use puppeteer"
 $ repomagpie note pdfkit --alternative puppeteer
 ✔ Updated in your personal journal: pdfkit
   ~/.magpie/notes/npm--pdfkit.md
+$ repomagpie note pdf-lib "fine for invoices" --use-when "filling in an existing PDF form"
+✔ Saved to your personal journal: pdf-lib
+  ~/.magpie/notes/npm--pdf-lib.md
 ```
 
-`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": [], "tags_md_added": []}`
+`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": [], "tags_md_added": [], "sections_changed": [], "drafts_replaced": [], "items_present": []}`
 
 - `alternatives_added` and `alternatives_present` list the `--alternative` targets as given: those written, and those already there. Both are `[]` without the flag. Added in 0.2; an addition, not a breaking change.
 - `tags_md_added` lists the new note's tags that were appended to `tags.md` (step 3). Added in 0.2; an addition.
+- `sections_changed` names the sections step 7 wrote (`"use_when"`, `"avoid_when"`), `drafts_replaced` those whose draft the items replaced, and `items_present` the items given that the note already had. All are `[]` without the flags. Added in 0.2; an addition.
 
 ### `repomagpie import <file>`
 
@@ -278,7 +291,7 @@ A stdio MCP server for the coding agent that starts it ([decision 0034](decision
 | `search` | `query` (at most 1,000 characters), `tags` (at most 32, each at most 64), `kind`, `journal`, `limit` (1 to 100, default 10) | `repomagpie search <query> [--tag …] [--kind …] [--journal …] [--limit n] --json` |
 | `suggest` | `need` (at most 10,000 characters), `journal`, `limit` (1 to 100, default 20) | `repomagpie suggest ["need"] [--journal …] [--limit n] --json` |
 | `catalog` | `tags`, `kind`, `journal`, `limit` (1 to 1,000, default 100), `cursor`, `full` | `repomagpie catalog [--tag …] [--kind …] [--journal …] [--limit n] [--cursor c] [--full] --json` |
-| `note` (only with `--allow-write`) | `target` (a name or PURL; a URL is refused: it needs GitHub), `text` (the user's Verdict, at most 1,000 characters), `alternatives` (at most 20), `type`, `to` (`personal` or `project`) | `repomagpie note <target> ["text"] [--alternative …] [--type …] [--to …] --json` |
+| `note` (only with `--allow-write`) | `target` (a name or PURL; a URL is refused: it needs GitHub), `text` (the user's Verdict, at most 1,000 characters), `alternatives` (at most 20), `use_when` and `avoid_when` (the user's own items, at most 20 each, each one line of at most 500 characters), `type`, `to` (`personal` or `project`) | `repomagpie note <target> ["text"] [--alternative …] [--use-when …] [--avoid-when …] [--type …] [--to …] --json` |
 
 - **`project`**, on every tool: the folder the call runs in, as if the command ran there: the project journal is found from it, and `suggest` reads its manifests and README. Default: the server's working folder. It must be an absolute path to an existing folder, at most 4,096 characters, without `..`, control characters or a Windows device name (`CON`, `NUL`, `COM1`, …) in any part, and not a `\\?\` or `\\.\` path; otherwise the call is a tool error and nothing is read.
 - **Annotations:** the four read tools `readOnlyHint: true`, `openWorldHint: false`; `note` `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`.
@@ -438,12 +451,13 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 - A read-only note has no `links` and no `backlinks`, and links to it are `missing`.
 - `read_only` is true when the frontmatter can't be read or has no `id`. `id` is then `null`, and `warnings` says why. The app shows such a note read-only, addressed by its `file` name (see [UI](ui.md), "API"). The Note list's `read_only` follows the same rule.
 
-**Editing a note.** The app's edit of one note ([decision 0023](decisions/0023-api-is-the-json-contract.md)) is `{"journal", "id", "version", "verdict"?, "sections"?, "fields"?, "accept_drafts"?}`. All edits are applied, or none:
+**Editing a note.** The app's edit of one note ([decision 0023](decisions/0023-api-is-the-json-contract.md)) is `{"journal", "id", "version", "verdict"?, "sections"?, "fields"?, "accept_drafts"?, "add_items"?}`. All edits are applied, or none:
 - `version` must be the file's current version (`sha256:<hex>` of its bytes); otherwise nothing is written, and the answer is the Note document as the file is now, plus `"error"`.
 - `verdict`: one line. It fills an empty Verdict as `repomagpie note` does (comments in the section stay); otherwise it replaces the section's body. `""` clears it. `status` follows: `reviewed` with a Verdict, `inbox` without.
 - `sections`: `{"<section name>": "<body>"}` for the schema's sections except the Verdict. The body replaces the section's body, without blank lines around it, followed by one blank line before the next section. A drafted section loses its draft marker (schema rule 3), unless the body is unchanged. A missing section is inserted before the next section in schema order, or, with no later section, after the file's last line (adding a line break and a blank line only where they are missing); an empty body for a missing section writes nothing. A body can't hold a `## ` heading outside a code block.
 - `fields`: `kind` (one of the schema's kinds), `tags` (lowercase kebab-case), `tried` (true or false), `rating` (1 to 5, or `null`), `alternatives` (the whole list, in order: link targets such as `["npm--puppeteer", "wkhtmltopdf"]`, without `[[ ]]`, `|` or `#`, or single wikilinks such as `"[[zod|Zod]]"`). Each requested entry is matched to the note's entry with the same target, ignoring case, and that entry stays exactly as written: its label, quotes and a comment on its line. Only what is added or removed changes. A removed entry goes with its line (a block list) or its comma (a flow list); a new one is written as `"[[<target>]]"`, or a wikilink as given, at its place in the list. An entry with no target (`"[[]]"`) can't be named, so it stays. Changing the order is refused. When nothing is left, the key and its lines go. A block list stays a block list. Any other key, `status` and the tool-owned fields included, is refused.
 - `accept_drafts`: section names whose draft marker is removed; the text stays.
+- `add_items`: `{"Use when": ["…"], "Avoid when": ["…"]}`, the user's own items, added as `repomagpie note --use-when` and `--avoid-when` add them (section 2, `note`, step 7), with the same caps. Only these two sections; the same section in `sections` and `add_items` is refused.
 - The answer is the Note document after the edit. Everything outside the edited parts stays byte for byte.
 
 **Restore.** The app's Undo after a delete (`POST /api/note/restore` with `{"journal", "trash": "<file name in .trash/>"}`, [decision 0037](decisions/0037-deleting-a-note-moves-it-to-the-trash.md)): the file goes back to `notes/` under its name without the stamp.

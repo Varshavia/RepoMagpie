@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Say when you'd use or avoid a package, in your words, when you save it: `repomagpie note zod "default for validating input" --use-when "checking API input" --avoid-when "a tiny script"`. Each flag adds one item and can be repeated. Your items are kept as you wrote them and new ones go after them; an item already there isn't added twice; items replace a draft "Use when" written from GitHub's description. An "Avoid when" item makes RepoMagpie ask before the package is installed, and the command says so. Notes are then found by what you need, not only by name.
+- The same in your agent, which may ask when you'd use or avoid it in the same question as your reason, and never fills these in for you (MCP `note` tool: `use_when` and `avoid_when`). Run `repomagpie setup` after the upgrade so your agents get the new skill.
+- The same in `repomagpie ui`: "Use when" and "Avoid when" fields under the Verdict in the inbox review and on the Add page. Enter adds an item; Ctrl/Cmd+Enter saves everything at once.
+
 ## [0.2.0-beta.10] - 2026-10-24
 
 The eleventh pre-release: your agent offers once, at the end of a task, to save a dependency decision made in it, with your reason as the Verdict. Run `repomagpie setup` after the upgrade so your agents get the new skill; the offer works as well as your agent follows it.

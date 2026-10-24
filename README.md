@@ -67,7 +67,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
    ```bash
    repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
-   repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
+   repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
    `--type npm` says the name is an npm package. Inside a project, RepoMagpie reads that from its manifest; elsewhere it asks.
@@ -189,6 +189,8 @@ Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries,
 <summary><strong>Where are my notes, and can I edit them by hand?</strong></summary>
 
 Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`.
+
+Add `--use-when` so your notes are found later by what you need, not only by name: `repomagpie note zod --use-when "checking API input"`.
 
 `repomagpie delete <name>`, or Delete in the app, moves a note to the journal's `.trash/`.
 

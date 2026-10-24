@@ -50,8 +50,10 @@ Use packages you really used. The text in quotes is your Verdict: one line, in y
 2. A package you like.
 
    ```bash
-   repomagpie note zod "default for validating input" --type npm
+   repomagpie note zod "default for validating input" --type npm --use-when "checking API input"
    ```
+
+   `--use-when` adds when you'd use it, in your words, so the note is found later by what you need, not only by name. Repeat it for more; `--avoid-when` works the same way.
 
 3. A GitHub repository, without text. RepoMagpie fetches its description, licence and topics, and the note goes to your inbox for review in step 6.
 
