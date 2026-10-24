@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.10] - 2026-10-24
+
+The eleventh pre-release: your agent offers once, at the end of a task, to save a dependency decision made in it, with your reason as the Verdict. Run `repomagpie setup` after the upgrade so your agents get the new skill; the offer works as well as your agent follows it.
+
 ### Changed
 
 - Your agent offers once, at the end of a task, to save a dependency decision made in it (zod over valibot, moment replaced by date-fns, lodash dropped), with your reason, in your words, as the Verdict and the package you chose as its alternative. It never writes the Verdict for you, never asks mid-task, and never asks again after a no. A yes without a reason saves the note to the inbox. "avoid" goes in only when you say it, or say yes to "Should RepoMagpie ask before installing it again?". The agent skill does this; there is no new model or hook.
@@ -250,7 +254,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...HEAD
+[0.2.0-beta.10]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...v0.2.0-beta.10
 [0.2.0-beta.9]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...v0.2.0-beta.9
 [0.2.0-beta.8]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...v0.2.0-beta.8
 [0.2.0-beta.7]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.6...v0.2.0-beta.7
