@@ -643,6 +643,11 @@ span.wikilink { cursor: help; }
 button.chip.suggestion { border: 1px dashed var(--hairline-strong); background: transparent; }
 button.chip.suggestion:hover:not(:disabled) { border-style: solid; color: var(--ink); }
 button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
+/* "Use when" and "Avoid when" at capture: the items to add, one row each, with a remove button. */
+.items-to-add { display: flex; flex-direction: column; gap: var(--xxs); list-style: none; }
+.items-to-add li { display: flex; align-items: flex-start; gap: var(--xs); color: var(--ink-muted); overflow-wrap: anywhere; }
+.items-to-add li > span { flex: 1; min-width: 0; padding-block: 1px; }
+.items-to-add li > span::before { content: "- "; color: var(--ink-subtle); }
 /* Add's preview: a new note's tags, each with a remove button (decision 0030). */
 .chip.tag.removable { padding-right: var(--xxs); }
 .chip.tag.removable > span::before { content: "#"; color: var(--ink-subtle); }

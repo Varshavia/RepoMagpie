@@ -1,5 +1,6 @@
-// The Verdict editor with the human-owned fields next to it (docs/ui.md §7, inbox review): kind,
-// tags from the journal's tags.md, tried, rating. Ctrl/Cmd+Enter saves; Esc leaves.
+// The Verdict editor with the human-owned fields next to it (docs/ui.md §7, inbox review): Use when
+// and Avoid when items, kind, tags from the journal's tags.md, tried, rating. Ctrl/Cmd+Enter saves
+// everything; Esc leaves.
 import { useId, type KeyboardEvent, type Ref } from "react";
 import { IS_MAC, MOD } from "../platform.ts";
 import type { Form } from "../logic/edits.ts";
@@ -7,7 +8,7 @@ import type { LinkNote } from "../logic/links.ts";
 import { KINDS } from "../logic/schema.ts";
 import { Icon } from "../icons.tsx";
 import { FieldError } from "./common.tsx";
-import { TopicChips } from "./fields.tsx";
+import { ItemsField, TopicChips } from "./fields.tsx";
 import { LinkTextarea } from "./LinkTextarea.tsx";
 
 interface Props {
@@ -28,9 +29,11 @@ interface Props {
   self: string | null; // the note itself, left out of it
   topics: string[]; // "From GitHub topics": topics that aren't tags of the note
   onAddTopic: (tag: string) => void;
+  drafts: { useWhen: boolean; avoidWhen: boolean }; // the sections that hold a draft, which typed items replace
+  name: string; // the note's name, for "RepoMagpie will ask before … is installed."
 }
 
-export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged, linkNotes, self, topics, onAddTopic }: Props) {
+export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged, linkNotes, self, topics, onAddTopic, drafts, name }: Props) {
   const id = useId();
   const keys = (e: KeyboardEvent) => {
     if ((IS_MAC ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
@@ -73,6 +76,9 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
           One line, in your words. For example: avoid: async streams painful; use puppeteer.
         </p>
       </div>
+
+      <ItemsField label="Use when" items={form.useWhen} text={form.useWhenText} onChange={(useWhen, useWhenText) => onChange({ ...form, useWhen, useWhenText })} draft={drafts.useWhen} disabled={saving} />
+      <ItemsField label="Avoid when" items={form.avoidWhen} text={form.avoidWhenText} onChange={(avoidWhen, avoidWhenText) => onChange({ ...form, avoidWhen, avoidWhenText })} draft={drafts.avoidWhen} asks={name} disabled={saving} />
 
       <div className="review-fields">
         <div className="field">

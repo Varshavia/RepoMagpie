@@ -10,6 +10,10 @@ export interface Form {
   tags: string[];
   tried: boolean;
   rating: number | null; // 1 to 5
+  useWhen: string[]; // items to add to "Use when", in the person's words; none until they type one
+  useWhenText: string; // a line typed but not added yet: saved with the items
+  avoidWhen: string[]; // items to add to "Avoid when"
+  avoidWhenText: string;
 }
 
 export interface Patch {
@@ -20,6 +24,7 @@ export interface Patch {
   fields?: Partial<Pick<Form, "kind" | "tags" | "tried" | "rating">> & { alternatives?: string[] }; // alternatives: link targets
   sections?: Record<string, string>;
   accept_drafts?: string[];
+  add_items?: Partial<Record<"Use when" | "Avoid when", string[]>>; // appended as note --use-when does
 }
 
 export function formOf(note: NoteJson): Form {
@@ -31,7 +36,18 @@ export function formOf(note: NoteJson): Form {
     tags: Array.isArray(fm.tags) ? fm.tags.filter((t): t is string => typeof t === "string") : [],
     tried: fm.tried === true,
     rating: typeof rating === "number" && Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
+    useWhen: [],
+    useWhenText: "",
+    avoidWhen: [],
+    avoidWhenText: "",
   };
+}
+
+// An item typed into the Use when or Avoid when field, added to the list: one line, trimmed, once
+// (ignoring case). The list unchanged when it is blank or already there.
+export function withItem(items: string[], typed: string): string[] {
+  const item = oneLine(typed);
+  return !item || items.some((i) => i.toLowerCase() === item.toLowerCase()) ? items : [...items, item];
 }
 
 // The line under a note's title: whether you ran it, and your rating; null when neither is set.
@@ -53,7 +69,13 @@ export function patchFor(note: NoteJson, form: Form): Patch | null {
   if (form.tried !== before.tried) fields.tried = form.tried;
   if (form.rating !== before.rating) fields.rating = form.rating;
   if (Object.keys(fields).length) patch.fields = fields;
-  return patch.verdict === undefined && !patch.fields ? null : patch;
+  const items: Patch["add_items"] = {};
+  const useWhen = withItem(form.useWhen, form.useWhenText);
+  const avoidWhen = withItem(form.avoidWhen, form.avoidWhenText);
+  if (useWhen.length) items["Use when"] = useWhen;
+  if (avoidWhen.length) items["Avoid when"] = avoidWhen;
+  if (Object.keys(items).length) patch.add_items = items;
+  return patch.verdict === undefined && !patch.fields && !patch.add_items ? null : patch;
 }
 
 // The Verdict is one line.
