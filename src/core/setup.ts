@@ -217,6 +217,15 @@ export function mcpByHand(agent: Agent, where: Where, text: string | null, hasEn
   return writeMethod(agent, cli, plain, hasEntry) ? null : manualReason(agent, cli, plain);
 }
 
+// Whether setup --remove takes this agent's entry out itself (planAgent's remove), or leaves it to the
+// user; for doctor's to-dos on an agent found by its folder only.
+export function mcpRemovable(agent: Agent, where: Where, text: string | null): boolean {
+  if (pathProblem(agent.mcpFile(where), where.home)) return false;
+  const how = CLI[agent.id];
+  if (onPath(agent.cli, where)[0] && how.remove) return true;
+  return how.edit && text !== null && isPlain(agent, text) && !("error" in mcpEntry(text, agent.format, NAME));
+}
+
 export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
   const { where } = request;
   const agents = plan.agents.map((p): AgentPlan => {

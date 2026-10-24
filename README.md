@@ -38,7 +38,7 @@ Do you want to proceed?
 
 In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
-- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Notes are Markdown files you own.
+- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers once, at the end of a task, to save a dependency decision made in it, with your reason, in your words, as the Verdict. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 
@@ -81,7 +81,9 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
 ![How RepoMagpie works: your agent is about to run npm install pdfkit; the skill or the MCP tool recall checks first, and the hook checks the install command as a backstop; both read your personal journal in ~/.magpie and the project journal in .magpie/; your Verdict, "avoid: async streams painful; use puppeteer", comes back, and your agent asks you before the install.](docs/assets/how-it-works.svg)
 
-Before an install, the skill tells your agent to look the package up with the MCP server's `recall` tool, or the `repomagpie recall` command. RepoMagpie reads both journals on your machine and returns your notes; when one says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step. Without a hook, the check works as well as the agent follows the skill.
+Before an install, the skill tells your agent to look the package up with the MCP server's `recall` tool, or the `repomagpie recall` command. RepoMagpie reads both journals on your machine and returns your notes; when one says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step.
+
+There is no extra model, no API key and no telemetry. RepoMagpie works through the agent you already use, so it works as well as that agent follows the skill: without a hook, that goes for the check before an install too.
 
 ## Ask your agent
 
@@ -145,6 +147,13 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 <summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
 
 No. Your personal journal is a folder of Markdown files on your machine, a project journal is as visible as its repository, and there is no telemetry. The only network requests go to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests, and send `GITHUB_TOKEN` if you set it, never anything from your journals. `repomagpie ui` listens on `127.0.0.1` only, and `repomagpie mcp` never opens a network connection or a port: it talks to your agent over stdio. Your agent sees the notes it reads, and its model provider gets them as part of the conversation. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+
+</details>
+
+<details>
+<summary><strong>Does RepoMagpie use AI?</strong></summary>
+
+Not a model of its own. RepoMagpie's commands match package names and words, and call no model. The AI is the coding agent you already use: through the skill and the MCP tools, it recalls your notes before an install, searches them when you ask what you have, and offers once, at the end of a task, to save a dependency decision. The skill tells it never to write your Verdict for you (only your words, or nothing), never to delete a note unless you ask for that note by name, and never to install a package you noted to avoid without asking you; where your agent has a hook, the hook checks that last one too. RepoMagpie itself sends nothing from your journals anywhere. Your agent's model provider sees what your agent reads, as the answer above says.
 
 </details>
 

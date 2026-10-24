@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Your agent offers once, at the end of a task, to save a dependency decision made in it (zod over valibot, moment replaced by date-fns, lodash dropped), with your reason, in your words, as the Verdict and the package you chose as its alternative. It never writes the Verdict for you, never asks mid-task, and never asks again after a no. A yes without a reason saves the note to the inbox. "avoid" goes in only when you say it, or say yes to "Should RepoMagpie ask before installing it again?". The agent skill does this; there is no new model or hook.
+
+### Fixed
+
+- `repomagpie doctor`'s to-do for a hook or MCP entry left in an agent found only by its folder (such as `~/.codex`, written by an earlier beta) now names both ways out: "If you use Codex CLI: run repomagpie setup --agents codex, then trust the hook in /hooks. If you don't: run repomagpie setup --remove --agents codex." Where `setup` can't edit the file, it says to edit it by hand. A to-do for an agent that isn't installed names the file to edit.
+
 ## [0.2.0-beta.9] - 2026-10-24
 
 The tenth pre-release, with the fixes from a macOS test: `repomagpie setup` now chooses only the agents it finds by their command or app, and `repomagpie setup --delete-backups` deletes the backups `setup` made. If you ran `setup` with an earlier beta, run `repomagpie setup --delete-backups` once: copies of `~/.claude.json` can hold sign-in tokens.
