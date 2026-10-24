@@ -10,6 +10,8 @@ Every fact below was checked on **2026-10-14** against the source linked next to
 
 `setup` writes the MCP entry, the skill and the hook (every one but VS Code) for the **first set**. For the others it prints the snippet and the path.
 
+**How `setup` and `doctor` find an agent** ([decision 0038](decisions/0038-setup-chooses-found-agents-and-deletes-backups-on-request.md)): by its command on `PATH`, by its app on macOS (`Cursor.app` and `Visual Studio Code.app` in `/Applications` or `~/Applications`, whose command is on `PATH` only once installed from the app with "Shell Command: Install 'code' command in PATH"), or by its folder alone. Without `--agents`, `setup` chooses only agents found by command or app: a folder outlives an uninstall, and other tools make some of them. In the macOS test (2026-10-24), `~/.codex`, `~/.cursor`, `~/.copilot` and VS Code's user folder were there with none of their commands, and the folder rule had preselected all four and written hooks for Codex CLI and Copilot CLI. The folders still count, as `found ~/.codex only`: they tell agents apart where they share a parent (Gemini CLI by `~/.gemini/settings.json`, Antigravity CLI by `~/.gemini/antigravity-cli/`, Copilot CLI by `~/.copilot/config.json` rather than `~/.copilot`, which VS Code reads too), `--agents` and the multi-select can still choose them, and `--remove` takes RepoMagpie's entries out of them. On Windows and Linux there is no app check: the installers put the command on `PATH`.
+
 | Agent | MCP at user scope | Skills (user scope) | Hook before a tool call | `setup` |
 |---|---|---|---|---|
 | Claude Code | `claude mcp add --scope user` → `~/.claude.json` | `~/.claude/skills/` | `PreToolUse`: allow, deny, ask; context for the agent | first set |

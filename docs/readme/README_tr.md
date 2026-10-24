@@ -55,7 +55,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
    repomagpie setup
    ```
 
-   `setup` ajanlarını bulur, hangi dosyada neyi değiştireceğini gösterir, önce sorar ve düzenlediği her dosyanın yedeğini alır; `repomagpie setup --dry-run` yalnızca planı gösterir. [Ajanlar](../agents.md) ya da [elle kurulum](../setup-by-hand.md) sayfasına bak.
+   `setup` ajanlarını komutlarından ya da uygulamalarından bulur (yalnızca klasörü kalmış bir ajan listelenir, seçilmez), hangi dosyada neyi değiştireceğini gösterir, önce sorar ve düzenlediği her dosyanın yedeğini alır; `repomagpie setup --dry-run` yalnızca planı gösterir. [Ajanlar](../agents.md) ya da [elle kurulum](../setup-by-hand.md) sayfasına bak.
 
 2. Her ajanda neyin bağlı olduğunu kontrol et:
 
@@ -63,7 +63,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
    repomagpie doctor
    ```
 
-   `doctor`, `setup`'ın yedeklerini de listeler. Her yedek, dosyasının tam bir kopyasıdır ve `~/.claude.json` kopyaları oturum token'larını ve MCP sunucularının gizli bilgilerini içerebilir: artık gerekmeyenleri sil.
+   `doctor`, `setup`'ın yedeklerini de listeler. Her yedek, dosyasının tam bir kopyasıdır ve `~/.claude.json` kopyaları oturum token'larını ve MCP sunucularının gizli bilgilerini içerebilir. `repomagpie setup --delete-backups` sorduktan sonra onları siler; `--keep-latest` her dosyanın en yenisini tutar.
 
 3. İlk notunu yaz. Bir paket adı ver ya da deponun lisansını, konularını (topics) ve ajan skill'lerini de çekmek için bir GitHub URL'si ver:
 
@@ -174,7 +174,7 @@ Hayır. RepoMagpie senin ve ekibinin not ettiklerini gösterir: kötü amaçlı 
 <details>
 <summary><strong>Nasıl kaldırırım?</strong></summary>
 
-`repomagpie setup --remove` çalıştır. Yalnızca RepoMagpie'nin kendi MCP girdilerini, hook'larını ve skill klasörlerini kaldırır; sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez. Günlüklerini (`~/.magpie` ve projelerdeki `.magpie/`) ve `setup`'ın yedeklerini bırakır: yedekleri listelemek için `repomagpie doctor` çalıştır, artık gerekmeyenleri sil, sonra `npm uninstall -g repomagpie` çalıştır. Antigravity CLI, sen `~/.gemini/antigravity-cli/mcp/` klasörünü temizleyene kadar kaldırılmış bir girdiyi listelemeye devam edebilir ([ajanlar](../agents.md#antigravity-cli)).
+`repomagpie setup --remove` çalıştır. Yalnızca RepoMagpie'nin kendi MCP girdilerini, hook'larını ve skill klasörlerini kaldırır; sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez. Günlüklerini (`~/.magpie` ve projelerdeki `.magpie/`) ve `setup`'ın yedeklerini bırakır: yedekleri sorduktan sonra silmek için `repomagpie setup --delete-backups` çalıştır, sonra `npm uninstall -g repomagpie` çalıştır. Antigravity CLI, sen `~/.gemini/antigravity-cli/mcp/` klasörünü temizleyene kadar kaldırılmış bir girdiyi listelemeye devam edebilir ([ajanlar](../agents.md#antigravity-cli)).
 
 </details>
 

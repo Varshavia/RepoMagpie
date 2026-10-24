@@ -66,8 +66,11 @@ src/
                edit: a person's edit of one note, checked and applied all or nothing; note versions (sha256)
                outcome: how a run ended, as an exit code (CLI) or an HTTP status (server)
                agents: the coding agents setup and doctor know (decision 0035, docs/agents.md): their config
-               files, commands on PATH and the packages they run, reading JSON with comments and Codex's TOML
+               files, commands on PATH and the packages they run, how each was found (command, app on
+               macOS, or folder; decision 0038), reading JSON with comments and Codex's TOML
                doctor: repomagpie doctor's report; read-only
+               backups: setup's backups, found from the folders' listings without following a link, and
+               deleted on request (repomagpie setup --delete-backups), found again just before
                launch: how agents start repomagpie mcp (absolute node, no code generation, the entry file)
                setup: repomagpie setup's plan per agent and applying it: backups, link and home checks,
                reading each change back; setup-skill: the skill's shared folder and the links from Claude

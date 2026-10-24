@@ -38,11 +38,13 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
 | 0028 | [The graph page](0028-the-graph-page.md) | accepted |
 | 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
-| 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted |
+| 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted (kind of a registry package note added by 0039) |
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
 | 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |
 | 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
-| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036) |
+| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036; which agents are chosen, deleting backups and doctor's to-dos refined by 0038) |
 | 0036 | [The hook in agents that can't ask](0036-hooks-in-other-agents.md) | accepted (refines 0024 and 0035) |
 | 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |
+| 0038 | [`setup` chooses agents found by command or app, and deletes its backups on request](0038-setup-chooses-found-agents-and-deletes-backups-on-request.md) | accepted (refines 0035) |
+| 0039 | [A note on a registry package starts as `library`](0039-a-registry-package-note-starts-as-library.md) | accepted (adds to 0030) |

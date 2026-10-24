@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `repomagpie setup --delete-backups` deletes `setup`'s backups. It lists them with their dates, asks "Delete these 3 backups? (y/N)", and prints each one it deleted; without a terminal it needs `--yes`. `--keep-latest` keeps the newest backup of each file. It deletes only the backups `repomagpie doctor` lists, never through a link. `setup`'s summary and `doctor` name the command.
+
+### Changed
+
+- `repomagpie setup` chooses only the agents it finds by their command, or on macOS by their app (`/Applications/Cursor.app`, `/Applications/Visual Studio Code.app`). An agent whose folder is all it finds, such as `~/.codex` left by an old install, is listed as `not chosen: found ~/.codex only (--agents codex sets it up)`; `--agents` still sets it up, and `--remove` still takes RepoMagpie's entries out of it. The multi-select says how it found each agent. `doctor` says `found ~/.codex only` for such an agent, with no to-do.
+- `repomagpie setup` without `--allow-write` says once that the note tool stays off in new entries: "Note tool: off (repomagpie setup --allow-write turns it on)."
+- A note on a registry package without GitHub data (`repomagpie note left-pad`) starts as kind `library` instead of `other`. Existing notes keep their kind.
+
+### Fixed
+
+- `repomagpie doctor`'s to-dos now name an action that works. Codex CLI without the `codex` command got "Run repomagpie setup", which can only print Codex's entry; now it says to paste the entry into `~/.codex/config.toml` by hand, and that `repomagpie setup --dry-run --agents codex` prints it. The same goes for files `setup` doesn't edit (with comments, or `.claude/settings.local.json`), the project's settings (`--project .`), skill copies in folders `setup` doesn't manage, and entries left in an agent that isn't installed.
+- `repomagpie setup --remove` says "nothing to remove" instead of "already set up" where an agent has no RepoMagpie entry.
+- The app now follows a change of the system's dark or light setting while it is open, when its theme is the system's, in Safari too. Settings says which one the system uses now.
+
 ## [0.2.0-beta.8] - 2026-10-23
 
 The ninth pre-release, the build for the tester round: `repomagpie setup --remove` now works on Windows when your home folder's name has letters outside ASCII, and `repomagpie suggest` no longer matches notes on single letters such as the `t` of "doesn't".
