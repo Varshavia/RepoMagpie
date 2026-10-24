@@ -95,7 +95,7 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
    - **Human-owned:** `kind`, `tags`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `repomagpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
    - The tool writes `tags` after creation only when you ask: an edit in the local app, or "Add GitHub topics as tags" (`repomagpie tags --from-topics`), which adds topics until the note has 8 tags and never removes or reorders one ([decision 0030](decisions/0030-github-topics-become-tags.md)). Either is a human edit.
    - **At creation only**, the tool may write drafts of `kind` (from GitHub data, [decision 0030](decisions/0030-github-topics-become-tags.md); `library` for a registry package name without it, [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)), `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
-   - **After creation**, the tool never modifies human-owned fields or sections, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines.
+   - **After creation**, the tool never modifies human-owned fields or sections on its own, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines. "Use when" and "Avoid when" items you give later are appended as rule 7 says.
 3. **Drafts.** A drafted section starts with the line `<!-- magpie:draft -->`. AI may draft only "What it does" and "Use when". "Avoid when" may also be a draft when it comes from the user's own `avoid:` text in `repomagpie import` (rule 7). The Verdict is never a draft. Deleting the marker accepts the draft. Search, suggest and recall label draft text as a draft.
 4. **Notable skills.** The tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
 5. **Tags** come from the journal's tag list (`<journal>/tags.md`), so the same idea isn't spelled three ways. Across the two journals, tags match by name. The tag list has one list line per tag, optionally with its meaning: ``- `testing` — tests and end-to-end checks``. Other lines are ignored. A new journal starts with a starter list of ten tags ([spec](spec.md), section 3); edit it freely. A journal with notes but no `tags.md` gets the starter list only when you ask for it ("Create tag list" in the local app).
@@ -104,9 +104,20 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
 6. **One note per subject.** A PURL appears in at most one note per journal, as its `id` or in its `packages`. A repository note that lists `pkg:npm/pdfkit` is the note for that package too.
 7. **User input.**
    - `repomagpie note <name-or-url> "text"`: the text is the Verdict (human-written).
+   - `repomagpie note <name-or-url> --use-when "…" --avoid-when "…"`, the MCP `note` tool's `use_when` and `avoid_when`, and the local app's "Use when" and "Avoid when" fields: each item is one human-written bullet, never a draft. How they meet what a section already holds:
+     - an empty section gets the items;
+     - a section that holds only a draft (rule 3) is replaced by them: your words win over a draft;
+     - a section with your own items keeps every line as written and gets the new items after the last one, with the same bullet marker and line endings; an item already there (ignoring case) isn't added twice.
+
+     ```markdown
+     ## Use when
+     - filling in an existing PDF form
+     - adding a page to a PDF a user uploaded
+     ```
    - `repomagpie import` reads one line per item: `- <url-or-name> — verdict: ... | use: ... | avoid: ...`. An explicit `verdict:` counts as human-written. `use:` and `avoid:` become draft "Use when" and "Avoid when" sections (rule 3). Text without a label goes to "My notes".
 8. **Lenient read, strict write.**
    - Read hand-written notes even when frontmatter fields or sections are missing, misordered or extra.
+   - HTML comments (`<!-- … -->`) aren't note text: the Verdict, search, recall and the items of "Use when" and "Avoid when" leave them out, and a `<!--` that never closes leaves out the rest of its line. The file keeps them.
    - Write notes in the canonical format above.
    - Never rewrite a human section; edits that preserve formatting and comments are required for frontmatter changes.
 

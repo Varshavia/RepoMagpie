@@ -2,6 +2,8 @@
 import { useId } from "react";
 import type { PackageType, Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
+import { withItem } from "../logic/edits.ts";
+import { visible } from "../logic/text.ts";
 
 // "From GitHub topics" (docs/ui.md §7): topics that aren't tags yet. A click adds the tag; a tag the
 // journal's tags.md doesn't list is appended to it. Without tags.md: "Create tag list" first.
@@ -77,6 +79,75 @@ export function TypeChoice({ value, onChange }: { value: PackageType | ""; onCha
         <option value="pypi">pypi</option>
         <option value="cargo">cargo</option>
       </select>
+    </div>
+  );
+}
+
+// "Use when" or "Avoid when" at capture (the inbox review and Add, docs/ui.md §7): one line per item,
+// in the person's words. Enter or Add puts the typed line in the list; each item can be removed before
+// saving, and a line still typed is saved with the rest. Never required.
+export function ItemsField(props: {
+  label: "Use when" | "Avoid when";
+  items: string[];
+  text: string;
+  onChange: (items: string[], text: string) => void;
+  draft?: boolean; // the section holds a draft, which the items replace
+  asks?: string | null; // Avoid when: the package's name, for "RepoMagpie will ask before … is installed."
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const { label, items, text, onChange, draft, asks, disabled } = props;
+  const add = () => onChange(withItem(items, text), "");
+  const help = draft
+    ? `This section holds a draft. Items you add here replace it.`
+    : label === "Use when"
+      ? "Optional. When you'd use it, in your words, one line each. Notes are found later by what you need, not only by name."
+      : "Optional. When you'd avoid it, in your words, one line each.";
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={`${id}-input`}>
+        {label}
+      </label>
+      <div className="input-row">
+        <input
+          id={`${id}-input`}
+          name={label === "Use when" ? "use-when" : "avoid-when"}
+          className="input"
+          value={text}
+          maxLength={500}
+          disabled={disabled}
+          onChange={(e) => onChange(items, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={label === "Use when" ? "a short invoice from a script" : "big PDFs with many images"}
+          autoComplete="off"
+          aria-describedby={`${id}-help`}
+          spellCheck
+        />
+        <button type="button" className="button secondary" onClick={add} disabled={disabled || !text.trim()} aria-label={`Add to ${label}`}>
+          Add
+        </button>
+      </div>
+      {items.length ? (
+        <ul className="items-to-add" aria-label={`${label}: items to add`}>
+          {items.map((item) => (
+            <li key={item}>
+              <span>{visible(item)}</span>
+              <button type="button" className="chip-remove" onClick={() => onChange(items.filter((i) => i !== item), text)} aria-label={`Remove ${visible(item)}`} title="Remove" disabled={disabled}>
+                <Icon name="x" size={12} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="field-help" id={`${id}-help`}>
+        {help}
+      </p>
+      {asks && (items.length || text.trim()) ? <p className="field-help">{`RepoMagpie will ask before ${asks} is installed.`}</p> : null}
     </div>
   );
 }

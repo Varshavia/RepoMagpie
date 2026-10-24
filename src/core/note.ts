@@ -212,6 +212,28 @@ function isTextList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
-function stripComments(text: string): string {
-  return text.replace(/<!--[\s\S]*?-->/g, "");
+// Text without HTML comments, the draft marker included. Comments are removed until none is left, so
+// "<!-<!---->-" can't leave "<!--" behind; then an unterminated "<!--" is dropped to the end of its line.
+// CodeQL's js/incomplete-multi-character-sanitization here is a false positive: see the property test in note.test.ts.
+export function stripComments(text: string): string {
+  let out = text;
+  for (let before = ""; out !== before; ) {
+    before = out;
+    out = out.replace(/<!--[\s\S]*?-->/g, "");
+  }
+  return out.replace(/<!--[^\r\n]*/g, "");
+}
+
+// A section's items: one per bullet, without comments and the draft marker. A line that isn't a
+// bullet starts an item of its own, unless it is indented under the previous one.
+export function sectionItems(body: string): string[] {
+  const out: string[] = [];
+  for (const line of stripComments(body).split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (bullet) out.push(bullet[1].trim());
+    else if (/^\s/.test(line) && out.length) out[out.length - 1] += ` ${line.trim()}`;
+    else out.push(line.trim());
+  }
+  return out;
 }

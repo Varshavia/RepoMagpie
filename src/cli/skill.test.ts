@@ -111,6 +111,21 @@ test("after a dependency decision, the skill offers once at the end, in the user
   assert.ok(section.split("\n").length <= 16, "the section stays within 15 lines (the skill is read on every task)");
 });
 
+// "Use when" and "Avoid when" at capture (feat/use-when-at-capture): asked in the same question as the
+// reason, saved in the user's words, never filled by the agent (decision 0018).
+test("recording an opinion may ask when they'd use or avoid it, in one question, with --use-when and --avoid-when", () => {
+  const text = readFileSync(skillFile, "utf8");
+  const opinion = /^## Recording an opinion\n([\s\S]*?)^## /m.exec(text)?.[1] ?? "";
+  const decision = /^## After a dependency decision\n([\s\S]*?)^## /m.exec(text)?.[1] ?? "";
+  assert.match(opinion, /in the same question when they'd use it, or avoid it/);
+  assert.match(opinion, /Never fill these yourself/);
+  assert.match(opinion, /don't ask a second question: with only a reason, save only the Verdict/);
+  assert.match(opinion, /`use_when`, `avoid_when`/);
+  const commands = commandLines("repomagpie").filter(({ usage }) => opinion.includes(usage) && usage.includes("--use-when"));
+  assert.deepEqual(commands.map(({ usage }) => usage), ['repomagpie note <name> "<the user\'s words>" --use-when "<their words>" --avoid-when "<their words>" --json']);
+  assert.match(decision, /when they'd use or avoid it, as in "Recording an opinion"/);
+});
+
 test("the skill's links stay inside the skill folder, one level deep, and exist", () => {
   for (const file of skillFiles()) {
     for (const m of withoutFences(readFileSync(file, "utf8")).matchAll(/\]\(([^)\s]+)\)/g)) {

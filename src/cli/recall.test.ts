@@ -126,6 +126,15 @@ test("--full shows every section that has text", async () => {
   assert.ok(!personal.includes("(+1 more)"));
 });
 
+test("--full shows no text from nested or unterminated comments", async () => {
+  const text = PDFKIT.replace("- you stream to S3", "- you stream to S3 <!-<!---->- hidden -->\n- big files <!-- open");
+  const box = sandbox({ ...FILES, "journal/notes/npm--pdfkit.md": text });
+  const r = await magpie(box, ["recall", "pdfkit", "--full"]);
+  const personal = r.out.split("\n\n")[1];
+  assert.match(personal, /\n {2}\s+you stream to S3\n {2}\s+big files\n/);
+  assert.ok(!personal.includes("<!--") && !personal.includes("hidden") && !personal.includes("open"));
+});
+
 // --- Alternatives (decision 0029) ---
 
 const withAlternatives = (text: string, entries: string[]) => text.replace("\nstatus:", `\nalternatives: [${entries.map((e) => JSON.stringify(e)).join(", ")}]\nstatus:`);

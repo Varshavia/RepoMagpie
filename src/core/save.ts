@@ -3,7 +3,7 @@
 // prints and the local app's API returns as is (decision 0023). Writes notes; never prints.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { captureNote, type Capture } from "./capture.ts";
+import { captureNote, type Capture, type Items } from "./capture.ts";
 import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
 import { parseImport } from "./import.ts";
@@ -32,7 +32,7 @@ import type { Outcome } from "./outcome.ts";
 import { CAPS, forAgent } from "./text.ts";
 import type { KnownTags } from "./topic-tags.ts";
 import { alternativeLinks, targetResolver } from "./wikilinks.ts";
-import { addAlternatives } from "./write.ts";
+import { addAlternatives, itemsProblem } from "./write.ts";
 
 // Where the journals are, plus what a write needs from the outside world.
 export interface Context extends Place {
@@ -71,8 +71,10 @@ export interface Item {
   source: string;
   skillPath?: string;
   verdict?: string;
-  useWhen?: string[];
-  avoidWhen?: string[];
+  useWhen?: string[]; // import's use: text, a draft
+  avoidWhen?: string[]; // import's avoid: text, a draft
+  ownUseWhen?: string[]; // note's --use-when, the user's own items
+  ownAvoidWhen?: string[]; // note's --avoid-when, the user's own items
   myNotes?: string;
   alternatives?: string[]; // note's --alternative targets, as the user gave them (decision 0029)
   tags?: string[]; // a new note's tags as chosen in Add's preview, in place of the drafted ones
@@ -90,6 +92,8 @@ export interface ItemResult {
   text: string | null; // the note's text after this item (written, or what a dry run would write); null when failed
   alternatives: { added: string[]; present: string[] }; // the --alternative targets, as given
   tagsMdAdded: string[]; // the new note's tags appended to tags.md (or, in a dry run, that would be)
+  items: Items; // what the --use-when and --avoid-when items did
+  asksFirst: boolean; // the user's own Avoid when items made or kept this an avoid note (decision 0024)
 }
 
 // What ranks a new note's topics (decision 0030): the tag list, and the topics and tags of every
@@ -109,7 +113,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const warnings: string[] = [];
   const notices: string[] = [];
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
-    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [] });
+    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [], items: { changed: [], draftsReplaced: [], present: [] }, asksFirst: false });
 
   // A link, or a file over the size limit, at the note's place or above it: never read nor written
   // (decision 0032, rule 5). Listing left it out, so without this it would look like a free name.
@@ -190,6 +194,8 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     text: text ?? existing,
     alternatives,
     tagsMdAdded,
+    items: capture.items,
+    asksFirst: Boolean(item.ownAvoidWhen?.some((i) => i.trim())),
   };
 }
 
@@ -267,6 +273,8 @@ export interface NoteRequest {
   type?: PackageType;
   to: Journal["scope"];
   alternatives?: string[]; // --alternative, repeatable
+  useWhen?: string[]; // --use-when, repeatable: the user's own items
+  avoidWhen?: string[]; // --avoid-when, repeatable: the user's own items
   tags?: string[]; // Add's preview: the new note's tags, as the user left them
 }
 
@@ -281,6 +289,9 @@ export interface NoteJson {
   alternatives_added: string[];
   alternatives_present: string[];
   tags_md_added: string[];
+  sections_changed: string[];
+  drafts_replaced: string[];
+  items_present: string[];
   error?: string;
 }
 
@@ -298,9 +309,11 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: noteForAgent({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], error }),
+    document: noteForAgent({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], error }),
   });
   if (journal.error) return stop(journal.error, "failed");
+  const itemsError = itemsProblem("--use-when", request.useWhen) ?? itemsProblem("--avoid-when", request.avoidWhen);
+  if (itemsError) return stop(itemsError, "usage");
   const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
   if (bad !== undefined) return stop(`--alternative takes a name, a PURL or a file stem, without [[ ]], | or #: ${JSON.stringify(bad)}.`, "usage");
   for (const target of request.alternatives ?? []) {
@@ -310,7 +323,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
 
-  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, tags: request.tags };
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
     id: saved.id,
@@ -322,6 +335,9 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     alternatives_added: saved.alternatives.added,
     alternatives_present: saved.alternatives.present,
     tags_md_added: saved.tagsMdAdded,
+    sections_changed: saved.items.changed,
+    drafts_replaced: saved.items.draftsReplaced,
+    items_present: saved.items.present,
   };
   if (saved.error !== null) document.error = saved.error;
   return { outcome: saved.error === null ? "ok" : "failed", document: noteForAgent(document), journal, saved };
@@ -330,7 +346,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
 // The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
 // API alike: names, paths and warnings can carry a note's or GitHub's text. People get `saved`.
 const noteForAgent = (document: NoteJson): NoteJson =>
-  forAgent(document, { id: CAPS.id, path: Infinity, warnings: { each: CAPS.other, count: Infinity }, tags_md_added: { each: CAPS.tag, count: CAPS.tags } });
+  forAgent(document, { id: CAPS.id, path: Infinity, warnings: { each: CAPS.other, count: Infinity }, tags_md_added: { each: CAPS.tag, count: CAPS.tags }, items_present: { each: CAPS.item, count: 2 * CAPS.items } });
 
 export interface ImportRequest {
   text: string; // the import file's contents

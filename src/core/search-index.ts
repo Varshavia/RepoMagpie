@@ -5,11 +5,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import MiniSearch, { type Options } from "minisearch";
-import { DRAFT_MARKER, readNote } from "./note.ts";
+import { readNote, stripComments } from "./note.ts";
 import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const CACHE_FILE = "search-index.json";
-const CACHE_VERSION = 2; // 2: the index sits under "data" (note-cache.ts)
+const CACHE_VERSION = 3; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped
 
 // One searchable document: a note, or one completed skill line of a note (decision 0006).
 export interface SearchDoc {
@@ -104,11 +104,9 @@ export function loadIndex(journal: string): { index: JournalIndex; rebuilt: bool
 
 // Section text for the index: without the draft marker and comments, trailing spaces trimmed.
 function clean(text: string): string {
-  return text
-    .replace(/<!--[\s\S]*?-->/g, "")
+  return stripComments(text)
     .split("\n")
     .map((line) => line.trimEnd())
     .join("\n")
-    .trim()
-    .replace(DRAFT_MARKER, "");
+    .trim();
 }

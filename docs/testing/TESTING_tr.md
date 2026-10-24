@@ -52,8 +52,10 @@ Gerçekten kullandığın paketleri seç. Tırnak içindeki metin senin Verdict'
 2. Sevdiğin bir paket.
 
    ```bash
-   repomagpie note zod "default for validating input" --type npm
+   repomagpie note zod "default for validating input" --type npm --use-when "checking API input"
    ```
+
+   `--use-when`, onu ne zaman kullanacağını kendi sözlerinle ekler; böylece not sonra yalnızca adıyla değil, neye ihtiyacın olduğuyla da bulunur. Daha fazlası için tekrarla; `--avoid-when` da aynı şekilde çalışır.
 
 3. Metinsiz bir GitHub deposu. RepoMagpie açıklamasını, lisansını ve konularını çeker; not, 6. adımda gözden geçirmen için gelen kutusuna (inbox) düşer.
 

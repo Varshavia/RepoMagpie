@@ -40,7 +40,7 @@ The product's category moved:
 | 6 | Resurfacing digest | Later | — | Nice to have |
 | 9 | Daily find | Later | — | Distraction from the core |
 | 12 | Auto-extraction | Candidate; step 1 done | after the tester round | H1: a note must cost almost nothing to write |
-| 13 | Taxonomy and semantic search | Candidate | after the tester round | Retrieval; a direction question first |
+| 13 | Taxonomy and semantic search | Approved in part ([RFC 0001](rfcs/0001-domains-tags-and-search.md)) | Phase 0 now; Phases 1–2 next; Phase 3 later | Retrieval; notes stay about packages (D1) |
 | 14 | Just-in-time context | Candidate | after the tester round | Token cost per task |
 | 15 | Multiplayer and team sync | Candidate | after the tester round | H3: the project journal exists; visibility is the gap |
 | 16 | A community hub and registry | Candidate | after the tester round | Sharing journals; prompt-injection risk |
@@ -230,13 +230,23 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - for small journals, the agent already makes the semantic choice over `repomagpie catalog` (the skill).
 - **The direction question:** domain kinds make a note a rule about a domain instead of a note about a package. That moves RepoMagpie from dependency memory ([decision 0009](decisions/0009-positioning-dependency-memory.md)) into general agent rules and memory, a crowded space: Cursor rules, CLAUDE.md, AGENTS.md, the agents' own memory features, Mem0. It needs a decision record that supersedes or extends 0009, decided with evidence, not as a schema change.
 - **Measured so far:** the retrieval baseline (`npm run eval:retrieval`, 2026-10-14) missed the same two needs with every method, and both notes had a vague GitHub description and an empty "Use when" ([roadmap](roadmap.md)). Asking for a one-line "Use when" at capture comes before any search change.
+  - With one synthetic "Use when" item per note (2026-10-25, 33 notes, 22 needs; the fixture's `use_when` items, written plainly from each repository's description by someone who had seen the needs, so an upper bound):
+
+    | | recall@5 | recall@10 |
+    |---|---|---|
+    | search, without | 18/22 (82 %) | 18/22 (82 %) |
+    | search, with "Use when" | 20/22 (91 %) | 22/22 (100 %) |
+    | suggest, without | 17/22 (77 %) | 18/22 (82 %) |
+    | suggest, with "Use when" | 19/22 (86 %) | 20/22 (91 %) |
+
+    The two needs every method missed are found: OpenHands at 4 in search and 2 in suggest, uptime-kuma at 9 in search only. One need ranks lower: the self-hosted Heroku alternative moves from 3 to 5. Suggest still misses "run large language models on my own laptop" and "get alerted when my website goes down".
 - **Options:**
   - a local embedding model: a download and a native module or WASM, which breaks "no runtime dependencies";
   - the agent's own semantic choice over `catalog`, which works today for journals of a few hundred notes;
   - an opt-in provider with the user's key, which sends note text off the machine (rule 6: off by default).
 - **Risks:** a schema change that moves the product's category without a decision; a dependency that makes the package heavy for a gain not measured.
 - **What decides it:** journals that reach thousands of notes, and `eval:retrieval` showing misses that a "Use when" line doesn't fix.
-- **Status:** candidate, after the tester round.
+- **Status:** worked out in [RFC 0001](rfcs/0001-domains-tags-and-search.md), and approved in part (2026-10-24). D1 answers the direction question: notes stay about packages and repositories, general project rules stay in CLAUDE.md or AGENTS.md, and domains make package notes findable by concern. D2 approves the 12 domains and the name `domains`. Phase 0, "Use when" and "Avoid when" at capture, is done on `feat/use-when-at-capture` (`repomagpie note --use-when`, the MCP `note` tool, the skill and the app); Phases 1 and 2 are next; Phase 3, semantic search, is decided after Phase 2's eval (D3).
 
 ## 14. Just-in-time context
 

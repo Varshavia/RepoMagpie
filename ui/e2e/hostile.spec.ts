@@ -1,7 +1,7 @@
 // Hostile notes in the local app (decision 0032, rule 7, docs/ui.md §3): links only for http and
 // https, note text never rendered as HTML, and files the journal skipped shown to the user. The
 // payloads are inert: they would only set document.title, and they must never run.
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "./fixtures.ts";
 
@@ -115,6 +115,26 @@ test("hidden characters: search results and Check a package show the markers too
   const card = page.locator("article").filter({ hasText: "txt.exe" });
   await expect(card).toContainText(SHOWN_VERDICT);
   expect(await card.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+});
+
+test("hidden characters: a Use when item typed in Add shows markers in the form, is written as typed, and shows markers on the note", async ({ page, magpie }) => {
+  const typed = `invoices ${ch(0x202e)}fdp${ch(0x07)}`;
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel("Package, PURL or GitHub URL").fill("pkg:npm/hidden-item");
+  const use = page.getByRole("textbox", { name: "Use when" });
+  await use.fill(typed);
+  await use.press("Enter");
+  const list = page.getByRole("list", { name: "Use when: items to add" });
+  await expect(list).toContainText(`invoices ${marker(0x202e)}fdp${marker(0x07)}`);
+  expect(await list.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+  await page.getByRole("button", { name: /Save note/ }).click();
+  await expect(page.getByText(/Saved to your personal journal/)).toBeVisible();
+  expect(readFileSync(magpie.note("npm--hidden-item.md"), "utf8")).toContain(`## Use when\n- ${typed}\n`);
+  await page.getByRole("button", { name: "Open the note" }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await expect(pane).toContainText(`invoices ${marker(0x202e)}fdp${marker(0x07)}`);
+  expect(await pane.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
 });
 
 test("the note view's alternative chips flag look-alike and invalid names, as Check a package does", async ({ page, magpie }) => {

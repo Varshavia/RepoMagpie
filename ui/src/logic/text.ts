@@ -11,7 +11,6 @@ export type Inline =
   | { kind: "wikilink"; target: string; label: string | null; text: string };
 export type Block = { kind: "list"; items: Inline[][] } | { kind: "lines"; lines: Inline[][] };
 
-const COMMENT = /<!--[\s\S]*?-->/g;
 const BULLET = /^\s*[-*+]\s+(.*)$/;
 const FENCE = /^(```|~~~)/;
 // A code span (a run of backticks, up to a run of the same length), a wikilink, a Markdown link, a
@@ -54,11 +53,24 @@ export function hasHidden(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.values(value).some(hasHidden);
 }
 
+// Text without HTML comments, as core's stripComments reads it (src/core/note.ts; text.test.ts keeps
+// them equal), so the app shows what core and the agent read. Comments are removed until none is left,
+// so "<!-<!---->-" can't leave "<!--" behind; then an unterminated "<!--" is dropped to the end of its line.
+// CodeQL's js/incomplete-multi-character-sanitization here is a false positive: see the property test in text.test.ts.
+export function stripComments(text: string): string {
+  let out = text;
+  for (let before = ""; out !== before; ) {
+    before = out;
+    out = out.replace(/<!--[\s\S]*?-->/g, "");
+  }
+  return out.replace(/<!--[^\r\n]*/g, "");
+}
+
 export function parseBody(body: string): Block[] {
   const blocks: Block[] = [];
   let current = null as Block | null;
   let fence: string | null = null;
-  for (const raw of body.replace(COMMENT, "").split(/\r?\n/)) {
+  for (const raw of stripComments(body).split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) {
       current = null;
@@ -129,7 +141,7 @@ export function firstEntries(blocks: Block[], n: number): { blocks: Block[]; mor
 
 // Only comments and whitespace: an empty section.
 export function isBlank(body: string): boolean {
-  return !body.replace(COMMENT, "").trim();
+  return !stripComments(body).trim();
 }
 
 // What the section editor starts with: the body without the draft marker and the blank lines

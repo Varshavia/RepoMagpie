@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { addTopicSuggestions, formOf, fromTopicsSummary, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine } from "./edits.ts";
+import { addTopicSuggestions, formOf, fromTopicsSummary, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine, withItem } from "./edits.ts";
 
 // "From GitHub topics" (docs/ui.md §7): topics that could become tags.
 test("topicSuggestions: topics not among the tags, in GitHub's order, at most 8, without the repository's name", () => {
@@ -49,8 +49,24 @@ const NOTE: NoteJson = {
 };
 
 test("formOf reads the human-owned fields from the note", () => {
-  assert.deepEqual(formOf(NOTE), { verdict: "", kind: "library", tags: ["text"], tried: false, rating: null });
-  assert.deepEqual(formOf({ ...NOTE, verdict: null, frontmatter: { tags: "oops", rating: 9 } }), { verdict: "", kind: "", tags: [], tried: false, rating: null });
+  const none = { useWhen: [], useWhenText: "", avoidWhen: [], avoidWhenText: "" };
+  assert.deepEqual(formOf(NOTE), { verdict: "", kind: "library", tags: ["text"], tried: false, rating: null, ...none });
+  assert.deepEqual(formOf({ ...NOTE, verdict: null, frontmatter: { tags: "oops", rating: 9 } }), { verdict: "", kind: "", tags: [], tried: false, rating: null, ...none });
+});
+
+test("withItem: one line, trimmed, once ignoring case; a blank line adds nothing", () => {
+  assert.deepEqual(withItem([], "  a short   invoice "), ["a short invoice"]);
+  assert.deepEqual(withItem(["a short invoice"], "A SHORT INVOICE"), ["a short invoice"]);
+  assert.deepEqual(withItem(["x"], "   "), ["x"]);
+});
+
+test("patchFor sends the Use when and Avoid when items as add_items, a line still typed included, with the Verdict", () => {
+  const form = { ...formOf(NOTE), verdict: "fine", useWhen: ["padding ids"], useWhenText: "  ", avoidWhen: [], avoidWhenText: "big strings" };
+  assert.deepEqual(patchFor(NOTE, form), {
+    journal: "personal", id: "pkg:npm/left-pad", version: "sha256:abc", verdict: "fine",
+    add_items: { "Use when": ["padding ids"], "Avoid when": ["big strings"] },
+  });
+  assert.deepEqual(patchFor(NOTE, { ...formOf(NOTE), useWhenText: "padding ids" })?.add_items, { "Use when": ["padding ids"] });
 });
 
 test("patchFor sends only what changed, with journal, id and version", () => {

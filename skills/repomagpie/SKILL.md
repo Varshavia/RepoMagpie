@@ -79,6 +79,7 @@ repomagpie note <name-or-url> "<the user's words>" --json
 ```
 
 - The text becomes the Verdict, so use the user's own words. If they haven't said a verdict, ask for one, or save the note without text: it goes to the inbox.
+- When you ask, you may ask in the same question when they'd use it, or avoid it: "In a few words, why? And when would you use it, if ever?" Each answer is an item, in their words: `repomagpie note <name> "<the user's words>" --use-when "<their words>" --avoid-when "<their words>" --json` (MCP: `use_when`, `avoid_when`). Never fill these yourself, and don't ask a second question: with only a reason, save only the Verdict.
 - A GitHub URL instead of a name also fetches the repository's facts.
 - The note goes to the personal journal. `--to project` only with the user's explicit OK.
 - Exit 1 with "already has a Verdict": RepoMagpie never overwrites one. Give the user the note's path; they edit it themselves.
@@ -89,7 +90,7 @@ repomagpie note <name-or-url> "<the user's words>" --json
 When the task is done (finished, or the user moved on) and in it the user chose a package over another, replaced one, dropped one after trouble or for a reason, pinned or avoided a version, or answered a RepoMagpie note, offer once to save that decision. A switch you proposed counts once the user accepted it. Don't offer mid-task, in reply to a hook, for a routine install with no choice, for a package you dropped without the user, or when the user asked not to be asked. With no user to answer (`claude -p`, CI), list the decisions in one line of your final output and save nothing.
 
 - First recall the packages. Skip one the user already declined in this conversation, or whose exact note's `verdict` already says it; when unsure, offer and quote that Verdict.
-- One message, after your summary, in the user's language: each decision in a few words (at most 3, then "+N more"), that it goes to their personal journal, and why, in their words. "We dropped moment for date-fns. Save that to your RepoMagpie journal? In a few words, why?" Never write the Verdict for them, and never ask again after a no.
+- One message, after your summary, in the user's language: each decision in a few words (at most 3, then "+N more"), that it goes to their personal journal, and why, in their words. "We dropped moment for date-fns. Save that to your RepoMagpie journal? In a few words, why?" You may also ask in it when they'd use or avoid it, as in "Recording an opinion". Never write the Verdict for them, and never ask again after a no.
 - A reason: save their words, unchanged, as in "Recording an opinion", on the package the reason is about, with `--alternative` only for a package they chose or named. Give the type (`--type`, or a PURL such as `pkg:npm/moment` as the MCP `target`):
 
 ```

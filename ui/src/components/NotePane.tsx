@@ -551,6 +551,8 @@ export function NotePane(props: NotePaneProps) {
               onEditTags={editTagList}
               noTagList={noTagList}
               onCreateTagList={onCreateTagList}
+              drafts={{ useWhen: Boolean(note.sections.find((s) => s.name === "Use when")?.draft), avoidWhen: Boolean(note.sections.find((s) => s.name === "Avoid when")?.draft) }}
+              name={typeof note.frontmatter.name === "string" ? note.frontmatter.name : (note.id ?? "it")}
             />
             </>
           ) : (

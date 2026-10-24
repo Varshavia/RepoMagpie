@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findLinks } from "../../../src/core/links.ts";
+import { readNote, sectionItems, stripComments as coreStripComments } from "../../../src/core/note.ts";
 import { clean } from "../../../src/core/text.ts";
-import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, visible } from "./text.ts";
+import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, stripComments, visible } from "./text.ts";
 
 // Decision 0032, rule 7: a URL from a note is a link only for http and https.
 test("externalHref: http and https only; javascript:, data:, vbscript:, file: and the unparsable give none", () => {
@@ -98,6 +99,62 @@ test("isBlank: only comments and whitespace", () => {
   assert.equal(isBlank("<!-- e.g. a CLI tool -->\n\n"), true);
   assert.equal(isBlank("<!-- magpie:draft -->\n"), true);
   assert.equal(isBlank("- x\n"), false);
+});
+
+// The same cases against core's stripComments and the app's, so the app shows what core and the agent read.
+const COMMENT_CASES = [
+  "a <!-- x --> b",
+  "<!-<!---->-",
+  "<!-<!---->- hidden -->kept",
+  "<!--<!---->-->",
+  "kept <!-- open\r\nnext <!-- also open",
+  "<!-- magpie:draft -->\n- one <!-<!---->- hidden -->\n- two <!-- open\n- three",
+  "```\n<!-- in a fence -->\n```",
+  "no comment at all",
+  "",
+];
+
+test("stripComments: the same text as core's for nested, unterminated and ordinary comments", () => {
+  for (const sample of COMMENT_CASES) assert.equal(stripComments(sample), coreStripComments(sample), JSON.stringify(sample));
+  assert.equal(stripComments("<!-<!---->-"), "");
+  assert.equal(stripComments("kept <!-- open\r\nnext"), "kept \r\nnext");
+});
+
+// Property test for stripComments (CodeQL's js/incomplete-multi-character-sanitization is a false
+// positive there): random strings over the characters that make and break comments, from a fixed seed.
+test("stripComments: on 20,000 random strings, the output never holds \"<!--\", and a second pass changes nothing", () => {
+  let state = 0x5eed;
+  const random = () => { // mulberry32
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const alphabet = ["<", "!", "-", ">", "x", "\n", "\r"];
+  for (let k = 0; k < 20_000; k++) {
+    const sample = Array.from({ length: Math.floor(random() * 41) }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
+    const out = stripComments(sample);
+    assert.ok(!out.includes("<!--"), JSON.stringify(sample));
+    assert.equal(stripComments(out), out, JSON.stringify(sample));
+  }
+});
+
+test("parseBody and isBlank: nested and unterminated comments show nothing, as core's sectionItems reads them", () => {
+  const body = "<!-- magpie:draft -->\n- one <!-<!---->- hidden -->\n- two <!-- open\n- three";
+  const shown = parseBody(body).flatMap((b) => (b.kind === "list" ? b.items : b.lines)).map((parts) => parts.map((p) => p.text).join("").trim());
+  assert.deepEqual(shown, sectionItems(body));
+  assert.deepEqual(shown, ["one", "two", "three"]);
+  for (const blank of ["<!-<!---->-\n", "<!-<!---->- avoid: hidden -->\n", "<!-- avoid: open\n"]) assert.equal(isBlank(blank), true, blank);
+});
+
+test("a Verdict core reads as empty is blank in the app too", () => {
+  const note = (verdict: string) => `---\nid: pkg:npm/pdfkit\nname: pdfkit\nstatus: reviewed\n---\n\n## Verdict\n${verdict}\n\n## Use when\n`;
+  for (const verdict of ["<!-<!---->-", "<!-<!---->- avoid: hidden -->", "<!-- avoid: open", "<!-- one line -->", "fine <!-- open"]) {
+    const read = readNote(note(verdict));
+    const body = read.sections.find((s) => s.name === "Verdict")?.body ?? "";
+    assert.equal(isBlank(body), read.verdict === "", verdict);
+    assert.equal(read.status, read.verdict === "" ? "inbox" : "reviewed", verdict);
+  }
 });
 
 test("editableBody: the body without the draft marker and the blank lines around it; other comments stay", () => {

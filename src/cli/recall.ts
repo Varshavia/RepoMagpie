@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { sep } from "node:path";
 import type { PackageType } from "../core/identity.ts";
-import { DRAFT_MARKER, readNote } from "../core/note.ts";
+import { readNote, stripComments } from "../core/note.ts";
 import { runRecall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { clean, cleanAll, nameConcern } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
@@ -94,7 +94,7 @@ function fullSections(m: RecallMatch, options: CardOptions): string[] {
   const { color } = options;
   const width = 16;
   const blocks = readNote(text).sections.map((section) => {
-    const body = section.body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/).map((line) => clean(line).trim()).filter(Boolean)
+    const body = stripComments(section.body).split(/\r?\n/).map((line) => clean(line).trim()).filter(Boolean)
       .map((line) => line.replace(/^[-*+]\s+/, ""));
     if (section.name === "Verdict" && !body.length) body.push(`${paint(color, 33, "[inbox]")} no verdict yet`);
     if (!body.length) return { name: section.name, lines: [] };

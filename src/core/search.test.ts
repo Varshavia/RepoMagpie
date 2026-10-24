@@ -28,6 +28,15 @@ const PERSONAL = () => source("personal", [
     .replace("- `pdf-report` —", "- `pdf-report` — turns a PDF into a short report"),
 });
 
+test("text inside nested or unterminated comments isn't indexed", () => {
+  const journal = source("personal", [
+    { file: "npm--pdfkit.md", id: "pkg:npm/pdfkit", verdict: "fine", myNotes: "Used it once. <!-<!---->- zebracorn -->\nAgain. <!-- quokkafish" },
+  ]);
+  assert.deepEqual(searchJournals([journal], "zebracorn", { limit: 10 }), []);
+  assert.deepEqual(searchJournals([journal], "quokkafish", { limit: 10 }), []);
+  assert.equal(searchJournals([journal], "again", { limit: 10 }).length, 1);
+});
+
 test("results carry the spec's fields; notes and completed skill lines are found", () => {
   const personal = PERSONAL();
   const results = searchJournals([personal], "tdd", { limit: 10 });

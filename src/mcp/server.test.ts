@@ -151,6 +151,40 @@ test("with --allow-write, note records the user's words as the CLI does; a URL i
   });
 });
 
+test("note's use_when and avoid_when: the user's items as the CLI writes them; an existing Verdict stays; caps refuse before any work", async () => {
+  const box = sandbox(FILES);
+  const twin = sandbox(FILES);
+  await withClient(box, { args: ["--allow-write"], modern: true }, async (client) => {
+    const tools = (await client.request("tools/list")).result?.tools as { name: string; description: string; inputSchema: { properties: Record<string, { description: string }> } }[];
+    const tool = tools.find((t) => t.name === "note")!;
+    assert.match(tool.inputSchema.properties.use_when.description, /Only with words the user said; never your summary/);
+    assert.match(tool.inputSchema.properties.avoid_when.description, /Only with words the user said; never your summary/);
+
+    const args = { target: "pdf-lib", type: "npm", use_when: ["edit existing PDFs"], avoid_when: ["generating from scratch"] };
+    const result = await client.call("note", args);
+    const expected = await magpie(twin, ["note", "pdf-lib", "--type", "npm", "--use-when", "edit existing PDFs", "--avoid-when", "generating from scratch", "--json"]);
+    const document = JSON.parse(expected.out) as { path: string; sections_changed: string[] };
+    assert.deepEqual(result.structuredContent, { ...document, path: document.path.replace(twin.root, box.root) });
+    assert.deepEqual(document.sections_changed, ["use_when", "avoid_when"]);
+
+    await client.call("note", { target: "pdf-lib", type: "npm", text: "mine" });
+    const kept = await client.call("note", { target: "pdf-lib", type: "npm", text: "replaced?", use_when: ["forms"] });
+    assert.equal(kept.isError, true);
+    const text = readFileSync(join(box.journal, "notes", "npm--pdf-lib.md"), "utf8");
+    assert.match(text, /## Verdict\nmine\n/);
+    assert.doesNotMatch(text, /forms/);
+    const added = await client.call("note", { target: "pdf-lib", type: "npm", use_when: ["forms", "EDIT EXISTING PDFS"] });
+    assert.deepEqual([added.structuredContent?.sections_changed, added.structuredContent?.items_present], [["use_when"], ["EDIT EXISTING PDFS"]]);
+
+    for (const bad of [{ use_when: ["x".repeat(501)] }, { avoid_when: Array.from({ length: 21 }, (_, k) => `i${k}`) }, { use_when: ["two\nlines"] }, { use_when: ["  "] }]) {
+      const answer = await client.request("tools/call", { name: "note", arguments: { target: "zod", type: "npm", ...bad } });
+      const refused = answer.result as { isError?: boolean } | undefined;
+      assert.ok(answer.error || refused?.isError, JSON.stringify(bad).slice(0, 80));
+    }
+    assert.ok(!existsSync(join(box.journal, "notes", "npm--zod.md")));
+  });
+});
+
 test("the project argument: a valid folder is where the call runs; huge, relative, .., device and missing paths are refused", async () => {
   const box = sandbox(FILES);
   const other = join(box.root, "other");

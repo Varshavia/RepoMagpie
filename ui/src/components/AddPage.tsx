@@ -3,11 +3,11 @@
 import { useId, useState, type ReactNode } from "react";
 import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedNoteJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { addTopicSuggestions, oneLine } from "../logic/edits.ts";
+import { addTopicSuggestions, oneLine, withItem } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, FieldError } from "./common.tsx";
-import { JournalChoice, TopicChips, TypeChoice, type ProjectState } from "./fields.tsx";
+import { ItemsField, JournalChoice, TopicChips, TypeChoice, type ProjectState } from "./fields.tsx";
 
 interface Props {
   project: ProjectState;
@@ -23,6 +23,8 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
   const [to, setTo] = useState<Scope>(defaultJournal);
   const [type, setType] = useState<PackageType | "">("");
   const [verdict, setVerdict] = useState("");
+  const [useWhen, setUseWhen] = useState<{ items: string[]; text: string }>({ items: [], text: "" });
+  const [avoidWhen, setAvoidWhen] = useState<{ items: string[]; text: string }>({ items: [], text: "" });
   const [preview, setPreview] = useState<NotePreviewJson | null>(null);
   const [tags, setTags] = useState<string[]>([]); // a new note's tags: the preview's, as the user leaves them (decision 0030)
   const [busy, setBusy] = useState<"" | "preview" | "save">("");
@@ -30,7 +32,10 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
   const [saved, setSaved] = useState<SavedNoteJson | null>(null);
 
   const request = { target: target.trim(), to, type: type || undefined };
-  const locked = Boolean(preview?.exists && preview.verdict);
+  const locked = Boolean(preview?.exists && preview.verdict); // the Verdict can't be written; items still can
+  const useItems = withItem(useWhen.items, useWhen.text);
+  const avoidItems = withItem(avoidWhen.items, avoidWhen.text);
+  const nothingToSave = locked && !useItems.length && !avoidItems.length;
 
   // Any change to what is being added drops the preview.
   const change = (fn: () => void) => {
@@ -58,16 +63,24 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
 
   async function doSave() {
     if (!request.target) return setError("Paste a package name, a PURL or a GitHub URL first.");
-    if (locked) return;
+    if (nothingToSave) return;
     setBusy("save");
     setError(null);
     try {
-      const text = oneLine(verdict);
+      const text = locked ? "" : oneLine(verdict);
       // The tags shown are the ones written; the save appends the new ones to tags.md.
-      const doc = await api.save({ ...request, text: text || undefined, tags: preview && !preview.exists ? tags : undefined });
+      const doc = await api.save({
+        ...request,
+        text: text || undefined,
+        tags: preview && !preview.exists ? tags : undefined,
+        use_when: useItems.length ? useItems : undefined,
+        avoid_when: avoidItems.length ? avoidItems : undefined,
+      });
       setSaved(doc);
       setTarget("");
       setVerdict("");
+      setUseWhen({ items: [], text: "" });
+      setAvoidWhen({ items: [], text: "" });
       setPreview(null);
       onSaved(to);
     } catch (e) {
@@ -161,9 +174,11 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
             autoComplete="off"
           />
         </div>
+        <ItemsField label="Use when" items={useWhen.items} text={useWhen.text} onChange={(items, text) => setUseWhen({ items, text })} disabled={busy !== ""} />
+        <ItemsField label="Avoid when" items={avoidWhen.items} text={avoidWhen.text} onChange={(items, text) => setAvoidWhen({ items, text })} asks={preview?.name ?? (request.target || null)} disabled={busy !== ""} />
         {error ? <FieldError>{error}</FieldError> : null}
         <div className="form-actions">
-          <button type="button" className="button primary" onClick={() => void doSave()} disabled={busy !== "" || locked}>
+          <button type="button" className="button primary" onClick={() => void doSave()} disabled={busy !== "" || nothingToSave}>
             {busy === "save" ? "Saving…" : "Save note"}
             <kbd>{MOD}+Enter</kbd>
           </button>

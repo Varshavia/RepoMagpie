@@ -11,6 +11,7 @@ import { STARTER_TAGS } from "../core/journals.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
 import type { Context } from "../core/save.ts";
+import { addSectionItems } from "../core/write.ts";
 import { client } from "./fixtures/http.ts";
 import { startServer } from "./server.ts";
 
@@ -156,6 +157,7 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
   const cases: [Record<string, unknown>, string[], string | null][] = [
     [{ target: "pkg:npm/chalk", text: "fine", to: "personal" }, ["note", "pkg:npm/chalk", "fine"], "npm--chalk.md"],
     [{ target: "chalk", to: "personal" }, ["note", "chalk"], "npm--chalk.md"],
+    [{ target: "pkg:npm/chalk", to: "personal", use_when: ["colour in a CLI"], avoid_when: ["browser code"] }, ["note", "pkg:npm/chalk", "--use-when", "colour in a CLI", "--avoid-when", "browser code"], "npm--chalk.md"],
     [{ target: "https://github.com/microsoft/playwright-cli", text: "great for agents", to: "personal" }, ["note", "https://github.com/microsoft/playwright-cli", "great for agents"], "github--microsoft--playwright-cli.md"],
     [{ target: "pkg:npm/pdfkit", text: "second verdict", to: "personal" }, ["note", "pkg:npm/pdfkit", "second verdict"], null],
     [{ target: "https://example.com/an-article", to: "personal" }, ["note", "https://example.com/an-article"], null],
@@ -176,7 +178,7 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
     }
     writeFileSync(tagsMd, tagsBefore);
   }
-  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }, { target: "pkg:npm/x", tags: "pdf" }, { target: "pkg:npm/x", tags: ["Not A Tag"] }]) {
+  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }, { target: "pkg:npm/x", tags: "pdf" }, { target: "pkg:npm/x", tags: ["Not A Tag"] }, { target: "pkg:npm/x", use_when: "one" }, { target: "pkg:npm/x", avoid_when: [3] }, { target: "pkg:npm/x", use_when: [" "] }, { target: "pkg:npm/x", use_when: ["x".repeat(501)] }]) {
     assert.equal((await http.write("POST", "/api/note", body)).status, 400, JSON.stringify(body));
   }
 });
@@ -323,6 +325,12 @@ test("PATCH /api/note edits through core and returns the Note document; an old v
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), after);
 
   const current = noteVersion(after);
+  const items = parsed(await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, add_items: { "Avoid when": ["big PDFs"] } }));
+  assert.equal(items.status, 200);
+  const withItems = readFileSync(box.note("npm--pdfkit.md"), "utf8");
+  assert.equal(withItems, addSectionItems(after, "Avoid when", ["big PDFs"]).text);
+  assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(withItems), add_items: { "My notes": ["x"] } })).status, 400);
+  writeFileSync(box.note("npm--pdfkit.md"), after);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, fields: { name: "x" } })).status, 400);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/nothing", version: current })).status, 404);
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), after);

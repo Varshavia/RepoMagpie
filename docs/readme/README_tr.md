@@ -69,7 +69,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 
    ```bash
    repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
-   repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests"
+   repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
    `--type npm`, adın bir npm paketi olduğunu söyler. Bir projenin içinde RepoMagpie bunu manifest dosyasından okur; başka bir yerde sorar.
@@ -191,6 +191,8 @@ Hayır. RepoMagpie senin ve ekibinin not ettiklerini gösterir: kötü amaçlı 
 <summary><strong>Notlarım nerede, onları elle düzenleyebilir miyim?</strong></summary>
 
 Her not, YAML frontmatter'ı olan bir Markdown dosyasıdır: kişisel günlüğün için `~/.magpie/notes/` içinde, bir projeninki için `.magpie/notes/` içinde ([not şeması](../note-schema.md)). Onları herhangi bir editörde düzenle: RepoMagpie, alanları ya da bölümleri eksik olsa da elle yazılmış notları okur ve senin bölümlerini asla yeniden yazmaz. `repomagpie ui` aynı dosyaları tarayıcıda düzenler. Kişisel günlüğü başka bir yerde tutmak için `MAGPIE_HOME`'u ayarla ya da `--home` ver.
+
+Notların sonra yalnızca adıyla değil, neye ihtiyacın olduğuyla da bulunsun diye `--use-when` ekle: `repomagpie note zod --use-when "checking API input"`.
 
 `repomagpie delete <name>` ya da uygulamadaki Delete, bir notu günlüğün `.trash/` klasörüne taşır.
 

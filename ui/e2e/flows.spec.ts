@@ -59,6 +59,43 @@ test("inbox review: kind, tags, tried and rating are saved with the Verdict", as
   expect(text).toMatch(/rating: 4/);
 });
 
+test("inbox review: Avoid when items, added with Enter and one removed, are saved with the Verdict by Ctrl+Enter, a typed line too", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  await page.getByRole("textbox", { name: "Verdict" }).fill("fine for a first look");
+  const avoid = page.getByRole("textbox", { name: "Avoid when" });
+  await avoid.fill("a repo with secrets");
+  await avoid.press("Enter");
+  await avoid.fill("by mistake");
+  await avoid.press("Enter");
+  const list = page.getByRole("list", { name: "Avoid when: items to add" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(page.getByText("RepoMagpie will ask before egonex-ai/understand-anything is installed.")).toBeVisible();
+  await list.getByRole("button", { name: "Remove by mistake" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await avoid.fill("monorepos over 1 GB");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("Verdict saved")).toBeVisible();
+  const text = readFileSync(magpie.note("github--egonex-ai--understand-anything.md"), "utf8");
+  expect(text).toContain("## Verdict\nfine for a first look\n");
+  expect(text).toContain("## Avoid when\n- a repo with secrets\n- monorepos over 1 GB\n\n## What it does");
+  expect(text).toContain("## Use when\n<!-- magpie:draft -->\n"); // untouched without items
+});
+
+test("inbox review: Use when items replace the section's draft, and the form says so first", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("This section holds a draft. Items you add here replace it.")).toBeVisible();
+  const use = page.getByRole("textbox", { name: "Use when" });
+  await use.fill("a first map of a large repo");
+  await page.getByRole("button", { name: "Add to Use when" }).click();
+  await page.getByRole("button", { name: /^Save/ }).click();
+  await expect(page.getByRole("status").getByText("Note saved")).toBeVisible();
+  const text = readFileSync(magpie.note("github--egonex-ai--understand-anything.md"), "utf8");
+  expect(text).toContain("## Use when\n- a first map of a large repo\n\n## Avoid when");
+  expect(text).not.toContain("onboarding onto a new project");
+});
+
 test("note view: Tried and the rating under the title; nothing for a note neither tried nor rated", async ({ page, magpie }) => {
   const file = magpie.note("github--egonex-ai--understand-anything.md");
   writeFileSync(file, readFileSync(file, "utf8").replace("tried: false", "tried: true").replace(/^rating:.*$/m, "rating: 3"));
@@ -415,6 +452,30 @@ test("add: preview a package, write the Verdict, save; the note is on disk", asy
   expect(text).toContain("## Verdict\navoid: use String.prototype.padStart\n");
   await page.getByRole("button", { name: "Open the note" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "left-pad" })).toBeVisible();
+});
+
+test("add: Use when and Avoid when items are written in the user's words; the avoid item makes Check a package show that the hook asks first", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel("Package, PURL or GitHub URL").fill("pkg:npm/left-pad");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("New note");
+  const use = page.getByRole("textbox", { name: "Use when" });
+  await use.fill("padding ids in an old script");
+  await use.press("Enter");
+  await page.getByRole("textbox", { name: "Avoid when" }).fill("new code: padStart exists");
+  await expect(page.getByText("RepoMagpie will ask before left-pad is installed.")).toBeVisible();
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByText("Saved to your personal journal: pkg:npm/left-pad. It is in the Inbox until it has a Verdict.")).toBeVisible();
+  const text = readFileSync(magpie.note("npm--left-pad.md"), "utf8");
+  expect(text).toContain("## Use when\n- padding ids in an old script\n");
+  expect(text).toContain("## Avoid when\n- new code: padStart exists\n");
+  expect(text).not.toContain("magpie:draft");
+
+  await page.getByRole("button", { name: "Check a package" }).click();
+  await page.getByLabel("Packages").fill("left-pad");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByText("In Claude Code, Gemini CLI and Antigravity CLI, the hook asks you first.")).toBeVisible();
 });
 
 test("add: a note that already has a Verdict says so before you write one", async ({ page, magpie }) => {
