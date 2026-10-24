@@ -19,9 +19,11 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: `0.2.0-beta.8` (2026-10-23), the build for the tester round: `setup --remove` on a Windows home folder with letters outside ASCII and suggest's single-letter keywords are fixed, and a check keeps the fs calls that broke out of the code (#47); the tester guide and the feedback form are in (#46).
   Also now: `0.2.0-beta.9` (2026-10-24), the fixes from the maintainer's macOS test (#49, [decision 0038](decisions/0038-setup-chooses-found-agents-and-deletes-backups-on-request.md), [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)): `setup` chooses agents found by their command or app, `repomagpie setup --delete-backups`, `doctor` to-dos that name a working action, the note-tool line, "nothing to remove", `library` for a registry package note, and the app following the system theme.
   Also now: [the capture offer](#the-capture-offer-featcapture-nudge) (`feat/capture-nudge`): at the end of a task, the agent offers once to save a dependency decision made in it, with the user's reason as the Verdict; `doctor`'s to-do for entries left in an agent found by its folder only names both ways out; the maintainer's ideas of 2026-10-24 assessed in [ideas](ideas.md). Merged (#51) and released in `0.2.0-beta.10` (2026-10-24); next, the maintainer runs the live scenarios on macOS with the real install and a scratch journal.
+  Also now: [Use when at capture](#use-when-at-capture-featuse-when-at-capture) (`feat/use-when-at-capture`), [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 0: `repomagpie note --use-when` and `--avoid-when`, the MCP `note` tool, the skill and the app; built, waiting for review.
   Also now: the tester round on `0.2.0-beta.10`: two people, one on macOS and one on Windows, for a week. They follow [TESTING.md](../TESTING.md) and answer the "Beta feedback" issue form; [validation](validation.md#beta-tester-round) maps each question to the hypothesis it tests.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
-- **Later:** v0.3 Trust, v0.4 Share.
+  Also next: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 1 (domains on notes, tag aliases, structured `search`, the expanded retrieval eval) and Phase 2 (ranking with field boosts, aliases, structured boosts and `why`), each with its decision record.
+- **Later:** v0.3 Trust, v0.4 Share. Also later: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 3, opt-in semantic search, decided after Phase 2's eval (D3).
 
 | Part | Status |
 |---|---|
@@ -332,8 +334,8 @@ From the maintainer's first day of real use (2026-10-09): ten GitHub repositorie
 **Done when:** a new GitHub repository note arrives with up to 8 tags from its topics; one action tags the existing notes, and a second run adds nothing; coolify and browser-use are no longer guessed as skill packs, and dify isn't `other` (langflow is a `library`, supabase stays `other`: accepted in 0030); the sidebar stays usable with hundreds of tags; all checks pass. (Met on `feat/topic-tags`, 2026-10-09, Windows dev machine, Node 24.13: 896 tests (894 pass, 2 skipped), 147 hook tests and 66 end-to-end flows. The dev machine was loaded that day: the local benchmarks ran 2–4× slower than at `0.2.0-beta.2`, and the graph's 2,000-note timing missed its 2 s in 4 of 8 runs. CI's report shows no regression: the graph's warm first frame 2,153 and 2,325 ms on this branch, 1,618–2,436 ms over `main`'s last five runs; every benchmark equal or faster than on `main`.)
 
 Follow-up, later (the maintainer, 2026-10-09):
-- [ ] Ask for a one-line "Use when" at capture, in `repomagpie note` and the app's Add; never required. The retrieval baseline (2026-10-14) missed the same two needs with every method, and both notes had a vague GitHub description ("A fancy self-hosted monitoring tool", "AI-Driven Development"): one line in the user's words fixes that without embeddings.
-- [ ] Tag synonyms: topics give near-duplicate tags (`llm` and `llms`, `no-code` and `nocode`, `web-scraping`, `webscraping` and `web-scraper`, `self-hosted` and `self-hosting`). Decide whether magpie merges or suggests one spelling; renaming and merging tags are out of scope until then.
+- [x] Ask for a one-line "Use when" at capture, in `repomagpie note` and the app's Add; never required ([Use when at capture](#use-when-at-capture-featuse-when-at-capture)). The retrieval baseline (2026-10-14) missed the same two needs with every method, and both notes had a vague GitHub description ("A fancy self-hosted monitoring tool", "AI-Driven Development"): one line in the user's words fixes that without embeddings.
+- [ ] Tag synonyms: topics give near-duplicate tags (`llm` and `llms`, `no-code` and `nocode`, `web-scraping`, `webscraping` and `web-scraper`, `self-hosted` and `self-hosting`). Decide whether magpie merges or suggests one spelling; renaming and merging tags are out of scope until then. Proposed in [RFC 0001](rfcs/0001-domains-tags-and-search.md#43-tag-aliases), Phase 1: aliases in `tags.md` and `repomagpie tags --merge`.
 
 ### Agents everywhere: MCP, setup and doctor (`feat/mcp-setup`)
 Any coding agent can ask "what do I have for X?" and check a package before installing it, without the user wiring anything by hand. RepoMagpie narrows candidates deterministically and offline and never calls a model; the agent makes the semantic choice. Decisions: [0034](decisions/0034-the-mcp-server.md) (the MCP server), [0035](decisions/0035-setup-and-doctor.md) (`setup` and `doctor`). Agent facts, with sources: [agents](agents.md).
@@ -387,6 +389,17 @@ H1 asks whether people will write notes ([validation](validation.md)). The commo
 - [ ] The five live scenarios in Claude Code on a scratch journal, run by the maintainer on macOS after `0.2.0-beta.10`, with the real install (the script is in the pull request).
 
 **Done when:** the skill offers once, at the end, when a dependency decision happened, and never writes the Verdict; the five live scenarios behave as expected; `doctor` names both ways out for a folder-only agent's entries; all checks pass.
+
+### Use when at capture (`feat/use-when-at-capture`)
+[RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 0: before any search change, notes say in the user's words when they'd use or avoid a package, so they are found by need, not only by name ([idea 13](ideas.md#13-taxonomy-and-semantic-search)).
+- [x] `repomagpie note --use-when` and `--avoid-when`, one item each, repeatable: the user's items are kept, new ones go after them, a draft gives way, an "Avoid when" item says the hook will ask; `--json` names the sections changed.
+- [x] The MCP `note` tool's `use_when` and `avoid_when`, only with the user's words.
+- [x] The skill asks in the same question as the reason, never fills them, and never asks a second question.
+- [x] The app: "Use when" and "Avoid when" fields in the inbox review and on Add, saved in one request.
+- [x] `npm run eval:retrieval` with and without one synthetic "Use when" item per note; the numbers are in [idea 13](ideas.md#13-taxonomy-and-semantic-search).
+- [x] Docs: the spec, the note schema, the app's doc, the READMEs, the tester guides and the changelog.
+
+**Done when:** "Use when" and "Avoid when" can be given from the CLI, the MCP tool, the review form and Add, without ever losing human text; the skill asks once and never fills them; the eval shows recall with and without; all checks pass.
 
 ## v0.3 Trust
 - [ ] `repomagpie init`, if it missed v0.1.
