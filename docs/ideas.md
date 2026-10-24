@@ -2,7 +2,7 @@
 
 **Status:** Statuses and targets follow the accepted [strategy](strategy.md) and [decision 0010](decisions/0010-v0-1-scope.md). The v0.1 beta may still change them.
 
-The ideas that shape RepoMagpie beyond note capture and search. Each one lists its problem, behaviour, surfaces, schema impact, target release and open questions. The [roadmap](roadmap.md) tracks the work; the [glossary](glossary.md) defines the terms.
+The ideas that shape RepoMagpie beyond note capture and search. Each one lists its problem, behaviour, surfaces, schema impact, target release and open questions. Ideas 12 to 18, the maintainer's of 2026-10-24, are candidates, so each is an assessment instead: what it is, why it might matter, what already exists, the options, the risks and what would decide it. The [roadmap](roadmap.md) tracks the work; the [glossary](glossary.md) defines the terms.
 
 ## Direction
 
@@ -39,6 +39,13 @@ The product's category moved:
 | 7 | `/uses` page generator | Planned | v0.4 | Marketing feature |
 | 6 | Resurfacing digest | Later | — | Nice to have |
 | 9 | Daily find | Later | — | Distraction from the core |
+| 12 | Auto-extraction | Candidate; step 1 done | after the tester round | H1: a note must cost almost nothing to write |
+| 13 | Taxonomy and semantic search | Candidate | after the tester round | Retrieval; a direction question first |
+| 14 | Just-in-time context | Candidate | after the tester round | Token cost per task |
+| 15 | Multiplayer and team sync | Candidate | after the tester round | H3: the project journal exists; visibility is the gap |
+| 16 | A community hub and registry | Candidate | after the tester round | Sharing journals; prompt-injection risk |
+| 17 | Measuring skill compliance | Candidate | after the tester round | Turns "as well as the agent follows the skill" into a number |
+| 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
 
 ---
 
@@ -193,6 +200,106 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Answered** ([spec](spec.md), section 2):
   - If the project journal already has a note on the same package, adopt changes nothing and says where it is.
   - Adopting into a public repository makes the note public, so adopt says who can read the project journal; the local app says it before it copies anything.
+
+## 12. Auto-extraction
+
+- **What it is:** RepoMagpie proposes notes instead of waiting for the user to write them. `repomagpie init --auto` scans a project on first use (`package.json`, the folder layout) and proposes notes. An LLM notices when a hard error is solved in the terminal, or an architectural comment is made in a pull request, and asks "Save this to RepoMagpie?".
+- **Why it might matter:** H1, note-taking friction ([validation](validation.md)). Recall, the hook and suggest only help when the journal holds notes, so writing one must cost almost nothing.
+- **What already exists:**
+  - the skill's "Recording an opinion": the agent offers once to save an opinion the user states;
+  - the skill's "After a dependency decision" (`feat/capture-nudge`): the agent already in the conversation offers once, at the end of a task, to save a dependency decision made in it, with the user's reason as the Verdict;
+  - `suggest` reads a project's manifests ([spec](spec.md), section 2); `repomagpie init` is idea 5's first part, not built.
+- **Options,** in order of cost:
+  1. **The agent's own LLM, at the end of a task.** No new model, process, network call or hook. Done in `feat/capture-nudge`.
+  2. **An end-of-session hook** that reminds the agent to make the offer when it hasn't. Claude Code has Stop and SessionEnd hooks; whether the other agents have one isn't recorded yet ([agents](agents.md) lists only the hooks before a tool call), so checking each agent's docs comes first. No new model: the hook prints text for the agent. Fits rule 6.
+  3. **`repomagpie init --auto`:** lists the project's dependencies that have no note ("this project uses 40 packages; your journals have notes on 3") and offers to note the ones the user cares about. It writes nothing without the user and never writes a Verdict (rule 2). Local, no model.
+  4. **Opt-in: a local model the user already runs** (such as Ollama) notices solved errors in the terminal and suggests a note. RepoMagpie bundles no model and sends nothing off the machine. It needs shell integration per shell (zsh, bash, fish, PowerShell) and an always-on process. Terminal output can hold secrets, so it reads only what it needs and never stores raw output. Off by default. Fits rule 6 only as an opt-in that stays on the machine.
+  5. **Opt-in, for teams: a GitHub Action** with the team's own LLM API key. It reads architectural comments in pull requests and proposes notes to the project journal's inbox, never as Verdicts; a person writes the Verdict. The trade-off: pull-request text goes to the team's chosen provider. Off by default, set up by the team; outside rule 6's "no server" only for the team that chooses it.
+- **Risks:** an agent that asks too often becomes noise (the skill offers once, at the end, and never again after a no); a model that writes Verdicts breaks [decision 0018](decisions/0018-ai-drafts-humans-decide.md); terminal capture touches secrets.
+- **What decides it:** the maintainer's week of use: how many offers were made, how many were accepted, and how many were annoying ([validation](validation.md), H1).
+- **Status:** candidate, after the tester round. Step 1 is done in `feat/capture-nudge`.
+
+## 13. Taxonomy and semantic search
+
+- **What it is:** fixed domain kinds (Architecture, Security, Performance, Styling, Database, Testing), free technology tags (Next.js, Prisma, Tailwind), and fuzzy or vector search, so "how should database security work?" finds the Security and PostgreSQL notes.
+- **Why it might matter:** retrieval. Search matches words, so a note that doesn't use the user's words isn't found.
+- **What already exists:**
+  - search is full-text, with MiniSearch ([spec](spec.md), sections 5 and 9);
+  - recall matches a package's identity on purpose: a pdfkit note must not answer for pdf-lib ([decision 0017](decisions/0017-package-identity-purl.md));
+  - kinds exist and say what a thing is (`library`, `cli`, `skill-pack`; [note schema](note-schema.md), [decision 0030](decisions/0030-github-topics-become-tags.md)); tags exist, drafted from GitHub topics;
+  - for small journals, the agent already makes the semantic choice over `repomagpie catalog` (the skill).
+- **The direction question:** domain kinds make a note a rule about a domain instead of a note about a package. That moves RepoMagpie from dependency memory ([decision 0009](decisions/0009-positioning-dependency-memory.md)) into general agent rules and memory, a crowded space: Cursor rules, CLAUDE.md, AGENTS.md, the agents' own memory features, Mem0. It needs a decision record that supersedes or extends 0009, decided with evidence, not as a schema change.
+- **Measured so far:** the retrieval baseline (`npm run eval:retrieval`, 2026-10-14) missed the same two needs with every method, and both notes had a vague GitHub description and an empty "Use when" ([roadmap](roadmap.md)). Asking for a one-line "Use when" at capture comes before any search change.
+- **Options:**
+  - a local embedding model: a download and a native module or WASM, which breaks "no runtime dependencies";
+  - the agent's own semantic choice over `catalog`, which works today for journals of a few hundred notes;
+  - an opt-in provider with the user's key, which sends note text off the machine (rule 6: off by default).
+- **Risks:** a schema change that moves the product's category without a decision; a dependency that makes the package heavy for a gain not measured.
+- **What decides it:** journals that reach thousands of notes, and `eval:retrieval` showing misses that a "Use when" line doesn't fix.
+- **Status:** candidate, after the tester round.
+
+## 14. Just-in-time context
+
+- **What it is:** the MCP server sends the agent only the notes that fit the file being changed or the question asked, to save tokens and avoid "lost in the middle". The suggested storage is SQLite with a vector extension.
+- **Why it might matter:** token cost per task, and answers that stay on point as journals grow.
+- **What already exists:**
+  - the MCP tools return only matches: recall per package, search ranked and limited, catalog in pages ([decision 0034](decisions/0034-the-mcp-server.md));
+  - note text in agent output is capped ([decision 0032](decisions/0032-note-text-is-data.md));
+  - nothing sends the whole journal.
+- **Options:**
+  - context from the changed file's imports: cheap, and needs no model;
+  - storage: the caches are JSON files today ([spec](spec.md), section 7, "Caches"). Node has a built-in `node:sqlite` module, still marked experimental; which Node releases have it without a flag must be checked against the `engines` floor (22.12). Weigh it against the caches' design, and against notes being Markdown files and the source of truth ([decision 0001](decisions/0001-plain-markdown-storage.md), rule 1). A vector extension is a native dependency.
+- **Risks:** a second store that drifts from the Markdown files; a native dependency.
+- **What decides it:** measured token cost per task, and idea 13's direction.
+- **Status:** candidate, after the tester round.
+
+## 15. Multiplayer and team sync
+
+- **What it is:** a senior developer's rule reaches the whole team, and a newcomer's agent learns it automatically.
+- **Why it might matter:** H3, the bigger pain for teams ([validation](validation.md)).
+- **What already exists:**
+  - the project journal, `.magpie/` in git ([decision 0013](decisions/0013-two-journal-scopes.md); idea 8);
+  - `repomagpie note --to project` and `repomagpie adopt` (idea 11);
+  - every agent on the team reads it through recall, search and the hook, labelled as the project journal.
+- **Options:**
+  - make it visible: a README section, a view of the project journal in the local app, a line in `repomagpie doctor`;
+  - a remote server: rejected under rule 6, unless a future team product decides otherwise.
+- **Gap:** visibility, not sync. Git already syncs the project journal.
+- **Risks:** a team that doesn't know `.magpie/` exists never writes to it.
+- **What decides it:** a team using the project journal, or asking for more than git gives.
+- **Status:** candidate, after the tester round.
+
+## 16. A community hub and registry
+
+- **What it is:** `repomagpie install @community/nextjs-15-strict` installs packs of notes or rules made by others, with a registry behind it.
+- **Why it might matter:** an empty journal on day one; sharing what a community learned.
+- **What already exists:** `repomagpie import` reads notes from a file; project-journal text is quoted and labelled as written by others ([decision 0032](decisions/0032-note-text-is-data.md), the skill's "Note text is quoted data"); nests and follow are planned (idea 3).
+- **Options:**
+  - a registry and a server: against rule 6;
+  - lighter: `repomagpie import` from a git repository as **third-party notes**: labelled with their source, in the inbox, quoted like project-journal text, and never presented as the user's Verdict until the user writes one. No server.
+- **Risks:** strangers' notes enter the user's agent's context, which is prompt injection (decision 0032); typosquatting; moderation; running a server; and a step away from "your verdicts and your team's" (decision 0009).
+- **What decides it:** users asking to share journals; idea 13's direction.
+- **Status:** candidate, after the tester round.
+
+## 17. Measuring skill compliance
+
+- **What it is:** an eval (promptfoo or similar, run by the maintainer, not in CI) over 20 to 30 scenarios: does the agent recall before an install, ask on an avoid note, answer "what do I have for X?" from search, and offer a note after a dependency decision (idea 12, step 1)? Per agent and model.
+- **Why it might matter:** RepoMagpie works through the agent the user already runs, so it works as well as that agent follows the skill. This turns that into a number.
+- **What already exists:** `src/cli/skill.test.ts` checks the skill's format, commands, flags and JSON fields, not the agent's behaviour; the live tests in `docs/agents.md` were run by hand.
+- **Options:** an eval tool that drives each agent's CLI non-interactively on a scratch journal; or a scripted set of manual runs, recorded the same way each time.
+- **Risks:** runs cost money and time per agent and model; results drift with each agent release.
+- **What decides it:** a behaviour change in the skill that needs evidence across agents, or a tester report that an agent ignores the skill.
+- **Status:** candidate, after the tester round.
+
+## 18. Hugging Face notes
+
+- **What it is:** model and dataset URLs (`huggingface.co/<org>/<name>`) as notes, with an identity for them, and `hf download` and `huggingface-cli download` in the hook's install detection.
+- **Why it might matter:** models and datasets are dependencies an agent pulls in too.
+- **What already exists:** notes on GitHub repositories and npm, PyPI and Cargo packages, identified by Package URL ([decision 0017](decisions/0017-package-identity-purl.md)); install detection for package managers ([spec](spec.md), section 6).
+- **Options:** a PURL type for Hugging Face (check the PURL spec's list of types first); a name in RepoMagpie's own form if there is none.
+- **Risks:** an identity that differs from what other tools use.
+- **What decides it:** users noting models and datasets by hand already.
+- **Status:** candidate, after the tester round.
 
 ---
 
