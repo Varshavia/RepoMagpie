@@ -233,6 +233,25 @@ test("stripComments removes comments until none is left, then an unterminated on
   assert.equal(stripComments("<!-- magpie:draft -->\nA PDF library."), "\nA PDF library.");
 });
 
+// Property test for stripComments (CodeQL's js/incomplete-multi-character-sanitization is a false
+// positive there): random strings over the characters that make and break comments, from a fixed seed.
+test("stripComments: on 20,000 random strings, the output never holds \"<!--\", and a second pass changes nothing", () => {
+  let state = 0x5eed;
+  const random = () => { // mulberry32
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const alphabet = ["<", "!", "-", ">", "x", "\n", "\r"];
+  for (let k = 0; k < 20_000; k++) {
+    const sample = Array.from({ length: Math.floor(random() * 41) }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
+    const out = stripComments(sample);
+    assert.ok(!out.includes("<!--"), JSON.stringify(sample));
+    assert.equal(stripComments(out), out, JSON.stringify(sample));
+  }
+});
+
 test("readNote: a Verdict of nested or unterminated comments only is empty, and the note is in the inbox", () => {
   for (const verdict of ["<!-<!---->-", "<!-<!---->- avoid: hidden -->", "<!-- avoid: open"]) {
     const note = readNote(CANONICAL.replace("avoid: async streams painful; use puppeteer", verdict));

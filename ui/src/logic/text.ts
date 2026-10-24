@@ -56,6 +56,7 @@ export function hasHidden(value: unknown): boolean {
 // Text without HTML comments, as core's stripComments reads it (src/core/note.ts; text.test.ts keeps
 // them equal), so the app shows what core and the agent read. Comments are removed until none is left,
 // so "<!-<!---->-" can't leave "<!--" behind; then an unterminated "<!--" is dropped to the end of its line.
+// CodeQL's js/incomplete-multi-character-sanitization here is a false positive: see the property test in text.test.ts.
 export function stripComments(text: string): string {
   let out = text;
   for (let before = ""; out !== before; ) {

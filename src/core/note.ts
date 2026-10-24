@@ -214,6 +214,7 @@ function isTextList(value: unknown): value is string[] {
 
 // Text without HTML comments, the draft marker included. Comments are removed until none is left, so
 // "<!-<!---->-" can't leave "<!--" behind; then an unterminated "<!--" is dropped to the end of its line.
+// CodeQL's js/incomplete-multi-character-sanitization here is a false positive: see the property test in note.test.ts.
 export function stripComments(text: string): string {
   let out = text;
   for (let before = ""; out !== before; ) {
