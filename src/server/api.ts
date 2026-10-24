@@ -28,6 +28,7 @@ import { importFailure, runImport, runNote, type Context } from "../core/save.ts
 import { runSearch, searchForAgent } from "../core/search.ts";
 import { runSuggest, suggestForAgent } from "../core/suggest.ts";
 import { tagsFromTopics } from "../core/tags-from-topics.ts";
+import { itemsProblem } from "../core/write.ts";
 
 export interface ApiRequest {
   query: URLSearchParams;
@@ -131,7 +132,11 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (packageType === null) return bad(empty, "type must be npm, pypi or cargo.");
         const tags = optionalTags(body.tags);
         if (tags === null) return bad(empty, "tags must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
-        return reply(await runNote({ target: body.target, text, type: packageType, to, tags }, context));
+        const items = itemsProblem("use_when", body.use_when) ?? itemsProblem("avoid_when", body.avoid_when);
+        if (items) return bad(empty, items);
+        const useWhen = body.use_when as string[] | undefined;
+        const avoidWhen = body.avoid_when as string[] | undefined;
+        return reply(await runNote({ target: body.target, text, type: packageType, to, tags, useWhen, avoidWhen }, context));
       },
     },
 

@@ -4,7 +4,8 @@
 // Pure functions on text; no file system, no printing.
 import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
 import { alternativeLinks, findLinks } from "./links.ts";
-import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, YAML_LIMITS, type SectionName } from "./note.ts";
+import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, sectionItems, YAML_LIMITS, type SectionName } from "./note.ts";
+import { CAPS, cut } from "./text.ts";
 
 export type ToolField = "id" | "name" | "url" | "language" | "license" | "topics" | "packages" | "explored" | "adopted";
 const TOOL_FIELDS: readonly string[] = ["id", "name", "url", "language", "license", "topics", "packages", "explored", "adopted"];
@@ -347,6 +348,78 @@ export function setSection(text: string, name: SectionName, body: string): EditR
   let result = lines.join("\n");
   if (name === "Verdict") result = editFrontmatter(result, { status: readNote(result).status }, false).text;
   return { text: result, changed: result !== text, warnings: [] };
+}
+
+// Why a list of the person's Use when or Avoid when items can't be written: each is one line of
+// text, at most CAPS.item characters, and one request takes at most CAPS.items of them (the caps
+// agent-facing output keeps, decision 0032). `label` names the input: "--use-when", "Use when". Null
+// when they're fine.
+export function itemsProblem(label: string, items: unknown): string | null {
+  if (items === undefined) return null;
+  if (!Array.isArray(items) || !items.every((item) => typeof item === "string")) return `${label} takes a list of text items.`;
+  if (items.length > CAPS.items) return `${label} takes at most ${CAPS.items} items.`;
+  const bad = items.find((item) => !item.trim() || /[\r\n]/.test(item.trim()) || item.trim().length > CAPS.item);
+  return bad === undefined ? null : `${label} takes one line of text, at most ${CAPS.item} characters: ${JSON.stringify(cut(bad, 80))}.`;
+}
+
+export interface ItemsResult extends EditResult {
+  added: string[]; // the items written, as given
+  present: string[]; // the items the section already had (ignoring case), so not written again
+  replacedDraft: boolean;
+}
+
+// The person's own items for "Use when" or "Avoid when" (magpie note --use-when / --avoid-when, spec
+// §2), one bullet each. A missing or empty section gets them. A section holding only a draft gets them
+// in place of the draft: the person decides (decision 0018). A section with the person's own lines
+// keeps every one, in order, and gets the new items after its last line; an item it already has,
+// ignoring case, isn't added again. A section the edit can't safely reach is left alone, with a
+// warning: one that appears twice, or holds a code fence or a comment that doesn't close.
+export function addSectionItems(text: string, name: "Use when" | "Avoid when", items: string[]): ItemsResult {
+  const result = (edit: EditResult, added: string[] = [], present: string[] = [], replacedDraft = false): ItemsResult =>
+    edit.warnings.length ? { ...edit, added: [], present: [], replacedDraft: false } : { ...edit, added, present, replacedDraft };
+  const bounds = readableFrontmatter(text);
+  if (!bounds) return result(untouched(text, "The note has no readable frontmatter; it was left unchanged."));
+  const lines = text.split("\n");
+  const headings = findHeadings(lines, bodyStart(text, bounds));
+  const found = headings.flatMap((h, k) => (h.name === name.toLowerCase() ? [k] : []));
+  const refuse = (why: string) => result(untouched(text, `The note's "${name}" section ${why}, so nothing was written; edit the file instead.`));
+  if (found.length > 1) return refuse("appears more than once");
+
+  const wanted: string[] = [];
+  for (const item of items.map((i) => i.trim())) if (item && !wanted.some((w) => w.toLowerCase() === item.toLowerCase())) wanted.push(item);
+  const bullets = (list: string[], marker = "-") => list.map((item) => `${marker} ${item}`);
+  if (!found.length) return result(setSection(text, name, bullets(wanted).join("\n")), wanted);
+
+  const at = found[0];
+  const start = headings[at].line + 1;
+  const end = headings[at + 1]?.line ?? lines.length;
+  const body = lines.slice(start, end).map((line) => line.replace(/\r$/, ""));
+  const joined = body.join("\n");
+  if (body.filter((line) => /^\s*(```|~~~)/.test(line)).length % 2) return refuse("has a code fence that doesn't close");
+  if (joined.lastIndexOf("<!--") > joined.lastIndexOf("-->")) return refuse("has a comment that doesn't close");
+
+  if (body.find((line) => line.trim() !== "")?.trim() === DRAFT_MARKER) {
+    return result(setSection(text, name, bullets(wanted).join("\n")), wanted, [], true);
+  }
+  const have = sectionItems(joined).map((item) => item.toLowerCase());
+  const present = wanted.filter((item) => have.includes(item.toLowerCase()));
+  const added = wanted.filter((item) => !have.includes(item.toLowerCase()));
+  if (!added.length) return result({ text, changed: false, warnings: [] }, [], present);
+
+  // After the section's last line that isn't blank, with its own bullet marker; one blank line before
+  // the next heading.
+  const cr = text.includes("\r\n") ? "\r" : "";
+  const marker = body.map((line) => line.match(/^([-*+])\s/)?.[1]).find(Boolean) ?? "-";
+  let last = end - 1;
+  while (last >= start && lines[last].trim() === "") last--;
+  if (last + 1 === lines.length) {
+    lines[last] += cr; // the file's last line had no line break
+    lines.push("");
+  }
+  const block = bullets(added, marker).map((line) => line + cr);
+  if (last + 1 < lines.length && last + 1 === end && at + 1 < headings.length) block.push(cr);
+  lines.splice(last + 1, 0, ...block);
+  return result({ text: lines.join("\n"), changed: true, warnings: [] }, added, present);
 }
 
 // "Accept draft" (decision 0023): removes the draft marker of one section and changes nothing else.

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
-import { DRAFT_MARKER, readNote } from "./note.ts";
+import { readNote, sectionItems } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
 import { CAPS, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
@@ -120,26 +120,12 @@ function entryOf(text: string, file: string): RecallEntry | null {
     name: typeof fm.name === "string" ? fm.name : file.replace(/\.md$/, ""),
     keys,
     verdict: note.verdict,
-    avoidWhen: items(section("Avoid when")?.body ?? ""),
-    useWhen: items(section("Use when")?.body ?? ""),
+    avoidWhen: sectionItems(section("Avoid when")?.body ?? ""),
+    useWhen: sectionItems(section("Use when")?.body ?? ""),
     drafts: [section("Use when")?.draft ? "use_when" : null, section("Avoid when")?.draft ? "avoid_when" : null].filter((d): d is ListName => d !== null),
     status: note.status,
     alternatives: alternativeLinks(fm.alternatives),
   };
-}
-
-// A section's items: one per bullet, without comments and the draft marker. A line that isn't a
-// bullet starts an item of its own, unless it is indented under the previous one.
-function items(body: string): string[] {
-  const out: string[] = [];
-  for (const line of body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
-    if (bullet) out.push(bullet[1].trim());
-    else if (/^\s/.test(line) && out.length) out[out.length - 1] += ` ${line.trim()}`;
-    else out.push(line.trim());
-  }
-  return out;
 }
 
 // Names compare as their registry does for exact matches, and loosely for name-only ones.

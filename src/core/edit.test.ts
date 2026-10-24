@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { editNote, noteVersion } from "./edit.ts";
 import { readNote } from "./note.ts";
-import { acceptDraft, setHumanFields, setSection, setVerdict } from "./write.ts";
+import { acceptDraft, addSectionItems, setHumanFields, setSection, setVerdict } from "./write.ts";
 
 // A note as a person might keep it: a comment, a block list, a drafted section.
 const NOTE = `---
@@ -68,6 +68,14 @@ test("sections, fields and accepted drafts are applied together; the rest stays 
   assert.ok(r.ok && r.text.includes("id: pkg:npm/pdfkit   # the subject\n"));
 });
 
+test("add_items appends the person's items as note --use-when does, with the Verdict, in one edit", () => {
+  const r = editNote(NOTE, { verdict: "fine for invoices", add_items: { "Use when": ["invoices"], "Avoid when": ["big PDFs"] } });
+  let expected = setVerdict(NOTE, "fine for invoices").text;
+  expected = addSectionItems(expected, "Use when", ["invoices"]).text;
+  expected = addSectionItems(expected, "Avoid when", ["big PDFs"]).text;
+  assert.deepEqual(r, { ok: true, text: expected, changed: true });
+});
+
 test("no edits change nothing", () => {
   assert.deepEqual(editNote(NOTE, {}), { ok: true, text: NOTE, changed: false });
 });
@@ -88,6 +96,13 @@ test("every bad edit is refused as a whole: nothing is applied", () => {
     { accept_drafts: "What it does" },
     { status: "reviewed" },
     { id: "pkg:npm/other" },
+    { add_items: ["Use when"] },
+    { add_items: { "My notes": ["x"] } },
+    { add_items: { "Use when": "x" } },
+    { add_items: { "Use when": ["two\nlines"] } },
+    { add_items: { "Use when": ["x".repeat(501)] } },
+    { verdict: "ok", add_items: { "Avoid when": [" "] } },
+    { sections: { "Use when": "- a" }, add_items: { "Use when": ["b"] } },
   ];
   for (const edits of bad) {
     const r = editNote(NOTE, edits);

@@ -215,3 +215,17 @@ function isTextList(value: unknown): value is string[] {
 function stripComments(text: string): string {
   return text.replace(/<!--[\s\S]*?-->/g, "");
 }
+
+// A section's items: one per bullet, without comments and the draft marker. A line that isn't a
+// bullet starts an item of its own, unless it is indented under the previous one.
+export function sectionItems(body: string): string[] {
+  const out: string[] = [];
+  for (const line of body.replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (bullet) out.push(bullet[1].trim());
+    else if (/^\s/.test(line) && out.length) out[out.length - 1] += ` ${line.trim()}`;
+    else out.push(line.trim());
+  }
+  return out;
+}

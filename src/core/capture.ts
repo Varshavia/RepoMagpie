@@ -5,7 +5,7 @@ import { PackageURL } from "packageurl-js";
 import { draftKind, type RepoMetadata } from "./github.ts";
 import { readNote, type SectionName } from "./note.ts";
 import { topicTags, type KnownTags } from "./topic-tags.ts";
-import { appendSkillLine, renderNote, setToolFields, setVerdict } from "./write.ts";
+import { addSectionItems, appendSkillLine, renderNote, setToolFields, setVerdict } from "./write.ts";
 
 export interface CaptureInput {
   purl: string;
@@ -14,6 +14,8 @@ export interface CaptureInput {
   verdict?: string; // the user's own words (decision 0018)
   useWhen?: string[]; // import's use: text, written as a draft
   avoidWhen?: string[]; // import's avoid: text, written as a draft
+  ownUseWhen?: string[]; // note's --use-when: the user's own items, never a draft
+  ownAvoidWhen?: string[]; // note's --avoid-when: the user's own items, never a draft
   myNotes?: string; // import's unlabelled text
   metadata: RepoMetadata | null; // GitHub metadata; null when not fetched or the fetch failed
   today: string; // YYYY-MM-DD
@@ -29,13 +31,29 @@ export interface Capture {
   status: "inbox" | "reviewed" | null;
   error: string | null;
   warnings: string[];
+  items: Items; // what the user's own --use-when and --avoid-when items did
 }
+
+export type ListName = "use_when" | "avoid_when";
+export interface Items {
+  changed: ListName[]; // the sections written
+  draftsReplaced: ListName[]; // sections whose draft the user's items replaced
+  present: string[]; // items a section already had, so not written again
+}
+const noItems = (): Items => ({ changed: [], draftsReplaced: [], present: [] });
 
 export function captureNote(existing: string | null, input: CaptureInput): Capture {
   if (input.verdict !== undefined && /[\r\n]/.test(input.verdict.trim())) {
-    return { result: "failed", text: null, tags: [], name: null, status: null, error: "The Verdict must be one line of text.", warnings: [] };
+    return { result: "failed", text: null, tags: [], name: null, status: null, error: "The Verdict must be one line of text.", warnings: [], items: noItems() };
   }
   return existing === null ? create(input) : update(existing, input);
+}
+
+// The user's own items, each once (ignoring case), without blank ones.
+function own(items: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const item of (items ?? []).map((i) => i.trim())) if (item && !out.some((o) => o.toLowerCase() === item.toLowerCase())) out.push(item);
+  return out;
 }
 
 function create(input: CaptureInput): Capture {
@@ -44,7 +62,11 @@ function create(input: CaptureInput): Capture {
   const skills = [...(m?.skills ?? [])];
   const skill = skillName(input.skillPath);
   if (skill && !skills.includes(skill)) skills.push(skill);
-  const drafts: SectionName[] = ["What it does", "Use when", "Avoid when"];
+  const useWhen = own(input.ownUseWhen);
+  const avoidWhen = own(input.ownAvoidWhen);
+  // The user's own items are human-written; import's use: and avoid: text is a draft (schema rule 7).
+  const drafts: SectionName[] = ["What it does", ...(useWhen.length ? [] : ["Use when" as const]), ...(avoidWhen.length ? [] : ["Avoid when" as const])];
+  const items: Items = { changed: [...(useWhen.length ? ["use_when" as const] : []), ...(avoidWhen.length ? ["avoid_when" as const] : [])], draftsReplaced: [], present: [] };
   const tags = input.tags ?? (m ? topicTags(m.topics, input.purl, input.known) : []);
   const text = renderNote({
     id: input.purl,
@@ -59,19 +81,19 @@ function create(input: CaptureInput): Capture {
     tags,
     verdict: input.verdict,
     whatItDoes: m?.description ?? undefined,
-    useWhen: input.useWhen,
-    avoidWhen: input.avoidWhen,
+    useWhen: useWhen.length ? useWhen : input.useWhen,
+    avoidWhen: avoidWhen.length ? avoidWhen : input.avoidWhen,
     myNotes: input.myNotes,
     skills,
     drafts,
   });
-  return { result: "created", text, tags, name, status: readNote(text).status, error: null, warnings: [] };
+  return { result: "created", text, tags, name, status: readNote(text).status, error: null, warnings: [], items };
 }
 
 function update(existing: string, input: CaptureInput): Capture {
   const before = readNote(existing);
   const name = typeof before.frontmatter.name === "string" ? before.frontmatter.name : null;
-  const failed = (error: string): Capture => ({ result: "failed", text: null, tags: [], name, status: before.status, error, warnings: [] });
+  const failed = (error: string): Capture => ({ result: "failed", text: null, tags: [], name, status: before.status, error, warnings: [], items: noItems() });
   if (input.verdict?.trim() && before.verdict) return failed("This note already has a Verdict; edit the file to change it.");
 
   const warnings: string[] = [];
@@ -104,8 +126,19 @@ function update(existing: string, input: CaptureInput): Capture {
     if (!written.changed) return failed(written.warnings[0]);
     text = written.text;
   }
+  // The user's own items, in the same write: a section that can't take them fails the whole note.
+  const items = noItems();
+  for (const [section, list, given] of [["Use when", "use_when", input.ownUseWhen], ["Avoid when", "avoid_when", input.ownAvoidWhen]] as const) {
+    if (!own(given).length) continue;
+    const added = addSectionItems(text, section, own(given));
+    if (added.warnings.length) return failed(added.warnings[0]);
+    text = added.text;
+    if (added.changed) items.changed.push(list);
+    if (added.replacedDraft) items.draftsReplaced.push(list);
+    items.present.push(...added.present);
+  }
   const changed = text !== existing;
-  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)] };
+  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)], items };
 }
 
 // The kind of a note made without GitHub data (decision 0039): a registry package (npm, PyPI,

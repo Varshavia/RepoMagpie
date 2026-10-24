@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readNote, validate } from "./note.ts";
-import { acceptDraft, addAlternatives, appendSkillLine, appendTagEntries, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
+import { acceptDraft, addAlternatives, addSectionItems, appendSkillLine, appendTagEntries, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
 
 // A hand-written note: comments, odd spacing, a block list, an empty value, text above the
 // sections, an extra hand-written section, and sections a person typed.
@@ -683,4 +683,60 @@ test("acceptDraft on a section that isn't a draft, or is missing, changes nothin
 test("acceptDraft keeps CRLF line endings", () => {
   const crlf = DRAFTED.replace(/\n/g, "\r\n");
   assert.equal(acceptDraft(crlf, "What it does").text, crlf.replace("<!-- magpie:draft -->\r\n", ""));
+});
+
+// --- addSectionItems: the user's own Use when and Avoid when items ---
+
+test("addSectionItems appends after the person's last line, with its bullet marker; every other byte stays", () => {
+  const r = addSectionItems(HAND_WRITTEN, "Use when", ["invoices", "Quick one-page PDFs from a script"]);
+  assert.deepEqual([r.changed, r.added, r.present, r.replacedDraft, r.warnings], [true, ["invoices"], ["Quick one-page PDFs from a script"], false, []]);
+  assert.equal(r.text, HAND_WRITTEN.replace(USE_WHEN, `${USE_WHEN}- invoices\n`));
+  const star = HAND_WRITTEN.replace(USE_WHEN, "* first\n");
+  assert.equal(addSectionItems(star, "Use when", ["second"]).text, star.replace("* first\n", "* first\n* second\n"));
+});
+
+test("addSectionItems skips an item the section has, ignoring case; nothing new changes nothing", () => {
+  const twice = addSectionItems(HAND_WRITTEN, "Use when", ["receipts", "RECEIPTS"]);
+  assert.deepEqual(twice.added, ["receipts"]);
+  const same = addSectionItems(`${HAND_WRITTEN.replace(USE_WHEN, "- Invoices\n")}`, "Use when", ["invoices"]);
+  assert.deepEqual([same.changed, same.added, same.present], [false, [], ["invoices"]]);
+});
+
+test("addSectionItems writes into an empty section after its comment, and adds a missing one in schema order", () => {
+  const empty = HAND_WRITTEN.replace(USE_WHEN, "<!-- situations -->\n");
+  assert.equal(addSectionItems(empty, "Use when", ["invoices"]).text, empty.replace("<!-- situations -->\n", "<!-- situations -->\n- invoices\n"));
+  const bare = HAND_WRITTEN.replace(USE_WHEN, "");
+  assert.equal(addSectionItems(bare, "Use when", ["invoices"]).text, bare.replace("## Use when\n", "## Use when\n- invoices\n"));
+  const tight = HAND_WRITTEN.replace(`## Use when\n${USE_WHEN}\n`, "## Use when\n");
+  assert.equal(addSectionItems(tight, "Use when", ["invoices"]).text, tight.replace("## Use when\n", "## Use when\n- invoices\n\n"));
+  const added = addSectionItems(HAND_WRITTEN, "Avoid when", ["big files"]);
+  assert.equal(added.text, HAND_WRITTEN.replace("## Notable skills", "## Avoid when\n- big files\n\n## Notable skills")); // before the next known section, as setSection does
+  assert.deepEqual(validate(readNote(added.text)), []);
+});
+
+test("addSectionItems replaces a draft with the person's items", () => {
+  const drafted = HAND_WRITTEN.replace(USE_WHEN, "<!-- magpie:draft -->\n- an agent's guess\n");
+  const r = addSectionItems(drafted, "Use when", ["invoices"]);
+  assert.deepEqual([r.replacedDraft, r.added], [true, ["invoices"]]);
+  assert.equal(r.text, HAND_WRITTEN.replace(USE_WHEN, "- invoices\n"));
+});
+
+test("addSectionItems leaves a section it can't safely edit alone: twice in the note, an open fence or comment", () => {
+  for (const text of [
+    `${HAND_WRITTEN}\n## Use when\n- again\n`,
+    HAND_WRITTEN.replace(USE_WHEN, "```\ncode\n"),
+    HAND_WRITTEN.replace(USE_WHEN, "- one <!-- open\n"),
+    HAND_WRITTEN.replace("---\n# my own", "--- [\n# my own"),
+  ]) {
+    const r = addSectionItems(text, "Use when", ["invoices"]);
+    assert.deepEqual([r.changed, r.text, r.added], [false, text, []]);
+    assert.equal(r.warnings.length, 1);
+  }
+});
+
+test("addSectionItems keeps CRLF line endings, and a file without a final line break", () => {
+  const crlf = HAND_WRITTEN.replace(/\n/g, "\r\n");
+  assert.equal(addSectionItems(crlf, "Use when", ["invoices"]).text, crlf.replace(USE_WHEN.replace("\n", "\r\n"), `${USE_WHEN.replace("\n", "\r\n")}- invoices\r\n`));
+  const last = "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one";
+  assert.equal(addSectionItems(last, "Use when", ["two"]).text, "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one\n- two\n");
 });

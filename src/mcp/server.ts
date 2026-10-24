@@ -15,7 +15,7 @@ import { runRecall } from "../core/recall.ts";
 import { runNote, type Context } from "../core/save.ts";
 import { runSearch, searchForAgent } from "../core/search.ts";
 import { runSuggest, suggestForAgent } from "../core/suggest.ts";
-import { clean } from "../core/text.ts";
+import { CAPS, clean } from "../core/text.ts";
 
 export interface McpOptions {
   place: Place; // home, env, the server's working folder, --home and --project
@@ -136,11 +136,13 @@ export function buildServer(options: McpOptions): McpServer {
 
   if (options.allowWrite) {
     server.registerTool("note", {
-      title: "Record the user's Verdict or alternative",
-      description: "Records the user's own words as a note's Verdict, or names an alternative. Only with words the user said to record; never your summary. An existing Verdict is never replaced. Takes a package name or PURL, not a URL.",
+      title: "Record the user's Verdict, when to use or avoid it, or an alternative",
+      description: "Records the user's own words as a note's Verdict, its Use when and Avoid when items, or names an alternative. Only with words the user said to record; never your summary. An existing Verdict is never replaced; items are added to the note's own, never replacing them. Avoid when items make RepoMagpie ask before the package is installed. Takes a package name or PURL, not a URL.",
       inputSchema: input({
         target: string(LIMITS.packageName, "A package name, or a PURL such as pkg:npm/pdfkit."),
         text: string(LIMITS.text, "The user's Verdict, in their words, one line."),
+        use_when: strings(CAPS.items, CAPS.item, "When the user would use it: one item each, one line, in their words. Only with words the user said; never your summary."),
+        avoid_when: strings(CAPS.items, CAPS.item, "When the user would avoid it: one item each, one line, in their words. Only with words the user said; never your summary."),
         alternatives: strings(20, LIMITS.packageName, "Packages the user named to use instead: names, PURLs or file stems."),
         type: { type: "string", enum: ["npm", "pypi", "cargo"], description: "The package type of a bare name." },
         to: { type: "string", enum: ["personal", "project"], default: "personal", description: "The journal to write to." },
@@ -152,10 +154,18 @@ export function buildServer(options: McpOptions): McpServer {
       // Never the network from MCP (decision 0034): a URL's note is made in a terminal.
       if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target.trim())) {
         const error = `A URL needs GitHub, which the MCP server never calls. Run repomagpie note ${target} in a terminal, or give a package name or PURL.`;
-        return { outcome: "usage" as const, document: { id: null, journal: (args.to as string | undefined) ?? "personal", path: null, created: false, status: null, warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], error } };
+        return { outcome: "usage" as const, document: { id: null, journal: (args.to as string | undefined) ?? "personal", path: null, created: false, status: null, warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], error } };
       }
       const context: Context = { ...place, today: options.today, fetch: () => Promise.reject(new Error("The MCP server makes no network requests.")) };
-      const run = await runNote({ target, text: args.text as string | undefined, type: args.type as PackageType | undefined, to: (args.to as "personal" | "project" | undefined) ?? "personal", alternatives: args.alternatives as string[] | undefined }, context);
+      const run = await runNote({
+        target,
+        text: args.text as string | undefined,
+        type: args.type as PackageType | undefined,
+        to: (args.to as "personal" | "project" | undefined) ?? "personal",
+        alternatives: args.alternatives as string[] | undefined,
+        useWhen: args.use_when as string[] | undefined,
+        avoidWhen: args.avoid_when as string[] | undefined,
+      }, context);
       return { outcome: run.outcome, document: run.document };
     }));
   }

@@ -6,6 +6,7 @@ import { fakeFetch, recorded, type Call } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
 import { readNote, validate } from "../core/note.ts";
+import { renderNote } from "../core/write.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
 // Every test gets its own temporary home, journal and project (fixtures/sandbox.ts); the real
@@ -34,7 +35,7 @@ test("--json prints exactly the spec's document and nothing on stderr", async ()
   const r = await magpie(box, ["note", "pdfkit", "ok", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [] });
 });
 
 test("a second Verdict is refused: exit 1, the path is printed, the file is unchanged", async () => {
@@ -53,7 +54,7 @@ test("text for an existing note with an empty Verdict writes it", async () => {
   await magpie(box, ["note", "pdfkit"]);
   const r = await magpie(box, ["note", "pdfkit", "later verdict", "--json"]);
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [] });
   valid(box.note("npm--pdfkit.md"));
 });
 
@@ -406,7 +407,7 @@ test("--alternative on a new note: written with it; a target without a note is w
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(JSON.parse(r.out), {
     id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [],
-    alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [],
+    alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [],
   });
   assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[puppeteer]]"]);
   valid(box.note("npm--pdfkit.md"));
@@ -507,4 +508,135 @@ test("a note can't be its own alternative: exit 1, nothing written", async () =>
     assert.match(r.err, /pdfkit can't be an alternative to itself/);
   }
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), before);
+});
+
+// --- --use-when and --avoid-when: the user's own items ---
+
+const sectionsOf = (path: string) => {
+  const note = readNote(readFileSync(path, "utf8"));
+  const body = (name: string) => note.sections.find((s) => s.name === name)?.body.trim() ?? "";
+  return { use: body("Use when"), avoid: body("Avoid when") };
+};
+const hookInput = (command: string, cwd: string) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, cwd });
+
+test("--use-when and --avoid-when on a new note: human-written items, no draft marker; the result says RepoMagpie will ask", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const r = await magpie(box, ["note", "pdfkit", "fine for small docs", "--use-when", "a short invoice", "--use-when", "a receipt", "--avoid-when", "big PDFs"]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.err, "✔ Saved to your personal journal: pdfkit\nRepoMagpie will ask before pdfkit is installed.\n");
+  assert.deepEqual(sectionsOf(box.note("npm--pdfkit.md")), { use: "- a short invoice\n- a receipt", avoid: "- big PDFs" });
+  valid(box.note("npm--pdfkit.md"));
+  const json = await magpie(box, ["note", "zod", "--use-when", "API input", "--json"]);
+  assert.deepEqual(JSON.parse(json.out).sections_changed, ["use_when"]);
+  assert.equal(readNote(readFileSync(box.note("npm--zod.md"), "utf8")).status, "inbox"); // items without a Verdict: still inbox
+});
+
+test("an existing note: an empty section gets the items; one with items keeps every line and gets only the new ones", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "ok"]);
+  const r = await magpie(box, ["note", "pdfkit", "--use-when", "invoices", "--json"]);
+  assert.equal(r.code, 0, r.err);
+  const doc = JSON.parse(r.out);
+  assert.deepEqual([doc.created, doc.sections_changed, doc.drafts_replaced, doc.items_present], [false, ["use_when"], [], []]);
+  const path = box.note("npm--pdfkit.md");
+  writeFileSync(path, readFileSync(path, "utf8").replace("- invoices\n", "- invoices   <!-- mine -->\nA line I wrote by hand.\n"));
+  const before = readFileSync(path, "utf8");
+  const again = await magpie(box, ["note", "pdfkit", "--use-when", "INVOICES", "--use-when", "receipts"]);
+  assert.equal(again.code, 0, again.err);
+  assert.match(again.err, /Already in the note: INVOICES\n/);
+  assert.equal(readFileSync(path, "utf8"), before.replace("A line I wrote by hand.\n", "A line I wrote by hand.\n- receipts\n"));
+});
+
+test("an existing note with a drafted Use when: the user's items replace the draft", async () => {
+  const drafted = renderNote({ id: "pkg:npm/pdfkit", name: "pdfkit", explored: "2026-10-24", kind: "library", tags: [], useWhen: ["an agent's guess"], drafts: ["Use when"] });
+  const box = sandbox({ "project/package.json": "{}", "journal/notes/npm--pdfkit.md": drafted });
+  const r = await magpie(box, ["note", "pdfkit", "--use-when", "invoices", "--json"]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(JSON.parse(r.out).drafts_replaced, ["use_when"]);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), drafted.replace("<!-- magpie:draft -->\n- an agent's guess\n", "- invoices\n"));
+  const human = await magpie(box, ["note", "pdfkit", "--use-when", "receipts"]);
+  assert.doesNotMatch(human.err, /replaced the draft/);
+});
+
+test("the items work with an existing Verdict; with Verdict text too it's exit 1 and nothing is written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "first"]);
+  const path = box.note("npm--pdfkit.md");
+  const before = readFileSync(path, "utf8");
+  const refused = await magpie(box, ["note", "pdfkit", "second", "--use-when", "invoices", "--avoid-when", "big PDFs"]);
+  assert.equal(refused.code, 1);
+  assert.match(refused.err, /This note already has a Verdict/);
+  assert.doesNotMatch(refused.err, /will ask/);
+  assert.equal(readFileSync(path, "utf8"), before);
+  const added = await magpie(box, ["note", "pdfkit", "--use-when", "invoices"]);
+  assert.equal(added.code, 0, added.err);
+  assert.equal(readNote(readFileSync(path, "utf8")).verdict, "first");
+  assert.deepEqual(sectionsOf(path).use, "- invoices");
+});
+
+test("--avoid-when turns the hook's answer into an ask (decision 0024)", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "fine for small docs"]);
+  const quiet = await magpie(box, ["hook", "claude-code"], { stdin: async () => hookInput("npm i pdfkit", box.project) });
+  assert.notEqual(quiet.out && JSON.parse(quiet.out).hookSpecificOutput?.permissionDecision, "ask");
+  const r = await magpie(box, ["note", "pdfkit", "--avoid-when", "big PDFs"]);
+  assert.match(r.err, /RepoMagpie will ask before pdfkit is installed\./);
+  const asked = await magpie(box, ["hook", "claude-code"], { stdin: async () => hookInput("npm i pdfkit", box.project) });
+  assert.equal(JSON.parse(asked.out).hookSpecificOutput.permissionDecision, "ask");
+  assert.match(JSON.parse(asked.out).hookSpecificOutput.permissionDecisionReason, /big PDFs/);
+});
+
+test("a section the edit can't safely reach: exit 1, the file is named, the note is unchanged (the Verdict too)", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit"]);
+  const path = box.note("npm--pdfkit.md");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\n## Use when\n- a second section\n`);
+  const before = readFileSync(path, "utf8");
+  const r = await magpie(box, ["note", "pdfkit", "my verdict", "--use-when", "invoices"]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /"Use when" section appears more than once/);
+  assert.equal(r.out, `${path}\n`);
+  assert.equal(readFileSync(path, "utf8"), before);
+});
+
+test("caps: an item is one line of at most 500 characters, at most 20 a flag; blank is refused; exit 2, nothing written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  for (const args of [
+    ["--use-when", "x".repeat(501)],
+    ["--avoid-when", "two\nlines"],
+    ["--use-when", "   "],
+    Array.from({ length: 21 }, (_, k) => ["--use-when", `item ${k}`]).flat(),
+  ]) {
+    const r = await magpie(box, ["note", "pdfkit", ...args]);
+    assert.equal(r.code, 2, args[1]);
+    assert.match(r.err, /--(use|avoid)-when takes/);
+  }
+  assert.equal(existsSync(box.note("npm--pdfkit.md")), false);
+  const r = await magpie(box, ["note", "pdfkit", "--use-when", "x".repeat(500)]);
+  assert.equal(r.code, 0, r.err);
+});
+
+test("hostile characters in an item are kept in the file, as in a Verdict, and shown as markers in output", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const rlo = String.fromCharCode(0x202e);
+  const bell = String.fromCharCode(0x07);
+  const r = await magpie(box, ["note", "pdfkit", "--use-when", `invoices ${rlo}fdp${bell}`, "--json"]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(sectionsOf(box.note("npm--pdfkit.md")).use, `- invoices ${rlo}fdp${bell}`);
+  const again = await magpie(box, ["note", "pdfkit", "--use-when", `INVOICES ${rlo}FDP${bell}`, "--json"]);
+  assert.deepEqual(JSON.parse(again.out).items_present, ["INVOICES <U+202E>FDP<U+0007>"]);
+  const recall = await magpie(box, ["recall", "pdfkit", "--json"]);
+  assert.deepEqual(JSON.parse(recall.out).matches[0].use_when, ["invoices <U+202E>fdp<U+0007>"]);
+});
+
+test("--to project follows the same rules, and a GitHub URL keeps its drafted What it does next to the user's items", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const r = await magpie(box, ["note", "pdfkit", "--to", "project", "--avoid-when", "big PDFs"]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(sectionsOf(join(box.project, ".magpie", "notes", "npm--pdfkit.md")).avoid, "- big PDFs");
+  const url = await magpie(box, ["note", PLAYWRIGHT_URL, "--use-when", "browser checks from a script"], { fetch: playwright() });
+  assert.equal(url.code, 0, url.err);
+  const note = readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8"));
+  assert.deepEqual(note.sections.filter((s) => s.draft).map((s) => s.name), ["What it does"]);
+  assert.equal(note.sections.find((s) => s.name === "Use when")?.body.trim(), "- browser checks from a script");
 });
