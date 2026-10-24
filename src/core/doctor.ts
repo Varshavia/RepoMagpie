@@ -9,7 +9,7 @@ import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
 import { setupBackups } from "./backups.ts";
 import { redactArgs, redactText } from "./redact.ts";
-import { mcpByHand } from "./setup.ts";
+import { mcpByHand, mcpRemovable } from "./setup.ts";
 import { findHooks } from "./setup-hook.ts";
 import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
 import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
@@ -183,24 +183,44 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // What fixes an agent's hook entry, as setup would: setup, with --agents when the agent was found by
   // its folder only (setup doesn't choose it then); by hand where setup leaves the file (comments,
   // a link, the agent's hooks turned off).
-  const agentHookFix = (h: AgentHookReport, why: string): string => {
-    if (!h.found) return notFound(h.name);
+  const hookByHand = (h: AgentHookReport): string | null => {
     const unsafe = pathProblem(h.file, request.home);
-    const hand = unsafe ? unsafe.replace(/\.$/, "") : h.off ? h.off.split(";")[0] : plainAgentHook.get(h.id) === false ? COMMENTS : null;
+    return unsafe ? unsafe.replace(/\.$/, "") : h.off ? h.off.split(";")[0] : plainAgentHook.get(h.id) === false ? COMMENTS : null;
+  };
+  const agentHookFix = (h: AgentHookReport, why: string): string => {
+    if (!h.found) return notFound(h.name, tilde(h.file));
+    const hand = hookByHand(h);
     return hand ? `Change it by hand (${hand}); repomagpie setup --dry-run --agents ${h.id} prints the entry.` : `Run ${setupFor(h.id, h.found)} ${why}.`;
   };
+  // An agent found by its folder only (decision 0038) may hold entries an earlier setup wrote, in an
+  // agent the user no longer runs. Its problems are gathered into one to-do that names both ways
+  // out: fix the entries (if you use it) or remove them (if you don't).
+  const leftovers = new Map<Agent["id"], Leftover>();
+  const leftover = (id: Agent["id"], name: string): Leftover => {
+    if (!leftovers.has(id)) leftovers.set(id, { name, what: [], hook: false, mcp: false, trust: null, first: false });
+    return leftovers.get(id) as Leftover;
+  };
   for (const h of agentHooks) {
+    const folder = h.found?.by === "folder" ? leftover(h.id, h.name) : null;
     for (const e of h.entries) {
       // No node in setup's form: Antigravity CLI's launcher (the entry's command) is missing or not ours.
       const missing = e.form === "setup" ? (!e.node_found ? e.node ?? e.command : !e.entry_found ? e.entry : null) : e.form === "name" && !e.node_found ? e.node : null;
-      if (missing) {
-        const what = e.form === "setup" ? "so it does nothing." : h.id === "copilot" ? "so Copilot CLI denies every tool call." : "so it fails on every shell command.";
-        const line = `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${what} ${agentHookFix(h, "again")}`;
-        if (h.id === "copilot") problems.unshift(line);
+      const problem = missing
+        ? `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${e.form === "setup" ? "so it does nothing." : h.id === "copilot" ? "so Copilot CLI denies every tool call." : "so it fails on every shell command."}`
+        : e.form === "name" ? `The ${h.name} hook in ${tilde(h.file)} starts repomagpie through the shell.` : null;
+      if (problem && folder) {
+        folder.what.push(problem);
+        folder.hook = true;
+        folder.first ||= h.id === "copilot" && missing !== null;
+      } else if (problem) {
+        const line = `${problem} ${agentHookFix(h, missing ? "again" : "to start node directly")}`;
+        if (h.id === "copilot" && missing) problems.unshift(line);
         else problems.push(line);
-      } else if (e.form === "name") problems.push(`The ${h.name} hook in ${tilde(h.file)} starts repomagpie through the shell. ${agentHookFix(h, "to start node directly")}`);
-      if (e.trust === "not trusted") problems.push("Codex CLI skips RepoMagpie's hook until you trust it: open /hooks in Codex and trust it.");
-      if (e.trust === "changed since trusted") problems.push("RepoMagpie's hook changed since you trusted it, so Codex CLI skips it: open /hooks in Codex and trust it again.");
+      }
+      const trust = e.trust === "not trusted" ? "Codex CLI skips RepoMagpie's hook until you trust it"
+        : e.trust === "changed since trusted" ? "RepoMagpie's hook changed since you trusted it, so Codex CLI skips it" : null;
+      if (trust && folder) folder.trust = trust;
+      else if (trust) problems.push(`${trust}: open /hooks in Codex and trust it${e.trust === "changed since trusted" ? " again" : ""}.`);
     }
     if (h.error) problems.push(`Couldn't read ${h.name}'s ${tilde(h.file)}: ${h.error}.`);
   }
@@ -242,16 +262,53 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     // CLI without its command, a file with comments). An agent found by its folder only and without
     // an entry is no to-do: setup doesn't choose it either.
     const hand = mcpByHand(AGENTS.find((a) => a.id === agent.id) as Agent, where, texts.get(agent.id) ?? null, agent.mcp !== null);
-    const fix = !agent.found ? notFound(agent.name)
+    const fix = !agent.found ? notFound(agent.name, tilde(agent.config))
       : hand ? `${agent.mcp ? "Replace the entry in" : "Paste the entry into"} ${tilde(agent.config)} by hand (${hand}); repomagpie setup --dry-run --agents ${agent.id} prints it.`
         : `Run ${setupFor(agent.id, agent.found)}${agent.mcp ? " again" : ""}.`;
+    let problem: string | null = null;
     if (agent.error) problems.push(`Couldn't read ${agent.name}'s ${tilde(agent.config)}: ${agent.error}.`);
-    else if (agent.found && agent.found.by !== "folder" && !agent.mcp) problems.push(`${agent.name} has no repomagpie MCP server. ${fix}`);
+    else if (agent.found && agent.found.by !== "folder" && !agent.mcp) problem = `${agent.name} has no repomagpie MCP server.`;
     else if (agent.mcp && (!agent.mcp.node_found || !agent.mcp.entry_found)) {
       const missing = !agent.mcp.node_found ? agent.mcp.command ?? "(no command)" : agent.mcp.entry ?? "(no entry file)";
-      problems.push(`${agent.name}'s repomagpie MCP server starts ${missing}, which doesn't exist. ${fix}`);
-    } else if (agent.mcp?.version && agent.mcp.version !== request.version) problems.push(`${agent.name}'s repomagpie MCP server runs version ${agent.mcp.version}; this is ${request.version}. ${fix}`);
-    else if (agent.mcp && !agent.mcp.code_generation_off) problems.push(`${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}. ${fix}`);
+      problem = `${agent.name}'s repomagpie MCP server starts ${missing}, which doesn't exist.`;
+    } else if (agent.mcp?.version && agent.mcp.version !== request.version) problem = `${agent.name}'s repomagpie MCP server runs version ${agent.mcp.version}; this is ${request.version}.`;
+    else if (agent.mcp && !agent.mcp.code_generation_off) problem = `${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}.`;
+    if (problem && agent.found?.by === "folder") {
+      const folder = leftover(agent.id, agent.name);
+      folder.what.push(problem);
+      folder.mcp = true;
+    } else if (problem) problems.push(`${problem} ${fix}`);
+  }
+
+  // One to-do per agent found by its folder only, with both ways out, each by setup where setup can
+  // (setup --remove edits the files setup would edit) and by hand where it can't.
+  for (const [id, l] of leftovers) {
+    if (!l.what.length && !l.trust) continue;
+    const agent = AGENTS.find((a) => a.id === id) as Agent;
+    const report = agents.find((a) => a.id === id) as AgentReport;
+    const hook = agentHooks.find((h) => h.id === id);
+    const trusting = id === "codex" ? ", then trust the hook in /hooks" : "";
+    const use: string[] = [];
+    const drop: string[] = [];
+    let printed = false; // a by-hand step, which the dry run prints the entry for
+    if (l.hook && hook) {
+      const hand = hookByHand(hook);
+      printed ||= hand !== null;
+      use.push(hand ? `change the hook in ${tilde(hook.file)} by hand (${hand})${trusting}` : `run repomagpie setup --agents ${id}${trusting}`);
+      const keeps = pathProblem(hook.file, request.home) !== null || plainAgentHook.get(id) === false;
+      drop.push(keeps ? `delete the hook entry in ${tilde(hook.file)} by hand` : `run repomagpie setup --remove --agents ${id}`);
+    } else if (l.trust) use.push("open /hooks in Codex and trust it");
+    if (l.mcp) {
+      const text = texts.get(id) ?? null;
+      const hand = mcpByHand(agent, where, text, true);
+      printed ||= hand !== null;
+      use.push(hand ? `replace the entry in ${tilde(report.config)} by hand (${hand})` : `run repomagpie setup --agents ${id}`);
+      drop.push(mcpRemovable(agent, where, text) ? `run repomagpie setup --remove --agents ${id}` : `delete the repomagpie entry in ${tilde(report.config)} by hand`);
+    }
+    const what = [...l.what, ...(l.trust && !l.hook ? [`${l.trust}.`] : [])];
+    const line = `${what.join(" ")} If you use ${l.name}: ${[...new Set(use)].join(", and ")}${printed ? `; repomagpie setup --dry-run --agents ${id} prints the entries` : ""}. If you don't: ${[...new Set(drop)].join(", and ")}.`;
+    if (l.first) problems.unshift(line);
+    else problems.push(line);
   }
 
   const backups = setupBackups(where);
@@ -318,7 +375,17 @@ const COMMENTS = "it has comments, trailing commas or a key written twice, which
 const setupFor = (id: Agent["id"], found: Found | null) => `repomagpie setup${found?.by === "folder" ? ` --agents ${id}` : ""}`;
 
 // An entry in the files of an agent that isn't found: setup skips that agent, even with --agents.
-const notFound = (name: string) => `${name} isn't installed, so setup leaves its files: delete the entry by hand, or install ${name} and run repomagpie setup.`;
+const notFound = (name: string, file: string) => `${name} isn't installed, so setup leaves its files: delete the entry in ${file} by hand, or install ${name} and run repomagpie setup.`;
+
+// The problems with an agent's entries when it was found by its folder only, for one to-do.
+interface Leftover {
+  name: string;
+  what: string[]; // each problem, a sentence without its fix
+  hook: boolean; // the hook entry needs fixing
+  mcp: boolean; // the MCP entry needs fixing
+  trust: string | null; // Codex CLI skips the hook until it is trusted
+  first: boolean; // Copilot CLI denies every tool call: the first to-do
+}
 
 // Claude Code's project settings, in the project root (where a .claude/ folder is).
 function projectSettings(request: DoctorRequest): string[] {

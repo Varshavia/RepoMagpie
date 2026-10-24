@@ -201,7 +201,7 @@ test("the other agents' hooks: setup's form with its paths and flags; a broken p
   assert.deepEqual([by("gemini")?.entries[0].form, by("gemini")?.entries[0].node_found], ["name", false], "no repomagpie on this PATH");
   assert.deepEqual([by("copilot")?.entries[0].node_found, by("copilot")?.entries[0].entry_found], [false, true]);
   // Copilot CLI's broken path is the first to-do; setup chooses an agent found by its folder only when named.
-  assert.match(report.problems[0], /^The Copilot CLI hook in ~[\\/]\.copilot[\\/]hooks[\\/]repomagpie\.json starts .*moved.*node\.exe, which isn't there, so it does nothing\. Run repomagpie setup --agents copilot again\.$/);
+  assert.match(report.problems[0], /^The Copilot CLI hook in ~[\\/]\.copilot[\\/]hooks[\\/]repomagpie\.json starts .*moved.*node\.exe, which isn't there, so it does nothing\. If you use Copilot CLI: run repomagpie setup --agents copilot\. If you don't: run repomagpie setup --remove --agents copilot\.$/);
   assert.ok(report.problems.some((p) => /^The Gemini CLI hook in .* starts repomagpie, which isn't there, so it fails on every shell command\./.test(p)), report.problems.join("\n"));
   assert.ok(!report.problems.some((p) => p.includes("Cursor hook")), "Cursor's is fine");
 });
@@ -218,7 +218,7 @@ test("Antigravity CLI's hook on Windows: node and the entry file read from the l
   assert.deepEqual(hook(), { form: "setup", command: launcher, node: process.execPath, entry, node_found: true, entry_found: true, flags: ["--inform-only"], trust: null });
   removeFolder(launcher);
   assert.deepEqual([hook()?.form, hook()?.node, hook()?.node_found], ["setup", null, false]);
-  assert.ok(runDoctor(box.request).problems.some((p) => p === `The Antigravity CLI hook in ~\\.gemini\\config\\hooks.json starts ${launcher}, which isn't there, so it does nothing. Run repomagpie setup --agents antigravity again.`));
+  assert.ok(runDoctor(box.request).problems.some((p) => p === `The Antigravity CLI hook in ~\\.gemini\\config\\hooks.json starts ${launcher}, which isn't there, so it does nothing. If you use Antigravity CLI: run repomagpie setup --agents antigravity. If you don't: run repomagpie setup --remove --agents antigravity.`));
 });
 
 test("the Codex CLI hook's trust, from config.toml: not trusted yet and changed are to-dos; trusted and turned off aren't", () => {
@@ -255,7 +255,7 @@ test("MCP entries: a broken path is found; a good one shows its version and --al
   const gemini = report.agents.find((a) => a.id === "gemini");
   assert.equal(cursor?.mcp?.node_found, false);
   assert.equal(cursor?.mcp?.entry_found, true);
-  assert.ok(report.problems.some((p) => p.startsWith("Cursor's repomagpie MCP server starts") && p.endsWith("which doesn't exist. Run repomagpie setup --agents cursor again.")));
+  assert.ok(report.problems.some((p) => p.startsWith("Cursor's repomagpie MCP server starts") && p.endsWith("which doesn't exist. If you use Cursor: run repomagpie setup --agents cursor. If you don't: run repomagpie setup --remove --agents cursor.")));
   assert.deepEqual(gemini?.mcp, { command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "mcp", "--allow-write"], env_keys: ["GITHUB_TOKEN"], allow_write: true, code_generation_off: true, node_found: true, entry: entry, entry_found: true, version: "0.2.0" });
   assert.equal(cursor?.mcp?.code_generation_off, false);
   assert.ok(!report.problems.some((p) => p.startsWith("Gemini CLI's")), "a good entry has nothing to do");
@@ -269,7 +269,7 @@ test("an entry without node's code-generation flag, or with it after the script,
   box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: { command: process.execPath, args: [entry, "--disallow-code-generation-from-strings", "mcp"] } } }));
   const report = runDoctor(box.request);
   assert.equal(report.agents.find((a) => a.id === "cursor")?.mcp?.code_generation_off, false);
-  assert.ok(report.problems.includes("Cursor's repomagpie MCP server doesn't start node with --disallow-code-generation-from-strings. Run repomagpie setup --agents cursor again."));
+  assert.ok(report.problems.includes("Cursor's repomagpie MCP server doesn't start node with --disallow-code-generation-from-strings. If you use Cursor: run repomagpie setup --agents cursor. If you don't: run repomagpie setup --remove --agents cursor."));
 });
 
 test("VS Code's JSON with comments and Codex's TOML are read; an unreadable file is named", () => {
@@ -328,10 +328,64 @@ test("Codex CLI without its command: no to-do without an entry; an entry to fix 
   mkdirSync(join(box.home, ".codex"));
   assert.deepEqual(codex(), [], "found by its folder only, which setup doesn't choose");
   box.write(join(box.home, ".codex", "config.toml"), `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(join(box.root, "gone", "node"))}\nargs = ["x.js", "mcp"]\n`);
-  assert.deepEqual(codex(), [`Codex CLI's repomagpie MCP server starts ${join(box.root, "gone", "node")}, which doesn't exist. Replace the entry in ~${windows ? "\\" : "/"}.codex${windows ? "\\" : "/"}config.toml by hand (the codex command isn't on PATH, and setup doesn't edit TOML itself); repomagpie setup --dry-run --agents codex prints it.`]);
+  // Found by its folder only: fixing the entry is for someone who uses Codex; both ways out are by
+  // hand, since setup reaches Codex's TOML only through the codex command.
+  const toml = `~${windows ? "\\" : "/"}.codex${windows ? "\\" : "/"}config.toml`;
+  assert.deepEqual(codex(), [`Codex CLI's repomagpie MCP server starts ${join(box.root, "gone", "node")}, which doesn't exist. If you use Codex CLI: replace the entry in ${toml} by hand (the codex command isn't on PATH, and setup doesn't edit TOML itself); repomagpie setup --dry-run --agents codex prints the entries. If you don't: delete the repomagpie entry in ${toml} by hand.`]);
   // With its command, setup writes the entry itself.
   command(box, "codex", null);
   assert.match(codex()[0], /which doesn't exist\. Run repomagpie setup again\.$/);
+});
+
+// After beta.9 (decision 0038), setup no longer chooses an agent found by its folder only, so entries
+// an earlier setup wrote there are either for someone who uses that agent or leftovers: one to-do
+// per agent names both ways out.
+test("a folder-only agent's hook: one to-do with both ways out; Codex's trust is part of it, not a second to-do", () => {
+  const box = scratchHome();
+  const s = windows ? "\\" : "/";
+  box.write(join(box.home, ".codex", "hooks.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "repomagpie hook codex", timeout: 10 }] }] } }));
+  assert.deepEqual(runDoctor(box.request).problems.filter((p) => p.includes("Codex")), [
+    `The Codex CLI hook in ~${s}.codex${s}hooks.json starts repomagpie, which isn't there, so it fails on every shell command. If you use Codex CLI: run repomagpie setup --agents codex, then trust the hook in /hooks. If you don't: run repomagpie setup --remove --agents codex.`,
+  ]);
+});
+
+test("a folder-only agent's MCP entry, and both entries: one to-do, setup's way where it edits the file, by hand where it can't", () => {
+  const box = scratchHome();
+  const s = windows ? "\\" : "/";
+  const gone = join(box.root, "gone", "node");
+  const cursor = () => runDoctor(box.request).problems.filter((p) => p.includes("Cursor"));
+  box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: { command: gone, args: ["x.js", "mcp"] } } }));
+  assert.deepEqual(cursor(), [`Cursor's repomagpie MCP server starts ${gone}, which doesn't exist. If you use Cursor: run repomagpie setup --agents cursor. If you don't: run repomagpie setup --remove --agents cursor.`]);
+  box.write(join(box.home, ".cursor", "hooks.json"), JSON.stringify({ version: 1, hooks: { beforeShellExecution: [{ command: "repomagpie hook cursor" }] } }));
+  assert.deepEqual(cursor(), [`The Cursor hook in ~${s}.cursor${s}hooks.json starts repomagpie, which isn't there, so it fails on every shell command. Cursor's repomagpie MCP server starts ${gone}, which doesn't exist. If you use Cursor: run repomagpie setup --agents cursor. If you don't: run repomagpie setup --remove --agents cursor.`]);
+
+  // Codex CLI's TOML: setup reaches it only through the codex command, so both ways are by hand for it.
+  box.write(join(box.home, ".codex", "hooks.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "repomagpie hook codex", timeout: 10 }] }] } }));
+  box.write(join(box.home, ".codex", "config.toml"), `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(gone)}\nargs = ["x.js", "mcp"]\n`);
+  const toml = `~${s}.codex${s}config.toml`;
+  assert.deepEqual(runDoctor(box.request).problems.filter((p) => p.includes("Codex")), [
+    `The Codex CLI hook in ~${s}.codex${s}hooks.json starts repomagpie, which isn't there, so it fails on every shell command. Codex CLI's repomagpie MCP server starts ${gone}, which doesn't exist. `
+      + `If you use Codex CLI: run repomagpie setup --agents codex, then trust the hook in /hooks, and replace the entry in ${toml} by hand (the codex command isn't on PATH, and setup doesn't edit TOML itself); repomagpie setup --dry-run --agents codex prints the entries. `
+      + `If you don't: run repomagpie setup --remove --agents codex, and delete the repomagpie entry in ${toml} by hand.`,
+  ]);
+});
+
+test("an agent that isn't installed keeps the by-hand to-do, naming the file; one found by its command keeps setup's", () => {
+  const box = scratchHome();
+  const s = windows ? "\\" : "/";
+  const gone = join(box.root, "gone", "node");
+  // ~/.copilot without config.json isn't Copilot CLI.
+  box.write(join(box.home, ".copilot", "mcp-config.json"), JSON.stringify({ mcpServers: { repomagpie: { type: "local", command: gone, args: ["x.js", "mcp"], tools: ["*"] } } }));
+  assert.deepEqual(runDoctor(box.request).problems.filter((p) => p.includes("Copilot CLI")), [
+    `Copilot CLI's repomagpie MCP server starts ${gone}, which doesn't exist. Copilot CLI isn't installed, so setup leaves its files: delete the entry in ~${s}.copilot${s}mcp-config.json by hand, or install Copilot CLI and run repomagpie setup.`,
+  ]);
+  command(box, "cursor", null);
+  box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: { command: gone, args: ["x.js", "mcp"] } } }));
+  box.write(join(box.home, ".cursor", "hooks.json"), JSON.stringify({ version: 1, hooks: { beforeShellExecution: [{ command: "repomagpie hook cursor" }] } }));
+  assert.deepEqual(runDoctor(box.request).problems.filter((p) => p.includes("Cursor")), [
+    `The Cursor hook in ~${s}.cursor${s}hooks.json starts repomagpie, which isn't there, so it fails on every shell command. Run repomagpie setup again.`,
+    `Cursor's repomagpie MCP server starts ${gone}, which doesn't exist. Run repomagpie setup again.`,
+  ]);
 });
 
 test("an MCP file setup won't edit: comments or a key written twice mean paste it by hand; setup's own edit means run setup", () => {
@@ -367,7 +421,7 @@ test("other agents' hook to-dos: by hand in a file with comments; an agent that 
   assert.ok(problems().some((p) => p.startsWith("The Cursor hook") && p.endsWith("Change it by hand (it has comments, trailing commas or a key written twice, which setup doesn't edit); repomagpie setup --dry-run --agents cursor prints the entry.")), problems().join("\n"));
   // ~/.copilot without config.json isn't Copilot CLI (VS Code reads ~/.copilot): setup skips it, even with --agents.
   box.write(join(box.home, ".copilot", "hooks", "repomagpie.json"), JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: "command", bash: "repomagpie hook copilot", powershell: "repomagpie hook copilot" }] } }));
-  assert.ok(problems().some((p) => p.startsWith("The Copilot CLI hook") && p.endsWith("Copilot CLI isn't installed, so setup leaves its files: delete the entry by hand, or install Copilot CLI and run repomagpie setup.")), problems().join("\n"));
+  assert.ok(problems().some((p) => p.startsWith("The Copilot CLI hook") && p.endsWith(`Copilot CLI isn't installed, so setup leaves its files: delete the entry in ~${windows ? "\\" : "/"}.copilot${windows ? "\\" : "/"}hooks${windows ? "\\" : "/"}repomagpie.json by hand, or install Copilot CLI and run repomagpie setup.`)), problems().join("\n"));
 });
 
 test("a skill in a folder setup doesn't write is updated the way it was installed, never by running setup", () => {
