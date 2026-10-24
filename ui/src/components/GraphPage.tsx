@@ -44,7 +44,7 @@ import {
   type Sources,
 } from "../logic/graph.ts";
 import type { LayoutReply, LayoutRequest } from "../layout.worker.ts";
-import { MOD, type Theme } from "../platform.ts";
+import { MOD, type Scheme, type Theme } from "../platform.ts";
 import { EmptyState } from "./common.tsx";
 import "./GraphPage.css";
 
@@ -105,6 +105,7 @@ interface View {
 interface Props {
   journal: Scope;
   theme: Theme;
+  scheme: Scheme; // the system's, which the page shows when the theme is "system" (App follows it)
   focus: string | null; // "Show in graph": the node to select, in local mode
   refresh: number; // grows when the journal's notes change on disk (notes-changed)
   onAdd:(target?: string) => void; // a missing note: Add, with its target filled in
@@ -113,12 +114,11 @@ interface Props {
   renderNote: (note: { id: string; file: string }, open: (id: string) => void) => ReactNode;
 }
 
-export default function GraphPage({ journal, theme, focus: focusOn, refresh, onAdd, onSearch, renderNote }: Props) {
+export default function GraphPage({ journal, theme, scheme, focus: focusOn, refresh, onAdd, onSearch, renderNote }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [webgl, setWebgl] = useState(hasWebGL);
   const [settled, setSettled] = useState(false);
-  const [scheme, setScheme] = useState(0); // the system's colour scheme changed
   const [selected, setSelected] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth>(0);
   const [query, setQuery] = useState("");
@@ -152,13 +152,6 @@ export default function GraphPage({ journal, theme, focus: focusOn, refresh, onA
       current = false;
     };
   }, [journal, attempt, refresh]);
-
-  useEffect(() => {
-    const query = matchMedia("(prefers-color-scheme: dark)");
-    const changed = () => setScheme((n) => n + 1);
-    query.addEventListener("change", changed);
-    return () => query.removeEventListener("change", changed);
-  }, []);
 
   const doc = load.status === "ready" ? load.doc : null;
   const shown = useMemo(() => (doc ? drawable(doc, sources, filters) : null), [doc, sources, filters]);

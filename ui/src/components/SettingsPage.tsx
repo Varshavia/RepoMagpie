@@ -2,7 +2,7 @@
 // value), the version, links to the docs. The theme is this browser's choice, not a journal setting.
 import type { SettingsJson } from "../api.ts";
 import { homePath } from "../logic/text.ts";
-import type { Theme } from "../platform.ts";
+import type { Scheme, Theme } from "../platform.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
 
 const DOCS = "https://github.com/Varshavia/RepoMagpie";
@@ -11,11 +11,12 @@ interface Props {
   settings: SettingsJson | null;
   error: string | null;
   theme: Theme;
+  scheme: Scheme; // the system's colour scheme now
   onTheme: (theme: Theme) => void;
   onKeys: () => void;
 }
 
-export function SettingsPage({ settings, error, theme, onTheme, onKeys }: Props) {
+export function SettingsPage({ settings, error, theme, scheme, onTheme, onKeys }: Props) {
   return (
     <div className="page">
       <h1 className="page-title">Settings</h1>
@@ -68,7 +69,9 @@ export function SettingsPage({ settings, error, theme, onTheme, onKeys }: Props)
             </button>
           ))}
         </div>
-        <p className="field-help">Saved in this browser only.</p>
+        <p className="field-help">
+          {theme === "system" ? `Follows the system, which is ${scheme} now.` : `${theme === "dark" ? "Dark" : "Light"}, whatever the system uses.`} Saved in this browser only.
+        </p>
       </section>
 
       <section className="page-section" aria-labelledby="settings-help">

@@ -24,7 +24,7 @@ import { filterNotes, nextAfter, noteKey, sidebarCounts, tagListState, type TagL
 import { suggestKey, type SuggestItem } from "./logic/suggest.ts";
 import { addTarget, noteHash, parseNoteHash } from "./logic/links.ts";
 import { homePath, visible } from "./logic/text.ts";
-import { applyTheme, IS_MAC, MOD, savedTheme, type Theme } from "./platform.ts";
+import { applyTheme, IS_MAC, MOD, onSystemScheme, savedTheme, showTheme, systemScheme, type Scheme, type Theme } from "./platform.ts";
 import { listOf, viewTitle, type View } from "./view.ts";
 import type { NoteSummary } from "../../src/core/documents.ts";
 
@@ -57,6 +57,7 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null); // an Undo that couldn't put the note back
   const [pane, setPane] = useState<"list" | "note">("list");
   const [theme, setTheme] = useState<Theme>(savedTheme);
+  const [scheme, setScheme] = useState<Scheme>(systemScheme);
   const [search, setSearch] = useState<SearchState>(NO_SEARCH);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hit, setHit] = useState<string | null>(null);
@@ -262,6 +263,13 @@ export function App() {
     setTheme(t);
     applyTheme(t);
   }, []);
+
+  // The system's scheme, followed while the page is open: the page shows it when the theme is
+  // "system", and the graph and Settings read it.
+  useEffect(() => onSystemScheme((s) => {
+    if (theme === "system") showTheme("system");
+    setScheme(s);
+  }), [theme]);
 
   // After Add or Import: the list, and tags.md, which a new note's tags may have grown (decision 0030).
   const afterWrite = useCallback(
@@ -632,6 +640,7 @@ export function App() {
           key={journal}
           journal={journal}
           theme={theme}
+          scheme={scheme}
           focus={view.focus ?? null}
           refresh={live[journal].tick}
           onAdd={addMissing}
@@ -659,7 +668,7 @@ export function App() {
         ) : view.page === "recall" ? (
           <RecallPage home={home} onOpenNote={openNote} onAdd={addInJournal} onSearch={searchName} />
         ) : (
-          <SettingsPage settings={settings} error={settingsError} theme={theme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
+          <SettingsPage settings={settings} error={settingsError} theme={theme} scheme={scheme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
         )}
       </section>
     );
