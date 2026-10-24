@@ -79,7 +79,7 @@ export const SIMILAR = { neighbours: 3, threshold: 0.25, languageBonus: 0.1 };
 
 const EDGE_TYPES: EdgeType[] = ["tagged", "link", "alternative", "similar"];
 const GRAPH_CACHE = "graph.json";
-const GRAPH_VERSION = 1;
+const GRAPH_VERSION = 2; // 2: status from a Verdict without nested or unterminated comments
 
 interface Entry {
   id: string;

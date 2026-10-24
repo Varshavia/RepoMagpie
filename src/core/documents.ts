@@ -8,7 +8,7 @@ import { editNote, noteVersion } from "./edit.ts";
 import { graphData, type GraphData } from "./graph.ts";
 import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
-import { DRAFT_MARKER, readableId, readNote } from "./note.ts";
+import { readableId, readNote, stripComments } from "./note.ts";
 import { assertWritable, isRecord, isTextOrNull, isTexts, journalPathProblem, noteEntries, noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { knownTags, locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
@@ -137,7 +137,7 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
 // and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
 const NOTE_LIST_CACHE = "note-list.json";
-const NOTE_LIST_VERSION = 1;
+const NOTE_LIST_VERSION = 2; // 2: nested and unterminated comments stripped from the Verdict
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
   const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
@@ -372,7 +372,7 @@ export async function previewNote(request: { target: string; type?: "npm" | "pyp
   const fm = note.frontmatter;
   const topicTags = rankTopics(textList(fm.topics), saved.id, knownTags(notes, tagList, saved.path));
   const text = (value: unknown) => (typeof value === "string" ? value : null);
-  const whatItDoes = (note.sections.find((s) => s.name === "What it does")?.body ?? "").replace(/<!--[\s\S]*?-->/g, "").replace(DRAFT_MARKER, "").trim();
+  const whatItDoes = stripComments(note.sections.find((s) => s.name === "What it does")?.body ?? "").trim();
   const exists = saved.result !== "created";
   return {
     outcome: "ok",

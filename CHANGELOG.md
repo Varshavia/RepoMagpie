@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The same in your agent, which may ask when you'd use or avoid it in the same question as your reason, and never fills these in for you (MCP `note` tool: `use_when` and `avoid_when`). Run `repomagpie setup` after the upgrade so your agents get the new skill.
 - The same in `repomagpie ui`: "Use when" and "Avoid when" fields under the Verdict in the inbox review and on the Add page. Enter adds an item; Ctrl/Cmd+Enter saves everything at once.
 
+### Fixed
+
+- Text inside an HTML comment no longer reaches search, recall or a note's Verdict when the comment is nested (`<!-<!---->- … -->`) or never closes: an unclosed `<!--` now hides the rest of its line. The caches rebuild once after the upgrade.
+
 ## [0.2.0-beta.10] - 2026-10-24
 
 The eleventh pre-release: your agent offers once, at the end of a task, to save a dependency decision made in it, with your reason as the Verdict. Run `repomagpie setup` after the upgrade so your agents get the new skill; the offer works as well as your agent follows it.

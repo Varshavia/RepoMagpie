@@ -533,6 +533,13 @@ test("Note preview of an existing note says so, with its Verdict", async () => {
   assert.equal(readFileSync(s.note("npm--pdfkit.md"), "utf8"), PDFKIT);
 });
 
+test("Note preview: What it does without nested or unterminated comments", async () => {
+  const text = PDFKIT.replace("\n## Use when", "\n## What it does\nA PDF library. <!-<!---->- hidden --> <!-- open\n\n## Use when");
+  const s = setup({ "journal/notes/npm--pdfkit.md": text });
+  const r = await previewNote({ target: "pkg:npm/pdfkit", to: "personal" }, s.context);
+  assert.equal(r.document.what_it_does, "A PDF library.");
+});
+
 test("Note preview without metadata: registry name, null metadata fields", async () => {
   const s = setup();
   const r = await previewNote({ target: "pkg:npm/left-pad", to: "personal" }, s.context);

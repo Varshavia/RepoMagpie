@@ -117,6 +117,7 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
    - `repomagpie import` reads one line per item: `- <url-or-name> — verdict: ... | use: ... | avoid: ...`. An explicit `verdict:` counts as human-written. `use:` and `avoid:` become draft "Use when" and "Avoid when" sections (rule 3). Text without a label goes to "My notes".
 8. **Lenient read, strict write.**
    - Read hand-written notes even when frontmatter fields or sections are missing, misordered or extra.
+   - HTML comments (`<!-- … -->`) aren't note text: the Verdict, search, recall and the items of "Use when" and "Avoid when" leave them out, and a `<!--` that never closes leaves out the rest of its line. The file keeps them.
    - Write notes in the canonical format above.
    - Never rewrite a human section; edits that preserve formatting and comments are required for frontmatter changes.
 

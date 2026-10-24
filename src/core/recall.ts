@@ -12,7 +12,7 @@ import { CAPS, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
-const CACHE_VERSION = 2; // 2: entries carry alternatives
+const CACHE_VERSION = 3; // 2: entries carry alternatives; 3: nested and unterminated comments stripped
 
 type ListName = "use_when" | "avoid_when";
 

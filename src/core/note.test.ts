@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readNote, validate } from "./note.ts";
+import { readNote, sectionItems, stripComments, validate } from "./note.ts";
 
 // A note in the canonical v1 format (note schema).
 const CANONICAL = `---
@@ -223,6 +223,27 @@ test("validate: the file name must match the id", () => {
   const note = readNote(CANONICAL);
   assert.deepEqual(validate(note, { fileName: "npm--pdfkit.md" }), []);
   assert.equal(validate(note, { fileName: "npm--other.md" }).filter((p) => p.where === "file").length, 1);
+});
+
+test("stripComments removes comments until none is left, then an unterminated one to the end of its line", () => {
+  assert.equal(stripComments("a <!-- x --> b"), "a  b");
+  assert.equal(stripComments("<!-<!---->-"), ""); // one pass would leave "<!--"
+  assert.equal(stripComments("<!-<!---->- hidden -->kept"), "kept"); // one pass would leave "<!-- hidden -->"
+  assert.equal(stripComments("kept <!-- open\r\nnext <!-- also open"), "kept \r\nnext ");
+  assert.equal(stripComments("<!-- magpie:draft -->\nA PDF library."), "\nA PDF library.");
+});
+
+test("readNote: a Verdict of nested or unterminated comments only is empty, and the note is in the inbox", () => {
+  for (const verdict of ["<!-<!---->-", "<!-<!---->- avoid: hidden -->", "<!-- avoid: open"]) {
+    const note = readNote(CANONICAL.replace("avoid: async streams painful; use puppeteer", verdict));
+    assert.deepEqual([note.verdict, note.status], ["", "inbox"], verdict);
+  }
+  assert.equal(readNote(CANONICAL.replace("avoid: async streams painful; use puppeteer", "<!-- open\nfine")).verdict, "fine");
+});
+
+test("sectionItems: nested and unterminated comments leave nothing behind", () => {
+  assert.deepEqual(sectionItems("<!-- magpie:draft -->\n- one <!-<!---->- hidden -->\n- two <!-- open\n- three"), ["one", "two", "three"]);
+  assert.deepEqual(sectionItems("<!-<!---->-\n- only"), ["only"]);
 });
 
 test("readNote and validate never throw", () => {

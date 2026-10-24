@@ -199,6 +199,14 @@ test("a Verdict section holding only a comment counts as empty; the comment stay
   assert.equal(r.text, text.replace("status: inbox", "status: reviewed").replace("##  Verdict\n", "##  Verdict\nok\n"));
 });
 
+test("a Verdict section holding only nested or unterminated comments counts as empty, as readNote reads it", () => {
+  for (const comment of ["<!-<!---->-", "<!-<!---->- hidden -->", "<!-- open"]) {
+    const text = NO_VERDICT.replace("##  Verdict\n", `##  Verdict\n${comment}\n`);
+    const r = setVerdict(text, "ok");
+    assert.equal(r.text, text.replace("status: inbox", "status: reviewed").replace("##  Verdict\n", "##  Verdict\nok\n"), comment);
+  }
+});
+
 test("an existing Verdict is never overwritten", () => {
   const r = setVerdict(HAND_WRITTEN, "something else");
   assert.equal(r.text, HAND_WRITTEN);
@@ -452,7 +460,8 @@ test("a heading inside a code block is not a section", () => {
 test("setSection keeps CRLF line endings", () => {
   const crlf = HAND_WRITTEN.replace(/\n/g, "\r\n");
   const r = setSection(crlf, "Use when", "- in scripts\n- in CI");
-  assert.equal(r.text, crlf.replace(USE_WHEN.replace("\n", "\r\n"), "- in scripts\r\n- in CI\r\n"));
+  // The expected file: the LF edit, with every line ending then made CRLF.
+  assert.equal(r.text, HAND_WRITTEN.replace(USE_WHEN, "- in scripts\n- in CI\n").replace(/\n/g, "\r\n"));
 });
 
 test("setSection refuses an unknown section, a body with a section heading, and unreadable frontmatter", () => {
@@ -736,7 +745,8 @@ test("addSectionItems leaves a section it can't safely edit alone: twice in the 
 
 test("addSectionItems keeps CRLF line endings, and a file without a final line break", () => {
   const crlf = HAND_WRITTEN.replace(/\n/g, "\r\n");
-  assert.equal(addSectionItems(crlf, "Use when", ["invoices"]).text, crlf.replace(USE_WHEN.replace("\n", "\r\n"), `${USE_WHEN.replace("\n", "\r\n")}- invoices\r\n`));
+  // The expected file: the LF edit, with every line ending then made CRLF.
+  assert.equal(addSectionItems(crlf, "Use when", ["invoices"]).text, HAND_WRITTEN.replace(USE_WHEN, `${USE_WHEN}- invoices\n`).replace(/\n/g, "\r\n"));
   const last = "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one";
   assert.equal(addSectionItems(last, "Use when", ["two"]).text, "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one\n- two\n");
 });

@@ -4,7 +4,7 @@
 // Pure functions on text; no file system, no printing.
 import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
 import { alternativeLinks, findLinks } from "./links.ts";
-import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, sectionItems, YAML_LIMITS, type SectionName } from "./note.ts";
+import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, sectionItems, stripComments, YAML_LIMITS, type SectionName } from "./note.ts";
 import { CAPS, cut } from "./text.ts";
 
 export type ToolField = "id" | "name" | "url" | "language" | "license" | "topics" | "packages" | "explored" | "adopted";
@@ -107,7 +107,7 @@ export function setVerdict(text: string, verdict: string): EditResult {
   if (at !== -1) {
     const start = headings[at].line;
     const body = lines.slice(start + 1, headings[at + 1]?.line ?? lines.length).join("\n");
-    if (body.replace(/<!--[\s\S]*?-->/g, "").trim()) return untouched(text, "This note already has a Verdict; edit the file to change it.");
+    if (stripComments(body).trim()) return untouched(text, "This note already has a Verdict; edit the file to change it.");
     lines.splice(start + 1, 0, line + cr);
   } else if (headings.length) {
     lines.splice(headings[0].line, 0, `## Verdict${cr}`, line + cr, cr);
