@@ -26,7 +26,7 @@ const valid = (text: string, purl: string) => assert.deepEqual(validate(readNote
 
 // --- new notes ---
 
-test("a bare name with text: a reviewed note with the Verdict, registry URL, kind other", () => {
+test("a bare name with text: a reviewed note with the Verdict, registry URL, kind library", () => {
   const c = captureNote(null, input({ verdict: "avoid: async streams painful; use puppeteer" }));
   assert.equal(c.result, "created");
   assert.equal(c.status, "reviewed");
@@ -35,9 +35,19 @@ test("a bare name with text: a reviewed note with the Verdict, registry URL, kin
   const note = readNote(c.text ?? "");
   assert.equal(note.verdict, "avoid: async streams painful; use puppeteer");
   assert.equal(note.frontmatter.url, "https://www.npmjs.com/package/pdfkit");
-  assert.equal(note.frontmatter.kind, "other");
+  assert.equal(note.frontmatter.kind, "library");
   assert.equal(note.frontmatter.explored, "2026-10-04");
   valid(c.text ?? "", "pkg:npm/pdfkit");
+});
+
+test("a registry package name starts as library on every registry (decision 0039); an existing note keeps its kind", () => {
+  for (const purl of ["pkg:npm/%40scope/thing", "pkg:pypi/requests", "pkg:cargo/serde"]) {
+    assert.equal(readNote(captureNote(null, input({ purl, source: purl })).text ?? "").frontmatter.kind, "library", purl);
+  }
+  const old = captureNote(null, input({})).text?.replace("kind: library", "kind: other") ?? "";
+  const updated = captureNote(old, input({ verdict: "fine" }));
+  assert.equal(updated.result, "updated");
+  assert.equal(readNote(updated.text ?? "").frontmatter.kind, "other");
 });
 
 test("without text the new note is inbox", () => {

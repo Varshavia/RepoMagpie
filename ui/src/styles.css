@@ -1,6 +1,7 @@
 /* The local app's styles. Tokens come from DESIGN.md, one custom property each; light-dark() picks
-   the theme's value. The theme follows prefers-color-scheme unless the person chose one
-   (html[data-theme]). No remote fonts, no images. */
+   the theme's value. The app sets the scheme on html[data-theme]: the person's choice, or the
+   system's, followed while the page is open (platform.ts). Without it, prefers-color-scheme.
+   No remote fonts, no images. */
 
 :root {
   color-scheme: dark light;

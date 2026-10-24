@@ -55,7 +55,7 @@ function create(input: CaptureInput): Capture {
     topics: m?.topics,
     packages: m?.packages ?? undefined,
     explored: input.today,
-    kind: m ? draftKind(m) : "other",
+    kind: m ? draftKind(m) : startingKind(input.purl),
     tags,
     verdict: input.verdict,
     whatItDoes: m?.description ?? undefined,
@@ -106,6 +106,13 @@ function update(existing: string, input: CaptureInput): Capture {
   }
   const changed = text !== existing;
   return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)] };
+}
+
+// The kind of a note made without GitHub data (decision 0039): a registry package (npm, PyPI,
+// Cargo) is a published package, as decision 0030's rule 9; a GitHub repository whose fetch
+// failed or was skipped says nothing about itself.
+function startingKind(purl: string): string {
+  return PackageURL.fromString(purl).type === "github" ? "other" : "library";
 }
 
 // The name people know a subject by: owner/repo for GitHub (with the case typed in a URL),

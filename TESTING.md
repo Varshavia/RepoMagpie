@@ -29,6 +29,8 @@ repomagpie doctor
 
 - **Windows PowerShell says "running scripts is disabled on this system".** PowerShell's default execution policy blocks npm's `.ps1` scripts. Use `repomagpie.cmd` instead of `repomagpie` (and `npm.cmd` instead of `npm`), or run the commands in Command Prompt.
 - **macOS: `npm install -g` fails with `EACCES`.** Node from the nodejs.org installer puts global packages in a folder your user can't write to. Don't use `sudo`. Install Node with Homebrew instead (`brew install node`), then run `npm install -g repomagpie@beta` again. npm's page on [EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) has other ways.
+- **An agent's folder is there, but not its command or app** (an old install, or a folder another tool made). `setup` lists it as `not chosen: found ~/.codex only` and leaves it alone. If you do use it, run `repomagpie setup --agents codex` (with the agent's name).
+- **Codex CLI without its command: paste the entry.** `setup` adds Codex's MCP entry through `codex mcp add`. Without `codex` on `PATH`, it prints the entry instead: paste it into `~/.codex/config.toml` yourself. `repomagpie setup --dry-run --agents codex` prints it again.
 - **Codex CLI runs a new hook only after you trust it.** Open `/hooks` in Codex and trust RepoMagpie's hook. Run `repomagpie doctor` again: the Codex line says `trusted`.
 - **You switch Node.js versions** (nvm, fnm, Volta). `setup` writes the path of the Node.js it ran with. After a switch, run `repomagpie doctor`, then `repomagpie setup` again.
 - **GitHub's limit.** Without a token, GitHub allows 60 requests an hour, and a note from a GitHub URL makes a few. If you hit the limit, wait an hour, or give RepoMagpie your GitHub CLI's token for the current shell: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
@@ -118,13 +120,14 @@ Send:
 
 ```bash
 repomagpie setup --remove
+repomagpie setup --delete-backups
 npm uninstall -g repomagpie
 ```
 
-`setup --remove` takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. Run it before `npm uninstall`.
+`setup --remove` takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. It backs up each file before it changes it, as `setup` does.
 
-It leaves:
-- your notes, in `~/.magpie` and any project's `.magpie/`;
-- `setup`'s backups. Run `repomagpie doctor` before the uninstall to list them, and delete the ones you no longer need. Copies of `~/.claude.json` can hold sign-in tokens.
+`setup --delete-backups` lists `setup`'s backups with their dates and asks before it deletes them. Copies of `~/.claude.json` can hold sign-in tokens. Add `--keep-latest` to keep the newest backup of each file. Run both before `npm uninstall`.
+
+It leaves your notes, in `~/.magpie` and any project's `.magpie/`.
 
 Antigravity CLI can keep listing a removed entry until you clear `~/.gemini/antigravity-cli/mcp/`.

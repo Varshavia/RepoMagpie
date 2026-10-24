@@ -177,6 +177,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--remove", "remove RepoMagpie's entries instead")
     .option("--allow-write", "turn on the note tool in the entries (without this or --no-allow-write, each entry keeps its own; setup asks when it can)")
     .option("--no-allow-write", "turn off the note tool in the entries")
+    .option("--delete-backups", "delete setup's backups instead (repomagpie doctor lists them), after asking")
+    .option("--keep-latest", "with --delete-backups: keep the newest backup of each file")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./setup.ts")).setupCommand(command.optsWithGlobals<SetupOptions>(), io);
     });

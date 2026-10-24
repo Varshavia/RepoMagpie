@@ -675,6 +675,35 @@ test("paths under the home directory show with ~, as magpie recall prints them: 
   expect(await shown()).not.toContain(magpie.home);
 });
 
+test("the theme follows a system change while the app is open; Settings says what it shows; a chosen theme stays", async ({ page, magpie }) => {
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  const canvas = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const [DARK, LIGHT] = ["rgb(14, 16, 18)", "rgb(250, 250, 249)"]; // --canvas, DESIGN.md
+  await page.emulateMedia({ colorScheme: "dark" });
+  await magpie.open(page);
+  expect(await theme()).toBe("dark");
+  await expect.poll(canvas).toBe(DARK);
+  // macOS switched to Light with the app open (the macOS test, 2026-10-24).
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect.poll(theme).toBe("light");
+  await expect.poll(canvas).toBe(LIGHT);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("radio", { name: "Same as the system" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Follows the system, which is light now.")).toBeVisible();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.getByText("Follows the system, which is dark now.")).toBeVisible();
+  await expect.poll(canvas).toBe(DARK);
+  // A chosen theme stays whatever the system does.
+  await page.getByRole("radio", { name: "Light" }).click();
+  await expect(page.getByText("Light, whatever the system uses.")).toBeVisible();
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await theme()).toBe("light");
+  await expect.poll(canvas).toBe(LIGHT);
+  await page.getByRole("radio", { name: "Same as the system" }).click();
+  await expect.poll(canvas).toBe(DARK);
+});
+
 test("the favicon: the magpie mark, an SVG served by magpie ui", async ({ page, magpie }) => {
   await magpie.open(page);
   const href = await page.locator('link[rel="icon"]').getAttribute("href");

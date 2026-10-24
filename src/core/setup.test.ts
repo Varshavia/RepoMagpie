@@ -3,17 +3,19 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Platform, Where } from "./agents.ts";
+import { AGENTS, foundBy, type Platform, type Where } from "./agents.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { NO_CODEGEN } from "./launch.ts";
-import { applySetup, planSetup, type SetupRequest } from "./setup.ts";
+import { applySetup, mcpByHand, planSetup, type SetupRequest } from "./setup.ts";
 
 // repomagpie setup's MCP part (decision 0035) on a scratch home, with fake agent CLIs on PATH that
 // record their arguments and change their files as the real ones' docs say (fixtures/fake-agent.ts).
 
 const platform = process.platform as Platform;
 const FAKE = fileURLToPath(new URL("./fixtures/fake-agent.ts", import.meta.url));
-const CLIS = { "claude-code": "claude", codex: "codex", gemini: "gemini", vscode: "code", copilot: "copilot" } as const;
+// Cursor's command makes it found by command (decision 0038); setup never runs it: it can't add an entry.
+const CLIS = { "claude-code": "claude", codex: "codex", gemini: "gemini", vscode: "code", copilot: "copilot", cursor: "cursor" } as const;
+const WITH_CURSOR = ["claude-code", "codex", "gemini", "vscode", "cursor"] as const;
 // Antigravity CLI and Copilot CLI (decision 0036) aren't installed unless a test says so.
 const NEW: [string, string, null][] = [["antigravity", "skip", null], ["copilot", "skip", null]];
 
@@ -56,7 +58,7 @@ const snapshot = (folder: string) => readdirSync(folder, { recursive: true, with
   .map((d) => { const p = join(d.parentPath, d.name); const s = statSync(p, { throwIfNoEntry: false }); return `${p} ${s?.size} ${s?.mtimeMs}`; }).sort();
 
 test("the plan: each installed agent, how it is written, and nothing written yet", () => {
-  const s = scratch();
+  const s = scratch([...WITH_CURSOR]);
   mkdirSync(join(s.home, ".cursor"));
   const before = snapshot(s.root);
   const plan = planSetup(s.request());
@@ -68,7 +70,7 @@ test("the plan: each installed agent, how it is written, and nothing written yet
 });
 
 test("applying: every agent's CLI gets the exact arguments, every file holds the entry, nothing else is set", () => {
-  const s = scratch();
+  const s = scratch([...WITH_CURSOR]);
   mkdirSync(join(s.home, ".cursor"));
   const done = applySetup(planSetup(s.request()), s.request());
   assert.deepEqual(done.agents.map((a) => [a.id, a.result, a.error]), [
@@ -91,7 +93,7 @@ test("applying: every agent's CLI gets the exact arguments, every file holds the
 });
 
 test("idempotent: a second run plans keep everywhere, calls no CLI and writes no backup", () => {
-  const s = scratch();
+  const s = scratch([...WITH_CURSOR]);
   mkdirSync(join(s.home, ".cursor"));
   applySetup(planSetup(s.request()), s.request());
   const calls = s.calls().length;
@@ -106,7 +108,7 @@ test("idempotent: a second run plans keep everywhere, calls no CLI and writes no
 
 // The note tool (--allow-write): a choice the user made stays until they make another.
 test("the note tool: without a choice each entry keeps its own, a new one starts off; on and off change only what differs", () => {
-  const s = scratch(["gemini", "vscode"]);
+  const s = scratch(["gemini", "vscode", "cursor"]);
   const on = { command: s.launch.command, args: [...s.launch.args, "--allow-write"] };
   s.write(s.files.cursor, JSON.stringify({ mcpServers: { repomagpie: on } }, null, 2));
   s.write(s.files.gemini, JSON.stringify({ mcpServers: { repomagpie: s.launch } }, null, 2));
@@ -143,12 +145,12 @@ test("the note tool: without a choice each entry keeps its own, a new one starts
 
   // A snippet to paste names the same choice: Codex without its CLI, an entry that has the note tool on.
   s.write(s.files.codex, `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(s.launch.command)}\nargs = ${JSON.stringify(on.args)}\n`);
-  assert.deepEqual(planSetup(s.request()).agents.find((a) => a.id === "codex")?.note_tool, { from: true, to: true });
+  assert.deepEqual(planSetup(s.request({ only: ["codex"] })).agents.find((a) => a.id === "codex")?.note_tool, { from: true, to: true });
   assert.deepEqual(planSetup(s.request({ remove: true })).agents.filter((a) => a.installed).map((a) => a.note_tool), [null, null, null, null], "--remove has no note-tool choice");
 });
 
 test("an existing file is backed up first; its other keys stay byte for byte", () => {
-  const s = scratch(["gemini"]);
+  const s = scratch(["gemini", "cursor"]);
   const cursor = '{\n\t"mcpServers": {\n\t\t"other": { "command": "x" }\n\t},\n\t"z": 1\n}\n';
   s.write(s.files.cursor, cursor);
   const gemini = '{\n  "theme": "Dracula",\n  "mcpServers": {}\n}\n';
@@ -164,7 +166,7 @@ test("an existing file is backed up first; its other keys stay byte for byte", (
 });
 
 test("--remove deletes only our entries, leaves the file as it was otherwise, and keeps later changes", () => {
-  const s = scratch(["gemini", "vscode"]);
+  const s = scratch(["gemini", "vscode", "cursor"]);
   const cursor = '{\n  "mcpServers": {\n    "other": { "command": "x" }\n  }\n}\n';
   s.write(s.files.cursor, cursor);
   applySetup(planSetup(s.request()), s.request());
@@ -182,7 +184,7 @@ test("--remove deletes only our entries, leaves the file as it was otherwise, an
 });
 
 test("an entry named repomagpie that runs something else is an update that shows the old command", () => {
-  const s = scratch(["gemini"]);
+  const s = scratch(["gemini", "cursor"]);
   s.write(s.files.cursor, JSON.stringify({ mcpServers: { repomagpie: { command: "npx", args: ["-y", "repomagpie", "mcp"] } } }));
   s.write(s.files.gemini, JSON.stringify({ mcpServers: { repomagpie: { command: "repomagpie", args: ["mcp"] } } }));
   const plan = planSetup(s.request());
@@ -203,7 +205,8 @@ test("refused or manual, never edited: JSON with comments, a linked config folde
   symlinkSync(outside, join(s.home, ".gemini"), "junction");
   mkdirSync(join(s.home, ".codex"));
   const before = snapshot(s.root);
-  const plan = planSetup(s.request());
+  // Found by their folders only, so named (--agents): Codex CLI without its command, among them.
+  const plan = planSetup(s.request({ only: ["codex", "cursor", "gemini"] }));
   const by = (id: string) => plan.agents.find((a) => a.id === id);
   assert.equal(by("cursor")?.action, "manual");
   assert.match(by("cursor")?.reason ?? "", /comments/);
@@ -277,7 +280,9 @@ test("Copilot CLI: its CLI adds and removes the entry; without it, its mcp-confi
 
   const t = scratch([]);
   t.write(join(t.home, ".copilot", "config.json"), "{}");
-  const plan = planSetup(t.request());
+  // Found by its config.json only: setup chooses it when named.
+  assert.deepEqual(planSetup(t.request()).agents.find((a) => a.id === "copilot")?.found, { by: "folder", path: join(t.home, ".copilot", "config.json") });
+  const plan = planSetup(t.request({ only: ["copilot"] }));
   assert.deepEqual(plan.agents.filter((a) => a.installed).map((a) => [a.id, a.action, a.method]), [["copilot", "add", "json"]]);
   applySetup(plan, t.request());
   assert.deepEqual(JSON.parse(readFileSync(join(t.home, ".copilot", "mcp-config.json"), "utf8")).mcpServers.repomagpie, { type: "local", ...t.launch, tools: ["*"] });
@@ -288,11 +293,12 @@ test("Copilot CLI: its CLI adds and removes the entry; without it, its mcp-confi
 });
 
 test("every agent with a hook gets its entry beside its MCP entry; Gemini CLI's one file gets two backups; --remove takes all out", () => {
-  const s = scratch(["codex", "gemini", "copilot"]);
+  const s = scratch(["codex", "gemini", "copilot", "cursor"]);
   mkdirSync(join(s.home, ".cursor"));
   mkdirSync(join(s.home, ".gemini", "antigravity-cli"), { recursive: true });
   s.write(s.files.gemini, '{\n  "theme": "Dracula"\n}\n');
-  const plan = planSetup(s.request());
+  const only: SetupRequest["only"] = ["codex", "cursor", "gemini", "antigravity", "copilot"]; // Antigravity CLI: found by its folder only
+  const plan = planSetup(s.request({ only }));
   assert.deepEqual(plan.hooks.map((h) => [h.id, h.action]), [["codex", "add"], ["cursor", "add"], ["gemini", "add"], ["antigravity", "add"], ["copilot", "add"]]);
   const gemini = plan.hooks.find((h) => h.id === "gemini");
   assert.equal(gemini?.backup, `${s.files.gemini}.repomagpie-backup-20261014-120000-2`, "the MCP entry's backup has the plain name");
@@ -305,7 +311,7 @@ test("every agent with a hook gets its entry beside its MCP entry; Gemini CLI's 
   // The skill: Claude Code isn't here, so its folder gets no link; Antigravity CLI's does.
   assert.deepEqual([done.skill?.claude, done.skill?.antigravity?.action], [null, "link"]);
   // Twice: nothing.
-  const again = planSetup(s.request({ stamp: "20261014-130000" }));
+  const again = planSetup(s.request({ only, stamp: "20261014-130000" }));
   assert.ok(again.hooks.every((h) => h.action === "keep"), JSON.stringify(again.hooks));
   const removed = applySetup(planSetup(s.request({ remove: true, stamp: "20261014-140000" })), s.request({ remove: true, stamp: "20261014-140000" }));
   assert.deepEqual(removed.hooks.map((h) => [h.id, h.action, h.result]), ["codex", "cursor", "gemini", "antigravity", "copilot"].map((id) => [id, "remove", "done"]));
@@ -321,10 +327,12 @@ test("an Antigravity ~/.gemini without settings.json and no gemini command isn't
   const mcp = join(s.home, ".gemini", "config", "mcp_config.json");
   s.write(mcp, '{ "mcpServers": {} }\n');
   mkdirSync(join(s.home, ".gemini", "antigravity-cli", "skills"), { recursive: true });
-  const plan = planSetup(s.request());
-  const by = (id: string) => plan.agents.find((a) => a.id === id);
+  const by = (id: string) => planSetup(s.request()).agents.find((a) => a.id === id);
   assert.deepEqual([by("gemini")?.installed, by("gemini")?.action, by("gemini")?.reason], [false, "skip", "not installed"]);
-  assert.deepEqual([by("antigravity")?.installed, by("antigravity")?.action, by("antigravity")?.method], [true, "add", "json"]);
+  // Antigravity CLI is found by its folder only, so setup chooses it when named (decision 0038).
+  assert.deepEqual([by("antigravity")?.installed, by("antigravity")?.action, by("antigravity")?.reason], [true, "skip", `found ${join(s.home, ".gemini", "antigravity-cli")} only`]);
+  const plan = planSetup(s.request({ only: ["antigravity"] }));
+  assert.deepEqual(plan.agents.map((a) => [a.id, a.installed, a.action, a.method]), [["antigravity", true, "add", "json"]]);
   applySetup(plan, s.request());
   assert.equal(existsSync(s.files.gemini), false);
   assert.deepEqual(JSON.parse(readFileSync(mcp, "utf8")).mcpServers.repomagpie, s.launch);
@@ -333,8 +341,51 @@ test("an Antigravity ~/.gemini without settings.json and no gemini command isn't
   assert.equal(existsSync(join(s.home, ".gemini", "antigravity-cli", "skills", "repomagpie")), false);
   const asked = planSetup(s.request({ only: ["gemini"] })).agents[0];
   assert.equal(asked.reason, `not installed: no ${s.files.gemini} and no gemini command`);
-  // Gemini CLI's own settings.json, without its command on PATH: installed, edited as JSON.
+  // Gemini CLI's own settings.json, without its command on PATH: found by it, edited as JSON when named.
   s.write(s.files.gemini, "{}\n");
-  const own = planSetup(s.request()).agents.find((a) => a.id === "gemini");
+  assert.deepEqual(by("gemini")?.found, { by: "folder", path: s.files.gemini });
+  const own = planSetup(s.request({ only: ["gemini"] })).agents[0];
   assert.deepEqual([own?.installed, own?.action, own?.method], [true, "add", "json"]);
+});
+
+// The macOS test (2026-10-24): the folders of four agents whose commands weren't there (decision 0038).
+test("how an agent is found: its command first, then its app on macOS, then its folder; only command and app are chosen", () => {
+  const s = scratch(["codex"]);
+  for (const folder of [".codex", ".cursor", join("Library", "Application Support", "Code", "User")]) mkdirSync(join(s.home, folder), { recursive: true });
+  const mac: Where = { home: s.home, env: { ...s.request().where.env }, platform: "darwin" };
+  const cursor = AGENTS.find((a) => a.id === "cursor") as (typeof AGENTS)[number];
+  const vscode = AGENTS.find((a) => a.id === "vscode") as (typeof AGENTS)[number];
+  assert.deepEqual(foundBy(cursor, mac), { by: "folder", path: join(s.home, ".cursor") });
+  mkdirSync(join(s.home, "Applications", "Cursor.app"), { recursive: true });
+  assert.deepEqual(foundBy(cursor, mac), { by: "app", path: join(s.home, "Applications", "Cursor.app") });
+  assert.equal(foundBy(cursor, { ...mac, platform: "linux" })?.by, "folder", "the app counts on macOS only");
+  if (platform !== "win32") {
+    const codex = foundBy(AGENTS.find((a) => a.id === "codex") as (typeof AGENTS)[number], mac);
+    assert.deepEqual(codex?.by, "command");
+  }
+  // The plan on that Mac: Codex CLI by its command, Cursor by its app; VS Code by its folder only, unchosen.
+  if (platform !== "win32") {
+    const plan = planSetup({ ...s.request(), where: mac });
+    const by = (id: string) => plan.agents.find((a) => a.id === id);
+    assert.deepEqual([by("codex")?.action, by("cursor")?.action, by("vscode")?.action, by("vscode")?.found?.by], ["add", "add", "skip", "folder"]);
+    assert.equal(foundBy(vscode, mac)?.path, join(s.home, "Library", "Application Support", "Code", "User"));
+    // --remove takes every agent found: an earlier setup may have written to VS Code's folder.
+    assert.equal(planSetup({ ...s.request({ remove: true }), where: mac }).agents.find((a) => a.id === "vscode")?.action, "keep");
+  }
+});
+
+test("mcpByHand: why setup can only print an entry (for doctor's to-dos), null where it writes it", () => {
+  const s = scratch(["gemini"]);
+  const agent = (id: string) => AGENTS.find((a) => a.id === id) as (typeof AGENTS)[number];
+  const where = s.request().where;
+  assert.match(mcpByHand(agent("codex"), where, null, false) ?? "", /codex command isn't on PATH, and setup doesn't edit TOML itself/);
+  assert.match(mcpByHand(agent("claude-code"), where, null, true) ?? "", /claude command isn't on PATH/);
+  assert.equal(mcpByHand(agent("cursor"), where, '{ "mcpServers": {} }', false), null);
+  assert.match(mcpByHand(agent("cursor"), where, '{\n  // mine\n  "mcpServers": {}\n}', false) ?? "", /comments/);
+  assert.match(mcpByHand(agent("cursor"), where, '{ "a": 1, "a": 2 }', true) ?? "", /a key written twice/);
+  assert.equal(mcpByHand(agent("gemini"), where, "{ // through its CLI, comments or not\n}", true), null);
+  const outside = join(s.root, "elsewhere");
+  mkdirSync(outside);
+  symlinkSync(outside, join(s.home, ".cursor"), "junction");
+  assert.match(mcpByHand(agent("cursor"), where, null, false) ?? "", /is a link; setup never writes through one$/);
 });

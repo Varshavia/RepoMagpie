@@ -53,7 +53,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
    repomagpie setup
    ```
 
-   `setup` finds your agents, shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
+   `setup` finds your agents by their command or app (an agent whose folder is all that's left is listed, not chosen), shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
 
 2. Check what is wired in each agent:
 
@@ -61,7 +61,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
    repomagpie doctor
    ```
 
-   `doctor` also lists `setup`'s backups. Each is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets: delete the ones you no longer need.
+   `doctor` also lists `setup`'s backups. Each is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets. `repomagpie setup --delete-backups` deletes them after asking; `--keep-latest` keeps the newest of each file.
 
 3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
 
@@ -172,7 +172,7 @@ No. RepoMagpie shows what you and your team wrote down: it never claims to detec
 <details>
 <summary><strong>How do I remove it?</strong></summary>
 
-Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. It leaves your journals (`~/.magpie` and any project's `.magpie/`) and `setup`'s backups: run `repomagpie doctor` to list the backups and delete the ones you no longer need, then `npm uninstall -g repomagpie`. Antigravity CLI can keep listing a removed entry until you clear `~/.gemini/antigravity-cli/mcp/` ([agents](docs/agents.md#antigravity-cli)).
+Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. It leaves your journals (`~/.magpie` and any project's `.magpie/`) and `setup`'s backups: run `repomagpie setup --delete-backups` to delete the backups after asking, then `npm uninstall -g repomagpie`. Antigravity CLI can keep listing a removed entry until you clear `~/.gemini/antigravity-cli/mcp/` ([agents](docs/agents.md#antigravity-cli)).
 
 </details>
 

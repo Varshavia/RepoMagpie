@@ -31,6 +31,8 @@ repomagpie doctor
 
 - **Windows PowerShell "running scripts is disabled on this system" diyor.** PowerShell'in varsayılan çalıştırma ilkesi npm'in `.ps1` betiklerini engeller. `repomagpie` yerine `repomagpie.cmd` (ve `npm` yerine `npm.cmd`) kullan ya da komutları Komut İstemi'nde (Command Prompt) çalıştır.
 - **macOS: `npm install -g` `EACCES` ile başarısız oluyor.** nodejs.org kurulum programıyla gelen Node, global paketleri kullanıcının yazamadığı bir klasöre koyar. `sudo` kullanma. Bunun yerine Node'u Homebrew ile kur (`brew install node`), sonra `npm install -g repomagpie@beta` komutunu yeniden çalıştır. npm'in [EACCES hataları](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) sayfasında başka yollar da var.
+- **Bir ajanın klasörü var, ama komutu ya da uygulaması yok** (eski bir kurulum ya da başka bir aracın açtığı bir klasör). `setup` onu `not chosen: found ~/.codex only` diye listeler ve dokunmaz. O ajanı kullanıyorsan `repomagpie setup --agents codex` çalıştır (ajanın adıyla).
+- **Komutu olmayan Codex CLI: kaydı elle yapıştır.** `setup`, Codex'in MCP kaydını `codex mcp add` ile ekler. `PATH`'te `codex` yoksa kaydı yazdırır: onu `~/.codex/config.toml` dosyasına kendin yapıştır. `repomagpie setup --dry-run --agents codex` kaydı yeniden yazdırır.
 - **Codex CLI yeni bir hook'u ancak ona güvendiğinde çalıştırır.** Codex'te `/hooks` açıp RepoMagpie'nin hook'una güven. `repomagpie doctor` komutunu yeniden çalıştır: Codex satırında `trusted` yazar.
 - **Node.js sürümünü değiştiriyorsun** (nvm, fnm, Volta). `setup`, çalıştığı Node.js'in yolunu yazar. Sürüm değiştirdikten sonra `repomagpie doctor`, ardından yeniden `repomagpie setup` çalıştır.
 - **GitHub sınırı.** Token olmadan GitHub saatte 60 isteğe izin verir ve bir GitHub URL'sinden not birkaç istek yapar. Sınıra takılırsan bir saat bekle ya da o anki kabuk için RepoMagpie'ye GitHub CLI'nin token'ını ver: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de `$env:GITHUB_TOKEN = gh auth token`.
@@ -120,13 +122,14 @@ Bir [Beta feedback issue'su](https://github.com/Varshavia/RepoMagpie/issues/new?
 
 ```bash
 repomagpie setup --remove
+repomagpie setup --delete-backups
 npm uninstall -g repomagpie
 ```
 
-`setup --remove` yalnızca RepoMagpie'nin kendi MCP kayıtlarını, hook'larını ve skill klasörlerini çıkarır; sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez. `npm uninstall`'dan önce çalıştır.
+`setup --remove` yalnızca RepoMagpie'nin kendi MCP kayıtlarını, hook'larını ve skill klasörlerini çıkarır; sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez. `setup` gibi, her dosyayı değiştirmeden önce yedekler.
 
-Şunları bırakır:
-- notlarını, `~/.magpie` ve her projenin `.magpie/` klasöründe;
-- `setup`'ın yedeklerini. Kaldırmadan önce onları listelemek için `repomagpie doctor` çalıştır ve artık gerekmeyenleri sil. `~/.claude.json` kopyaları oturum token'ları içerebilir.
+`setup --delete-backups`, `setup`'ın yedeklerini tarihleriyle listeler ve silmeden önce sorar. `~/.claude.json` kopyaları oturum token'ları içerebilir. Her dosyanın en yeni yedeğini tutmak için `--keep-latest` ekle. İkisini de `npm uninstall`'dan önce çalıştır.
+
+Notlarını, `~/.magpie` ve her projenin `.magpie/` klasöründe bırakır.
 
 Antigravity CLI, `~/.gemini/antigravity-cli/mcp/` klasörünü temizleyene kadar kaldırılmış bir kaydı listelemeye devam edebilir.

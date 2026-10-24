@@ -2,12 +2,14 @@
 // report. Read-only: it writes nothing, not even a cache. Values from config files' `env` never
 // appear, only their names. Never prints.
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { AGENTS, claudeSettings, isInstalled, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type McpEntry, type Platform, type Where } from "./agents.ts";
+import { basename, dirname, isAbsolute, join } from "node:path";
+import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
-import { backupsOf, CONFIG_LIMIT } from "./config-write.ts";
+import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
+import { setupBackups } from "./backups.ts";
 import { redactArgs, redactText } from "./redact.ts";
+import { mcpByHand } from "./setup.ts";
 import { findHooks } from "./setup-hook.ts";
 import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
 import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
@@ -44,7 +46,8 @@ export interface HookEntry {
 export interface AgentReport {
   id: Agent["id"];
   name: string;
-  installed: boolean; // its marker exists (agents.ts), or its command is on PATH
+  installed: boolean; // found: its command is on PATH, its app is there, or its marker exists (agents.ts)
+  found: Found | null; // how; setup chooses only agents found by command or app
   config: string; // the file that holds its MCP entry
   mcp: (McpEntry & { allow_write: boolean; code_generation_off: boolean; node_found: boolean; entry: string | null; entry_found: boolean; version: string | null }) | null;
   error?: string; // the file exists but can't be read
@@ -72,6 +75,7 @@ export interface AgentHookReport {
   id: Agent["id"];
   name: string;
   installed: boolean;
+  found: Found | null;
   file: string;
   entries: AgentHookEntry[];
   off: string | null; // the agent's hooks are turned off, which setup leaves as it is
@@ -96,7 +100,7 @@ export interface DoctorJson {
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
   agent_hooks: AgentHookReport[]; // Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI
   agents: AgentReport[];
-  backups: { path: string; date: string }[]; // setup's backups, for the user to delete; never a problem
+  backups: { path: string; date: string }[]; // setup's backups, which setup --delete-backups deletes; never a problem
   journals: JournalReport[];
   problems: string[]; // what to do, one sentence each
 }
@@ -124,43 +128,77 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // The skill.
   const skills = skillFolders(where).filter((path) => existsSync(join(path, "SKILL.md"))).map((path) => ({ path, link: linkTarget(path), version: skillVersion(join(path, "SKILL.md")) }));
   if (!skills.length) problems.push("The skill isn't installed. Run repomagpie setup.");
+  // setup keeps the shared folder current (not a link of the user's), and links Claude Code's and
+  // Antigravity CLI's folders to it; it never writes the others.
+  const [shared, claudeSkill, , , geminiSkill] = skillFolders(where);
+  const sharedFolder = skills.find((s) => s.path === shared && !s.link) ? realpathSync(shared) : null;
   for (const skill of skills) {
-    if (skill.version !== null && skill.version !== request.version) problems.push(`The skill in ${tilde(skill.path)} is version ${skill.version}; the CLI is ${request.version}. Run repomagpie setup.`);
+    if (skill.version === null || skill.version === request.version) continue;
+    const fix = skill.link && sharedFolder && samePath(skill.link, sharedFolder) ? "Run repomagpie setup."
+      : skill.link ? "It is a link, which setup leaves: update the folder it points to, or delete the link and run repomagpie setup."
+      : skill.path === shared ? "Run repomagpie setup."
+        : skill.path === claudeSkill ? `Run ${setupFor("claude-code", foundBy(AGENTS[0], where))}.`
+          : skill.path === geminiSkill ? `Run ${setupFor("antigravity", foundBy(AGENTS.find((a) => a.id === "antigravity") as Agent, where))}, or delete it if Antigravity CLI didn't put it there.`
+            : `setup doesn't write that folder: update it the way you installed it (npx skills update), or delete it; the agents also read ${tilde(shared)}, which setup keeps current.`;
+    problems.push(`The skill in ${tilde(skill.path)} is version ${skill.version}; the CLI is ${request.version}. ${fix}`);
   }
 
   // The Claude Code hook.
   // Run in the home folder, ~/.claude/settings.json is the user's settings and the project's: listed once.
   const hookFiles = [claudeSettings(where), ...projectSettings(request).filter((file) => !samePath(file, claudeSettings(where)))].filter((file) => existsSync(file));
+  const plainHook = new Map<string, boolean>(); // false: setup gives a snippet instead of editing it
   const hook = hookFiles.map((file) => {
     const read = readConfig(file);
     if ("error" in read) return { file, entries: [], error: redactText(read.error) };
     const parsed = readJsonc(read.text);
-    return "error" in parsed ? { file, entries: [], error: parsed.error } : { file, entries: hookEntries(parsed.value, where) };
+    if ("error" in parsed) return { file, entries: [], error: parsed.error };
+    plainHook.set(file, parsed.plain);
+    return { file, entries: hookEntries(parsed.value, where) };
   });
   const userSettings = claudeSettings(where);
+  // What fixes an entry in this file, as setup would: in the user's settings `setup`, in the
+  // project's `setup --project .`; by hand where setup leaves the file (comments, a link) or never
+  // writes it (settings.local.json). `why` says what the run does ("to change it", "again").
+  const hookFix = (file: string, why: string): string => {
+    if (basename(file) === "settings.local.json") return "Change it by hand: setup writes .claude/settings.json, never settings.local.json.";
+    const project = file === userSettings ? "" : " --project .";
+    const unsafe = pathProblem(file, file === userSettings ? request.home : request.cwd);
+    const hand = unsafe ? unsafe.replace(/\.$/, "") : plainHook.get(file) === false ? COMMENTS : null;
+    return hand ? `Change it by hand (${hand}); repomagpie setup --dry-run${project} --agents claude-code prints the entry.` : `Run repomagpie setup${project} ${why}.`;
+  };
   for (const { file, entries, error } of hook) {
     if (error) problems.push(`Couldn't read ${tilde(file)}: ${error}.`);
-    if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. Run repomagpie setup to change it.`);
-    if (file === userSettings && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. Run repomagpie setup to start node directly.`);
+    if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. ${hookFix(file, "to change it")}`);
+    if (file === userSettings && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. ${hookFix(file, "to start node directly")}`);
     for (const e of entries.filter((x) => x.form === "exec")) {
-      if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. Run repomagpie setup again.`);
-      else if (!e.code_generation_off) problems.push(`The Claude Code hook in ${tilde(file)} doesn't start node with ${NO_CODEGEN}. Run repomagpie setup again.`);
+      if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(file, "again")}`);
+      else if (!e.code_generation_off) problems.push(`The Claude Code hook in ${tilde(file)} doesn't start node with ${NO_CODEGEN}. ${hookFix(file, "again")}`);
     }
   }
 
   // The other agents' hooks. A broken Copilot CLI hook goes first: Copilot CLI denies every tool
   // call when a hook fails, which setup's entry avoids only while its paths exist.
-  const agentHooks = HOOK_SPECS.map((spec) => agentHookReport(spec, where));
+  const plainAgentHook = new Map<Agent["id"], boolean>();
+  const agentHooks = HOOK_SPECS.map((spec) => agentHookReport(spec, where, plainAgentHook));
+  // What fixes an agent's hook entry, as setup would: setup, with --agents when the agent was found by
+  // its folder only (setup doesn't choose it then); by hand where setup leaves the file (comments,
+  // a link, the agent's hooks turned off).
+  const agentHookFix = (h: AgentHookReport, why: string): string => {
+    if (!h.found) return notFound(h.name);
+    const unsafe = pathProblem(h.file, request.home);
+    const hand = unsafe ? unsafe.replace(/\.$/, "") : h.off ? h.off.split(";")[0] : plainAgentHook.get(h.id) === false ? COMMENTS : null;
+    return hand ? `Change it by hand (${hand}); repomagpie setup --dry-run --agents ${h.id} prints the entry.` : `Run ${setupFor(h.id, h.found)} ${why}.`;
+  };
   for (const h of agentHooks) {
     for (const e of h.entries) {
       // No node in setup's form: Antigravity CLI's launcher (the entry's command) is missing or not ours.
       const missing = e.form === "setup" ? (!e.node_found ? e.node ?? e.command : !e.entry_found ? e.entry : null) : e.form === "name" && !e.node_found ? e.node : null;
       if (missing) {
-        const what = e.form === "setup" ? "so it does nothing. Run repomagpie setup again." : h.id === "copilot" ? "so Copilot CLI denies every tool call. Run repomagpie setup again." : "so it fails on every shell command. Run repomagpie setup again.";
-        const line = `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${what}`;
+        const what = e.form === "setup" ? "so it does nothing." : h.id === "copilot" ? "so Copilot CLI denies every tool call." : "so it fails on every shell command.";
+        const line = `The ${h.name} hook in ${tilde(h.file)} starts ${missing}, which isn't there, ${what} ${agentHookFix(h, "again")}`;
         if (h.id === "copilot") problems.unshift(line);
         else problems.push(line);
-      } else if (e.form === "name") problems.push(`The ${h.name} hook in ${tilde(h.file)} starts repomagpie through the shell. Run repomagpie setup to start node directly.`);
+      } else if (e.form === "name") problems.push(`The ${h.name} hook in ${tilde(h.file)} starts repomagpie through the shell. ${agentHookFix(h, "to start node directly")}`);
       if (e.trust === "not trusted") problems.push("Codex CLI skips RepoMagpie's hook until you trust it: open /hooks in Codex and trust it.");
       if (e.trust === "changed since trusted") problems.push("RepoMagpie's hook changed since you trusted it, so Codex CLI skips it: open /hooks in Codex and trust it again.");
     }
@@ -168,12 +206,14 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   }
 
   // Each agent's MCP entry.
+  const texts = new Map<Agent["id"], string>(); // each MCP file's text, for what setup can do with it
   const agents = AGENTS.map((agent): AgentReport => {
     const config = agent.mcpFile(where);
-    const installed = isInstalled(agent, where);
-    const report: AgentReport = { id: agent.id, name: agent.name, installed, config, mcp: null };
+    const by = foundBy(agent, where);
+    const report: AgentReport = { id: agent.id, name: agent.name, installed: by !== null, found: by, config, mcp: null };
     if (!existsSync(config)) return report;
     const read = readConfig(config);
+    if (!("error" in read)) texts.set(agent.id, read.text);
     const found = "error" in read ? read : mcpEntry(read.text, agent.format, "repomagpie");
     if ("error" in found) return { ...report, error: redactText(found.error) };
     if (!found.entry) return report;
@@ -198,19 +238,23 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     };
   });
   for (const agent of agents) {
+    // What fixes it, as setup would: setup itself, or by hand where setup only prints the entry (Codex
+    // CLI without its command, a file with comments). An agent found by its folder only and without
+    // an entry is no to-do: setup doesn't choose it either.
+    const hand = mcpByHand(AGENTS.find((a) => a.id === agent.id) as Agent, where, texts.get(agent.id) ?? null, agent.mcp !== null);
+    const fix = !agent.found ? notFound(agent.name)
+      : hand ? `${agent.mcp ? "Replace the entry in" : "Paste the entry into"} ${tilde(agent.config)} by hand (${hand}); repomagpie setup --dry-run --agents ${agent.id} prints it.`
+        : `Run ${setupFor(agent.id, agent.found)}${agent.mcp ? " again" : ""}.`;
     if (agent.error) problems.push(`Couldn't read ${agent.name}'s ${tilde(agent.config)}: ${agent.error}.`);
-    else if (agent.installed && !agent.mcp) problems.push(`${agent.name} has no repomagpie MCP server. Run repomagpie setup.`);
+    else if (agent.found && agent.found.by !== "folder" && !agent.mcp) problems.push(`${agent.name} has no repomagpie MCP server. ${fix}`);
     else if (agent.mcp && (!agent.mcp.node_found || !agent.mcp.entry_found)) {
       const missing = !agent.mcp.node_found ? agent.mcp.command ?? "(no command)" : agent.mcp.entry ?? "(no entry file)";
-      problems.push(`${agent.name}'s repomagpie MCP server starts ${missing}, which doesn't exist. Run repomagpie setup again.`);
-    } else if (agent.mcp?.version && agent.mcp.version !== request.version) problems.push(`${agent.name}'s repomagpie MCP server runs version ${agent.mcp.version}; this is ${request.version}. Run repomagpie setup again.`);
-    else if (agent.mcp && !agent.mcp.code_generation_off) problems.push(`${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}. Run repomagpie setup again.`);
+      problems.push(`${agent.name}'s repomagpie MCP server starts ${missing}, which doesn't exist. ${fix}`);
+    } else if (agent.mcp?.version && agent.mcp.version !== request.version) problems.push(`${agent.name}'s repomagpie MCP server runs version ${agent.mcp.version}; this is ${request.version}. ${fix}`);
+    else if (agent.mcp && !agent.mcp.code_generation_off) problems.push(`${agent.name}'s repomagpie MCP server doesn't start node with ${NO_CODEGEN}. ${fix}`);
   }
 
-  // Setup's backups: beside each file it edits, and beside the skills folders (setup-skill.ts).
-  const backedUp = [...AGENTS.map((agent) => agent.mcpFile(where)), claudeSettings(where), ...HOOK_SPECS.map((spec) => spec.file(where)),
-    join(request.home, ".agents", "repomagpie-skill"), join(request.home, ".claude", "repomagpie-skill"), join(request.home, ".gemini", "repomagpie-skill")];
-  const backups = [...new Set(backedUp)].flatMap((file) => backupsOf(file, request.home));
+  const backups = setupBackups(where);
 
   // The journals.
   const personal = resolvePersonalJournal({ home: request.home, env: request.env, cwd: request.cwd, flag: request.homeFlag });
@@ -226,15 +270,18 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked
-// and, for Codex CLI, the trust config.toml keeps for each.
-function agentHookReport(spec: HookSpec, where: Where): AgentHookReport {
+// and, for Codex CLI, the trust config.toml keeps for each. `plain` records whether setup would edit
+// the file.
+function agentHookReport(spec: HookSpec, where: Where, plain: Map<Agent["id"], boolean>): AgentHookReport {
   const agent = AGENTS.find((a) => a.id === spec.id) as Agent;
   const file = spec.file(where);
-  const report: AgentHookReport = { id: spec.id, name: agent.name, installed: isInstalled(agent, where), file, entries: [], off: spec.off?.(where) ?? null };
+  const by = foundBy(agent, where);
+  const report: AgentHookReport = { id: spec.id, name: agent.name, installed: by !== null, found: by, file, entries: [], off: spec.off?.(where) ?? null };
   if (!existsSync(file)) return report;
   const read = readConfig(file);
   const parsed = "error" in read ? read : readJsonc(read.text);
   if ("error" in parsed) return { ...report, error: redactText(parsed.error) };
+  plain.set(spec.id, parsed.plain);
   const found = findAgentHooks(spec, parsed.value, where.platform);
   if (typeof found === "string") return { ...report, error: found };
   const windows = where.platform === "win32";
@@ -263,6 +310,15 @@ function agentHookReport(spec: HookSpec, where: Where): AgentHookReport {
   });
   return report;
 }
+
+const COMMENTS = "it has comments, trailing commas or a key written twice, which setup doesn't edit";
+
+// The setup command that chooses this agent: without --agents, setup chooses only agents found by
+// their command or app.
+const setupFor = (id: Agent["id"], found: Found | null) => `repomagpie setup${found?.by === "folder" ? ` --agents ${id}` : ""}`;
+
+// An entry in the files of an agent that isn't found: setup skips that agent, even with --agents.
+const notFound = (name: string) => `${name} isn't installed, so setup leaves its files: delete the entry by hand, or install ${name} and run repomagpie setup.`;
 
 // Claude Code's project settings, in the project root (where a .claude/ folder is).
 function projectSettings(request: DoctorRequest): string[] {

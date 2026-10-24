@@ -33,7 +33,8 @@ test("--json prints the report; human output has every section and what to do; e
     assert.ok(human.out.split(/\r?\n/).includes(heading), heading);
   }
   assert.match(human.out, /^ {2}~[\\/]\.claude[\\/]settings\.json: magpie hook claude-code {2}\(the old name\)$/m);
-  assert.match(human.out, /^ {2}Claude Code {3}installed; no repomagpie entry in ~[\\/]\.claude\.json$/m);
+  // ~/.claude without the claude command: found by its folder only, so not called installed (decision 0038).
+  assert.match(human.out, /^ {2}Claude Code {3}found ~[\\/]\.claude only; no repomagpie entry in ~[\\/]\.claude\.json$/m);
   assert.match(human.out, /^ {2}VS Code \(GitHub Copilot\) {2}not installed$/m);
   assert.match(human.out, /^ {2}- The Claude Code hook in ~[\\/]\.claude[\\/]settings\.json runs magpie hook claude-code, the old name\./m);
 });
@@ -60,21 +61,22 @@ test("everything wired: no To do section", async () => {
 
 test("hooks in other agents: one line per agent, with the form, the flags and Codex's trust", async () => {
   const { render } = await import("./doctor.ts");
-  const hook = (id: string, name: string, installed: boolean, entries: unknown[], off: string | null = null) => ({ id, name, installed, file: `/home/me/.${id}/hooks.json`, entries, off });
+  const hook = (id: string, name: string, by: "command" | "folder" | null, entries: unknown[], off: string | null = null) =>
+    ({ id, name, installed: by !== null, found: by && { by, path: `/home/me/.${id}` }, file: `/home/me/.${id}/hooks.json`, entries, off });
   const entry = { form: "setup", command: "x", node: "/n", entry: "/e", node_found: true, entry_found: true, flags: [], trust: null };
   const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], hook: [], agents: [], backups: [], journals: [], problems: [],
     agent_hooks: [
-      hook("codex", "Codex CLI", true, [{ ...entry, trust: "not trusted" }]),
-      hook("cursor", "Cursor", true, [{ ...entry, flags: ["--inform-only"], entry_found: false }]),
-      hook("gemini", "Gemini CLI", true, [], "Gemini CLI's hooks are turned off (hooksConfig.enabled is false in x); setup doesn't turn them on"),
-      hook("antigravity", "Antigravity CLI", false, []),
-      hook("copilot", "Copilot CLI", true, [{ ...entry, form: "name", node_found: true }]),
+      hook("codex", "Codex CLI", "command", [{ ...entry, trust: "not trusted" }]),
+      hook("cursor", "Cursor", "command", [{ ...entry, flags: ["--inform-only"], entry_found: false }]),
+      hook("gemini", "Gemini CLI", "folder", [], "Gemini CLI's hooks are turned off (hooksConfig.enabled is false in x); setup doesn't turn them on"),
+      hook("antigravity", "Antigravity CLI", null, []),
+      hook("copilot", "Copilot CLI", "command", [{ ...entry, form: "name", node_found: true }]),
     ] as DoctorJson["agent_hooks"] }, "/home/me");
   assert.ok(out.includes([
     "Hooks in other agents",
     "  Codex CLI        ~/.codex/hooks.json: node started directly, not trusted",
     "  Cursor           ~/.cursor/hooks.json: node started directly, a path is missing, --inform-only",
-    "  Gemini CLI       none  (Gemini CLI's hooks are turned off (hooksConfig.enabled is false in x))",
+    "  Gemini CLI       none (found ~/.gemini only)  (Gemini CLI's hooks are turned off (hooksConfig.enabled is false in x))",
     "  Antigravity CLI  not installed",
     "  Copilot CLI      ~/.copilot/hooks.json: repomagpie through the shell",
     "",
@@ -92,7 +94,7 @@ test("backups from setup: each with its date, one word on tokens and deleting; s
     "Backups from setup",
     "  ~/.claude.json.repomagpie-backup-20261015-010147Z  2026-10-15 01:01 UTC",
     "  ~/.cursor/mcp.json.repomagpie-backup-20261015-020000Z  2026-10-15 02:00 UTC",
-    "  Each is a whole copy of the file: those of ~/.claude.json can hold sign-in tokens and MCP servers' secrets. Delete the backups you no longer need.",
+    "  Each is a whole copy of the file: those of ~/.claude.json can hold sign-in tokens and MCP servers' secrets. repomagpie setup --delete-backups deletes them, after asking; with --keep-latest it keeps the newest of each file.",
     "",
   ].join("\n")), out);
   assert.ok(out.endsWith("Everything is wired.\n"));
