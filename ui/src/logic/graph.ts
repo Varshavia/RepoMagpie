@@ -2,6 +2,7 @@
 // starts, how big it is, the edge styles, the layout's settings and the status line. No DOM, no
 // sigma: the page (components/GraphPage.tsx) draws what this decides.
 import type { GraphJson } from "../../../src/core/documents.ts";
+import { DOMAIN_IDS, type Domain } from "../../../src/core/domains.ts";
 import { visible } from "./text.ts";
 
 export type { GraphJson };
@@ -9,21 +10,23 @@ export type GraphNode = GraphJson["nodes"][number];
 export type GraphEdge = GraphJson["edges"][number];
 export type EdgeType = GraphEdge["type"];
 
-// Which edge sources are drawn, and missing notes. The defaults of decision 0026.
+// Which edge sources are drawn, missing notes, and tags that only one note carries. The defaults
+// of decision 0026; tags on one note are off (decision 0044).
 export interface Sources {
   tagged: boolean;
+  oneNoteTags: boolean;
   link: boolean;
   alternative: boolean;
   similar: boolean;
   ghosts: boolean;
 }
 
-export const DEFAULT_SOURCES: Sources = { tagged: true, link: true, alternative: true, similar: false, ghosts: false };
+export const DEFAULT_SOURCES: Sources = { tagged: true, oneNoteTags: false, link: true, alternative: true, similar: false, ghosts: false };
 
 export interface Shown {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  counts: { notes: number; tags: number; connections: number };
+  counts: { notes: number; tags: number; connections: number; hiddenTags?: number }; // hiddenTags: tags on one note left out
 }
 
 export type KindGroup = Extract<GraphNode, { type: "note" }>["kind_group"];
@@ -44,8 +47,20 @@ export function filtersActive(filters: Filters): boolean {
 
 // What is drawn for these sources and filters: the notes that pass the filters, then the edges of
 // the drawn types between them and tag or missing-note nodes, then the tag and missing-note nodes
-// that keep at least one drawn edge.
-export function drawable(doc: GraphJson, sources: Sources, filters: Filters = NO_FILTERS): Shown {
+// that keep at least one drawn edge. Without "Tags on one note", a tag only one note in the journal
+// carries is left out with its edge, and counted in hiddenTags; a tag in the filters, or in `keep`
+// (found with the search box), is drawn all the same.
+export function drawable(doc: GraphJson, sources: Sources, filters: Filters = NO_FILTERS, keep: readonly string[] = []): Shown {
+  const all = drawAll(doc, sources, filters);
+  if (sources.oneNoteTags) return all;
+  const hide = new Set(all.nodes.flatMap((n) => (n.type === "tag" && n.count === 1 && !filters.tags.includes(n.tag) && !keep.includes(n.key) ? [n.key] : [])));
+  if (!hide.size) return all;
+  const nodes = all.nodes.filter((n) => !hide.has(n.key));
+  const edges = all.edges.filter((e) => !hide.has(e.source) && !hide.has(e.target));
+  return { nodes, edges, counts: { ...count(nodes, edges), hiddenTags: hide.size } };
+}
+
+function drawAll(doc: GraphJson, sources: Sources, filters: Filters): Shown {
   const passes = (n: GraphNode) =>
     n.type !== "note"
       ? n.type === "tag"
@@ -132,11 +147,23 @@ export function nodeLabel(node: GraphNode): string {
 
 export const KIND_GROUP_LABEL: Record<KindGroup, string> = { "skill-pack": "Skill pack", tool: "Tool", resource: "Resource", other: "Other" };
 
-// In words, what the graph shows by colour and fading (docs/ui.md §9).
-export function nodeDetail(node: GraphNode): string {
+// In words, what the graph shows by colour and fading (docs/ui.md §9): the kind group, or with
+// "Colour by domain" the note's domain.
+export function nodeDetail(node: GraphNode, byDomain = false): string {
   if (node.type === "tag") return `Tag, ${plural(node.count, "note")}`;
   if (node.type === "ghost") return "No note yet";
-  return `${KIND_GROUP_LABEL[node.kind_group]}${node.status === "inbox" ? ", in the inbox" : ""}`;
+  const colour = !byDomain ? KIND_GROUP_LABEL[node.kind_group] : node.domain === null ? "No domain" : `${node.domain}${node.domain_suggested ? " (suggested)" : ""}`;
+  return `${colour}${node.status === "inbox" ? ", in the inbox" : ""}`;
+}
+
+// "Colour by domain" (DESIGN.md, Graph): a domain's token, and the domains the shown notes are
+// coloured by, in the vocabulary's order, for the legend. Domains are written as their ids, as on
+// the note's chips.
+export const domainColor = (domain: string) => `--domain-${domain}`;
+
+export function shownDomains(shown: Shown): Domain[] {
+  const present = new Set(shown.nodes.flatMap((n) => (n.type === "note" && n.domain ? [n.domain] : [])));
+  return DOMAIN_IDS.filter((d) => present.has(d));
 }
 
 const MAX_MATCHES = 8;
@@ -157,43 +184,120 @@ export function searchNodes(nodes: GraphNode[], query: string): GraphNode[] {
 }
 
 // empty: no notes. unconnected: nothing the Tags, Links or Alternatives toggles would draw.
-// off: there is, but the toggles that would draw it are switched off. ready: connections drawn.
-export type GraphState = "empty" | "unconnected" | "off" | "ready";
+// off: there is, but the toggles that would draw it are switched off. oneNote: only tags on one
+// note would connect anything, and they are hidden. ready: connections drawn.
+export type GraphState = "empty" | "unconnected" | "off" | "oneNote" | "ready";
 
 export function graphState(doc: GraphJson, sources: Sources): GraphState {
   if (!doc.nodes.some((n) => n.type === "note")) return "empty";
   if (drawable(doc, sources).edges.length) return "ready";
-  return drawable(doc, { ...sources, tagged: true, link: true, alternative: true }).edges.length ? "off" : "unconnected";
+  if (sources.tagged && drawable(doc, { ...sources, oneNoteTags: true }).edges.length) return "oneNote";
+  return drawable(doc, { ...sources, tagged: true, oneNoteTags: true, link: true, alternative: true }).edges.length ? "off" : "unconnected";
 }
 
 // The notice over the canvas, when nothing connects what is drawn.
 export function notice(state: GraphState): string | null {
   if (state === "unconnected") return "Your notes aren't connected yet. Add tags, or [[links]] in My notes.";
   if (state === "off") return "No connections drawn. Turn on Tags or Links to see how your notes connect.";
+  if (state === "oneNote") return "Each of your tags is on one note. Turn on Tags on one note to draw them.";
   return null;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export function statusLine(counts: Shown["counts"]): string {
-  return `Showing ${plural(counts.notes, "note")}, ${plural(counts.tags, "tag")} and ${plural(counts.connections, "connection")}`;
+  const hidden = counts.hiddenTags ? ` (${counts.hiddenTags} on one note hidden)` : "";
+  return `Showing ${plural(counts.notes, "note")}, ${plural(counts.tags, "tag")}${hidden} and ${plural(counts.connections, "connection")}`;
 }
 
 // Sizes are sigma's, about the radius in screen pixels at the default zoom. A note with no
 // connections is still clearly visible (about 14 px across); a note grows with the log of its
 // connections, so hubs stand out without hiding the rest. In a small graph, tag nodes are a little
 // smaller than the smallest note, all the same size; their label says what they are. In a large one
-// (`large`: from ALL_LABELS_BELOW nodes up), a tag's connections are its notes, on the notes' scale:
-// sigma's label grid names the largest node in each cell, so popular tags keep their names.
+// (`large`: from LARGE_GRAPH nodes up), a tag's connections are its notes, on the notes' scale:
+// labels go to the largest nodes first (placeLabels), so popular tags keep their names.
 export function nodeSize(type: GraphNode["type"], connections: number, large = false): number {
   return type === "note" || (type === "tag" && large) ? 8 + 2.5 * Math.log2(1 + connections) : 6;
 }
 
-// A small graph shows every label; a larger one names its larger nodes, and the rest as you zoom in.
-export const ALL_LABELS_BELOW = 150;
+export const LARGE_GRAPH = 150;
 
-export function allLabels(drawnNodes: number): boolean {
-  return drawnNodes < ALL_LABELS_BELOW;
+export function largeGraph(drawnNodes: number): boolean {
+  return drawnNodes >= LARGE_GRAPH;
+}
+
+// Labels (decision 0044), one rule at every size: no two drawn labels overlap. Every labelled node
+// on screen is a candidate. They are placed in order, and a label whose box would come within
+// LABEL_GAP of one already placed waits until zooming in makes room. The order: the hovered node,
+// then the selected one, each always placed, on its plate; then the lit node's neighbours; then
+// the rest, the largest node first, a note before a tag of the same size, tags by note count.
+// Tag labels are smaller and in a quieter ink, so note names lead.
+export const LABEL_STYLE = { note: { size: 12, weight: "500" }, tag: { size: 11, weight: "400" } } as const;
+export const LABEL_GAP = 2;
+
+export interface LabelCandidate {
+  key: string;
+  label: string;
+  x: number; // the node's centre on screen
+  y: number;
+  size: number; // its radius on screen
+  tag: boolean;
+  count: number; // a tag's notes
+  rank: 0 | 1 | 2 | 3; // hovered, selected, a neighbour of the lit node, the rest
+}
+
+export interface LabelBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PlacedLabel {
+  candidate: LabelCandidate;
+  box: LabelBox;
+  plate: boolean; // hovered or selected: sigma draws it on its plate, with the note style
+}
+
+// The box a label covers, as the page draws it: the text from size + 3 px right of the centre, on a
+// baseline font/3 below it, with a 1.5 px halo (cap height to descender: about the font size); a
+// plate is 4 px of padding around the text, from size + 4 px.
+export function labelBox(c: LabelCandidate, textWidth: number, plate: boolean): LabelBox {
+  const font = (plate || !c.tag ? LABEL_STYLE.note : LABEL_STYLE.tag).size;
+  if (plate) return { x: c.x + c.size + 4, y: c.y - font / 2 - 4, width: textWidth + 8, height: font + 8 };
+  return { x: c.x + c.size + 1.5, y: c.y + font / 3 - 0.75 * font - 1.5, width: textWidth + 3, height: font + 3 };
+}
+
+const before = (a: LabelCandidate, b: LabelCandidate) =>
+  a.rank - b.rank || b.size - a.size || Number(a.tag) - Number(b.tag) || b.count - a.count || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+const CELL = 64; // the spatial index's cell, in px
+
+// `measure` gives a label's text width in px, in the note or the tag style.
+export function placeLabels(candidates: LabelCandidate[], measure: (label: string, tag: boolean) => number): PlacedLabel[] {
+  const placed: PlacedLabel[] = [];
+  const cells = new Map<string, LabelBox[]>();
+  const cellsOf = (b: LabelBox) => {
+    const keys: string[] = [];
+    for (let i = Math.floor((b.x - LABEL_GAP) / CELL); i <= Math.floor((b.x + b.width + LABEL_GAP) / CELL); i++) {
+      for (let j = Math.floor((b.y - LABEL_GAP) / CELL); j <= Math.floor((b.y + b.height + LABEL_GAP) / CELL); j++) keys.push(`${i} ${j}`);
+    }
+    return keys;
+  };
+  for (const c of [...candidates].sort(before)) {
+    const plate = c.rank <= 1;
+    const box = labelBox(c, measure(c.label, c.tag && !plate), plate);
+    const near = cellsOf(box);
+    if (!plate && near.some((k) => cells.get(k)?.some((o) => overlap(o, box, LABEL_GAP)))) continue;
+    for (const k of near) cells.set(k, [...(cells.get(k) ?? []), box]);
+    placed.push({ candidate: c, box, plate });
+  }
+  return placed;
+}
+
+// Whether two boxes come within `gap` px of each other.
+export function overlap(a: LabelBox, b: LabelBox, gap = 0): boolean {
+  return a.x < b.x + b.width + gap && b.x < a.x + a.width + gap && a.y < b.y + b.height + gap && b.y < a.y + a.height + gap;
 }
 
 // Edge sizes are in screen pixels at the default zoom. Colours are the DESIGN.md tokens.

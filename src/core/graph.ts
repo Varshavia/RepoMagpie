@@ -3,6 +3,7 @@
 // ghost nodes. Built from the notes, their per-file cache and the link index. A pure read: nothing is
 // written but the caches. Never prints.
 import { readFileSync } from "node:fs";
+import { isDomain, noteDomains, type Domain } from "./domains.ts";
 import { resolvedLinkIndex } from "./links.ts";
 import { readableId, readNote } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
@@ -24,6 +25,9 @@ export interface NoteNode {
   rating: number | null;
   tags: string[];
   language: string | null;
+  // The colour by domain (decision 0040): the first confirmed domain, else the first suggested one.
+  domain: Domain | null;
+  domain_suggested: boolean;
   degree: number; // edges to other notes and tags (tagged, link, alternative); not similar, not ghosts
 }
 
@@ -79,7 +83,7 @@ export const SIMILAR = { neighbours: 3, threshold: 0.25, languageBonus: 0.1 };
 
 const EDGE_TYPES: EdgeType[] = ["tagged", "link", "alternative", "similar"];
 const GRAPH_CACHE = "graph.json";
-const GRAPH_VERSION = 2; // 2: status from a Verdict without nested or unterminated comments
+const GRAPH_VERSION = 3; // 2: status from a Verdict without nested or unterminated comments; 3: domain
 
 interface Entry {
   id: string;
@@ -91,6 +95,8 @@ interface Entry {
   tags: string[];
   language: string | null;
   topics: string[];
+  domain: Domain | null;
+  domain_suggested: boolean;
 }
 
 export function graphData(journal: string, options: { ghosts?: boolean } = {}): GraphData {
@@ -155,7 +161,7 @@ export function graphData(journal: string, options: { ghosts?: boolean } = {}): 
     ...notes.map((file): NoteNode => {
       const { topics: _topics, ...note } = data[file] as Entry;
       const kind_group = (note.kind && KIND_GROUPS[note.kind]) || "other";
-      return { type: "note", key: noteKey(file), id: note.id, file, name: note.name, kind: note.kind, kind_group, status: note.status, tried: note.tried, rating: note.rating, tags: note.tags, language: note.language, degree: degree.get(noteKey(file)) as number };
+      return { type: "note", key: noteKey(file), id: note.id, file, name: note.name, kind: note.kind, kind_group, status: note.status, tried: note.tried, rating: note.rating, tags: note.tags, language: note.language, domain: note.domain, domain_suggested: note.domain_suggested, degree: degree.get(noteKey(file)) as number };
     }),
     ...[...tagCount.keys()].sort(order).map((tag): TagNode => ({ type: "tag", key: `tag:${tag}`, tag, count: tagCount.get(tag) as number })),
     ...[...ghosts.keys()].sort(order).map((key) => ghosts.get(key) as GhostNode),
@@ -205,7 +211,8 @@ function isEntry(e: unknown): boolean {
   if (!isRecord(e)) return false;
   if (e.id === null) return true;
   return typeof e.id === "string" && isTextOrNull(e.name) && isTextOrNull(e.kind) && (e.status === "inbox" || e.status === "reviewed") &&
-    typeof e.tried === "boolean" && (e.rating === null || Number.isInteger(e.rating)) && isTexts(e.tags) && isTextOrNull(e.language) && isTexts(e.topics);
+    typeof e.tried === "boolean" && (e.rating === null || Number.isInteger(e.rating)) && isTexts(e.tags) && isTextOrNull(e.language) && isTexts(e.topics) &&
+    (e.domain === null || isDomain(e.domain)) && typeof e.domain_suggested === "boolean";
 }
 
 // One note's graph fields; no id for a note that can't be read (skipped, as in the link index).
@@ -221,6 +228,7 @@ function entry(path: string): Entry | { id: null } {
   const fm = note.frontmatter;
   const text = (value: unknown) => (typeof value === "string" ? value : null);
   const list = (value: unknown) => (Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string"))] : []);
+  const { domains, suggested } = noteDomains(fm);
   return {
     id,
     name: text(fm.name),
@@ -231,5 +239,7 @@ function entry(path: string): Entry | { id: null } {
     tags: list(fm.tags),
     language: text(fm.language),
     topics: [...new Set(list(fm.topics).map((topic) => topic.toLowerCase()))],
+    domain: domains[0] ?? suggested[0] ?? null,
+    domain_suggested: !domains.length && suggested.length > 0,
   };
 }

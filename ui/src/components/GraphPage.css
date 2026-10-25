@@ -72,6 +72,7 @@
 .swatch.dot.small { width: 7px; height: 7px; }
 .swatch.dot.faded { background: color-mix(in srgb, var(--graph-tool) 45%, var(--canvas)); }
 .swatch.dot.faded.ghost { background: color-mix(in srgb, var(--graph-other) 45%, var(--canvas)); }
+.swatch.dot.suggested { background: color-mix(in srgb, var(--domain-database) 60%, var(--canvas)); }
 .swatch.line { width: 16px; height: 1px; }
 .swatch.line.link { height: 2px; }
 .swatch.line.alternative { height: 3px; }
