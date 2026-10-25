@@ -6,6 +6,7 @@ import { parse as parseYaml } from "yaml";
 import type { Manifest } from "./identity.ts";
 import { readNote, YAML_LIMITS } from "./note.ts";
 import { assertWritable, linkProblem, noteSignature, readableJournalFile, skip } from "./note-cache.ts";
+import { aliasMap, parseAliasLines } from "./tag-aliases.ts";
 
 export type Env = Record<string, string | undefined>;
 
@@ -243,6 +244,14 @@ export function appendTags(journal: string, tags: readonly string[]): string[] {
 export function readTagList(journal: string): string[] {
   const file = readableJournalFile(journal, join(journal, "tags.md"));
   return file ? parseTagList(readFileSync(file, "utf8")) : [];
+}
+
+// The journal's tag aliases (alias → canonical tag): the starter list, with tags.md's own lines
+// winning over it (tag-aliases.ts). A journal without a readable tags.md gets the starter list.
+export function journalAliases(journal: string): Map<string, string> {
+  const file = lstatExists(join(journal, "tags.md")) ? readableJournalFile(journal, join(journal, "tags.md")) : null;
+  const text = file ? readFileSync(file, "utf8") : "";
+  return aliasMap(parseTagList(text), parseAliasLines(text));
 }
 
 function isDirectory(path: string): boolean {

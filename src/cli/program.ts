@@ -4,12 +4,15 @@ import type { AdoptOptions } from "./adopt.ts";
 import type { CatalogOptions } from "./catalog.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { DeleteOptions } from "./delete.ts";
+import { DOMAIN_IDS } from "../core/domains.ts";
+import type { DomainsOptions } from "./domains.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { packageVersion } from "../core/version.ts";
 import { ANTIGRAVITY_HOOK_HELP, CODEX_HOOK_HELP, COPILOT_HOOK_HELP, CURSOR_HOOK_HELP, GEMINI_HOOK_HELP, HOOK_HELP } from "./hook-help.ts";
 import type { HookOptions } from "./hook.ts";
 import type { ImportOptions } from "./import.ts";
+import type { InitOptions } from "./init.ts";
 import type { McpCommandOptions } from "./mcp.ts";
 import type { NoteOptions } from "./note.ts";
 import type { Terminal } from "./prompt.ts";
@@ -43,12 +46,7 @@ export interface Io {
   self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
 }
 
-const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "search", "catalog", "recall", "suggest", "adopt", "delete"]);
-
-// The v0.1 commands not built yet (spec section 2).
-const NOT_YET = [
-  { usage: "init", summary: "draft notes from this project's manifests" },
-];
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "domains", "search", "catalog", "recall", "suggest", "init", "adopt", "delete"]);
 
 // Runs repomagpie with the given arguments and returns the exit code (spec section 1).
 export async function run(argv: string[], io: Io): Promise<number> {
@@ -73,6 +71,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--alternative <target>", "a package you named to use instead: a name, a PURL or a file stem (repeatable)", (target: string, targets: string[] = []) => [...targets, target])
     .option("--use-when <text>", "when you'd use it, in your words: one item (repeatable)", (item: string, items: string[] = []) => [...items, item])
     .option("--avoid-when <text>", "when you'd avoid it, in your words: one item (repeatable); RepoMagpie then asks before it is installed", (item: string, items: string[] = []) => [...items, item])
+    .option("--domain <domain>", `a concern it addresses, confirmed by you (repeatable, at most 3): ${DOMAIN_IDS.join(", ")}`, (domain: string, domains: string[] = []) => [...domains, domain])
     .action(async (target: string, text: string | undefined, _options: unknown, command: Command) => {
       code = await (await import("./note.ts")).noteCommand(target, text, command.optsWithGlobals<NoteOptions>(), io);
     });
@@ -89,19 +88,33 @@ export async function run(argv: string[], io: Io): Promise<number> {
 
   program
     .command("tags")
-    .description("add GitHub topics as tags to your notes, up to 8 per note")
+    .description("add GitHub topics as tags to your notes, or merge two spellings of a tag")
+    .argument("[tags...]", "with --merge: the tag to replace, then the tag to keep")
     .option("--from-topics", "add each note's GitHub topics that aren't tags yet, until it has 8 tags")
+    .option("--merge", "replace one tag with another in every note, and make it an alias in tags.md")
     .addOption(new Option("--journal <journal>", "the journal to tag").choices(["personal", "project"]).default("personal"))
     .option("--dry-run", "report what would happen; write nothing")
+    .action(async (tags: string[], _options: unknown, command: Command) => {
+      code = await (await import("./tags.ts")).tagsCommand(tags, command.optsWithGlobals<TagsOptions>(), io);
+    });
+
+  program
+    .command("domains")
+    .description("suggest domains for notes that have none, from their tags and topics")
+    .option("--suggest", "write suggested domains to every note that has no domains yet")
+    .addOption(new Option("--journal <journal>", "the journal to suggest for").choices(["personal", "project"]).default("personal"))
+    .option("--dry-run", "report what would happen; write nothing")
     .action(async (_options: unknown, command: Command) => {
-      code = (await import("./tags.ts")).tagsCommand(command.optsWithGlobals<TagsOptions>(), io);
+      code = await (await import("./domains.ts")).domainsCommand(command.optsWithGlobals<DomainsOptions>(), io);
     });
 
   program
     .command("search")
     .description("keyword search across both journals")
     .argument("<query>", "words to look for")
-    .option("--tag <tag>", "only notes with this tag (repeatable: every tag must match)", (tag: string, tags: string[]) => [...tags, tag], [])
+    .option("--domain <domain>", `a concern the question is about (repeatable): ${DOMAIN_IDS.join(", ")}`, (domain: string, domains: string[]) => [...domains, domain], [])
+    .option("--tag <tag>", "a technology the question names; any spelling in tags.md works (repeatable)", (tag: string, tags: string[]) => [...tags, tag], [])
+    .addOption(new Option("--match <how>", "boost: domains and tags rank notes higher; filter: only notes with one of them").choices(["boost", "filter"]).default("boost"))
     .addOption(new Option("--kind <kind>", "only notes of this kind").choices(KINDS))
     .addOption(new Option("--journal <journal>", "search one journal only").choices(["personal", "project"]))
     .option("--limit <n>", "show at most n results", positiveInteger, 10)
@@ -143,6 +156,15 @@ export async function run(argv: string[], io: Io): Promise<number> {
     });
 
   program
+    .command("init")
+    .description("your notes on this project's packages")
+    .option("--auto", "group the dependencies (an avoid note, a note, no note); in a terminal, ask for a Verdict on each one without a note")
+    .addOption(new Option("--to <journal>", "the journal new notes go to").choices(["personal", "project"]).default("personal"))
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./init.ts")).initCommand(command.optsWithGlobals<InitOptions>(), io);
+    });
+
+  program
     .command("adopt")
     .description("copy a note into the project journal")
     .argument("<name-or-purl>", "a package name or PURL that has a note in your personal journal")
@@ -181,6 +203,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--no-allow-write", "turn off the note tool in the entries")
     .option("--delete-backups", "delete setup's backups instead (repomagpie doctor lists them), after asking")
     .option("--keep-latest", "with --delete-backups: keep the newest backup of each file")
+    .option("--capture-reminder", "also add Claude Code's Stop reminder: once a session, after an install of a package without a note, the agent is reminded to offer one")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./setup.ts")).setupCommand(command.optsWithGlobals<SetupOptions>(), io);
     });
@@ -249,14 +272,12 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./hook.ts")).hookCommand("cursor", command.optsWithGlobals<HookOptions>(), io);
     });
-
-  for (const { usage, summary } of NOT_YET) {
-    const name = usage.split(" ")[0];
-    program.command(usage).description(`[not implemented yet] ${summary}`).action(() => {
-      io.err(`repomagpie ${name}: not implemented yet\n`);
-      code = 1;
+  hook
+    .command("claude-code-stop")
+    .description("the Claude Code Stop reminder (opt-in): reads the session's transcript, reminds the agent once to offer a note")
+    .action(async (_options: unknown, command: Command) => {
+      code = await (await import("./hook.ts")).hookCommand("claude-code-stop", command.optsWithGlobals<HookOptions>(), io);
     });
-  }
 
   try {
     await program.parseAsync(argv, { from: "user" });

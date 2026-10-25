@@ -49,6 +49,9 @@ const median = (times: number[]) => {
 const CALLS: [string, object, number][] = [
   ["recall", { packages: ["package-1500"] }, 150],
   ["search", { query: "pdf stream" }, 500],
+  ["search", { query: "pdf stream", domains: ["testing", "api"], tags: ["testing"] }, 500],
+  ["vocabulary", {}, 500], // reads the index search reads: search's budget
+
   ["suggest", { need: "a TypeScript CLI with tests" }, 500],
   ["catalog", { limit: 1000 }, 500],
 ];

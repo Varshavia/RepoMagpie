@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectInstalls } from "./install-detect.ts";
+import { detectCommand, detectInstalls } from "./install-detect.ts";
 
 // Spec section 6: the install commands recall recognises, and how a command line is split.
 // Each case: the command, then the packages found as "<type>:<name>" (versions and extras dropped).
@@ -126,6 +126,39 @@ test("each install keeps the package as written", () => {
     { type: "npm", name: "pdfkit", spec: "pdfkit@1.2.0" },
     { type: "pypi", name: "requests", spec: "requests[socks]>=2" },
   ]);
+});
+
+// Removals, for the Stop reminder (decision 0042): each tool's verbs, through the same splitting.
+const REMOVALS: [string, string[]][] = [
+  ["npm uninstall moment", ["npm:moment"]],
+  ["npm rm moment lodash", ["npm:moment", "npm:lodash"]],
+  ["npm remove @scope/old", ["npm:@scope/old"]],
+  ["npm un moment && npm i date-fns", ["npm:moment"]],
+  ["pnpm remove moment", ["npm:moment"]],
+  ["yarn remove moment", ["npm:moment"]],
+  ["yarn workspace web remove moment", ["npm:moment"]],
+  ["bun rm moment", ["npm:moment"]],
+  ["pip uninstall -y requests", ["pypi:requests"]],
+  ["python -m pip uninstall requests", ["pypi:requests"]],
+  ["uv remove requests", ["pypi:requests"]],
+  ["uv pip uninstall requests", ["pypi:requests"]],
+  ["cargo remove serde", ["cargo:serde"]],
+  ["bash -c 'npm uninstall moment'", ["npm:moment"]],
+  // Not removals: installs, other commands, and words that only look like the verbs
+  ["npm install moment", []],
+  ["npm run remove-moment", []],
+  ["rm -rf node_modules", []],
+  ["git rm moment.js", []],
+];
+
+for (const [command, expected] of REMOVALS) {
+  test(`detectCommand (remove): ${JSON.stringify(command)}`, () => {
+    assert.deepEqual(detectCommand(command, "remove").installs.map((i) => `${i.type}:${i.name}`), expected);
+  });
+}
+
+test("installs stay installs: a removal is never found as one", () => {
+  assert.deepEqual(detectInstalls("npm uninstall moment && pip uninstall requests && cargo rm serde"), []);
 });
 
 test("a very long or deeply nested command never throws", () => {

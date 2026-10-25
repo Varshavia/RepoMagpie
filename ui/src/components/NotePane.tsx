@@ -3,9 +3,10 @@
 // metadata and actions. Every write sends the version the note was read with; a 409 shows the
 // conflict banner. [[Links]] open the note they resolve to, as core resolved them.
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { DOMAIN_LIMIT, DOMAINS } from "../../../src/core/domains.ts";
 import { api, ApiError, type Address, type AdoptJson, type DeleteJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { formOf, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
+import { formOf, noteDomainList, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
 import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, visible, type Block, type Inline } from "../logic/text.ts";
@@ -261,6 +262,26 @@ export function NotePane(props: NotePaneProps) {
     }
   }
 
+  // A suggested domain's check: saved now, on its own; an open form keeps its edits and gets the domain.
+  async function confirmDomain(domain: string) {
+    if (!note?.id || !note.version) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const doc = await api.patch({ journal, id: note.id, version: note.version, domains: { confirm: [domain] } });
+      setNote(doc);
+      setForm((f) => (f && !f.domains.includes(domain) ? { ...f, domains: [...f.domains, domain] } : f));
+      setConflict(null);
+      onSaved(doc, `Domain ${domain} confirmed`);
+    } catch (error) {
+      const e = error as ApiError;
+      if (e.status === 409 && e.document) setConflict(e.document as NoteJson);
+      else setSaveError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function accept(sectionName: string) {
     if (!note?.id || !note.version) return;
     await submit({ journal, id: note.id, version: note.version, accept_drafts: [sectionName] }, `${sectionName} accepted`);
@@ -368,6 +389,12 @@ export function NotePane(props: NotePaneProps) {
             <StatusBadge status={note.status} readOnly={note.read_only} />
           </div>
           {tried ? <p className="note-tried">{tried}</p> : null}
+          {journal === "project" ? (
+            <p className="note-journal">
+              <Icon name="users" size={14} />
+              Project journal, shared with this repository's contributors
+            </p>
+          ) : null}
           {note.id ? (
             <p className="note-purl">
               <span className="mono" translate="no">
@@ -378,7 +405,17 @@ export function NotePane(props: NotePaneProps) {
               </button>
             </p>
           ) : null}
-          <Chips kind={text("kind")} license={text("license")} language={text("language")} packages={list("packages")} tags={list("tags")} />
+          <Chips
+            kind={text("kind")}
+            license={text("license")}
+            language={text("language")}
+            packages={list("packages")}
+            tags={list("tags")}
+            domains={noteDomainList(note, "domains")}
+            suggested={noteDomainList(note, "domains_suggested")}
+            onConfirm={note.id && note.version && !note.read_only ? (d) => void confirmDomain(d) : null}
+            busy={saving}
+          />
           <div className="actions">
             {url && externalHref(url) ? (
               <a className="button secondary" href={externalHref(url) ?? undefined} target="_blank" rel="noreferrer">
@@ -553,6 +590,7 @@ export function NotePane(props: NotePaneProps) {
               onCreateTagList={onCreateTagList}
               drafts={{ useWhen: Boolean(note.sections.find((s) => s.name === "Use when")?.draft), avoidWhen: Boolean(note.sections.find((s) => s.name === "Avoid when")?.draft) }}
               name={typeof note.frontmatter.name === "string" ? note.frontmatter.name : (note.id ?? "it")}
+              suggestedDomains={noteDomainList(note, "domains_suggested")}
             />
             </>
           ) : (
@@ -710,11 +748,41 @@ function Shell({ children, onBack }: { children: ReactNode; onBack: () => void }
   );
 }
 
-function Chips({ kind, license, language, packages, tags }: { kind: string | null; license: string | null; language: string | null; packages: string[]; tags: string[] }) {
-  if (!kind && !license && !language && !packages.length && !tags.length) return null;
+const domainDefinition = (d: string) => DOMAINS.find((x) => x.id === d)?.definition ?? d;
+
+interface ChipsProps {
+  kind: string | null;
+  license: string | null;
+  language: string | null;
+  packages: string[];
+  tags: string[];
+  domains: string[];
+  suggested: string[];
+  onConfirm: ((domain: string) => void) | null; // null: the note can't be edited here
+  busy: boolean;
+}
+
+function Chips({ kind, license, language, packages, tags, domains, suggested, onConfirm, busy }: ChipsProps) {
+  if (!kind && !license && !language && !packages.length && !tags.length && !domains.length && !suggested.length) return null;
   return (
     <ul className="chips" aria-label="Details">
       {kind ? <li className="chip">{visible(kind)}</li> : null}
+      {domains.map((d) => (
+        <li key={d} className="chip domain" title={`Domain: ${domainDefinition(d)}`}>
+          {d}
+        </li>
+      ))}
+      {suggested.map((d) => (
+        <li key={d} className="chip domain suggested" title={`Suggested domain: ${domainDefinition(d)}`}>
+          {d}
+          <span className="visually-hidden"> (suggested)</span>
+          {onConfirm ? (
+            <button type="button" className="chip-remove" onClick={() => onConfirm(d)} disabled={busy || domains.length >= DOMAIN_LIMIT} aria-label={`Confirm the domain ${d}`} title={domains.length >= DOMAIN_LIMIT ? `A note has at most ${DOMAIN_LIMIT} domains` : `Confirm ${d}`}>
+              <Icon name="check" size={12} />
+            </button>
+          ) : null}
+        </li>
+      ))}
       {license ? (
         <li className="chip meta" title="Licence">
           {license === "unknown" ? "licence unknown" : visible(license)}

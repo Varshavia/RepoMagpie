@@ -15,7 +15,7 @@ import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { ALLOW_WRITE, noteTool, type Launch } from "./launch.ts";
 import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookPlan, type AgentHookTarget } from "./setup-agent-hooks.ts";
-import { applyHook, planHook, type HookPlan, type HookTarget } from "./setup-hook.ts";
+import { applyHook, planHook, STOP, type HookPlan, type HookTarget } from "./setup-hook.ts";
 import { applySkill, planSkill, type SkillPlan, type SkillRequest } from "./setup-skill.ts";
 
 // The package's skill: beside dist/ in the package, beside src/ in the repository.
@@ -52,6 +52,9 @@ export interface SetupPlan {
   agents: AgentPlan[]; // the MCP entries, always in the user's settings
   skill: SkillPlan | null; // when any agent is set up
   hook: HookPlan | null; // when Claude Code is set up
+  // The opt-in Stop reminder (decision 0042), in the user's settings only: added with
+  // --capture-reminder, kept up to date when there, removed with --remove.
+  reminder: HookPlan | null;
   hooks: AgentHookPlan[]; // the other agents' hooks, for each one set up that has a hook (decision 0036)
 }
 
@@ -68,6 +71,7 @@ export interface SetupRequest {
   stamp: string; // for backup names: YYYYMMDD-HHMMSSZ, in UTC
   project?: string; // --project: the project root, for the skill and the hook
   skillSource?: string; // default: the package's
+  captureReminder?: boolean; // --capture-reminder: add the Stop reminder (decision 0042)
 }
 
 // The agent CLIs' commands (docs/agents.md). VS Code's CLI can add but not remove.
@@ -90,7 +94,7 @@ const jsonEntry = (id: Agent["id"], l: { command: string; args: string[] }) =>
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
   const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
-  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null, hooks: [] };
+  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null, reminder: null, hooks: [] };
   for (const agent of AGENTS) {
     const found = foundBy(agent, where);
     const installed = found !== null;
@@ -112,6 +116,14 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const root = request.project ?? where.home;
   if (chosen.length) plan.skill = planSkill(skillRequest(request, plan));
   if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request));
+  // The reminder is personal: never in a project's committed settings.
+  // Listed only when asked for or when it changes: a reminder that isn't there stays unmentioned.
+  if (claude && request.project === undefined) {
+    const reminder = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request), STOP, request.captureReminder === true);
+    // The same file as the hook's: a second backup in this run gets its own name.
+    if (reminder.backup && reminder.backup === plan.hook?.backup) reminder.backup = `${reminder.backup}-2`;
+    if (reminder.action !== "keep" || request.captureReminder) plan.reminder = reminder;
+  }
   // The other agents' hooks: always in the user's settings, as the MCP entries are.
   for (const spec of HOOK_SPECS.filter((s) => chosen.some((a) => a.id === s.id))) {
     const hook = planAgentHook(spec, where, request.remove, request.stamp, agentHookTarget(request));
@@ -272,8 +284,9 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
   });
   const skill = plan.skill && applySkill(plan.skill, skillRequest(request, plan));
   const hook = plan.hook && applyHook(plan.hook, ROOT(request), hookTarget(request));
+  const reminder = plan.reminder && applyHook(plan.reminder, ROOT(request), hookTarget(request), STOP);
   const hooks = plan.hooks.map((h) => applyAgentHook(h, HOOK_SPECS.find((s) => s.id === h.id) as (typeof HOOK_SPECS)[number], where, request.stamp, agentHookTarget(request)));
-  return { ...plan, agents, skill, hook, hooks };
+  return { ...plan, agents, skill, hook, reminder, hooks };
 }
 
 const same = (a: Pick<McpEntry, "command" | "args">, b: { command: string; args: string[] }) =>

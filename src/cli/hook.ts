@@ -6,7 +6,7 @@ import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { journalPathProblem, takeSkipped } from "../core/note-cache.ts";
-import type { HookAgent } from "../hook/agents.ts";
+import type { HookCommand } from "../hook/agents.ts";
 import type { HookContext } from "../hook/core.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
@@ -18,7 +18,8 @@ export interface HookOptions extends GlobalOptions {
 // Each adapter is its own chunk, loaded only by its subcommand: hook claude-code never loads the
 // others, nor the retry record they share.
 type Adapter = (input: string, ctx: HookContext) => string | null;
-const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
+const ADAPTERS: Record<HookCommand, () => Promise<Adapter>> = {
+  "claude-code-stop": async () => (await import("../hook/claude-code-stop.ts")).stopOutput,
   "claude-code": async () => (await import("../hook/claude-code.ts")).hookOutput,
   codex: async () => (await import("../hook/codex.ts")).codexOutput,
   "gemini-cli": async () => (await import("../hook/gemini-cli.ts")).geminiOutput,
@@ -27,7 +28,7 @@ const ADAPTERS: Record<HookAgent, () => Promise<Adapter>> = {
   cursor: async () => (await import("../hook/cursor.ts")).cursorOutput,
 };
 
-export async function hookCommand(agent: HookAgent, options: HookOptions, io: Io): Promise<number> {
+export async function hookCommand(agent: HookCommand, options: HookOptions, io: Io): Promise<number> {
   try {
     const input = io.stdin ? await io.stdin() : "";
     const adapter = await ADAPTERS[agent]();

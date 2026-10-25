@@ -33,6 +33,18 @@
   --graph-edge-link: light-dark(#565F6A, #8A949E);
   --graph-edge-alternative: light-dark(#0B7A6E, #3CC8B4);
   --graph-edge-similar: light-dark(#7F8994, #69737E);
+  --domain-architecture: light-dark(#2368C7, #7DAAE8);
+  --domain-security: light-dark(#C72323, #E36363);
+  --domain-performance: light-dark(#7E7516, #E3D963);
+  --domain-styling: light-dark(#C72375, #E363A3);
+  --domain-database: light-dark(#197B8F, #63CEE3);
+  --domain-testing: light-dark(#188618, #63E363);
+  --domain-auth: light-dark(#8323C7, #BB7DE8);
+  --domain-api: light-dark(#A5611D, #E3A363);
+  --domain-devops: light-dark(#178255, #63E3AE);
+  --domain-observability: light-dark(#537E16, #AEE363);
+  --domain-ai: light-dark(#C322C3, #E363E3);
+  --domain-tooling: light-dark(#3123C7, #867DE8);
   --shadow: light-dark(rgb(21 24 27 / 0.16), rgb(0 0 0 / 0.5));
   --scrim: light-dark(rgb(21 24 27 / 0.32), rgb(0 0 0 / 0.55));
 
@@ -513,6 +525,7 @@ button.chip[aria-pressed="true"] { background: var(--accent-wash); color: var(--
 }
 
 .note-tried { color: var(--ink-muted); }
+.note-journal { display: flex; align-items: center; gap: var(--xs); color: var(--ink-muted); }
 
 .note-purl {
   display: flex;
@@ -643,6 +656,11 @@ span.wikilink { cursor: help; }
 button.chip.suggestion { border: 1px dashed var(--hairline-strong); background: transparent; }
 button.chip.suggestion:hover:not(:disabled) { border-style: solid; color: var(--ink); }
 button.chip.suggestion:disabled { cursor: not-allowed; opacity: 0.6; }
+/* Domains (decision 0040): confirmed ones solid, suggested ones outlined (dashed), as topic suggestions are. */
+.chip.domain { color: var(--ink); }
+.chip.domain.suggested { border: 1px dashed var(--hairline-strong); background: transparent; color: var(--ink-muted); }
+.chip.domain:has(.chip-remove) { padding-right: var(--xxs); }
+button.chip.domain:disabled { cursor: not-allowed; opacity: 0.6; }
 /* "Use when" and "Avoid when" at capture: the items to add, one row each, with a remove button. */
 .items-to-add { display: flex; flex-direction: column; gap: var(--xxs); list-style: none; }
 .items-to-add li { display: flex; align-items: flex-start; gap: var(--xs); color: var(--ink-muted); overflow-wrap: anywhere; }

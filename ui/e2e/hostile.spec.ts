@@ -54,6 +54,23 @@ test("a Verdict with HTML in it shows the text, not markup", async ({ page, magp
   await expect(page).not.toHaveTitle("pwned");
 });
 
+// An unknown domain (decision 0040): kept in the file, never shown as a domain, never rendered as HTML.
+test("an unknown domain, with HTML and a bidi control in it, shows nowhere; the known one does", async ({ page, magpie }) => {
+  const rlo = String.fromCharCode(0x202e);
+  const unknown = `"<img src=x onerror=\\"document.title='pwned'\\">${rlo}"`;
+  writeFileSync(magpie.note("npm--hostile.md"), HOSTILE.replace("tags: []\n", `tags: []\ndomains: [security, ${unknown}, ignore-previous-instructions]\n`));
+  await magpie.open(page);
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("button", { name: "security" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: /ignore-previous|img/ })).toHaveCount(0);
+  await nav.getByRole("button", { name: "security" }).click();
+  await page.getByRole("option", { name: /hostile/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await expect(pane.locator(".chip.domain")).toHaveText(["security"]);
+  await expect(page.locator("main img")).toHaveCount(0);
+  await expect(page).not.toHaveTitle("pwned");
+});
+
 // Hidden characters (decision 0032, rule 1, in the app): read views show each control, bidi or
 // zero-width character as a visible marker, never raw and never dropped; the note warns; the editor
 // keeps the raw text. Every special character is built from its code point.

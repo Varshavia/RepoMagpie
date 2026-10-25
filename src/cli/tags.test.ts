@@ -56,4 +56,44 @@ test("--journal project reads the project journal; without --from-topics it's a 
   const usage = await magpie(box, ["tags"]);
   assert.equal(usage.code, 2);
   assert.match(usage.err, /--from-topics/);
+  assert.match(usage.err, /--merge <from> <to>/);
+});
+
+// magpie tags --merge (decision 0041).
+
+const tagged = (id: string, tags: string) => `---\nid: ${id}\nname: x\nkind: library\ntags: ${tags}\ntried: false\nstatus: inbox\n---\n\n## Verdict\n`;
+const mergeFiles = {
+  "journal/tags.md": "- `postgres`\n- `postgresql` — the database\n",
+  "journal/notes/npm--a.md": tagged("pkg:npm/a", "[db, postgres]"),
+  "journal/notes/npm--b.md": tagged("pkg:npm/b", "[postgresql, postgres]"),
+};
+
+test("--merge: the plan on stdout, then the notes and tags.md are rewritten; --dry-run writes nothing", async () => {
+  const box = sandbox(mergeFiles);
+  const dry = await magpie(box, ["tags", "--merge", "postgres", "postgresql", "--dry-run"]);
+  assert.equal(dry.code, 0, dry.err);
+  assert.equal(dry.out, "pkg:npm/a: db, postgresql\npkg:npm/b: postgresql\n");
+  assert.equal(dry.err, "2 notes have postgres; it becomes postgresql. tags.md lists postgres as an alias of postgresql, and postgres's own line goes.\nDry run: nothing was written.\n");
+  assert.equal(readFileSync(box.note("npm--a.md"), "utf8"), mergeFiles["journal/notes/npm--a.md"]);
+
+  const r = await magpie(box, ["tags", "--merge", "postgres", "postgresql"]);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /Merged postgres into postgresql in 2 notes\.\n$/);
+  assert.equal(readFileSync(box.note("npm--b.md"), "utf8"), tagged("pkg:npm/b", "[postgresql]"));
+  assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `postgresql` (postgres) — the database\n");
+});
+
+test("--merge in a terminal asks first; --json runs without asking; it needs exactly two tags", async () => {
+  const box = sandbox(mergeFiles);
+  const no = await magpie(box, ["tags", "--merge", "postgres", "postgresql"], { interactive: true, ask: async () => "n" });
+  assert.match(no.err, /Nothing was written\.\n$/);
+  assert.equal(readFileSync(box.note("npm--a.md"), "utf8"), mergeFiles["journal/notes/npm--a.md"]);
+  const json = await magpie(box, ["tags", "--merge", "postgres", "postgresql", "--json"], { interactive: true });
+  assert.equal(json.code, 0, json.err);
+  assert.equal(JSON.parse(json.out).notes.length, 2);
+  for (const argv of [["tags", "--merge", "postgres"], ["tags", "--merge", "a", "b", "c"]]) {
+    const usage = await magpie(box, argv);
+    assert.equal(usage.code, 2, argv.join(" "));
+    assert.match(usage.err, /--merge takes two tags/);
+  }
 });

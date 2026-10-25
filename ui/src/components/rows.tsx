@@ -4,6 +4,7 @@
 import { Fragment } from "react";
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import type { Scope, SearchResult } from "../api.ts";
+import { whyLine } from "../logic/search.ts";
 import type { SuggestItem } from "../logic/suggest.ts";
 import { visible } from "../logic/text.ts";
 import { AlternativeName, StatusBadge } from "./common.tsx";
@@ -66,6 +67,7 @@ export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
 
 export function SearchRow({ result }: { result: SearchResult }) {
   const verdict = result.verdict !== null ? visible(result.verdict) : result.type === "skill" ? null : "no verdict yet";
+  const why = whyLine(result);
   return (
     <>
       <span className="row-line">
@@ -79,6 +81,7 @@ export function SearchRow({ result }: { result: SearchResult }) {
         </span>
       </span>
       <span className="row-verdict">{verdict}</span>
+      {why ? <span className="row-why" title={`Matched: ${visible(why)}`}>{`Matched: ${visible(why)}`}</span> : null}
     </>
   );
 }

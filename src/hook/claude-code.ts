@@ -10,7 +10,7 @@ export type { HookContext } from "./core.ts";
 const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
 // Cursor runs Claude Code's hooks too, and its input carries fields Claude Code's never has. The
 // Cursor adapter answers there, so this one stays silent (decision 0036, "One answer per agent").
-const CURSOR_FIELDS = ["cursor_version", "conversation_id", "generation_id", "workspace_roots"];
+export const CURSOR_FIELDS = ["cursor_version", "conversation_id", "generation_id", "workspace_roots"];
 
 export function hookOutput(input: string, ctx: HookContext): string | null {
   const call = parseInput(input);

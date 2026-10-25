@@ -1,7 +1,7 @@
 // The local app (docs/ui.md §7): three panes, the command palette, the keyboard map, live updates
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
+import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { ProjectState } from "./components/fields.tsx";
@@ -40,6 +40,8 @@ export function App() {
   const [settings, setSettings] = useState<SettingsJson | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [journal, setJournal] = useState<Scope>("personal");
+  const journalNow = useRef(journal); // for go, which stays the same function
+  journalNow.current = journal;
   const [lists, setLists] = useState<Record<Scope, ListState>>({ personal: { status: "loading" }, project: { status: "loading" } });
   const [tagLists, setTagLists] = useState<Record<Scope, string[]>>({ personal: [], project: [] });
   // No tags.md, or one without tags: the Tags section shows an empty state (docs/ui.md §7).
@@ -202,7 +204,9 @@ export function App() {
     if (opts.pane) setPane("note");
   }, []);
 
-  const go = useCallback((next: View) => {
+  // `journal` is the journal the next view shows, when the caller changes it in the same step.
+  const go = useCallback((next: View, journal?: Scope) => {
+    if (next.page === "graph") fetchGraphEarly(journal ?? journalNow.current);
     setView(next);
     setSelected(null);
     setPane("list");
@@ -429,7 +433,7 @@ export function App() {
   // "Show in graph" in the note view: the graph, centred on that note, in local mode.
   const showInGraph = (scope: Scope, file: string) => {
     setJournal(scope);
-    go({ page: "graph", focus: `note:${file}` });
+    go({ page: "graph", focus: `note:${file}` }, scope);
   };
 
   // Undo after a delete (decision 0037): the file goes back to notes/ under its original name. A note
@@ -559,6 +563,10 @@ export function App() {
               row={(n) => <NoteRow note={n} showInbox={!review} />}
               listRef={listRef}
             />
+          ) : journal === "project" && projectState === "new" ? (
+            <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>
+              This repository has no project journal yet. A project journal is a <code>.magpie/</code> folder committed with the code: everyone who can read the repository can read its notes, and RepoMagpie's hook and recall read them for every contributor. Start one with <code>repomagpie note &lt;name&gt; --to project</code>, or with Adopt to project on one of your notes.
+            </EmptyState>
           ) : review ? (
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>{`Your inbox is empty. Add a repository here, or from the palette (${MOD}+K).`}</EmptyState>
           ) : (

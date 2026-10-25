@@ -35,7 +35,7 @@ test("--json prints exactly the spec's document and nothing on stderr", async ()
   const r = await magpie(box, ["note", "pdfkit", "ok", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
 });
 
 test("a second Verdict is refused: exit 1, the path is printed, the file is unchanged", async () => {
@@ -54,7 +54,7 @@ test("text for an existing note with an empty Verdict writes it", async () => {
   await magpie(box, ["note", "pdfkit"]);
   const r = await magpie(box, ["note", "pdfkit", "later verdict", "--json"]);
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
   valid(box.note("npm--pdfkit.md"));
 });
 
@@ -407,7 +407,7 @@ test("--alternative on a new note: written with it; a target without a note is w
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(JSON.parse(r.out), {
     id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [],
-    alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [],
+    alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [],
   });
   assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[puppeteer]]"]);
   valid(box.note("npm--pdfkit.md"));
@@ -639,4 +639,56 @@ test("--to project follows the same rules, and a GitHub URL keeps its drafted Wh
   const note = readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8"));
   assert.deepEqual(note.sections.filter((s) => s.draft).map((s) => s.name), ["What it does"]);
   assert.equal(note.sections.find((s) => s.name === "Use when")?.body.trim(), "- browser checks from a script");
+});
+
+// --- --domain: the user's domains (decision 0040) ---
+
+test("a new note from a GitHub URL gets domains_suggested from its tags; --domain writes domains instead", async () => {
+  const box = sandbox();
+  await magpie(box, ["note", PLAYWRIGHT_URL], { fetch: playwright() });
+  const suggested = readNote(readFileSync(box.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter;
+  assert.deepEqual([suggested.domains, suggested.domains_suggested], [undefined, ["testing"]]);
+
+  const other = sandbox();
+  const r = await magpie(other, ["note", PLAYWRIGHT_URL, "--domain", "testing", "--domain", "tooling", "--json"], { fetch: playwright() });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(JSON.parse(r.out).domains_added, ["testing", "tooling"]);
+  const fm = readNote(readFileSync(other.note("github--microsoft--playwright-cli.md"), "utf8")).frontmatter;
+  assert.deepEqual([fm.domains, fm.domains_suggested], [["testing", "tooling"], undefined]);
+  assert.match(readFileSync(other.note("github--microsoft--playwright-cli.md"), "utf8"), /^tags: \[playwright\]\ndomains: \[testing, tooling\]\n/m);
+  valid(other.note("github--microsoft--playwright-cli.md"));
+});
+
+test("--domain on an existing note confirms a suggestion: it moves from domains_suggested to domains; nothing else changes", async () => {
+  const box = sandbox();
+  await magpie(box, ["note", PLAYWRIGHT_URL], { fetch: playwright() });
+  const path = box.note("github--microsoft--playwright-cli.md");
+  const before = readFileSync(path, "utf8");
+  const r = await magpie(box, ["note", "pkg:github/microsoft/playwright-cli", "--domain", "testing", "--json"], { fetch: playwright() });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(JSON.parse(r.out).domains_added, ["testing"]);
+  assert.equal(readFileSync(path, "utf8"), before.replace("domains_suggested: [testing]\n", "domains: [testing]\ndomains_suggested: []\n"));
+  const again = await magpie(box, ["note", "pkg:github/microsoft/playwright-cli", "--domain", "testing", "--json"], { fetch: playwright() });
+  assert.deepEqual(JSON.parse(again.out).domains_added, []);
+});
+
+test("--domain takes one of the 12 domains, at most 3: otherwise a usage error and nothing written", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const unknown = await magpie(box, ["note", "pdfkit", "--domain", "pdfs"]);
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.err, /--domain takes one of: .*security.* Not a domain: "pdfs"\./);
+  const many = await magpie(box, ["note", "pdfkit", "--domain", "styling", "--domain", "api", "--domain", "tooling", "--domain", "testing"]);
+  assert.equal(many.code, 2);
+  assert.match(many.err, /at most 3 domains/);
+  assert.equal(existsSync(box.note("npm--pdfkit.md")), false);
+});
+
+test("--domain on a note that already has 3 domains: refused with a warning, exit 1, the file unchanged", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "pdfkit", "fine", "--domain", "styling", "--domain", "api", "--domain", "tooling"]);
+  const before = readFileSync(box.note("npm--pdfkit.md"), "utf8");
+  const r = await magpie(box, ["note", "pdfkit", "--domain", "testing"]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /at most 3 domains/);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), before);
 });

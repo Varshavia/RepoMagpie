@@ -46,6 +46,11 @@ export function render(r: DoctorJson, home: string): string {
     if (h.error) lines.push(`  ${tilde(h.file)}: can't be read: ${h.error}`);
   }
 
+  // Opt-in (decision 0042): off is information, not a to-do.
+  lines.push("", "Claude Code Stop reminder");
+  if (!r.reminder.length) lines.push("  off (repomagpie setup --capture-reminder turns it on)");
+  for (const e of r.reminder) lines.push(`  on: ${[e.command, ...(e.args ?? [])].map((part) => tilde(part)).join(" ")}${e.form === "exec" && !(e.node_found && e.entry_found) ? "  (a path is missing)" : ""}`);
+
   lines.push("", "Hooks in other agents");
   for (const h of r.agent_hooks) {
     const off = h.off ? `  (${h.off.split(";")[0]})` : "";
@@ -70,8 +75,10 @@ export function render(r: DoctorJson, home: string): string {
     lines.push(`  ${j.scope.padEnd(8)}  ${tilde(j.path)}  ${state}`);
     for (const s of j.skipped) lines.push(`            skipped: ${s}`);
     for (const u of j.unreadable) lines.push(`            unreadable: ${u}`);
+    for (const u of j.unknown_domains) lines.push(`            unknown domain: ${u.file}: ${u.values.join(", ")}`);
   }
-  if (!r.journals.some((j) => j.scope === "project")) lines.push("  project   none here");
+  // Information, not a to-do: a project journal is a choice to share notes through git.
+  if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here${r.git_repository ? "; repomagpie note <x> --to project starts one, shared through git" : ""}`);
 
   lines.push("");
   if (r.problems.length) lines.push("To do", ...r.problems.map((p) => `  - ${p}`));

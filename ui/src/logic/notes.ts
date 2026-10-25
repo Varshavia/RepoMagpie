@@ -1,23 +1,30 @@
 // The sidebar's counts and the centre list, from one journal's Note list document.
 import type { NoteSummary } from "../../../src/core/documents.ts";
+import { DOMAIN_IDS } from "../../../src/core/domains.ts";
 
-export type ListView = { list: "inbox" } | { list: "all" } | { list: "kind"; value: string } | { list: "tag"; value: string };
+export type ListView = { list: "inbox" } | { list: "all" } | { list: "kind"; value: string } | { list: "tag"; value: string } | { list: "domain"; value: string };
 
 export interface Counts {
   all: number;
   inbox: number;
   kinds: { name: string; count: number }[]; // by name
   tags: { name: string; count: number }[]; // most used first, then by name
+  domains: { name: string; count: number; suggested: number }[]; // in the vocabulary's order; count: confirmed or suggested, suggested: only suggested
 }
 
 export function sidebarCounts(notes: NoteSummary[]): Counts {
   const kinds = new Map<string, number>();
   const tags = new Map<string, number>();
+  const domains = new Map<string, { count: number; suggested: number }>();
   let inbox = 0;
   for (const n of notes) {
     if (n.status === "inbox") inbox++;
     if (n.kind) kinds.set(n.kind, (kinds.get(n.kind) ?? 0) + 1);
     for (const t of n.tags) tags.set(t, (tags.get(t) ?? 0) + 1);
+    for (const d of [...n.domains, ...n.domains_suggested]) {
+      const count = domains.get(d) ?? { count: 0, suggested: 0 };
+      domains.set(d, { count: count.count + 1, suggested: count.suggested + (n.domains.includes(d) ? 0 : 1) });
+    }
   }
   const byName = (a: { name: string }, b: { name: string }) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   return {
@@ -25,6 +32,7 @@ export function sidebarCounts(notes: NoteSummary[]): Counts {
     inbox,
     kinds: [...kinds].map(([name, count]) => ({ name, count })).sort(byName),
     tags: [...tags].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || byName(a, b)),
+    domains: DOMAIN_IDS.flatMap((name) => { const c = domains.get(name); return c ? [{ name, ...c }] : []; }),
   };
 }
 
@@ -58,6 +66,8 @@ export function filterNotes(notes: NoteSummary[], view: ListView): NoteSummary[]
       return notes.filter((n) => n.kind === view.value);
     case "tag":
       return notes.filter((n) => n.tags.includes(view.value));
+    case "domain":
+      return notes.filter((n) => n.domains.includes(view.value) || n.domains_suggested.includes(view.value));
   }
 }
 

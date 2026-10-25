@@ -7,4 +7,6 @@ const QUERY = "pdf stream";
 
 withJournal("search", (root, journal) => {
   measure(`magpie search "${QUERY}"`, root, ["search", QUERY, "--home", journal], 500);
+  // Domains and tags also score notes no word finds (decision 0041): every note is a candidate.
+  measure(`magpie search "${QUERY}" --domain testing --tag testing`, root, ["search", QUERY, "--domain", "testing", "--tag", "testing", "--home", journal], 500);
 });

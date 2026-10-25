@@ -2,6 +2,7 @@
 // inbox review, search, add, import, conflicts, live updates, the palette and the keyboard map.
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
+import { removeFolder } from "../../src/core/copy-folder.ts";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
 import { runSuggest } from "../../src/core/suggest.ts";
@@ -421,6 +422,60 @@ test("alternatives: entries written by hand stay as written; Undo brings back a 
   await row.getByRole("button", { name: "Undo" }).click();
   await expect(row.getByRole("link", { name: "Playwright" })).toBeVisible();
   expect(readFileSync(file, "utf8")).toBe(PDFKIT.replace("status: reviewed\n", 'status: reviewed\nalternatives: ["[[github--microsoft--playwright-cli|Playwright]]"]\n'));
+});
+
+// Domains (decision 0040): suggested ones outlined until the person picks them.
+const UNDERSTAND = "github--egonex-ai--understand-anything.md";
+function withDomains(magpie: { note: (file: string) => string }, file: string, lines: string) {
+  const path = magpie.note(file);
+  writeFileSync(path, readFileSync(path, "utf8").replace("tried:", `${lines}tried:`));
+}
+
+test("domains: the review shows the suggested ones outlined; one picked is saved by Ctrl+Enter; the other stays suggested", async ({ page, magpie }) => {
+  withDomains(magpie, UNDERSTAND, "domains_suggested: [ai, tooling]\n");
+  await magpie.open(page);
+  await page.keyboard.press("Enter");
+  const domains = page.getByRole("group", { name: "Domains" });
+  await expect(domains.getByRole("button")).toHaveCount(12);
+  await expect(domains.getByRole("button", { name: "ai (suggested)" })).toHaveAttribute("aria-pressed", "false");
+  await domains.getByRole("button", { name: "ai (suggested)" }).click();
+  await expect(domains.getByRole("button", { name: "ai", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("textbox", { name: "Verdict" }).fill("good for a first map of a codebase");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect(page.getByRole("status").getByText("Verdict saved")).toBeVisible();
+  const text = readFileSync(magpie.note(UNDERSTAND), "utf8");
+  expect(text).toContain("domains: [ai]\ndomains_suggested: [tooling]\n");
+});
+
+test("domains: the sidebar counts them; a domain lists its notes; a suggested chip's check confirms it on disk", async ({ page, magpie }) => {
+  withDomains(magpie, UNDERSTAND, "domains_suggested: [tooling]\n");
+  withDomains(magpie, "npm--pdfkit.md", "domains: [tooling]\n");
+  await magpie.open(page);
+  const tooling = page.getByRole("navigation").getByRole("button", { name: "tooling" });
+  await expect(tooling).toHaveAttribute("title", "tooling: 1 confirmed, 1 suggested");
+  await expect(tooling).toContainText("2");
+  await tooling.click();
+  const list = page.getByRole("listbox", { name: "Domain: tooling" });
+  await expect(list.getByRole("option")).toHaveCount(2);
+  await list.getByRole("option", { name: /Understand-Anything/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await pane.getByRole("button", { name: "Confirm the domain tooling" }).click();
+  await expect(page.getByRole("status").getByText("Domain tooling confirmed")).toBeVisible();
+  await expect(pane.getByRole("button", { name: "Confirm the domain tooling" })).toHaveCount(0);
+  expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toContain("domains: [tooling]\ndomains_suggested: []\n");
+});
+
+test("search: the domain filter keeps only notes with it; each row says why it matched", async ({ page, magpie }) => {
+  withDomains(magpie, "npm--pdfkit.md", "domains: [tooling]\n");
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  await page.keyboard.type("pdf");
+  const results = page.getByRole("listbox", { name: "Search results" });
+  await expect(results.getByRole("option").first()).toContainText("Matched: word");
+  await page.getByLabel("Domain").selectOption("tooling");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await expect(results.getByRole("option").first()).toContainText("pdfkit");
+  await expect(results.getByRole("option").first()).toContainText("Matched: domain tooling");
 });
 
 test("search: / focuses the box, Verdicts first, Enter opens the note; the status filter applies", async ({ page, magpie }) => {
@@ -884,6 +939,30 @@ test("adopt: the note reaches the project journal only after the confirm; the in
   await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Adopt to project" })).toHaveCount(0);
+});
+
+test("project journal: without .magpie, the Project switch explains what one is and how to start one; a project note says who reads it", async ({ page, magpie }) => {
+  removeFolder(join(magpie.project, ".magpie"));
+  await magpie.open(page);
+  await page.getByRole("radio", { name: "Project" }).click();
+  for (const screen of [/Inbox/, /All notes/]) {
+    await page.getByRole("button", { name: screen }).click();
+    const empty = page.getByText("This repository has no project journal yet.");
+    await expect(empty).toBeVisible();
+    await expect(empty).toContainText("everyone who can read the repository can read its notes");
+    await expect(empty.locator("code")).toHaveText([".magpie/", "repomagpie note <name> --to project"]);
+  }
+
+  await page.getByRole("radio", { name: "Personal" }).click();
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await expect(page.getByText("Project journal, shared with this repository's contributors")).toHaveCount(0);
+  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await page.getByRole("button", { name: "Open the project's note" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  await expect(page.getByText("Project journal, shared with this repository's contributors")).toBeVisible();
+  await expect(page.getByText("This repository has no project journal yet.")).toHaveCount(0);
 });
 
 test("adopt: a note whose Verdict says to avoid is copied, with no install command", async ({ page, magpie }) => {

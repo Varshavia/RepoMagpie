@@ -16,14 +16,18 @@ export function isStopTopic(topic: string): boolean {
 export interface KnownTags {
   tagList: readonly string[]; // the journal's tags.md
   shared: { has(topic: string): boolean }; // topics and tags that other notes in the journal carry
+  aliases?: ReadonlyMap<string, string>; // alias → canonical tag (tag-aliases.ts)
 }
 
-// The topics that may become tags: valid tags, not the repository's own name, not on the stop list,
-// each once. Ranked: in tags.md, then carried by another note, then the rest; GitHub's order within
-// each group (Array.prototype.sort is stable).
+// The topics that may become tags, each as its canonical tag ("postgres" becomes "postgresql"): valid
+// tags, not the repository's own name, not on the stop list, each once. Ranked: in tags.md, then
+// carried by another note, then the rest; GitHub's order within each group (Array.prototype.sort is
+// stable).
 export function rankTopics(topics: readonly unknown[], id: string, known: KnownTags): string[] {
   const repo = id.match(/^pkg:github\/[^/]+\/([^/?#@]+)/)?.[1]?.toLowerCase();
-  const usable = [...new Set(topics)].filter((t): t is string => typeof t === "string" && TAG.test(t) && !isStopTopic(t) && t !== repo);
+  const canonical = (t: string) => known.aliases?.get(t) ?? t;
+  const usable = [...new Set(topics.filter((t): t is string => typeof t === "string" && !isStopTopic(t) && t !== repo).map(canonical))]
+    .filter((t) => TAG.test(t) && !isStopTopic(t) && t !== repo);
   const group = (topic: string) => (known.tagList.includes(topic) ? 0 : known.shared.has(topic) ? 1 : 2);
   return usable.sort((a, b) => group(a) - group(b));
 }

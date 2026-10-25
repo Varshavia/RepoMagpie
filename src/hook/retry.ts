@@ -27,7 +27,14 @@ export function retryKey(agent: string, folder: string, installs: { type: string
 // "pass": this install was denied less than 10 minutes ago. "deny": it wasn't, and the deny is now
 // recorded. "unavailable": the record can't be read or written, so the caller must not deny.
 export function retryDecision(journal: string, key: string, now = Date.now()): "pass" | "deny" | "unavailable" {
-  const file = retryFile(journal);
+  const seen = onceWithin(journal, retryFile(journal), key, RETRY_WINDOW, now);
+  return seen === "seen" ? "pass" : seen === "first" ? "deny" : "unavailable";
+}
+
+// The same record for another use (the Stop reminder's sessions, decision 0042): "seen" when `key`
+// was recorded less than `window` ms ago; "first" when it wasn't, and it is now; "unavailable" when
+// the record can't be read or written.
+export function onceWithin(journal: string, file: string, key: string, window: number, now = Date.now()): "seen" | "first" | "unavailable" {
   try {
     if (!statSync(journal).isDirectory() || journalPathProblem(journal, file, false)) return "unavailable";
   } catch {
@@ -35,8 +42,8 @@ export function retryDecision(journal: string, key: string, now = Date.now()): "
   }
   const entries = read(file);
   if (entries === null) return "unavailable";
-  const fresh = (time: number) => time <= now && now - time < RETRY_WINDOW;
-  if (Object.hasOwn(entries, key) && fresh(entries[key])) return "pass";
+  const fresh = (time: number) => time <= now && now - time < window;
+  if (Object.hasOwn(entries, key) && fresh(entries[key])) return "seen";
 
   const kept = Object.entries(entries).filter(([k, time]) => k !== key && fresh(time)).sort((a, b) => b[1] - a[1]).slice(0, MAX_ENTRIES - 1);
   const temporary = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
@@ -45,7 +52,7 @@ export function retryDecision(journal: string, key: string, now = Date.now()): "
     if (journalPathProblem(journal, file, false)) return "unavailable"; // .cache became a link
     writeFileSync(temporary, JSON.stringify({ version: 1, entries: Object.fromEntries([[key, now], ...kept]) }), { flag: "wx", mode: 0o600 });
     replaceFile(temporary, file);
-    return "deny";
+    return "first";
   } catch {
     try {
       removeFolder(temporary);

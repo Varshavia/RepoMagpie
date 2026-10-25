@@ -4,15 +4,16 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
-import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
+import { findProjectJournal, findProjectRoot, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
 import { setupBackups } from "./backups.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { mcpByHand, mcpRemovable } from "./setup.ts";
-import { findHooks } from "./setup-hook.ts";
+import { findHooks, PRE_TOOL_USE, STOP, type HookKind } from "./setup-hook.ts";
 import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
 import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
+import { DOMAIN_IDS, noteDomains } from "./domains.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
 
@@ -89,6 +90,7 @@ export interface JournalReport {
   notes: number;
   skipped: string[]; // links and files over 256 KB (decision 0032), and why
   unreadable: string[]; // notes whose frontmatter can't be read
+  unknown_domains: { file: string; values: string[] }[]; // values of domains or domains_suggested outside the vocabulary (decision 0040), kept in the files
 }
 
 export interface DoctorJson {
@@ -98,10 +100,13 @@ export interface DoctorJson {
   commands: { name: "repomagpie" | "magpie"; found: Command[] }[]; // the first one found runs
   skills: { path: string; link: string | null; version: string | null }[]; // the folders that exist
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
+  // The opt-in Stop reminder (decision 0042): its entries in the user's settings; [] when off.
+  reminder: HookEntry[];
   agent_hooks: AgentHookReport[]; // Codex CLI, Cursor, Gemini CLI, Antigravity CLI and Copilot CLI
   agents: AgentReport[];
   backups: { path: string; date: string }[]; // setup's backups, which setup --delete-backups deletes; never a problem
   journals: JournalReport[];
+  git_repository: boolean; // the working directory is in a git repository (not one at home), where a project journal could start
   problems: string[]; // what to do, one sentence each
 }
 
@@ -156,6 +161,10 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     return { file, entries: hookEntries(parsed.value, where) };
   });
   const userSettings = claudeSettings(where);
+  // The reminder lives in the user's settings only (setup never writes it in a project).
+  const userRead = existsSync(userSettings) ? readConfig(userSettings) : null;
+  const userParsed = userRead && !("error" in userRead) ? readJsonc(userRead.text) : null;
+  const reminder = userParsed && !("error" in userParsed) ? hookEntries(userParsed.value, where, STOP) : [];
   // What fixes an entry in this file, as setup would: in the user's settings `setup`, in the
   // project's `setup --project .`; by hand where setup leaves the file (comments, a link) or never
   // writes it (settings.local.json). `why` says what the run does ("to change it", "again").
@@ -174,6 +183,9 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
       if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(file, "again")}`);
       else if (!e.code_generation_off) problems.push(`The Claude Code hook in ${tilde(file)} doesn't start node with ${NO_CODEGEN}. ${hookFix(file, "again")}`);
     }
+  }
+  for (const e of reminder.filter((x) => x.form === "exec" && (!x.node_found || !x.entry_found))) {
+    problems.push(`The Claude Code Stop reminder in ${tilde(userSettings)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(userSettings, "again")}`);
   }
 
   // The other agents' hooks. A broken Copilot CLI hook goes first: Copilot CLI denies every tool
@@ -321,9 +333,13 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   for (const j of journals) {
     if (j.skipped.length) problems.push(`${j.skipped.length} ${j.skipped.length === 1 ? "file" : "files"} skipped in the ${j.scope} journal (${tilde(j.path)}).`);
     if (j.unreadable.length) problems.push(`${j.unreadable.length} ${j.unreadable.length === 1 ? "note has" : "notes have"} frontmatter that can't be read in the ${j.scope} journal.`);
+    for (const u of j.unknown_domains) problems.push(`Unknown domain in the ${j.scope} journal's ${u.file}: ${u.values.join(", ")}. Use one of: ${DOMAIN_IDS.join(", ")}.`);
   }
 
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, agent_hooks: agentHooks, agents, backups, journals, problems };
+  const root = findProjectRoot(request.cwd, request.home);
+  const gitRepository = !samePath(root, request.home) && existsSync(join(root, ".git"));
+
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, problems };
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked
@@ -393,11 +409,11 @@ function projectSettings(request: DoctorRequest): string[] {
 }
 
 // Our hook entries, read as setup reads them (setup-hook.ts), with the exec form's paths checked.
-function hookEntries(settings: unknown, where: Where): HookEntry[] {
-  const found = findHooks(settings);
-  // No hooks, no PreToolUse, or one that isn't a list: no entries. Found ones mean PreToolUse is a list.
+function hookEntries(settings: unknown, where: Where, kind: HookKind = PRE_TOOL_USE): HookEntry[] {
+  const found = findHooks(settings, kind);
+  // No hooks, no such event, or one that isn't a list: no entries. Found ones mean it is a list.
   if (typeof found === "string" || !found.length) return [];
-  const groups = (settings as { hooks: { PreToolUse: { matcher?: unknown }[] } }).hooks.PreToolUse;
+  const groups = (settings as { hooks: Record<string, { matcher?: unknown }[]> }).hooks[kind.event];
   return found.map((f) => {
     const matcher = groups[f.group]?.matcher;
     const exec = f.form === "exec" && f.args !== null;
@@ -415,16 +431,21 @@ function hookEntries(settings: unknown, where: Where): HookEntry[] {
 }
 
 function journalReport(scope: "personal" | "project", path: string): JournalReport {
-  if (!existsSync(path)) return { scope, path, exists: false, notes: 0, skipped: [], unreadable: [] };
+  if (!existsSync(path)) return { scope, path, exists: false, notes: 0, skipped: [], unreadable: [], unknown_domains: [] };
   const { files, skipped } = noteSignature(path);
-  const unreadable = files.filter((file) => {
+  const unreadable: string[] = [];
+  const unknownDomains: JournalReport["unknown_domains"] = [];
+  for (const file of files) {
     try {
-      return readNote(readFileSync(join(path, "notes", file), "utf8")).warnings.some((w) => w.startsWith("The frontmatter"));
+      const note = readNote(readFileSync(join(path, "notes", file), "utf8"));
+      if (note.warnings.some((w) => w.startsWith("The frontmatter"))) unreadable.push(file);
+      const { unknown } = noteDomains(note.frontmatter);
+      if (unknown.length) unknownDomains.push({ file, values: unknown });
     } catch {
-      return true;
+      unreadable.push(file);
     }
-  });
-  return { scope, path, exists: true, notes: files.length, skipped, unreadable };
+  }
+  return { scope, path, exists: true, notes: files.length, skipped, unreadable, unknown_domains: unknownDomains };
 }
 
 // A config file's text, or why it can't be read. A link is read: it is the user's own file.

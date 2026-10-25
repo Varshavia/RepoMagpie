@@ -4,6 +4,7 @@
 // notes/ listing: no request text is ever joined to a path. Never prints.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { noteDomains } from "./domains.ts";
 import { editNote, noteVersion } from "./edit.ts";
 import { graphData, type GraphData } from "./graph.ts";
 import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
@@ -102,6 +103,8 @@ export interface NoteSummary {
   name: string | null;
   kind: string | null;
   tags: string[];
+  domains: string[]; // the known domains the user confirmed (decision 0040)
+  domains_suggested: string[]; // the known suggested ones, without the confirmed
   status: "inbox" | "reviewed";
   verdict: string;
   tried: boolean;
@@ -122,6 +125,7 @@ export interface NoteFilters {
   status?: "inbox" | "reviewed";
   kind?: string;
   tags?: string[]; // every tag must be present
+  domain?: string; // confirmed or suggested
 }
 
 export function noteListDocument(scope: Scope, filters: NoteFilters, place: Place): Result<NoteListJson> {
@@ -129,7 +133,8 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
   if (journal.error) return { outcome: "failed", document: { journal: scope, count: 0, notes: [], skipped: [], error: journal.error } };
   const { notes: all, skipped } = summaries(journal.path);
   const notes = all
-    .filter((n) => (!filters.status || n.status === filters.status) && (!filters.kind || n.kind === filters.kind) && (filters.tags ?? []).every((tag) => n.tags.includes(tag)))
+    .filter((n) => (!filters.status || n.status === filters.status) && (!filters.kind || n.kind === filters.kind) && (filters.tags ?? []).every((tag) => n.tags.includes(tag)) &&
+      (!filters.domain || n.domains.includes(filters.domain) || n.domains_suggested.includes(filters.domain)))
     .sort((a, b) => compare((a.name ?? a.file).toLowerCase(), (b.name ?? b.file).toLowerCase()) || compare(a.file, b.file));
   return { outcome: "ok", document: { journal: scope, count: notes.length, notes, skipped } };
 }
@@ -137,7 +142,7 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
 // and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
 const NOTE_LIST_CACHE = "note-list.json";
-const NOTE_LIST_VERSION = 2; // 2: nested and unterminated comments stripped from the Verdict
+const NOTE_LIST_VERSION = 3; // 2: nested and unterminated comments stripped from the Verdict; 3: domains
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
   const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
@@ -146,7 +151,7 @@ function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] }
 
 // Whether a cached value has a summary's shape (a damaged cache is read again from the note).
 function isSummary(s: unknown): boolean {
-  return isRecord(s) && isTextOrNull(s.id) && typeof s.file === "string" && isTextOrNull(s.name) && isTextOrNull(s.kind) && isTexts(s.tags) &&
+  return isRecord(s) && isTextOrNull(s.id) && typeof s.file === "string" && isTextOrNull(s.name) && isTextOrNull(s.kind) && isTexts(s.tags) && isTexts(s.domains) && isTexts(s.domains_suggested) &&
     (s.status === "inbox" || s.status === "reviewed") && typeof s.verdict === "string" && typeof s.tried === "boolean" &&
     (s.rating === null || Number.isInteger(s.rating)) && isTextOrNull(s.explored) && typeof s.read_only === "boolean";
 }
@@ -154,12 +159,15 @@ function isSummary(s: unknown): boolean {
 function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {
   const fm = note.frontmatter;
   const id = readableId(note);
+  const domains = noteDomains(fm);
   return {
     id,
     file,
     name: typeof fm.name === "string" ? fm.name : null,
     kind: typeof fm.kind === "string" ? fm.kind : null,
     tags: textList(fm.tags),
+    domains: domains.domains,
+    domains_suggested: domains.suggested,
     status: note.status,
     verdict: note.verdict,
     tried: fm.tried === true,

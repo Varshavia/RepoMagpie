@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { NO_CODEGEN } from "./launch.ts";
-import { applyHook, HOOK_COMMAND, planHook, type HookTarget } from "./setup-hook.ts";
+import { applyHook, HOOK_COMMAND, planHook, STOP, type HookTarget } from "./setup-hook.ts";
 
 // The Claude Code hook (spec §6; decision 0035): in the user's settings the exec form (node started
 // directly, no shell); in a project the shell form. Added, migrated with its flags, kept, removed;
@@ -122,4 +122,39 @@ test("never edited: comments (a snippet instead), a linked folder, PreToolUse th
   const npx = scratch(GUARD);
   const blocked = planHook(npx.file, npx.home, false, STAMP, { error: "This copy of RepoMagpie runs from npx's cache" });
   assert.deepEqual([blocked.action, blocked.reason], ["refused", "This copy of RepoMagpie runs from npx's cache"]);
+});
+
+// The Stop reminder (decision 0042): the same writer, another event, its own subcommand.
+test("the Stop reminder: a Stop entry without a matcher, beside the PreToolUse hook; kept, updated and removed on its own", () => {
+  const s = scratch(GUARD);
+  assert.equal(s.run(EXEC).result, "done");
+  const before = s.read();
+  // Without --capture-reminder (add false), nothing is added.
+  assert.equal(planHook(s.file, s.home, false, STAMP, EXEC, STOP, false).action, "keep");
+  const plan = planHook(s.file, s.home, false, "20261014-130000", EXEC, STOP);
+  assert.equal(plan.action, "add");
+  assert.equal(applyHook(plan, s.home, EXEC, STOP).result, "done");
+  const settings = JSON.parse(s.read()) as { hooks: { PreToolUse: unknown; Stop: unknown } };
+  assert.deepEqual(settings.hooks.Stop, [{ hooks: [{ type: "command", command: NODE, args: [NO_CODEGEN, ENTRY, "hook", "claude-code-stop"] }] }]);
+  assert.deepEqual(settings.hooks.PreToolUse, (JSON.parse(before) as { hooks: { PreToolUse: unknown } }).hooks.PreToolUse, "the PreToolUse hook is untouched");
+  // Each finds only its own: hook claude-code isn't hook claude-code-stop.
+  assert.equal(planHook(s.file, s.home, false, STAMP, EXEC).action, "keep");
+  assert.equal(planHook(s.file, s.home, false, STAMP, EXEC, STOP, false).action, "keep");
+  // A moved entry file: kept up to date even without the flag.
+  const moved: HookTarget = { exec: { command: NODE, args: [NO_CODEGEN, "C:\\new\\main.js", "hook", "claude-code"] } };
+  assert.equal(planHook(s.file, s.home, false, STAMP, moved, STOP, false).action, "migrate");
+  // --remove takes out the reminder alone; the hook stays.
+  assert.equal(applyHook(planHook(s.file, s.home, true, "20261014-140000", EXEC, STOP), s.home, EXEC, STOP).result, "done");
+  const after = JSON.parse(s.read()) as { hooks: Record<string, unknown> };
+  assert.deepEqual(after.hooks.Stop, []);
+  assert.deepEqual(after.hooks.PreToolUse, (JSON.parse(before) as { hooks: { PreToolUse: unknown } }).hooks.PreToolUse);
+});
+
+test("the Stop reminder in a project's shell form, and a Stop that isn't a list", () => {
+  const s = scratch();
+  assert.equal(applyHook(planHook(s.file, s.home, false, STAMP, SHELL, STOP), s.home, SHELL, STOP).result, "done");
+  assert.deepEqual(JSON.parse(s.read()).hooks.Stop, [{ hooks: [{ type: "command", command: "repomagpie hook claude-code-stop" }] }]);
+  const wrong = scratch('{"hooks": {"Stop": {}}}');
+  assert.match(planHook(wrong.file, wrong.home, false, STAMP, EXEC, STOP).reason ?? "", /hooks\.Stop isn't a list/);
+  assert.equal(planHook(wrong.file, wrong.home, false, STAMP, EXEC).action, "add", "the PreToolUse hook doesn't mind");
 });

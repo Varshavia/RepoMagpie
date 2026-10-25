@@ -20,6 +20,7 @@ import {
   tagListPath,
   type NoteAddress,
 } from "../core/documents.ts";
+import { DOMAIN_IDS, domainsProblem, isDomain } from "../core/domains.ts";
 import type { PackageType } from "../core/identity.ts";
 import { KINDS } from "../core/note.ts";
 import type { Outcome } from "../core/outcome.ts";
@@ -99,7 +100,9 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (status !== undefined && status !== "inbox" && status !== "reviewed") return bad(empty, "status must be inbox or reviewed.");
         const kind = query.get("kind") ?? undefined;
         if (kind !== undefined && !KINDS.includes(kind)) return bad(empty, `kind must be one of: ${KINDS.join(", ")}.`);
-        return reply(noteListDocument(journal, { status, kind, tags: query.getAll("tag") }, context));
+        const domain = query.get("domain") ?? undefined;
+        if (domain !== undefined && !isDomain(domain)) return bad(empty, `domain must be one of: ${DOMAIN_IDS.join(", ")}.`);
+        return reply(noteListDocument(journal, { status, kind, tags: query.getAll("tag"), domain }, context));
       },
     },
 
@@ -134,9 +137,12 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (tags === null) return bad(empty, "tags must be a list of lowercase kebab-case tags, such as [\"browser-automation\"].");
         const items = itemsProblem("use_when", body.use_when) ?? itemsProblem("avoid_when", body.avoid_when);
         if (items) return bad(empty, items);
+        const domainProblem = domainsProblem("domains", body.domains === null ? undefined : body.domains);
+        if (domainProblem) return bad(empty, domainProblem);
         const useWhen = body.use_when as string[] | undefined;
         const avoidWhen = body.avoid_when as string[] | undefined;
-        return reply(await runNote({ target: body.target, text, type: packageType, to, tags, useWhen, avoidWhen }, context));
+        const domains = (body.domains ?? undefined) as string[] | undefined;
+        return reply(await runNote({ target: body.target, text, type: packageType, to, tags, useWhen, avoidWhen, domains }, context));
       },
     },
 
@@ -187,7 +193,9 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (journal === null) return bad(empty, JOURNAL);
         const limit = query.has("limit") ? Number(query.get("limit")) : 10;
         if (!Number.isInteger(limit) || limit < 1) return bad(empty, "limit must be a whole number of 1 or more.");
-        const run = runSearch({ query: q, tags: query.getAll("tag"), kind, journal, limit }, context);
+        const match = query.get("match") ?? "boost";
+        if (match !== "boost" && match !== "filter") return bad(empty, "match must be boost or filter.");
+        const run = runSearch({ query: q, tags: query.getAll("tag"), domains: query.getAll("domain"), match, kind, journal, limit }, context);
         return reply({ ...run, document: searchForAgent(run.document) });
       },
     },

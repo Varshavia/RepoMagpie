@@ -1,7 +1,8 @@
 // The Verdict editor with the human-owned fields next to it (docs/ui.md §7, inbox review): Use when
-// and Avoid when items, kind, tags from the journal's tags.md, tried, rating. Ctrl/Cmd+Enter saves
-// everything; Esc leaves.
+// and Avoid when items, kind, domains, tags from the journal's tags.md, tried, rating. Ctrl/Cmd+Enter
+// saves everything, the domains picked included; Esc leaves.
 import { useId, type KeyboardEvent, type Ref } from "react";
+import { DOMAIN_LIMIT, DOMAINS } from "../../../src/core/domains.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import type { Form } from "../logic/edits.ts";
 import type { LinkNote } from "../logic/links.ts";
@@ -31,9 +32,10 @@ interface Props {
   onAddTopic: (tag: string) => void;
   drafts: { useWhen: boolean; avoidWhen: boolean }; // the sections that hold a draft, which typed items replace
   name: string; // the note's name, for "RepoMagpie will ask before … is installed."
+  suggestedDomains: string[]; // the note's domains_suggested (decision 0040): shown outlined until picked
 }
 
-export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged, linkNotes, self, topics, onAddTopic, drafts, name }: Props) {
+export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagList, noTagList, onCreateTagList, saving, dirty, error, verdictRef, verdictChanged, linkNotes, self, topics, onAddTopic, drafts, name, suggestedDomains }: Props) {
   const id = useId();
   const keys = (e: KeyboardEvent) => {
     if ((IS_MAC ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
@@ -115,6 +117,37 @@ export function ReviewForm({ form, onChange, onSave, onLeave, onEditTags, tagLis
           <input type="checkbox" name="tried" checked={form.tried} onChange={(e) => set("tried", e.target.checked)} />
           Tried it
         </label>
+
+        <div className="field wide">
+          <span className="field-label" id={`${id}-domains`}>
+            Domains
+          </span>
+          <div className="chips" role="group" aria-labelledby={`${id}-domains`} aria-describedby={`${id}-domains-help`}>
+            {DOMAINS.map(({ id: d, definition }) => {
+              const on = form.domains.includes(d);
+              const suggested = suggestedDomains.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  className={suggested && !on ? "chip domain suggested" : "chip domain"}
+                  aria-pressed={on}
+                  disabled={!on && form.domains.length >= DOMAIN_LIMIT}
+                  title={suggested && !on ? `${definition} Suggested from the note's tags and topics.` : definition}
+                  onClick={() => set("domains", on ? form.domains.filter((x) => x !== d) : [...form.domains, d])}
+                >
+                  {on ? <Icon name="check" size={12} /> : null}
+                  {d}
+                  {suggested && !on ? <span className="visually-hidden"> (suggested)</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <p className="field-help" id={`${id}-domains-help`}>
+            {suggestedDomains.some((d) => !form.domains.includes(d)) ? "Outlined: suggested by RepoMagpie. Pick the ones that are right; they are saved with the note. " : ""}
+            At most {DOMAIN_LIMIT}.
+          </p>
+        </div>
 
         <div className="field wide">
           <div className="field-label-row">

@@ -17,6 +17,7 @@ import {
   flagJournal,
   homeJournal,
   isLink,
+  journalAliases,
   journalTagList,
   listNotes,
   noteFor,
@@ -25,6 +26,7 @@ import {
   type NoteEntry,
   type Place,
 } from "./journals.ts";
+import { domainsProblem } from "./domains.ts";
 import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
 import { assertWritable, journalPathProblem, linkProblem } from "./note-cache.ts";
@@ -78,6 +80,7 @@ export interface Item {
   myNotes?: string;
   alternatives?: string[]; // note's --alternative targets, as the user gave them (decision 0029)
   tags?: string[]; // a new note's tags as chosen in Add's preview, in place of the drafted ones
+  domains?: string[]; // note's --domain: the domains the user confirmed (decision 0040)
 }
 
 export interface ItemResult {
@@ -94,6 +97,7 @@ export interface ItemResult {
   tagsMdAdded: string[]; // the new note's tags appended to tags.md (or, in a dry run, that would be)
   items: Items; // what the --use-when and --avoid-when items did
   asksFirst: boolean; // the user's own Avoid when items made or kept this an avoid note (decision 0024)
+  domainsAdded: string[]; // the --domain values written to `domains`
 }
 
 // What ranks a new note's topics (decision 0030): the tag list, and the topics and tags of every
@@ -113,7 +117,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   const warnings: string[] = [];
   const notices: string[] = [];
   const fail = (error: string, at: string | null, status: Capture["status"] = null, name: string | null = null): ItemResult =>
-    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [], items: { changed: [], draftsReplaced: [], present: [] }, asksFirst: false });
+    ({ id: entry?.id ?? item.purl, path: at, result: "failed", name, status, error, warnings, notices, text: null, alternatives: { added: [], present: [] }, tagsMdAdded: [], items: { changed: [], draftsReplaced: [], present: [] }, asksFirst: false, domainsAdded: [] });
 
   // A link, or a file over the size limit, at the note's place or above it: never read nor written
   // (decision 0032, rule 5). Listing left it out, so without this it would look like a free name.
@@ -139,7 +143,8 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     }
   }
 
-  const capture = captureNote(existing, { ...item, metadata, today: context.today(), known: knownTags(notes, tagList, path) });
+  const known = { ...knownTags(notes, tagList, path), aliases: journalAliases(journal.path) };
+  const capture = captureNote(existing, { ...item, metadata, today: context.today(), known });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
 
@@ -196,6 +201,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     tagsMdAdded,
     items: capture.items,
     asksFirst: Boolean(item.ownAvoidWhen?.some((i) => i.trim())),
+    domainsAdded: capture.domainsAdded,
   };
 }
 
@@ -276,6 +282,7 @@ export interface NoteRequest {
   useWhen?: string[]; // --use-when, repeatable: the user's own items
   avoidWhen?: string[]; // --avoid-when, repeatable: the user's own items
   tags?: string[]; // Add's preview: the new note's tags, as the user left them
+  domains?: string[]; // --domain, repeatable: domains the user confirmed (decision 0040)
 }
 
 // The --json document of magpie note (spec §2).
@@ -292,6 +299,7 @@ export interface NoteJson {
   sections_changed: string[];
   drafts_replaced: string[];
   items_present: string[];
+  domains_added: string[]; // the --domain values written to `domains` (decision 0040)
   error?: string;
 }
 
@@ -309,10 +317,10 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     outcome,
     journal,
     saved: null,
-    document: noteForAgent({ id: null, journal: journal.scope, path: null, created: false, status: null, warnings: journal.warnings, alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], error }),
+    document: noteForAgent({ ...emptyNoteJson(journal.scope), warnings: journal.warnings, error }),
   });
   if (journal.error) return stop(journal.error, "failed");
-  const itemsError = itemsProblem("--use-when", request.useWhen) ?? itemsProblem("--avoid-when", request.avoidWhen);
+  const itemsError = itemsProblem("--use-when", request.useWhen) ?? itemsProblem("--avoid-when", request.avoidWhen) ?? domainsProblem("--domain", request.domains);
   if (itemsError) return stop(itemsError, "usage");
   const bad = request.alternatives?.find((target) => !/^[^[\]|#\r\n]+$/.test(target.trim()));
   if (bad !== undefined) return stop(`--alternative takes a name, a PURL or a file stem, without [[ ]], | or #: ${JSON.stringify(bad)}.`, "usage");
@@ -323,7 +331,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
 
-  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags };
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags, domains: request.domains };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
     id: saved.id,
@@ -338,9 +346,15 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     sections_changed: saved.items.changed,
     drafts_replaced: saved.items.draftsReplaced,
     items_present: saved.items.present,
+    domains_added: saved.domainsAdded,
   };
   if (saved.error !== null) document.error = saved.error;
   return { outcome: saved.error === null ? "ok" : "failed", document: noteForAgent(document), journal, saved };
+}
+
+// magpie note's --json document when nothing was saved; the caller adds `error`.
+export function emptyNoteJson(scope: Journal["scope"]): NoteJson {
+  return { id: null, journal: scope, path: null, created: false, status: null, warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] };
 }
 
 // The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the

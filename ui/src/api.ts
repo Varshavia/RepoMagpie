@@ -62,6 +62,23 @@ const write = <T>(method: "POST" | "PATCH", path: string, body: unknown) =>
 
 const addressParams = (address: Address) => ("id" in address ? { id: address.id } : { file: address.file });
 
+// The graph page's data, asked for as soon as the page is (App's go), so the request runs while the
+// page's chunk loads instead of after it (docs/ui.md §10). The page takes it once, when it mounts
+// for that journal; any other time it fetches its own.
+let early: { journal: Scope; data: Promise<GraphJson> } | null = null;
+
+export function fetchGraphEarly(journal: Scope): void {
+  performance.mark("graph:fetch");
+  early = { journal, data: api.graph(journal, true) };
+  early.data.catch(() => {}); // a failure is the page's to show, if it takes the request
+}
+
+export function takeGraph(journal: Scope): Promise<GraphJson> | null {
+  const data = early?.journal === journal ? early.data : null;
+  early = null;
+  return data;
+}
+
 export const api = {
   settings: () => get<SettingsJson>("/api/settings"),
   tags: (journal: Scope) => get<TagListJson>("/api/tags", { journal }),
@@ -72,8 +89,8 @@ export const api = {
   graph: (journal: Scope, ghosts: boolean) => get<GraphJson>("/api/graph", { journal, ghosts: ghosts ? "1" : undefined }),
   note: (journal: Scope, address: Address) => get<NoteJson>("/api/note", { journal, ...addressParams(address) }),
   patch: (patch: Patch) => write<NoteJson>("PATCH", "/api/note", patch),
-  search: (params: { q: string; journal?: Scope; kind?: string; tag?: string[]; limit?: number }) =>
-    get<{ query: string; results: SearchResult[] }>("/api/search", { q: params.q, journal: params.journal, kind: params.kind, tag: params.tag, limit: String(params.limit ?? 10) }),
+  search: (params: { q: string; journal?: Scope; kind?: string; tag?: string[]; domain?: string[]; match?: "boost" | "filter"; limit?: number }) =>
+    get<{ query: string; results: SearchResult[] }>("/api/search", { q: params.q, journal: params.journal, kind: params.kind, tag: params.tag, domain: params.domain, match: params.match, limit: String(params.limit ?? 10) }),
   preview: (body: { target: string; type?: PackageType; to: Scope }) => write<NotePreviewJson>("POST", "/api/note/preview", body),
   save: (body: { target: string; text?: string; type?: PackageType; to: Scope; tags?: string[]; use_when?: string[]; avoid_when?: string[] }) => write<SavedNoteJson>("POST", "/api/note", body),
   importLines: (body: { text: string; to: Scope; dry_run: boolean }) => write<ImportJson>("POST", "/api/import", body),

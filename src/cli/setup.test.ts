@@ -82,9 +82,10 @@ test("--json needs --yes or --dry-run, and prints the plan with each result", as
   const r = await magpie(b, ["setup", "--yes", "--json"], b.over);
   assert.equal(r.err, "");
   const doc = JSON.parse(r.out);
-  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "project", "launch", "launch_error", "agents", "skill", "hook", "hooks"]);
+  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "project", "launch", "launch_error", "agents", "skill", "hook", "reminder", "hooks"]);
   assert.equal(doc.skill.result, "done");
   assert.equal(doc.hook, null, "no Claude Code here");
+  assert.equal(doc.reminder, null);
   assert.deepEqual(doc.hooks.map((h: { id: string; action: string; result: string }) => [h.id, h.action, h.result]), [["cursor", "add", "done"]]);
   const cursor = doc.agents.find((a: { id: string }) => a.id === "cursor");
   assert.deepEqual([cursor.action, cursor.method, cursor.result], ["add", "json", "done"]);
@@ -256,6 +257,43 @@ test("--project: the skill and the Claude Code hook go into the project; the MCP
   assert.ok(!existsSync(join(b.home, ".agents")) && !existsSync(join(b.home, ".claude", "settings.json")));
   assert.deepEqual(b.entry().args.slice(0, 1), [NO_CODEGEN], "Cursor's MCP entry is in ~/.cursor, as without --project");
   assert.equal((await magpie(b, ["--project", join(b.root, "nope"), "setup", "--yes"], b.over)).code, 2);
+});
+
+test("--capture-reminder adds the Stop reminder beside the hook, in the user's settings; a second run keeps it; --remove takes both", async () => {
+  const b = box();
+  mkdirSync(join(b.home, ".claude"));
+  const settings = join(b.home, ".claude", "settings.json");
+  const plain = await magpie(b, ["setup", "--dry-run", "--agents", "claude-code"], b.over);
+  assert.doesNotMatch(plain.err, /Reminder/, "off by default, and not mentioned");
+  const r = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], b.over);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /^ {2}Reminder {6}add the Stop reminder: ~[\\/]\.claude[\\/]settings\.json$/m);
+  assert.match(r.err, /^Done: the Claude Code Stop reminder, added\.$/m);
+  const hooks = JSON.parse(readFileSync(settings, "utf8")).hooks;
+  assert.deepEqual(hooks.Stop, [{ hooks: [{ type: "command", command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "hook", "claude-code-stop"] }] }]);
+  assert.equal(hooks.PreToolUse[0].hooks[0].args.at(-1), "claude-code", "the hook, added in the same run, is still there");
+  const again = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], b.over);
+  assert.match(again.err, /^ {2}Reminder {6}already set up: /m);
+  assert.doesNotMatch((await magpie(b, ["setup", "--yes", "--agents", "claude-code"], b.over)).err, /Reminder/, "kept without the flag, unmentioned");
+  assert.ok(JSON.parse(readFileSync(settings, "utf8")).hooks.Stop.length);
+  const removed = await magpie(b, ["setup", "--remove", "--yes", "--agents", "claude-code"], b.over);
+  assert.match(removed.err, /^Done: the Claude Code Stop reminder, removed \(backup: .*-2\)\.$/m);
+  const after = JSON.parse(readFileSync(settings, "utf8")).hooks;
+  assert.deepEqual([after.Stop, after.PreToolUse], [[], []]);
+});
+
+test("--capture-reminder: not with --remove, --project, --delete-backups, or --agents without claude-code", async () => {
+  const b = box();
+  for (const [args, message] of [
+    [["--remove"], /Use one of them/],
+    [["--project", b.project], /each person chooses it/],
+    [["--delete-backups"], /--delete-backups goes alone/],
+    [["--agents", "cursor"], /add claude-code to --agents/],
+  ] as const) {
+    const r = await magpie(b, args[0] === "--project" ? ["--project", b.project, "setup", "--yes", "--capture-reminder"] : ["setup", "--yes", "--capture-reminder", ...args], b.over);
+    assert.equal(r.code, 2, args.join(" "));
+    assert.match(r.err, message);
+  }
 });
 
 test("the hooks: each on its agent's lines in the plan, then in the summary; Codex CLI's says how to trust it", async () => {

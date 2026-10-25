@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { run } from "./program.ts";
 
-const NOT_YET = ["init"];
 const version: string = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
 
 // These tests never reach a journal or the network: every call below fails fast if they do.
@@ -30,7 +29,7 @@ test("--version prints the package version", async () => {
   assert.equal(r.out.trim(), version);
 });
 
-test("--help lists note, import, search, recall and hook, and every v0.1 command not built yet as not implemented yet", async () => {
+test("--help lists note, import, search, recall, suggest, init, adopt and hook", async () => {
   const r = await magpie("--help");
   assert.equal(r.code, 0);
   assert.match(r.out, /^\s+note \[options\] <name-or-url> \[text\]\s+capture a verdict in one line$/m);
@@ -39,10 +38,9 @@ test("--help lists note, import, search, recall and hook, and every v0.1 command
   assert.match(r.out, /^\s+recall \[options\] <package\.\.\.>\s+show your notes before an install$/m);
   assert.match(r.out, /^\s+suggest \[options\] \[description\]\s+show the notes that fit this project$/m);
   assert.match(r.out, /^\s+adopt \[options\] <name-or-purl>\s+copy a note into the project journal$/m);
+  assert.match(r.out, /^\s+init \[options\]\s+your notes on this project's packages$/m);
   assert.match(r.out, /^\s+hook\s+adapters that agent hooks run/m);
-  for (const command of NOT_YET) {
-    assert.match(r.out, new RegExp(`^\\s+${command}\\b.*not implemented yet`, "m"), command);
-  }
+  assert.doesNotMatch(r.out, /not implemented yet/);
 });
 
 // Decision 0031: the command is repomagpie; help names the alias once.
@@ -54,11 +52,11 @@ test("--help names the command repomagpie and says once that magpie is a short a
   assert.match((await magpie("note", "--help")).out, /^Usage: repomagpie note /m);
 });
 
-test("a v0.1 command not built yet says so and exits 1", async () => {
+test("init without --auto says what --auto does and exits 2", async () => {
   const r = await magpie("init");
-  assert.equal(r.code, 1);
+  assert.equal(r.code, 2);
   assert.equal(r.out, "");
-  assert.equal(r.err, "repomagpie init: not implemented yet\n");
+  assert.match(r.err, /^repomagpie init: say what to do\. For now there is one action: repomagpie init --auto /);
 });
 
 test("a choice outside --to's list is a usage error (exit 2)", async () => {

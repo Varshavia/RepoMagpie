@@ -203,11 +203,11 @@ test("Note list: every note, sorted by name, read-only ones included", () => {
   assert.equal(document.count, 3);
   assert.deepEqual(document.notes.map((n) => n.file), ["github--microsoft--playwright-cli.md", "npm--broken.md", "npm--pdfkit.md"]);
   assert.deepEqual(document.notes[2], {
-    id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", kind: "library", tags: ["pdf"], status: "reviewed",
+    id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", kind: "library", tags: ["pdf"], domains: [], domains_suggested: [], status: "reviewed",
     verdict: "avoid: async streams painful; use puppeteer", tried: true, rating: 2, explored: "2026-10-03", read_only: false,
   });
   assert.deepEqual(document.notes[1], {
-    id: null, file: "npm--broken.md", name: null, kind: null, tags: [], status: "inbox",
+    id: null, file: "npm--broken.md", name: null, kind: null, tags: [], domains: [], domains_suggested: [], status: "inbox",
     verdict: "", tried: false, rating: null, explored: null, read_only: true,
   });
 });
@@ -220,6 +220,16 @@ test("Note list filters: status, kind, and every tag", () => {
   assert.deepEqual(files({ tags: ["pdf"] }), ["npm--pdfkit.md"]);
   assert.deepEqual(files({ tags: ["pdf", "testing"] }), []);
   assert.deepEqual(noteListDocument("project", {}, s.context).document.notes.map((n) => n.id), ["pkg:npm/puppeteer"]);
+});
+
+test("Note list: known domains only, suggested without the confirmed; the domain filter takes either (decision 0040)", () => {
+  const s = setup();
+  const path = join(s.journal, "notes", "npm--pdfkit.md");
+  writeFileSync(path, readFileSync(path, "utf8").replace("tried:", "domains: [api, pdfs]\ndomains_suggested: [api, testing]\ntried:"));
+  const { notes } = noteListDocument("personal", {}, s.context).document;
+  assert.deepEqual([notes[2].domains, notes[2].domains_suggested], [["api"], ["testing"]]);
+  const files = (domain: string) => noteListDocument("personal", { domain }, s.context).document.notes.map((n) => n.file);
+  assert.deepEqual([files("api"), files("testing"), files("pdfs"), files("ai")], [["npm--pdfkit.md"], ["npm--pdfkit.md"], [], []]);
 });
 
 test("Note list cache: .cache/note-list.json; unchanged notes come from it, changed and new notes from disk", () => {
