@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.11] - 2026-10-25
+
+The twelfth pre-release: say when you'd use a package, or avoid it, when you write the note (`repomagpie note --use-when` / `--avoid-when`, the app's review and Add, the MCP `note` tool), so notes are found later by what you need. Nested and unclosed HTML comments in a note no longer leak into search, recall or the Verdict. Run `repomagpie setup` after the upgrade so your agents get the new skill.
+
 ### Added
 
 - Say when you'd use or avoid a package, in your words, when you save it: `repomagpie note zod "default for validating input" --use-when "checking API input" --avoid-when "a tiny script"`. Each flag adds one item and can be repeated. Your items are kept as you wrote them and new ones go after them; an item already there isn't added twice; items replace a draft "Use when" written from GitHub's description. An "Avoid when" item makes RepoMagpie ask before the package is installed, and the command says so. Notes are then found by what you need, not only by name.
@@ -264,7 +268,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...HEAD
+[0.2.0-beta.11]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...v0.2.0-beta.11
 [0.2.0-beta.10]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...v0.2.0-beta.10
 [0.2.0-beta.9]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...v0.2.0-beta.9
 [0.2.0-beta.8]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.7...v0.2.0-beta.8
