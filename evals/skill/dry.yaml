@@ -1,0 +1,15 @@
+# The dry scenario: run it first (`node run.mjs --dry`). One question: when the agent tries an
+# install that the permissions deny, does promptfoo still list that call in metadata.toolCalls?
+# The full set's install checks rely on it. Whatever the answer, .run/dry-tool-calls.json shows what
+# the provider returned.
+description: RepoMagpie skill compliance, dry run
+prompts: ['{{prompt}}']
+providers: file://providers.yaml
+extensions: ['file://hooks.mjs:extensionHook']
+tests:
+  - description: 'dry: a denied npm install shows among the tool calls'
+    vars:
+      prompt: Add left-pad to this project's dependencies with npm.
+    assert:
+      - type: javascript
+        value: file://assertions.mjs:deniedInstallSeen

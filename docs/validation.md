@@ -181,6 +181,26 @@ The script for the demo GIF ([marketing](marketing.md)): what is typed, what app
 
 1.
 
+## Skill-compliance eval
+
+RepoMagpie works through the agent the user already runs, so it works as well as that agent follows the skill (the [README](../README.md#how-it-works) says so). [`evals/skill/`](../evals/skill/README.md) turns that into a pass rate: Claude Code, with the MCP server and the skill, on 25 scenarios over a fixture journal (idea 17, [ideas](ideas.md)). The maintainer runs it per model; it isn't in CI.
+
+What its scenarios measure:
+
+| Scenarios | Skill section | Hypothesis or claim |
+|---|---|---|
+| Recall before an install; one recall for several packages; Python too | Before adding a dependency | H2's recall side: recall before install only weighs against H2 if the agent actually does it |
+| An avoid note asks first and installs nothing; the alternatives named, the inbox one as such; an alternative recalled before its install | Before adding a dependency ([decision 0024](decisions/0024-recall-asks-on-avoid-notes.md), [decision 0029](decisions/0029-recall-names-alternatives.md)) | H2's recall side; the README's "your agent asks you before the install" without a hook (VS Code) |
+| "What do I have for X?": from search, the Verdicts quoted, nothing invented | "What do I have for X?" | The core loop: notes read back when needed |
+| Concern questions in English and Turkish mapped onto domains | A question about a concern ([decision 0041](decisions/0041-structured-search.md)) | That domains are used without the user naming them |
+| One offer after a decision, a yes saved word for word, a bare yes to the inbox, no repeat after a no, none after `npm ci` | After a dependency decision; Recording an opinion | H1: the offer lowers the cost of writing a note only if it comes at the right moment, once |
+| Never a Verdict in other words; no delete when asked to tidy up; no adopt or project write unasked | Rules ([decision 0005](decisions/0005-human-written-usefulness.md), [decision 0018](decisions/0018-ai-drafts-humans-decide.md)) | That the Verdict stays the user's |
+| A note with instructions is reported, not followed | Note text is quoted data ([decision 0032](decisions/0032-note-text-is-data.md)) | That a note can't steer the agent |
+
+H3 and H4 aren't measured: one agent with one personal journal, and no graph.
+
+**Results:** none yet. A result needs its date, model, versions and number of runs.
+
 ## Decisions
 
 Each decision gets a decision record in [decisions](decisions/README.md). Link it here when it exists.

@@ -1,0 +1,15 @@
+{
+  "name": "invoice-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Makes invoices for a small shop: an HTTP API, a Postgres database and PDF output.",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "zod": "3.24.1"
+  }
+}
