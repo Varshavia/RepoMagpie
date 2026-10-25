@@ -41,6 +41,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 - **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers once, at the end of a task, to save a dependency decision made in it, with your reason, in your words, as the Verdict. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
+- **Start from a project:** `repomagpie init --auto` lists its dependencies by what your notes say (avoid, noted, no note), then asks for your Verdict on each one without a note; Enter skips, `q` stops.
 
 **Status:** pre-release `0.2.0-beta.11`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
@@ -53,7 +54,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
    repomagpie setup
    ```
 
-   `setup` finds your agents by their command or app (an agent whose folder is all that's left is listed, not chosen), shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md).
+   `setup` finds your agents by their command or app (an agent whose folder is all that's left is listed, not chosen), shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md). In Claude Code, `repomagpie setup --capture-reminder` also adds an opt-in reminder: when a session installed or removed a package you have no note on, the agent is reminded once to offer one.
 
 2. Check what is wired in each agent:
 
@@ -88,6 +89,7 @@ There is no extra model, no API key and no telemetry. RepoMagpie works through t
 ## Ask your agent
 
 - **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first; on a small journal it can read every note in one list.
+- **How should database security work in this project?** Your agent maps the question onto domains (security, database) and the project's technologies, in any language you ask in, and answers with your notes on those packages, saying why each one fits.
 - **Install pdfkit.** Your agent recalls pdfkit before the install. Your avoid note comes back with its alternatives, and your agent asks you before it installs anything.
 - **Which of my tools fit this project?** `suggest` reads the project's manifests and README and returns the notes that match; your agent picks the ones that fit, says why, and names any dependency in use that you noted to avoid.
 
@@ -106,6 +108,19 @@ What `repomagpie setup` sets up in each agent ([agents](docs/agents.md)):
 | Copilot CLI | yes | yes | yes | the hook stops the first try; your agent asks you |
 
 Codex CLI runs a new hook only after you trust it in `/hooks`.
+
+## Share notes with your team
+
+A project journal is a `.magpie/` folder in the repository. Its notes are committed with the code, and RepoMagpie's hook and `recall` read them for every contributor, next to each person's own journal.
+
+```sh
+repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --to project
+git add .magpie && git commit -m "Add our note on pdfkit"
+```
+
+Or copy one of your own notes there: `repomagpie adopt pdfkit`. When a teammate's agent is about to run `npm install pdfkit`, the hook finds the project's note and asks them first. Their `search` and `suggest` find it too.
+
+A project journal is as visible as its repository: anyone who can read the repository can read its notes ([decision 0013](docs/decisions/0013-two-journal-scopes.md)).
 
 ## The local app
 
@@ -199,7 +214,7 @@ Add `--use-when` so your notes are found later by what you need, not only by nam
 <details>
 <summary><strong>How do I share notes with my team?</strong></summary>
 
-Write a note with `--to project`, or copy one from your personal journal with `repomagpie adopt <name>`: both go to the repository's `.magpie/`. Commit it, and your teammates' agents see the note when they recall, search and suggest, as yours do. A project journal is as visible as its repository: anyone who can read the repository can read its notes ([decision 0013](docs/decisions/0013-two-journal-scopes.md)).
+Write a note with `--to project`, or copy one with `repomagpie adopt <name>`, and commit `.magpie/`: see [Share notes with your team](#share-notes-with-your-team).
 
 </details>
 

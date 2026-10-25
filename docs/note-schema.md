@@ -36,6 +36,8 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 | `adopted` | no | date | tool | Project journal only: the date `repomagpie adopt` copied this note from the personal journal ([spec](spec.md)) |
 | `kind` | yes | enum | human (tool drafts at creation) | See below |
 | `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the journal's tag list. Drafted from a repository's GitHub topics (rule 5) |
+| `domains` | no | list | human | The concerns the subject addresses, that you confirmed: at most 3 of the 12 domains below ([decision 0040](decisions/0040-domains-a-second-axis.md)). Written after `tags`, only when not empty |
+| `domains_suggested` | no | list | tool (at creation; `repomagpie domains --suggest`) | Domains RepoMagpie suggested from the topics and tags, at most 3; never written by an agent. Confirming one moves it to `domains`. Search counts it at half weight |
 | `tried` | yes | bool | human (default `false`) | Have you actually run it? |
 | `rating` | no | 1–5 | human | Leave empty until tried |
 | `status` | yes | enum | human (tool sets it at creation) | `inbox` or `reviewed`; see rule 1 |
@@ -44,6 +46,35 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 ### `kind` values
 
 `skill-pack` · `cli` · `library` · `framework` · `plugin` · `app` · `platform` · `awesome-list` · `template` · `other`
+
+### `domains` values
+
+`kind` says what a thing is; a domain says what concern it addresses. The list is fixed, the same in every journal, and shown to agents with these definitions ([decision 0040](decisions/0040-domains-a-second-axis.md)):
+
+| Domain | Covers |
+|---|---|
+| `architecture` | Structure, patterns, state management and application frameworks |
+| `security` | Vulnerabilities, secrets, hardening and input validation |
+| `performance` | Speed, caching, bundle size and profiling |
+| `styling` | CSS, design systems and UI components |
+| `database` | Databases, ORMs, migrations and storage |
+| `testing` | Unit tests, end-to-end tests and mocking |
+| `auth` | Sign-in, sessions and permissions |
+| `api` | HTTP, RPC, API clients and servers |
+| `devops` | Build, deploy, CI and containers |
+| `observability` | Logging, metrics, tracing and error tracking |
+| `ai` | LLMs, agents, embeddings and MCP |
+| `tooling` | Developer tools, CLIs, linters, formatters, docs and editors |
+
+```yaml
+tags: [supabase, postgresql]
+domains: [database, auth]
+domains_suggested: [security]
+```
+
+- A note may have none. More than 3 means the subject is a platform: pick the 3 that matter to you.
+- A value outside the list (a typo, a domain from a later release) is kept in the file. Search and the app ignore it; `repomagpie doctor` reports it as an unknown domain.
+- A domain is in one field only. Removing one deletes it from whichever field holds it; a field left empty stays as `[]`, so `domains --suggest` doesn't fill it again.
 
 ## Body sections (in this order)
 
@@ -91,8 +122,8 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
 
 1. **Status.** A note is `inbox` until its Verdict has human-written text ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)); then it is `reviewed`. The tool sets `status` when it writes a note. When reading, a note with an empty Verdict counts as `inbox`, whatever its `status` field says.
 2. **Ownership.**
-   - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
-   - **Human-owned:** `kind`, `tags`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `repomagpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
+   - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`, `domains_suggested`. The tool writes `domains_suggested` at creation, and on existing notes only when you run `repomagpie domains --suggest`, which fills it on notes with neither domain field. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
+   - **Human-owned:** `kind`, `tags`, `domains`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `repomagpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
    - The tool writes `tags` after creation only when you ask: an edit in the local app, or "Add GitHub topics as tags" (`repomagpie tags --from-topics`), which adds topics until the note has 8 tags and never removes or reorders one ([decision 0030](decisions/0030-github-topics-become-tags.md)). Either is a human edit.
    - **At creation only**, the tool may write drafts of `kind` (from GitHub data, [decision 0030](decisions/0030-github-topics-become-tags.md); `library` for a registry package name without it, [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)), `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
    - **After creation**, the tool never modifies human-owned fields or sections on its own, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines. "Use when" and "Avoid when" items you give later are appended as rule 7 says.
@@ -101,6 +132,7 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
 5. **Tags** come from the journal's tag list (`<journal>/tags.md`), so the same idea isn't spelled three ways. Across the two journals, tags match by name. The tag list has one list line per tag, optionally with its meaning: ``- `testing` — tests and end-to-end checks``. Other lines are ignored. A new journal starts with a starter list of ten tags ([spec](spec.md), section 3); edit it freely. A journal with notes but no `tags.md` gets the starter list only when you ask for it ("Create tag list" in the local app).
    - **GitHub topics become tags** ([decision 0030](decisions/0030-github-topics-become-tags.md)). When a note for a GitHub repository is created, its topics become its tags: only valid tags, not the repository's own name, not a topic on the stop list (`hacktoberfest`, `hacktoberfest` with a year, `open-source`, `opensource`, `good-first-issue`), at most 8. Topics already in `tags.md` come first, then topics another note in the journal also carries (in its `topics` or `tags`), then the rest; within each group, GitHub's (alphabetical) order. "Add GitHub topics as tags" uses the same rule for existing notes.
    - Each of these tags not yet in `tags.md` is appended to it as ``- `<tag>` `` in the same save. A journal without `tags.md` gets one with a `# Tags` heading and just those tags. Clicking a "From GitHub topics" chip appends its tag the same way.
+   - **Aliases** ([decision 0041](decisions/0041-structured-search.md)): other spellings of a tag, in parentheses after it: ``- `postgresql` (postgres, psql) — the PostgreSQL database``. A topic or a `--tag` spelled as an alias means the tag (`postgres` becomes `postgresql` when a note is created), and a search word that is exactly an alias finds the tag too. A starter list of common spellings ships with RepoMagpie (`nextjs` for `next.js`, `kubernetes` for `k8s`, …); a line in your `tags.md` wins over it. `repomagpie tags --merge postgres postgresql` rewrites the tag in every note and adds the alias.
 6. **One note per subject.** A PURL appears in at most one note per journal, as its `id` or in its `packages`. A repository note that lists `pkg:npm/pdfkit` is the note for that package too.
 7. **User input.**
    - `repomagpie note <name-or-url> "text"`: the text is the Verdict (human-written).
