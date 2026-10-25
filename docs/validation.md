@@ -121,7 +121,7 @@ What came up in more than one interview, and what it means for the [ideas](ideas
 
 ## Beta tester round
 
-Two people test `0.2.0-beta.10` for a week, one on macOS and one on Windows, following [TESTING.md](../TESTING.md). On day 7 they answer the "Beta feedback" issue form (`.github/ISSUE_TEMPLATE/beta-feedback.yml`), or send the same answers privately. Unlike the desk research, this is first-hand use of RepoMagpie. Two testers show what can happen, not how often: record what they did, and read it against the hypotheses above.
+Two people test `0.2.0-beta.11` for a week, one on macOS and one on Windows, following [TESTING.md](../TESTING.md). On day 7 they answer the "Beta feedback" issue form (`.github/ISSUE_TEMPLATE/beta-feedback.yml`), or send the same answers privately. Unlike the desk research, this is first-hand use of RepoMagpie. Two testers show what can happen, not how often: record what they did, and read it against the hypotheses above.
 
 Which hypothesis each question tests:
 

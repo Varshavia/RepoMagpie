@@ -44,7 +44,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
 
-**Durum:** erken test edenler için ön sürüm `0.2.0-beta.10`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
+**Durum:** erken test edenler için ön sürüm `0.2.0-beta.11`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
 
 ## Hızlı başlangıç
 
