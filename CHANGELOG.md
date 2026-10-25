@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Domains: the concern a package addresses, from a fixed list of 12 (security, database, testing, auth, …), so a question such as "how should database security work?" finds your notes on supabase or prisma without sharing a word with them. A new note gets suggested domains from its GitHub topics and tags; you confirm them: `repomagpie note prisma --domain database`, or a click in `repomagpie ui`. `repomagpie domains --suggest` suggests them for the notes you already have, after showing the plan. `repomagpie doctor` names a domain it doesn't know.
+- Search by domain and tag: `repomagpie search "row level security" --domain security --domain database --tag postgres`. Each result says why it matched (`why` in `--json`). The same in your agent, which maps your question onto domains in whatever language you ask (MCP `search`: `domains`, `tags`, `match`, `max_chars`), and in the app's search, whose results say "Matched: domain security · tag postgresql".
+- Tag spellings: `tags.md` can list other spellings of a tag, `` - `postgresql` (postgres, psql) ``, and common ones ship built in (`next.js`, `k8s`, `tailwindcss`, …). A topic, a `--tag` or a search word in another spelling finds the tag. `repomagpie tags --merge postgres postgresql` rewrites a tag in every note and adds the spelling to `tags.md`.
+- A new read-only MCP tool, `vocabulary`: the 12 domains with their definitions, and the tags your journals use with their counts and spellings. Run `repomagpie setup` after the upgrade so your agents get the new skill.
+- In `repomagpie ui`: a Domains section in the sidebar with counts; domain chips on a note, suggested ones outlined with a button to confirm; domain picks in the inbox review, saved with Ctrl/Cmd+Enter; a domain filter in Search.
+- `repomagpie init --auto`: a project's dependencies in three groups, avoid notes first, then those you have a note on (with the Verdict's first words), then those without one. In a terminal it then asks for your Verdict on each one without a note: Enter skips, `q` stops, and it never writes a Verdict for you. `--json`, or no terminal, only lists. Your agent may run it when you start in a project and sum it up: "this project uses 40 packages; you have notes on 3, one says avoid". Plain `repomagpie init` now says what `--auto` does.
+- An opt-in reminder for Claude Code: `repomagpie setup --capture-reminder`. When a session installed or removed a package you have no note on, and the agent didn't offer to save it, Claude Code reminds the agent once in that session to make the offer. It isn't on by default; `repomagpie setup --remove` takes it out, and `repomagpie doctor` says whether it's on.
+- Sharing notes with your team is easier to find. The README has a "Share notes with your team" section. In `repomagpie ui`, the Project switch in a repository without `.magpie/` says what a project journal is and how to start one, and a project note says it's shared with the repository's contributors. In a git repository without one, `repomagpie doctor` adds under Journals: `none here; repomagpie note <x> --to project starts one, shared through git` (`git_repository` in `--json`).
+- "Colour by domain" in the graph's Draw options: each note takes its domain's colour, dimmer when the domain is only suggested, grey with none. The legend lists the domains drawn, and the neighbours list and the search box name each note's domain.
+- "Tags on one note" in the graph's Draw options, off by default. Most tags from GitHub topics are on one note and connect nothing, so they're now left out until you turn it on. The status line says how many: "Showing 39 notes, 22 tags (45 on one note hidden) and 98 connections". A tag you pick in the filter, or find with the search box, is always drawn.
+
+### Fixed
+
+- Graph labels no longer sit on top of each other. At any size and zoom, a label that would overlap another waits until you zoom in. The hovered and selected nodes and the selected node's neighbours come first. Tag labels are smaller and quieter than note names.
+
+### Changed
+
+- The graph opens faster the first time: it fetches its data while its code loads. On 2,000 notes the cold first open went from about 2.2 s to about 2.1 s, labels included. The graph cache rebuilds once after the upgrade.
+- `repomagpie search --tag` now raises the notes with that tag instead of keeping only them. `--match filter` keeps only notes with at least one of the tags or domains given; before, several `--tag` flags kept only notes with every one. The search cache rebuilds once after the upgrade.
+
 ## [0.2.0-beta.11] - 2026-10-25
 
 The twelfth pre-release: say when you'd use a package, or avoid it, when you write the note (`repomagpie note --use-when` / `--avoid-when`, the app's review and Add, the MCP `note` tool), so notes are found later by what you need. Nested and unclosed HTML comments in a note no longer leak into search, recall or the Verdict. Run `repomagpie setup` after the upgrade so your agents get the new skill.

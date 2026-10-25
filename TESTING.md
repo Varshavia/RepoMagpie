@@ -4,6 +4,8 @@
 
 Thank you for testing RepoMagpie for a week. Day 1 takes about 20 minutes. After that, you use your coding agent as usual and write a line when you pick or drop a package. On day 7 you answer a short form.
 
+The checks the maintainer runs by hand before the launch are listed in [manual checks](docs/testing/manual-checks.md). You don't need them.
+
 ## Before you start
 
 - **Node.js 22.12 or later.** Check with `node --version`.
