@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.12] - 2026-10-26
+
+The thirteenth pre-release: domains. Say what a package is for (security, database, testing, …) and your agent finds it by the concern you ask about, in any language. Also: tag spellings and `repomagpie tags --merge`; graph labels that never overlap, and colour by domain; `repomagpie init --auto`, which lists a project's dependencies by what your notes say; the opt-in Stop reminder (`repomagpie setup --capture-reminder`); and the project journal made visible. Run `repomagpie setup` after the upgrade so your agents get the new skill, and `repomagpie domains --suggest` once to suggest domains for the notes you have.
+
 ### Added
 
 - Domains: the concern a package addresses, from a fixed list of 12 (security, database, testing, auth, …), so a question such as "how should database security work?" finds your notes on supabase or prisma without sharing a word with them. A new note gets suggested domains from its GitHub topics and tags; you confirm them: `repomagpie note prisma --domain database`, or a click in `repomagpie ui`. `repomagpie domains --suggest` suggests them for the notes you already have, after showing the plan. `repomagpie doctor` names a domain it doesn't know.
@@ -290,7 +294,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...HEAD
+[0.2.0-beta.12]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...v0.2.0-beta.12
 [0.2.0-beta.11]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...v0.2.0-beta.11
 [0.2.0-beta.10]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...v0.2.0-beta.10
 [0.2.0-beta.9]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.8...v0.2.0-beta.9
