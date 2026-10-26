@@ -15,7 +15,7 @@ Accepted in part, 2026-10-24. The maintainer's decisions on §12:
 
 Phases:
 - **Phase 0** shipped in 0.2.0-beta.11 (branch `feat/use-when-at-capture`).
-- **Phase 1 is built** on the branch `feat/next-batch` (2026-10-25): domains, tag aliases, structured search, the MCP `vocabulary` tool, the app's domain chips and filters, and the expanded eval. Decisions [0040](../decisions/0040-domains-a-second-axis.md) (D1, D2, D4) and [0041](../decisions/0041-structured-search.md) (the search contract, with the eval's numbers).
+- **Phase 1** shipped in 0.2.0-beta.12 (branch `feat/next-batch`): domains, tag aliases, structured search, the MCP `vocabulary` tool, the app's domain chips and filters, and the expanded eval. Decisions [0040](../decisions/0040-domains-a-second-axis.md) (D1, D2, D4) and [0041](../decisions/0041-structured-search.md) (the search contract, with the eval's numbers).
 - **Phase 2, in part:** the structured boosts, alias expansion, near spellings for tags, `why` and `max_chars` came with Phase 1 (0041). Not done: the field-boost changes in §6, fuzzy and prefix limits, and optional `files` (§5.4).
 - **Phase 3** is later, gated by D3 ([roadmap](../roadmap.md)).
 
