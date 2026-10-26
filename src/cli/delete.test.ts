@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { escapeRegExp } from "../core/text.ts";
 import { renderNote } from "../core/write.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
@@ -20,7 +21,7 @@ test("--yes moves the note to the trash: the trash path on stdout, the links on 
   const b = box();
   const r = await magpie(b, ["delete", "pdfkit", "--yes"]);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, new RegExp(`^${join(b.journal, ".trash").replace(/\\/g, "\\\\")}[\\\\/]npm--pdfkit\\.\\d{8}-\\d{6}Z\\.md\\n$`));
+  assert.match(r.out, new RegExp(`^${escapeRegExp(join(b.journal, ".trash"))}[\\\\/]npm--pdfkit\\.\\d{8}-\\d{6}Z\\.md\\n$`));
   assert.match(r.err, /^✔ Moved to the trash: pdfkit$/m);
   assert.match(r.err, /^Linked from: puppeteer \(in Related\)\. Those links show as unresolved now\.$/m);
   assert.ok(!existsSync(b.note("npm--pdfkit.md")));

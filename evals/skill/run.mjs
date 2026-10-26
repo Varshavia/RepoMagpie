@@ -79,6 +79,8 @@ for (const r of rows) {
 const passed = [...scenarios.values()].reduce((n, e) => n + e.passed, 0);
 const runs = [...scenarios.values()].reduce((n, e) => n + e.runs, 0);
 const percent = (a, b) => (b ? `${Math.round((100 * a) / b)} %` : "n/a");
+// A Markdown table cell: backslashes first, so a "\|" in the text can't end the cell.
+const cell = (text) => text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 const lines = [
   `# Skill compliance: claude-code/${MODEL}, ${new Date().toISOString().slice(0, 10)}`,
   "",
@@ -86,7 +88,7 @@ const lines = [
   "",
   "| Scenario | Passed | Rate | Why it failed |",
   "|---|---|---|---|",
-  ...[...scenarios].map(([name, e]) => `| ${name.replace(/\|/g, "\\|")} | ${e.passed}/${e.runs} | ${percent(e.passed, e.runs)} | ${[...e.reasons].join("; ").replace(/\|/g, "\\|")} |`),
+  ...[...scenarios].map(([name, e]) => `| ${cell(name)} | ${e.passed}/${e.runs} | ${percent(e.passed, e.runs)} | ${cell([...e.reasons].join("; "))} |`),
 ];
 const resets = existsSync(join(RUN, "resets.log")) ? readFileSync(join(RUN, "resets.log"), "utf8").trim().split("\n").length - 1 : 0;
 if (resets < runs) lines.push("", `Warning: the journal was reset ${resets} times for ${runs} runs: the beforeEach hook didn't run for each scenario, so a scenario may have seen another one's notes.`);

@@ -30,6 +30,9 @@ const CHARACTERS = new RegExp(`[${set([0x00, 0x08], [0x0b, 0x0c], [0x0e, 0x1f], 
 const LINE_BREAKS = new RegExp(`\\r\\n|[\\r${set([0x2028, 0x2029])}]`, "g");
 
 // A hidden character as a visible marker, in ASCII so every console font shows it: <U+202E>.
+// Text for a RegExp that matches it literally: every metacharacter escaped, the backslash included.
+export const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const marker = (character: string) => `<U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}>`;
 
 // The text with every hidden character shown as its marker, never raw and never dropped (decision

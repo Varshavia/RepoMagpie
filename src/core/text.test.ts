@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CAPS, clean, cut, forAgent, marker, quote } from "./text.ts";
+import { CAPS, clean, cut, escapeRegExp, forAgent, marker, quote } from "./text.ts";
 
 // Note text is data (decision 0032, rules 1 to 3): every control-character class, the caps, the
 // `truncated` marker and quoting. Hostile inputs are inert: an example.invalid host, echo pwned.
@@ -111,4 +111,10 @@ test("forAgent: a list is cut by count and by item; a string with no rule gets t
 test("forAgent: an honest object comes back equal, with no truncated key", () => {
   const value = { id: "pkg:npm/pdfkit", verdict: "avoid: async streams painful; use puppeteer", avoid_when: ["you need streamed output"], alternatives: [{ name: "puppeteer" }] };
   assert.deepEqual(forAgent(value, {}), value);
+});
+
+test("escapeRegExp: every metacharacter, the backslash included, matches itself", () => {
+  const text = String.raw`a.b*c+d?e^f$g{h}i(j)k|l[m]n\o`;
+  assert.match(text, new RegExp(`^${escapeRegExp(text)}$`));
+  assert.doesNotMatch("axb", new RegExp(escapeRegExp("a.b")));
 });

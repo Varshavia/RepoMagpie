@@ -10,6 +10,7 @@ import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { readJsonc } from "./agents.ts";
 import { backupName, parseJson, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { appendItem, removeAt, replaceAt, setMember } from "./json-edit.ts";
+import { escapeRegExp } from "./text.ts";
 
 export const HOOK_COMMAND = "repomagpie hook claude-code";
 
@@ -56,7 +57,7 @@ export function findHooks(settings: unknown, kind: HookKind = PRE_TOOL_USE): Fou
   if (pre === undefined) return [];
   if (!Array.isArray(pre)) return `hooks.${kind.event} isn't a list`;
   // The subcommand as a whole word: "hook claude-code" isn't "hook claude-code-stop".
-  const sub = `${kind.sub.replace(/-/g, "\\-")}(?![\\w-])`;
+  const sub = `${escapeRegExp(kind.sub)}(?![\\w-])`;
   const found: FoundHook[] = [];
   for (const [group, entry] of pre.entries()) {
     const hooks = (entry as { hooks?: unknown } | null)?.hooks;
