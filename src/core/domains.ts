@@ -49,7 +49,8 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "css": "styling", "css-framework": "styling", "tailwind": "styling", "tailwindcss": "styling", "sass": "styling",
   "scss": "styling", "css-in-js": "styling", "styled-components": "styling", "design-system": "styling",
   "design-systems": "styling", "ui-components": "styling", "component-library": "styling", "ui-library": "styling",
-  "shadcn": "styling", "shadcn-ui": "styling",
+  "shadcn": "styling", "shadcn-ui": "styling", "design": "styling", "ui-design": "styling", "web-design": "styling",
+  "frontend-design": "styling", "ui-ux": "styling",
   // database
   "database": "database", "databases": "database", "db": "database", "orm": "database", "sql": "database",
   "nosql": "database", "postgres": "database", "postgresql": "database", "mysql": "database", "sqlite": "database",
@@ -69,8 +70,9 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "trpc": "api", "openapi": "api", "http-client": "api", "http-server": "api",
   "api-client": "api", "websocket": "api", "websockets": "api",
   // devops
-  "devops": "devops", "docker": "devops", "containers": "devops", "kubernetes": "devops", "k8s": "devops",
-  "ci": "devops", "ci-cd": "devops", "cicd": "devops", "continuous-integration": "devops", "deployment": "devops",
+  "devops": "devops", "containers": "devops", "kubernetes": "devops", "k8s": "devops",
+  "ci": "devops", "ci-cd": "devops", "cicd": "devops", "continuous-integration": "devops", "continuous-delivery": "devops",
+  "continuous-deployment": "devops", "deployment": "devops", "infrastructure": "devops",
   "github-actions": "devops", "terraform": "devops", "ansible": "devops", "infrastructure-as-code": "devops",
   "iac": "devops", "paas": "devops", "heroku": "devops", "build-tool": "devops",
   // observability
@@ -90,20 +92,38 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "vscode-extension": "tooling", "documentation-tool": "tooling",
 };
 
-// The domains a note's topics and tags suggest: its tags first, then its topics, each mapped value
-// once, in that order, at most DOMAIN_LIMIT. Never includes a domain the note already has
-// confirmed. `aliases` maps a spelling to its canonical tag, so "postgres" maps as "postgresql".
+// The word alone says a project touches AI, not that AI is what it's for: supabase has the topic "ai".
+const GENERIC = new Set(["ai", "artificial-intelligence"]);
+// Playwright drives browsers for tests and for automation: on a note about automation or scraping,
+// it doesn't name testing. Scraping itself names no domain: none of the 12 is that concern.
+const AUTOMATION = new Set([
+  "browser-automation", "web-automation", "rpa", "robotic-process-automation", "crawler", "crawling", "web-crawler",
+  "web-crawling", "scraper", "scraping", "web-scraper", "web-scraping", "webscraping", "data-extraction",
+]);
+
+// The domains a note's topics and tags suggest, at most DOMAIN_LIMIT, the best supported first: a
+// domain named by more of the note's words comes before one named by fewer; on a tie, the one named
+// first, tags before topics. A generic word ("ai") makes a domain a candidate but doesn't support it,
+// and a domain named only by generic words is dropped when the note has another. Never includes a
+// domain the note already has confirmed. `aliases` maps a spelling to its canonical tag, so
+// "postgres" maps as "postgresql".
 export function suggestDomains(note: { tags?: unknown; topics?: unknown; domains?: unknown }, aliases?: ReadonlyMap<string, string>): Domain[] {
   const texts = (value: unknown) => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
   const confirmed = texts(note.domains);
-  const out: Domain[] = [];
+  const words = new Set<string>();
   for (const raw of [...texts(note.tags), ...texts(note.topics)]) {
     const value = raw.toLowerCase();
-    const domain = DOMAIN_MAP[value] ?? DOMAIN_MAP[aliases?.get(value) ?? ""];
-    if (domain && !out.includes(domain) && !confirmed.includes(domain)) out.push(domain);
-    if (out.length === DOMAIN_LIMIT) break;
+    words.add(DOMAIN_MAP[value] ? value : (aliases?.get(value) ?? value));
   }
-  return out;
+  const automation = [...words].some((word) => AUTOMATION.has(word));
+  const support = new Map<Domain, number>(); // in the order first named
+  for (const word of words) {
+    const domain = DOMAIN_MAP[word];
+    if (!domain || confirmed.includes(domain) || (word === "playwright" && automation)) continue;
+    support.set(domain, (support.get(domain) ?? 0) + (GENERIC.has(word) ? 0 : 1));
+  }
+  for (const [domain, count] of support) if (count === 0 && support.size > 1) support.delete(domain);
+  return [...support].sort((a, b) => b[1] - a[1]).slice(0, DOMAIN_LIMIT).map(([domain]) => domain);
 }
 
 // Why a list of domains given by the user (repomagpie note --domain, the MCP note tool, the app) can't

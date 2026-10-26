@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Suggested domains fit what a package is for. A browser automation or scraping tool no longer gets `testing` from its `playwright` topic, and a project that ships a Docker image no longer gets `devops` from `docker`. The domain named by most of a note's topics and tags comes first, so supabase gets database, auth, then ai. A bare `ai` topic counts only when the note names nothing else. Design topics (`design`, `ui-design`, `web-design`, `frontend-design`, `ui-ux`) now suggest `styling`; `continuous-delivery`, `continuous-deployment` and `infrastructure` suggest `devops`. Notes that already have suggested domains keep them: remove a wrong one in `repomagpie ui`.
+
 ## [0.2.0-beta.12] - 2026-10-26
 
 The thirteenth pre-release: domains. Say what a package is for (security, database, testing, …) and your agent finds it by the concern you ask about, in any language. Also: tag spellings and `repomagpie tags --merge`; graph labels that never overlap, and colour by domain; `repomagpie init --auto`, which lists a project's dependencies by what your notes say; the opt-in Stop reminder (`repomagpie setup --capture-reminder`); and the project journal made visible. Run `repomagpie setup` after the upgrade so your agents get the new skill, and `repomagpie domains --suggest` once to suggest domains for the notes you have.
