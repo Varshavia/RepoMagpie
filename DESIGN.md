@@ -30,6 +30,18 @@ colors:
   graph-edge-link: "#8A949E"
   graph-edge-alternative: "#3CC8B4"
   graph-edge-similar: "#69737E"
+  domain-architecture: "#7DAAE8"
+  domain-security: "#E36363"
+  domain-performance: "#E3D963"
+  domain-styling: "#E363A3"
+  domain-database: "#63CEE3"
+  domain-testing: "#63E363"
+  domain-auth: "#BB7DE8"
+  domain-api: "#E3A363"
+  domain-devops: "#63E3AE"
+  domain-observability: "#AEE363"
+  domain-ai: "#E363E3"
+  domain-tooling: "#867DE8"
   # Light theme
   light-canvas: "#FAFAF9"
   light-surface-1: "#F2F3F4"
@@ -58,6 +70,18 @@ colors:
   light-graph-edge-link: "#565F6A"
   light-graph-edge-alternative: "#0B7A6E"
   light-graph-edge-similar: "#7F8994"
+  light-domain-architecture: "#2368C7"
+  light-domain-security: "#C72323"
+  light-domain-performance: "#7E7516"
+  light-domain-styling: "#C72375"
+  light-domain-database: "#197B8F"
+  light-domain-testing: "#188618"
+  light-domain-auth: "#8323C7"
+  light-domain-api: "#A5611D"
+  light-domain-devops: "#178255"
+  light-domain-observability: "#537E16"
+  light-domain-ai: "#C322C3"
+  light-domain-tooling: "#3123C7"
 typography:
   headline-md:
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -348,11 +372,13 @@ The palette is two neutral ramps (dark and light) with one accent and three sema
 ### Graph
 The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on `canvas` with its own tokens. Each is checked at 3:1 against `canvas` (non-text); the legend, always shown, says each in words.
 - **Kind groups (`graph-skill-pack`, `graph-tool`, `graph-resource`, `graph-other`):** a note's fill. Violet, blue, pink and grey: hues apart from the semantic colours, so a kind never reads as inbox, reviewed or avoid.
-- **Tag (`graph-tag`):** tag nodes, labelled `#tag`. Neutral, near `ink`. In a small graph they are small and every one is labelled; from 150 drawn nodes up they grow with their note count, so the popular ones keep their labels.
+- **Tag (`graph-tag`):** tag nodes, labelled `#tag`. Neutral, near `ink`. In a small graph they are all the same size, a little smaller than the smallest note; from 150 drawn nodes up they grow with their note count, so the popular ones win their labels ([decision 0044](docs/decisions/0044-graph-labels-never-overlap.md)).
+- **Labels** never overlap: one that would waits until zooming in makes room. Note names are 12 px at weight 500 in `ink`; tag labels are quieter, 11 px at weight 400 in `ink-muted`, so note names lead.
 - **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a stronger grey, drawn thicker; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation. A thin line is antialiased, so it shows lighter than its token: `graph-edge-tagged` is set at about 4.4:1, so that a tag edge, 1.5 px wide, still shows at 3:1 or more at the default zoom (measured on screenshots, 2026-10-08: 3.52 dark, 3.22 light).
 - **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
+- **Colour by domain** (a Draw option): a note takes its first confirmed domain's `domain-*` token, otherwise its first suggested domain's mixed 40% toward `canvas` (dimmer), otherwise `graph-other`. Twelve hues about 30° apart, each at least 4.5:1 on `canvas` in both themes; the dimmer ones are under 3:1 for some domains, on purpose, as the inbox fade is, and the legend says "Dimmer: a suggested domain". The inbox fade isn't applied in this mode, so one fade means one thing. With twelve hues, some sit near the semantic colours (security near danger, performance near warning, testing near success); the legend names each domain in words, and only the domains present are listed.
 - **Missing notes** (a link or alternative to a subject without a note, off until "Missing notes" is on) are `graph-other` faded the same way; the legend says "Faded grey: no note yet".
-- **Around a hovered or selected node**, everything else is mixed 70% toward `canvas` and loses its label; the node gets a ring in `ink` and its label on a `surface-2` plate. Labels are `ink` with a halo in `canvas`, so they stay readable over nodes and edges.
+- **Around a hovered or selected node**, everything else is mixed 70% toward `canvas` and loses its label; the node gets a ring in `ink` and its label on a `surface-2` plate. Labels have a halo in `canvas`, so they stay readable over nodes and edges.
 - **Notices** lie over the top of the graph as a strip of `surface-1` (92%, so the graph shows faintly through) with a `hairline` under it, in `ink-muted`, so they never resize the canvas. Only their buttons take the pointer.
 - **The neighbours list** beside the graph uses the list rows of the `[[` autocomplete; each says in words what the graph shows by colour (kind group, in the inbox, a tag's note count).
 
@@ -363,6 +389,7 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 |---|---|---|
 | `ink` on `canvas` | 15.53 | 17.06 |
 | `ink-muted` on `surface-1` | 8.05 | 7.14 |
+| `ink-muted` on `canvas` (graph tag labels; 2026-10-26) | 8.61 | 7.60 |
 | `ink-subtle` on `surface-3` (the lowest pair) | 4.65 | 4.89 |
 | `accent-text` on `canvas` | 10.81 | 5.87 |
 | `on-accent` on `accent` | 8.21 | 5.22 |
@@ -382,6 +409,23 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 | `graph-edge-similar` on `canvas` (3:1) | 3.95 | 3.40 |
 
 The graph rows were checked on 2026-10-08, with the same formula.
+
+The domain tokens, checked on 2026-10-25 with the same formula, each against `canvas` (3:1; "dimmer" is the colour mixed 40% toward `canvas`, for a suggested domain):
+
+| Token | Dark | Dimmer, dark | Light | Dimmer, light |
+|---|---|---|---|---|
+| `domain-architecture` | 7.98 | 3.55 | 5.19 | 2.51 |
+| `domain-security` | 5.66 | 2.73 | 5.44 | 2.86 |
+| `domain-performance` | 13.05 | 5.27 | 4.53 | 2.28 |
+| `domain-styling` | 5.97 | 2.84 | 5.12 | 2.74 |
+| `domain-database` | 10.41 | 4.37 | 4.71 | 2.37 |
+| `domain-testing` | 11.53 | 4.75 | 4.51 | 2.37 |
+| `domain-auth` | 6.55 | 3.05 | 6.64 | 3.01 |
+| `domain-api` | 8.79 | 3.82 | 4.65 | 2.34 |
+| `domain-devops` | 11.92 | 4.89 | 4.61 | 2.36 |
+| `domain-observability` | 12.68 | 5.15 | 4.61 | 2.30 |
+| `domain-ai` | 6.50 | 3.02 | 4.64 | 2.63 |
+| `domain-tooling` | 5.55 | 2.71 | 9.16 | 3.53 |
 
 ## Typography
 
@@ -448,6 +492,7 @@ Every interactive component has these states: default, hover, focus-visible (a 2
 - **Draft badge:** "Draft" next to a drafted section's label; an "Accept" action removes the marker ([decision 0023](docs/decisions/0023-api-is-the-json-contract.md)).
 - **Status badge:** "Inbox" (amber) or "Reviewed" (green), always with the word.
 - **Chip:** tags and filters. Selected: `accent-wash` and `accent-text`.
+- **Domain chip** ([decision 0040](docs/decisions/0040-domains-a-second-axis.md)): a chip. Confirmed: solid. Suggested: a transparent chip in `ink-muted` with a 1 px dashed `hairline-strong` border, like the "From GitHub topics" chips, and "(suggested)" for screen readers; on a note it has a check button to confirm it. In the review form the 12 are toggle chips (`aria-pressed`), selected as a chip is; at 3, the others are disabled.
 - **Metadata chip:** licence, language, packages, in mono.
 - **Buttons:** primary (one per view at most), secondary, ghost. Labels are one to three words.
 - **Text input and Verdict editor:** `border-input` outline; focus adds the ring; error turns the outline and helper text `danger`, with the message in words.

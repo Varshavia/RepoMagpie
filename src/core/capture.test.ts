@@ -88,6 +88,7 @@ test("a GitHub repository with metadata: tool-owned fields, drafts and skill lin
       explored: "2026-10-04",
       kind: "cli",
       tags: ["testing", "playwright"],
+      domains_suggested: ["testing"], // from its tags (decision 0040); never `domains`
       tried: false,
       rating: null,
       status: "inbox",

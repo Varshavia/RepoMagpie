@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readNote, validate } from "./note.ts";
-import { acceptDraft, addAlternatives, addSectionItems, appendSkillLine, appendTagEntries, renderNote, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
+import { acceptDraft, addAlternatives, addSectionItems, appendSkillLine, appendTagEntries, renderNote, setDomains, setHumanFields, setSection, setToolFields, setVerdict } from "./write.ts";
 
 // A hand-written note: comments, odd spacing, a block list, an empty value, text above the
 // sections, an extra hand-written section, and sections a person typed.
@@ -749,4 +749,59 @@ test("addSectionItems keeps CRLF line endings, and a file without a final line b
   assert.equal(addSectionItems(crlf, "Use when", ["invoices"]).text, HAND_WRITTEN.replace(USE_WHEN, `${USE_WHEN}- invoices\n`).replace(/\n/g, "\r\n"));
   const last = "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one";
   assert.equal(addSectionItems(last, "Use when", ["two"]).text, "---\nid: pkg:npm/pdfkit\n---\n\n## Use when\n- one\n- two\n");
+});
+
+// Decision 0040: the two domain fields.
+test("renderNote writes domains and domains_suggested after tags, only when not empty", () => {
+  const base = { id: "pkg:npm/zod", name: "zod", explored: "2026-10-25", kind: "library", tags: ["validation"] };
+  assert.doesNotMatch(renderNote(base), /domains/);
+  const text = renderNote({ ...base, domains: ["security"], domainsSuggested: ["api"] });
+  assert.match(text, /\ntags: \[validation\]\ndomains: \[security\]\ndomains_suggested: \[api\]\ntried: false\n/);
+  assert.deepEqual(validate(readNote(text)), []);
+});
+
+test("setDomains: suggestions go only to a note that has neither field, after tags", () => {
+  const suggested = setDomains(HAND_WRITTEN, { suggest: ["database", "testing"] });
+  assert.deepEqual([suggested.changed, suggested.suggested], [true, ["database", "testing"]]);
+  assert.equal(suggested.text, HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n  - pdf\ndomains_suggested: [database, testing]\n"));
+  // A second run, or a note whose suggestions the user removed ([]), gets nothing.
+  assert.equal(setDomains(suggested.text, { suggest: ["api"] }).changed, false);
+  const emptied = HAND_WRITTEN.replace("tried: true", "domains_suggested: []\ntried: true");
+  assert.equal(setDomains(emptied, { suggest: ["api"] }).changed, false);
+});
+
+test("setDomains: confirming moves a domain from the suggestions to domains; removing takes it out of both; an emptied field stays as []", () => {
+  const start = HAND_WRITTEN.replace("tried: true", "domains_suggested: [database, testing]\ntried: true");
+  const confirmed = setDomains(start, { confirm: ["database"] });
+  assert.deepEqual(confirmed.confirmed, ["database"]);
+  assert.equal(confirmed.text, HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n  - pdf\ndomains: [database]\n").replace("tried: true", "domains_suggested: [testing]\ntried: true"));
+  const removed = setDomains(confirmed.text, { remove: ["database", "testing"] });
+  assert.deepEqual(removed.removed, ["database", "testing"]);
+  assert.match(removed.text, /\ndomains: \[\]\n/);
+  assert.match(removed.text, /\ndomains_suggested: \[\]\n/);
+  // Everything else stays byte for byte.
+  assert.equal(removed.text.replace(/domains: \[\]\n/, "").replace("domains_suggested: []\n", ""), HAND_WRITTEN);
+  // Confirming a domain already confirmed changes nothing.
+  assert.equal(setDomains(confirmed.text, { confirm: ["database"] }).changed, false);
+});
+
+test("setDomains keeps unknown values, refuses a fourth domain, and leaves a field that isn't a list alone", () => {
+  const odd = HAND_WRITTEN.replace("tried: true", "domains: [security, Pdfs]\ntried: true");
+  const added = setDomains(odd, { confirm: ["database"] });
+  assert.match(added.text, /\ndomains: \[security, Pdfs, database\]\n/);
+  const full = HAND_WRITTEN.replace("tried: true", "domains: [security, database, auth]\ntried: true");
+  const fourth = setDomains(full, { confirm: ["api"] });
+  assert.deepEqual([fourth.changed, fourth.text], [false, full]);
+  assert.match(fourth.warnings[0], /at most 3 domains/);
+  const scalar = HAND_WRITTEN.replace("tried: true", "domains: security\ntried: true");
+  const r = setDomains(scalar, { confirm: ["api"] });
+  assert.deepEqual([r.changed, r.text], [false, scalar]);
+  assert.match(r.warnings[0], /isn't a list/);
+});
+
+test("setDomains keeps a block list a block list, and CRLF line endings", () => {
+  const block = HAND_WRITTEN.replace("tried: true", "domains:\n  - security\ntried: true");
+  assert.match(setDomains(block, { confirm: ["database"] }).text, /\ndomains:\n {2}- security\n {2}- database\ntried: true/);
+  const crlf = HAND_WRITTEN.replace(/\n/g, "\r\n");
+  assert.equal(setDomains(crlf, { suggest: ["api"] }).text, HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n  - pdf\ndomains_suggested: [api]\n").replace(/\n/g, "\r\n"));
 });

@@ -33,7 +33,7 @@ The product's category moved:
 | 4 | Context-aware suggest | **Core** | v0.1 | Shows what you already have when a project starts |
 | 11 | Adopt | **Core** | v0.1 | Moves a note from your personal journal into a project |
 | 10 | Graph views | **In the app** | v0.2 (part 2) | The first user asks for it to work in ([decision 0026](decisions/0026-the-app-is-the-workspace.md)) |
-| 5 | Gap detection | `repomagpie init`; `repomagpie gaps` | `init`: v0.1 if time allows, else v0.3; `gaps`: v0.3 | Fills an empty journal from real manifests |
+| 5 | Gap detection | `repomagpie init --auto` built; plain `init`'s drafts dropped; `repomagpie gaps` planned | `init --auto`: 0.2; `gaps`: v0.3 | Fills an empty journal from real manifests |
 | 2 | Vet and drift | **Reduced** | v0.3 | Record your review; integrate existing scanners and lockfiles; no own scanner |
 | 3 | Nests and follow | Planned | v0.4 | Needs users first |
 | 7 | `/uses` page generator | Planned | v0.4 | Marketing feature |
@@ -42,9 +42,9 @@ The product's category moved:
 | 12 | Auto-extraction | Candidate; step 1 done | after the tester round | H1: a note must cost almost nothing to write |
 | 13 | Taxonomy and semantic search | Approved in part ([RFC 0001](rfcs/0001-domains-tags-and-search.md)) | Phase 0 now; Phases 1–2 next; Phase 3 later | Retrieval; notes stay about packages (D1) |
 | 14 | Just-in-time context | Candidate | after the tester round | Token cost per task |
-| 15 | Multiplayer and team sync | Candidate | after the tester round | H3: the project journal exists; visibility is the gap |
+| 15 | Multiplayer and team sync | Visibility built (README, app, doctor); sync stays git | 0.2 | H3: the project journal exists; visibility was the gap |
 | 16 | A community hub and registry | Candidate | after the tester round | Sharing journals; prompt-injection risk |
-| 17 | Measuring skill compliance | Candidate | after the tester round | Turns "as well as the agent follows the skill" into a number |
+| 17 | Measuring skill compliance | Built for Claude Code (`evals/skill/`); no results yet | 0.2 | Turns "as well as the agent follows the skill" into a number |
 | 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
 
 ---
@@ -126,13 +126,13 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 
 - **Problem:** A new journal is empty, and you can't see which tools you rely on but never wrote down.
 - **Behaviour:**
-  - `repomagpie init` reads a project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`) and creates draft notes for the dependencies already in use, so the journal starts from real decisions instead of stars.
+  - `repomagpie init --auto` reads a project's manifests (`package.json`, `pyproject.toml`, `Cargo.toml`), lists the dependencies already in use by what your notes say, and asks for your Verdict on each one without a note, so the journal starts from real decisions instead of stars.
   - `repomagpie gaps` reports dependencies used in a project but missing from the journals, and tags or kinds with no reviewed notes.
 - **Surfaces:** CLI (`repomagpie init`, `repomagpie gaps`).
 - **Schema impact:** none planned; it reads the `packages` field (idea 1).
 - **Target release:** `init` in v0.1 if time allows, otherwise v0.3; `gaps` in v0.3.
+- **Status (2026-10-25):** `repomagpie init --auto` is built for 0.2: it lists a project's dependencies as avoid, noted and no note, and in a terminal asks for the user's Verdict on each one without a note (never a draft without one). Plain `init`'s draft notes are dropped (the maintainer, 2026-10-25): plain `init` only says what `--auto` does.
 - **Open questions:**
-  - Does `init` write drafts into the project journal, the personal journal, or ask?
   - Which projects does `gaps` scan, and how does the user point to them?
 
 ## 6. Resurfacing digest
@@ -208,7 +208,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **What already exists:**
   - the skill's "Recording an opinion": the agent offers once to save an opinion the user states;
   - the skill's "After a dependency decision" (`feat/capture-nudge`): the agent already in the conversation offers once, at the end of a task, to save a dependency decision made in it, with the user's reason as the Verdict;
-  - `suggest` reads a project's manifests ([spec](spec.md), section 2); `repomagpie init` is idea 5's first part, not built.
+  - `suggest` reads a project's manifests ([spec](spec.md), section 2); `repomagpie init --auto` is idea 5's first part, built for 0.2.
 - **Options,** in order of cost:
   1. **The agent's own LLM, at the end of a task.** No new model, process, network call or hook. Done in `feat/capture-nudge`.
   2. **An end-of-session hook** that reminds the agent to make the offer when it hasn't. Claude Code has Stop and SessionEnd hooks; whether the other agents have one isn't recorded yet ([agents](agents.md) lists only the hooks before a tool call), so checking each agent's docs comes first. No new model: the hook prints text for the agent. Fits rule 6.
@@ -246,7 +246,8 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - an opt-in provider with the user's key, which sends note text off the machine (rule 6: off by default).
 - **Risks:** a schema change that moves the product's category without a decision; a dependency that makes the package heavy for a gain not measured.
 - **What decides it:** journals that reach thousands of notes, and `eval:retrieval` showing misses that a "Use when" line doesn't fix.
-- **Status:** worked out in [RFC 0001](rfcs/0001-domains-tags-and-search.md), and approved in part (2026-10-24). D1 answers the direction question: notes stay about packages and repositories, general project rules stay in CLAUDE.md or AGENTS.md, and domains make package notes findable by concern. D2 approves the 12 domains and the name `domains`. Phase 0, "Use when" and "Avoid when" at capture, is done on `feat/use-when-at-capture` (`repomagpie note --use-when`, the MCP `note` tool, the skill and the app); Phases 1 and 2 are next; Phase 3, semantic search, is decided after Phase 2's eval (D3).
+- **Status:** worked out in [RFC 0001](rfcs/0001-domains-tags-and-search.md), and approved in part (2026-10-24). D1 answers the direction question: notes stay about packages and repositories, general project rules stay in CLAUDE.md or AGENTS.md, and domains make package notes findable by concern. D2 approves the 12 domains and the name `domains`. Phase 0, "Use when" and "Avoid when" at capture, shipped in 0.2.0-beta.11. Phase 1 and the structured part of Phase 2 are built on `feat/next-batch` (2026-10-25): domains ([decision 0040](decisions/0040-domains-a-second-axis.md)), tag aliases, structured search with `why`, and the MCP `vocabulary` tool ([decision 0041](decisions/0041-structured-search.md)). Phase 3, semantic search, is decided with those numbers (D3).
+- **Measured on the expanded eval** (2026-10-25, 60 notes, 82 needs: concern, technology spelling, use case and Turkish; tuning and held-out splits; the structured forms written with the needs, so an upper bound). Held-out, recall@5: the need as the query 30/41, structured 41/41. MRR over all needs, today → structured: concern 0.26 → 0.97, Turkish 0.39 → 0.95, use case 0.66 → 0.84, technology 0.97 → 0.91. Aliases alone change nothing measurable. The numbers and the weights' grid are in decision 0041.
 
 ## 14. Just-in-time context
 
@@ -277,7 +278,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Gap:** visibility, not sync. Git already syncs the project journal.
 - **Risks:** a team that doesn't know `.magpie/` exists never writes to it.
 - **What decides it:** a team using the project journal, or asking for more than git gives.
-- **Status:** candidate, after the tester round.
+- **Status:** visibility built (2026-10-25): the README's "Share notes with your team"; in the app, the Project switch's empty state, which says how to start one, and "shared with this repository's contributors" on a project note; `repomagpie doctor`'s line under Journals in a git repository without `.magpie/`. Anything beyond git waits for a team asking for it.
 
 ## 16. A community hub and registry
 
@@ -299,7 +300,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Options:** an eval tool that drives each agent's CLI non-interactively on a scratch journal; or a scripted set of manual runs, recorded the same way each time.
 - **Risks:** runs cost money and time per agent and model; results drift with each agent release.
 - **What decides it:** a behaviour change in the skill that needs evidence across agents, or a tester report that an agent ignores the skill.
-- **Status:** candidate, after the tester round.
+- **Status:** built for Claude Code (2026-10-25): [`evals/skill/`](../evals/skill/README.md), promptfoo with the Claude Agent SDK, 25 scenarios, run by the maintainer, not in CI ([validation](validation.md#skill-compliance-eval)). No results yet. Other agents would each need their own provider.
 
 ## 18. Hugging Face notes
 

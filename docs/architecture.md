@@ -54,6 +54,7 @@ src/
                recall: recall's matching rules, the journals it reads, its cache, each match's alternatives
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
                suggest: suggest's keywords, scoring and the project's dependencies left out
+               init-auto: init --auto's groups of the project's dependencies (avoid, noted, no note)
                adopt: copying a personal note into the project journal; the install command
                delete: moving a note to <journal>/.trash/ and back (Undo), the version check, the notes
                that link to it, .trash/ in a project's .gitignore (decision 0037)
@@ -91,7 +92,9 @@ src/
                decision 0036); claude-code.ts: tool call JSON → core → ask or inform JSON; codex.ts:
                the same for Codex CLI → deny the first try or inform; gemini-cli.ts: for Gemini CLI →
                ask or inform (one constant switches it to deny); antigravity.ts: force_ask or nothing;
-               copilot.ts and cursor.ts: deny the first try or nothing;
+               copilot.ts and cursor.ts: deny the first try or nothing; claude-code-stop.ts: the opt-in
+               Stop reminder, transcript → installs and removals without a note → one reminder a
+               session (decision 0042);
                deny.ts and retry.ts: the deny
                texts and the retry record, for agents that can't ask; agents.ts: the agents with an
                adapter. Each adapter is its own chunk, loaded only by its subcommand (check:build)

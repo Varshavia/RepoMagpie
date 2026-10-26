@@ -5,11 +5,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import MiniSearch, { type Options } from "minisearch";
+import { noteDomains } from "./domains.ts";
 import { readNote, stripComments } from "./note.ts";
 import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const CACHE_FILE = "search-index.json";
-const CACHE_VERSION = 3; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped
+const CACHE_VERSION = 4; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped; 4: domains
 
 // One searchable document: a note, or one completed skill line of a note (decision 0006).
 export interface SearchDoc {
@@ -21,6 +22,8 @@ export interface SearchDoc {
   skill: string | null;
   kind: string | null;
   tags: string[];
+  domains: string[]; // the confirmed ones in the vocabulary (decision 0040)
+  domainsSuggested: string[]; // the suggested ones in the vocabulary, without the confirmed
   status: "inbox" | "reviewed";
   verdict: string;
   useWhen: string;
@@ -32,7 +35,7 @@ export interface SearchDoc {
 }
 
 const FIELDS = ["name", "purl", "tags", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skill", "skillText"];
-const STORED = ["type", "file", "purl", "name", "skill", "kind", "tags", "status", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skillText", "drafts"];
+const STORED = ["type", "file", "purl", "name", "skill", "kind", "tags", "domains", "domainsSuggested", "status", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skillText", "drafts"];
 
 export const INDEX_OPTIONS: Options<SearchDoc> = {
   idField: "key",
@@ -48,12 +51,15 @@ export function noteDocuments(text: string, file: string): SearchDoc[] {
   const note = readNote(text);
   const fm = note.frontmatter;
   const section = (name: string) => clean(note.sections.find((s) => s.name === name)?.body ?? "");
+  const domains = noteDomains(fm);
   const base = {
     file,
     purl: typeof fm.id === "string" ? fm.id : null,
     name: typeof fm.name === "string" ? fm.name : file.replace(/\.md$/, ""),
     kind: typeof fm.kind === "string" ? fm.kind : null,
     tags: Array.isArray(fm.tags) ? fm.tags.filter((tag): tag is string => typeof tag === "string") : [],
+    domains: domains.domains,
+    domainsSuggested: domains.suggested,
     status: note.status,
   };
   const empty = { verdict: "", useWhen: "", avoidWhen: "", whatItDoes: "", myNotes: "", drafts: [] as string[] };

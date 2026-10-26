@@ -25,6 +25,7 @@ export interface SetupOptions extends GlobalOptions {
   allowWrite?: boolean; // --allow-write (true), --no-allow-write (false), neither (undefined)
   deleteBackups?: boolean;
   keepLatest?: boolean; // with --delete-backups: keep the newest backup of each file
+  captureReminder?: boolean; // add Claude Code's Stop reminder (decision 0042)
 }
 
 export async function setupCommand(options: SetupOptions, io: Io): Promise<number> {
@@ -36,7 +37,10 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   const unknown = ids?.filter((id) => !AGENTS.some((a) => a.id === id));
   if (unknown?.length) return usage(`unknown agent ${unknown.join(", ")}. Use: ${AGENTS.map((a) => a.id).join(", ")}.`);
   if (options.keepLatest && !options.deleteBackups) return usage("--keep-latest goes with --delete-backups.");
-  if (options.deleteBackups && (options.remove || ids || options.allowWrite !== undefined || options.project)) return usage("--delete-backups goes alone: not with --remove, --agents, --allow-write, --no-allow-write or --project.");
+  if (options.deleteBackups && (options.remove || ids || options.allowWrite !== undefined || options.project || options.captureReminder)) return usage("--delete-backups goes alone: not with --remove, --agents, --allow-write, --no-allow-write, --project or --capture-reminder.");
+  if (options.captureReminder && options.remove) return usage("--capture-reminder adds the reminder; --remove takes it out with the rest. Use one of them.");
+  if (options.captureReminder && options.project) return usage("--capture-reminder goes in your own settings, not a project's: each person chooses it. Leave out --project.");
+  if (options.captureReminder && ids && !ids.includes("claude-code")) return usage("--capture-reminder is for Claude Code: add claude-code to --agents.");
   if (options.json && !options.yes && !options.dryRun) return usage(`--json never asks: add --yes to ${options.deleteBackups ? "delete the backups" : "apply the plan"}, or --dry-run to see ${options.deleteBackups ? "them" : "it"}.`);
   const ask = !options.json && !options.yes && !options.dryRun && io.interactive;
   if (!ask && !options.yes && !options.dryRun) return usage(`there's no terminal to ask in. Add --yes to ${options.deleteBackups ? "delete the backups" : "apply the plan"}, or --dry-run to see ${options.deleteBackups ? "them" : "it"}.`);
@@ -65,6 +69,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
     only,
     stamp,
     project,
+    captureReminder: Boolean(options.captureReminder),
   });
 
   // The note tool changes only with a flag or an answer; otherwise each entry keeps its own.
@@ -103,7 +108,7 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
   if (options.json) io.out(`${JSON.stringify(cleanAll({ dry_run: Boolean(options.dryRun), allow_write: allowWrite ?? null, ...done }))}\n`);
   else if (!options.dryRun) io.err(summary(done, io.home, backupCounts(done, io.home, project), allowWrite));
   else io.err("Dry run: nothing changed.\n");
-  const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" || done.hooks.some((h) => h.result === "failed") ||
+  const failed = done.agents.some((a) => a.result === "failed") || done.skill?.result === "failed" || done.hook?.result === "failed" || done.reminder?.result === "failed" || done.hooks.some((h) => h.result === "failed") ||
     (!options.remove && done.launch_error !== null && done.agents.some((a) => a.installed));
   return failed && !options.dryRun ? 1 : 0;
 }
@@ -145,7 +150,7 @@ async function deleteBackupsCommand(options: SetupOptions, io: Io, ask: boolean)
 const changes = (a: AgentPlan) => a.action === "add" || a.action === "update" || a.action === "remove";
 const anyChange = (plan: SetupPlan) => plan.agents.some(changes) ||
   [plan.skill?.shared, plan.skill?.claude, plan.skill?.antigravity].some((item) => item && !["keep", "leave"].includes(item.action)) ||
-  [plan.hook, ...plan.hooks].some((h) => h !== null && ["add", "migrate", "remove"].includes(h.action));
+  [plan.hook, plan.reminder, ...plan.hooks].some((h) => h !== null && ["add", "migrate", "remove"].includes(h.action));
 
 function cancelled(io: Io): number {
   io.err("Cancelled. Nothing changed.\n");
@@ -238,6 +243,13 @@ export function render(plan: SetupPlan, home: string, allowWrite?: boolean): str
     if (h.backup) lines.push(`                backup first: ${tilde(h.backup)}`);
     if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                  ${line}`));
   }
+  if (plan.reminder) {
+    const r = plan.reminder;
+    lines.push(`  ${"Reminder".padEnd(12)}  ${what(REMINDER_WHAT, r.action)}: ${tilde(r.file)}${r.reason ? `: ${r.reason}` : ""}`);
+    if (r.action === "add") lines.push("                when Claude Code stops after installing or removing a package you have no note on, it reminds the agent once a session to offer one");
+    if (r.backup) lines.push(`                backup first: ${tilde(r.backup)}`);
+    if (r.snippet) lines.push(...r.snippet.split("\n").map((line) => `                  ${line}`));
+  }
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }
 
@@ -247,6 +259,7 @@ const SKILL_WHAT: Record<SkillItem["action"], string> = {
 const HOOK_WHAT: Record<HookPlan["action"], string> = {
   add: "add the hook", migrate: "update the hook entry", keep: "already set up", remove: "remove", manual: "by hand", refused: "can't",
 };
+const REMINDER_WHAT: Record<HookPlan["action"], string> = { ...HOOK_WHAT, add: "add the Stop reminder", migrate: "update the reminder entry" };
 // The other agents' hooks, on their agent's lines: the MCP entry's words.
 const AGENT_HOOK_WHAT: Record<HookPlan["action"], string> = { ...WHAT, migrate: "update" };
 const DONE: Partial<Record<HookPlan["action"], string>> = { add: "added", migrate: "updated", remove: "removed" };
@@ -257,6 +270,7 @@ function backupCounts(plan: SetupPlan, home: string, project: string | undefined
   const written: { label: string; backup: string | null; root: string }[] = [
     ...plan.agents.filter((a) => a.result === "done").map((a) => ({ label: a.file, backup: a.backup, root: home })),
     ...(plan.hook?.result === "done" ? [{ label: plan.hook.file, backup: plan.hook.backup, root: project ?? home }] : []),
+    ...(plan.reminder?.result === "done" ? [{ label: plan.reminder.file, backup: plan.reminder.backup, root: home }] : []),
     ...plan.hooks.filter((h) => h.result === "done").map((h) => ({ label: h.file, backup: h.backup, root: home })),
     ...(plan.skill?.result === "done" ? [plan.skill.shared, plan.skill.claude, plan.skill.antigravity].flatMap((item) => (item ? [{ label: item.path, backup: item.backup, root: project ?? home }] : [])) : []),
   ];
@@ -274,6 +288,7 @@ function summary(plan: SetupPlan, home: string, backups: { label: string; count:
     lines.push(plan.skill.result === "done" ? `Done: the skill, ${SKILL_WHAT[item.action]}: ${tilde(item.path)}${item.made === "copy" && item.action !== "copy" ? " (a copy: a link couldn't be made)" : ""}.` : `Failed: the skill: ${plan.skill.error}`);
   }
   if (plan.hook?.result) lines.push(plan.hook.result === "done" ? `Done: the Claude Code hook, ${HOOK_WHAT[plan.hook.action]}${plan.hook.backup ? ` (backup: ${tilde(plan.hook.backup)})` : ""}.` : `Failed: the Claude Code hook: ${plan.hook.error}`);
+  if (plan.reminder?.result) lines.push(plan.reminder.result === "done" ? `Done: the Claude Code Stop reminder, ${DONE[plan.reminder.action]}${plan.reminder.backup ? ` (backup: ${tilde(plan.reminder.backup)})` : ""}.` : `Failed: the Claude Code Stop reminder: ${plan.reminder.error}`);
   for (const h of plan.hooks.filter((x) => x.result)) {
     const name = AGENTS.find((a) => a.id === h.id)?.name;
     lines.push(h.result === "done" ? `Done: the ${name} hook, ${DONE[h.action]}${h.backup ? ` (backup: ${tilde(h.backup)})` : ""}.` : `Failed: the ${name} hook: ${h.error}`);
@@ -288,7 +303,7 @@ function summary(plan: SetupPlan, home: string, backups: { label: string; count:
   for (const b of backups) lines.push(`${tilde(b.label)} now has ${b.count} ${b.count === 1 ? "backup" : "backups"} from setup; repomagpie doctor lists them.`);
   if (backups.length) lines.push("repomagpie setup --delete-backups deletes them; with --keep-latest it keeps the newest of each file.");
   if (plan.launch_error && !plan.remove) lines.push("No MCP entry was written.");
-  const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done" || plan.hooks.some((h) => h.result === "done");
+  const changed = plan.agents.some((a) => a.result === "done") || plan.skill?.result === "done" || plan.hook?.result === "done" || plan.reminder?.result === "done" || plan.hooks.some((h) => h.result === "done");
   if (changed) lines.push("Restart your agents to load the change. Run repomagpie doctor to check.");
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }

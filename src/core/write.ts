@@ -3,6 +3,7 @@
 // the intended change stays as the person wrote it (note schema, rules 2 and 8).
 // Pure functions on text; no file system, no printing.
 import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
+import { DOMAIN_LIMIT, isDomain } from "./domains.ts";
 import { alternativeLinks, findLinks } from "./links.ts";
 import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, sectionItems, stripComments, YAML_LIMITS, type SectionName } from "./note.ts";
 import { CAPS, cut } from "./text.ts";
@@ -23,6 +24,8 @@ export interface NewNote {
   explored: string;
   kind: string;
   tags: string[];
+  domains?: string[]; // confirmed by the user (decision 0040); written only when not empty
+  domainsSuggested?: string[]; // suggested from topics and tags; written only when not empty
   url?: string;
   language?: string;
   license?: string;
@@ -57,6 +60,8 @@ export function renderNote(note: NewNote): string {
     ...(note.adopted ? [["adopted", note.adopted] as [string, unknown]] : []),
     ["kind", note.kind],
     ["tags", note.tags],
+    ...(note.domains?.length ? [["domains", note.domains] as [string, unknown]] : []),
+    ...(note.domainsSuggested?.length ? [["domains_suggested", note.domainsSuggested] as [string, unknown]] : []),
     ["tried", note.tried ?? false],
     ["rating", note.rating ?? null],
     ["status", status],
@@ -198,6 +203,80 @@ export function appendTagEntries(text: string, tags: string[]): EditResult {
   }
   const result = text.slice(0, bounds.start) + frontmatter.slice(0, at) + insert + frontmatter.slice(at) + text.slice(bounds.end);
   return { text: result, changed: result !== text, warnings: [] };
+}
+
+export interface DomainChange {
+  confirm?: string[]; // the user's domains: added to `domains`, taken out of `domains_suggested`
+  remove?: string[]; // taken out of wherever they are
+  suggest?: string[]; // RepoMagpie's suggestions, written only to a note that has neither field
+}
+
+export interface DomainResult extends EditResult {
+  confirmed: string[]; // the domains newly added to `domains`
+  removed: string[];
+  suggested: string[];
+}
+
+// The two domain fields (decision 0040): `domains`, the user's, at most DOMAIN_LIMIT known ones;
+// `domains_suggested`, RepoMagpie's, never holding a confirmed one. Confirming moves a domain from
+// the suggestions to `domains`; removing takes it out of both. A field emptied stays, as [], so
+// `repomagpie domains --suggest` knows the user took the suggestions out. Values that aren't in the
+// vocabulary are kept as written. A field that isn't a list of text is left alone, with a warning.
+export function setDomains(text: string, change: DomainChange): DomainResult {
+  const none = (edit: EditResult): DomainResult => ({ ...edit, confirmed: [], removed: [], suggested: [] });
+  const fm = readNote(text).frontmatter;
+  const isList = (value: unknown) => value === undefined || value === null || (Array.isArray(value) && value.every((v) => typeof v === "string"));
+  for (const key of ["domains", "domains_suggested"]) {
+    if (!isList(fm[key])) return none(untouched(text, `The note's ${key} field isn't a list, so it was left unchanged; edit the file to fix it.`));
+  }
+  const confirmedNow = ((fm.domains ?? []) as string[]).slice();
+  const suggestedNow = ((fm.domains_suggested ?? []) as string[]).slice();
+  const remove = new Set(change.remove ?? []);
+  const confirm = [...new Set(change.confirm ?? [])].filter((d) => !remove.has(d));
+  const confirmed = confirm.filter((d) => !confirmedNow.includes(d));
+  const removed = [...remove].filter((d) => confirmedNow.includes(d) || suggestedNow.includes(d));
+  const nextDomains = [...confirmedNow.filter((d) => !remove.has(d)), ...confirmed];
+  if (new Set(nextDomains.filter(isDomain)).size > DOMAIN_LIMIT) {
+    return none(untouched(text, `A note has at most ${DOMAIN_LIMIT} domains; a note with more is a platform. Remove one first.`));
+  }
+  let nextSuggested = suggestedNow.filter((d) => !remove.has(d) && !nextDomains.includes(d));
+  const fresh = fm.domains === undefined && fm.domains_suggested === undefined;
+  const suggested = fresh && !confirmed.length ? [...new Set(change.suggest ?? [])].filter((d) => !nextDomains.includes(d)) : [];
+  if (suggested.length) nextSuggested = suggested;
+
+  const values: Record<string, unknown> = {};
+  if (confirmed.length || removed.some((d) => confirmedNow.includes(d))) values.domains = nextDomains;
+  if (suggested.length || nextSuggested.length !== suggestedNow.length) values.domains_suggested = nextSuggested;
+  if (!Object.keys(values).length) return none({ text, changed: false, warnings: [] });
+  // A new key goes after `tags`, where a new note has it; editFrontmatter would put it at the end.
+  const edited = insertAfterTags(text, values);
+  return edited.warnings.length ? none(edited) : { ...edited, confirmed, removed, suggested };
+}
+
+// Sets frontmatter values; a key the frontmatter doesn't have yet goes after `tags` (domains before
+// domains_suggested), or at the end without `tags`.
+function insertAfterTags(text: string, values: Record<string, unknown>): EditResult {
+  const bounds = readableFrontmatter(text);
+  if (!bounds) return untouched(text, "The frontmatter can't be read; the note was left unchanged.");
+  const present = readNote(text).frontmatter;
+  const existing = Object.fromEntries(Object.entries(values).filter(([key]) => key in present));
+  const fresh = Object.entries(values).filter(([key]) => !(key in present));
+  let result = editFrontmatter(text, existing, false);
+  if (result.warnings.length || !fresh.length) return result;
+  const frontmatter = result.text.slice(bounds.start, readableFrontmatter(result.text)?.end ?? bounds.end);
+  const doc = parseDocument(frontmatter);
+  const after = (key: string) => (isMap(doc.contents) ? (doc.contents.items as Pair[]).find((p) => isScalar(p.key) && p.key.value === key) : undefined);
+  const anchor = after("domains") ?? after("tags");
+  if (!anchor) return editFrontmatter(result.text, Object.fromEntries(fresh), false);
+  const end = (anchor.value as { range?: [number, number, number] } | null)?.range?.[1] ?? (anchor.key as { range?: [number, number, number] }).range?.[1] ?? 0;
+  const lineEnd = frontmatter[end - 1] === "\n" ? end : (() => {
+    const newline = frontmatter.indexOf("\n", end);
+    return newline === -1 ? frontmatter.length : newline + 1;
+  })();
+  const lines = fresh.map(([key, value]) => `${key}: ${valueText(value)}${bounds.eol}`).join("");
+  const updated = result.text.slice(0, bounds.start) + frontmatter.slice(0, lineEnd) + lines + frontmatter.slice(lineEnd) + result.text.slice(bounds.start + frontmatter.length);
+  result = { text: updated, changed: updated !== text, warnings: [] };
+  return result;
 }
 
 const WIKILINK = /^\[\[[^[\]\r\n]+\]\]$/;

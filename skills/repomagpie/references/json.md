@@ -35,6 +35,8 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `results[].journal`: `"personal"` or `"project"`.
 - `results[].verdict`: the Verdict (for a skill, the skill line's text), or `null` for an inbox note.
 - `results[].status`: `"reviewed"` or `"inbox"`.
+- `results[].domains`, `results[].domains_suggested`: the note's domains, confirmed by the user or suggested by RepoMagpie.
+- `results[].why`: what matched. `results[].why.domains` and `results[].why.tags`: those you asked for that the note has; `results[].why.words`: the query's words found in it.
 - `results[].path`: the note's file; read it for the full note.
 
 ## `repomagpie catalog --json`
@@ -65,6 +67,15 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `in_use_avoid[].query`: the dependency's name.
 - `in_use_avoid[].verdict`, `in_use_avoid[].avoid_when`: what the note says.
 - `in_use_avoid[].alternatives[]`: what the user noted to use instead, as in recall.
+
+## `repomagpie init --auto --json`
+
+- `dependencies`: how many packages the project's manifests list, each once; `manifests`: which files.
+- `avoid[]`: dependencies with an avoid note, in either journal. Name each one to the user.
+- `noted[]`: dependencies with a note that isn't an avoid note.
+- `avoid[].verdict`, `noted[].verdict`: the Verdict, or `null` for an inbox note; `noted[].journal`: whose note it is.
+- `none[]`: dependencies without a note, each with `none[].name` and `none[].type`.
+- `error`: no manifest found (exit 2).
 
 ## `repomagpie note <name-or-url> ["text"] --json`
 

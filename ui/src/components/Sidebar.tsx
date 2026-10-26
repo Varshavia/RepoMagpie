@@ -1,5 +1,5 @@
 // The left pane (DESIGN.md, Layout): journal switcher, Inbox with its count, all notes, the other
-// screens, then kinds and tags. Below 960 px only the icons show; each item keeps its name for
+// screens, then kinds, domains and tags. Below 960 px only the icons show; each item keeps its name for
 // screen readers and as a tooltip.
 import { memo, useState } from "react";
 import type { Scope } from "../api.ts";
@@ -87,6 +87,26 @@ export const Sidebar = memo(function Sidebar({ journal, hasProject, onJournal, c
               <Icon name="cube" />
               <span className="label">{visible(k.name)}</span>
               <span className="count">{k.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {counts && counts.domains.length ? (
+        <div className="nav-group taxonomy">
+          <h2 className="nav-label">Domains</h2>
+          {counts.domains.map((d) => (
+            <button
+              key={d.name}
+              type="button"
+              className="nav-item"
+              aria-current={is("domain", d.name) ? "page" : undefined}
+              onClick={() => onView({ page: "domain", value: d.name })}
+              title={d.suggested ? `${d.name}: ${d.count - d.suggested} confirmed, ${d.suggested} suggested` : `${d.name}: ${d.count} confirmed`}
+            >
+              <Icon name="folder" />
+              <span className="label">{d.name}</span>
+              <span className="count">{d.count}</span>
             </button>
           ))}
         </div>

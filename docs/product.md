@@ -156,9 +156,11 @@ Settled by [decision 0028](decisions/0028-the-graph-page.md):
 | Property | Encodes | In the app (v0.2) |
 |---|---|---|
 | fill colour | `kind`, in 4 groups: skill pack; tool (cli, library, framework, plugin); resource (awesome-list, template, platform, app); other | yes |
+| fill colour, "Colour by domain" | the first confirmed domain, else the first suggested one (dimmer), else neutral; the inbox fade is off then ([decision 0043](decisions/0043-the-graph-colours-by-domain.md)) | yes, off by default |
 | size | number of connections, on a log scale (not rating: most notes have none) | yes |
 | faded | `status: inbox` | yes |
-| tag nodes | neutral, labelled `#tag`; under 150 drawn nodes a little smaller than any note, from 150 up sized by their note count (log scale) | yes |
+| tag nodes | neutral, labelled `#tag` in a quieter ink than note names; under 150 drawn nodes a little smaller than any note, from 150 up sized by their note count (log scale). A tag on one note is hidden until "Tags on one note" is on ([decision 0044](decisions/0044-graph-labels-never-overlap.md)) | yes |
+| labels | never overlap: the hovered and selected nodes first, then the lit node's neighbours, then the larger node, a note before a tag; the rest wait until zooming in makes room (decision 0044) | yes |
 | edges | tag edges thin and faint; links solid; alternatives in their own colour and thicker; similarity faint | yes |
 | hollow vs. solid | `tried: false` vs. `tried: true` | later: needs a node program we don't have |
 | ring | drift: a red ring when upstream changed since review | later: drift doesn't exist yet, and it needs a node program |

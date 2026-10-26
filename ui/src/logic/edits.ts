@@ -1,6 +1,7 @@
 // The app's edit of one note (spec, "Editing a note"): only what the person changed, with the version
 // the note was read with. Core checks and applies it; these helpers only shape the request.
 import type { NoteJson } from "../../../src/core/documents.ts";
+import { isDomain } from "../../../src/core/domains.ts";
 import type { TagsFromTopicsJson } from "../../../src/core/tags-from-topics.ts";
 import { isStopTopic, TAG_PATTERN } from "./schema.ts";
 
@@ -8,6 +9,7 @@ export interface Form {
   verdict: string;
   kind: string; // "" when the note has none
   tags: string[];
+  domains: string[]; // the confirmed domains (decision 0040); a suggested one the person picks joins them
   tried: boolean;
   rating: number | null; // 1 to 5
   useWhen: string[]; // items to add to "Use when", in the person's words; none until they type one
@@ -25,6 +27,7 @@ export interface Patch {
   sections?: Record<string, string>;
   accept_drafts?: string[];
   add_items?: Partial<Record<"Use when" | "Avoid when", string[]>>; // appended as note --use-when does
+  domains?: { confirm?: string[]; remove?: string[] };
 }
 
 export function formOf(note: NoteJson): Form {
@@ -34,6 +37,7 @@ export function formOf(note: NoteJson): Form {
     verdict: note.verdict ?? "",
     kind: typeof fm.kind === "string" ? fm.kind : "",
     tags: Array.isArray(fm.tags) ? fm.tags.filter((t): t is string => typeof t === "string") : [],
+    domains: noteDomainList(note, "domains"),
     tried: fm.tried === true,
     rating: typeof rating === "number" && Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
     useWhen: [],
@@ -75,7 +79,18 @@ export function patchFor(note: NoteJson, form: Form): Patch | null {
   if (useWhen.length) items["Use when"] = useWhen;
   if (avoidWhen.length) items["Avoid when"] = avoidWhen;
   if (Object.keys(items).length) patch.add_items = items;
-  return patch.verdict === undefined && !patch.fields && !patch.add_items ? null : patch;
+  const confirm = form.domains.filter((d) => !before.domains.includes(d));
+  const remove = before.domains.filter((d) => !form.domains.includes(d));
+  if (confirm.length || remove.length) patch.domains = { ...(confirm.length ? { confirm } : {}), ...(remove.length ? { remove } : {}) };
+  return patch.verdict === undefined && !patch.fields && !patch.add_items && !patch.domains ? null : patch;
+}
+
+// A note's known domains as written (an unknown value is kept in the file; doctor reports it);
+// the suggested ones without those already confirmed.
+export function noteDomainList(note: NoteJson, key: "domains" | "domains_suggested"): string[] {
+  const list = (value: unknown) => (Array.isArray(value) ? [...new Set(value.filter(isDomain))] : []);
+  const confirmed = list(note.frontmatter.domains);
+  return key === "domains" ? confirmed : list(note.frontmatter.domains_suggested).filter((d) => !confirmed.includes(d));
 }
 
 // The Verdict is one line.

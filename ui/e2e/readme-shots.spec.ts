@@ -44,7 +44,7 @@ test("suggest for this project", async ({ page, magpie }) => {
 });
 
 // Nothing selected: a selection dims the rest of the graph and hides its labels, so the shot keeps
-// every label (under 150 nodes the page draws them all) rather than a note open beside it.
+// every label that fits (decision 0044) rather than a note open beside it.
 test("graph", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Graph", exact: true }).click();

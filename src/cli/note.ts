@@ -11,13 +11,14 @@ export interface NoteOptions extends GlobalOptions {
   alternative?: string[];
   useWhen?: string[];
   avoidWhen?: string[];
+  domain?: string[];
 }
 
 export async function noteCommand(target: string, text: string | undefined, options: NoteOptions, terminal: Io): Promise<number> {
   const io = plainIo(terminal);
   const json = Boolean(options.json);
   const ask = io.interactive && !json ? io.ask : undefined;
-  const request = { target, text, type: options.type, to: options.to, alternatives: options.alternative, useWhen: options.useWhen, avoidWhen: options.avoidWhen };
+  const request = { target, text, type: options.type, to: options.to, alternatives: options.alternative, useWhen: options.useWhen, avoidWhen: options.avoidWhen, domains: options.domain };
   const run = await runNote(request, contextOf(io, options), ask);
   if (json) {
     io.out(`${JSON.stringify(run.document)}\n`);

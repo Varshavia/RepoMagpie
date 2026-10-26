@@ -1,4 +1,4 @@
-// Benchmark for `magpie suggest` (spec §7): 2,000 generated notes and a project with 25 dependencies,
+// Benchmark for `magpie suggest` and `magpie init --auto` (spec §7): 2,000 generated notes and a project with 25 dependencies,
 // keywords, a description and a README; the built CLI run 20 times as separate processes after one
 // warm-up run that builds the caches; median and 95th percentile. Exits 1 over the budget, unless
 // --report-only. Run with `npm run bench` (it builds first). It runs twice: on the plain journal, then
@@ -23,5 +23,7 @@ for (const alternatives of [false, true]) {
     writeFileSync(join(root, "README.md"), "# Invoice renderer\n\nRenders PDF invoices from a stream of orders, with a browser agent and a queue worker.\n");
     measure(`magpie suggest (manifests and README)${label}`, root, ["suggest", "--home", journal], 500);
     measure(`magpie suggest "a TypeScript CLI with tests"${label}`, root, ["suggest", "a TypeScript CLI with tests", "--home", journal], 500);
+    // init --auto reads the same manifests and recalls each dependency: within suggest's budget.
+    measure(`magpie init --auto --json (25 dependencies)${label}`, root, ["init", "--auto", "--json", "--home", journal], 500);
   }, true, false, alternatives);
 }

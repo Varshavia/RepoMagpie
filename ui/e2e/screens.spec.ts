@@ -195,3 +195,18 @@ test("adopt to project", async ({ page, magpie }) => {
   await expect(page.getByText("npm install zod")).toBeVisible();
   await shoot(page, "17-adopt-done");
 });
+
+// The README's journal, so the labels can be checked by eye on a graph of its size (decision 0044).
+test.describe("graph", () => {
+  test.use({ showcase: true });
+
+  test("graph: labels, tags on one note hidden and shown", async ({ page, magpie }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Graph", exact: true }).click();
+    await expect(page.locator(".graph-canvas")).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+    await shoot(page, "20-graph-labels");
+    await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags on one note" }).check();
+    await shoot(page, "21-graph-labels-one-note-tags");
+  });
+});

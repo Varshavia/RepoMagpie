@@ -36,7 +36,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0025 | [Bundle the CLI](0025-bundle-the-cli.md) | accepted |
 | 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
-| 0028 | [The graph page](0028-the-graph-page.md) | accepted |
+| 0028 | [The graph page](0028-the-graph-page.md) | accepted (the "Tag nodes" row and labelling every node under 150 superseded by 0044) |
 | 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
 | 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted (kind of a registry package note added by 0039) |
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
@@ -48,3 +48,8 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |
 | 0038 | [`setup` chooses agents found by command or app, and deletes its backups on request](0038-setup-chooses-found-agents-and-deletes-backups-on-request.md) | accepted (refines 0035) |
 | 0039 | [A note on a registry package starts as `library`](0039-a-registry-package-note-starts-as-library.md) | accepted (adds to 0030) |
+| 0040 | [Domains: a second axis on a note](0040-domains-a-second-axis.md) | accepted (adds to 0030) |
+| 0041 | [Structured search: domains, tags, aliases and `why`](0041-structured-search.md) | accepted (changes `search --tag`; adds a tool to 0034) |
+| 0042 | [The Stop reminder: an opt-in nudge to offer a note](0042-the-stop-reminder.md) | accepted (adds to 0035) |
+| 0043 | [The graph colours by domain on request, and fetches its data while its code loads](0043-the-graph-colours-by-domain.md) | accepted (adds to 0028) |
+| 0044 | [Graph labels never overlap, and tags on one note are hidden by default](0044-graph-labels-never-overlap.md) | accepted (supersedes parts of 0028) |

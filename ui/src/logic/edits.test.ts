@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { addTopicSuggestions, formOf, fromTopicsSummary, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine, withItem } from "./edits.ts";
+import { addTopicSuggestions, formOf, fromTopicsSummary, noteDomainList, oneLine, parseTags, patchFor, tagProblems, topicSuggestions, triedLine, withItem } from "./edits.ts";
 
 // "From GitHub topics" (docs/ui.md §7): topics that could become tags.
 test("topicSuggestions: topics not among the tags, in GitHub's order, at most 8, without the repository's name", () => {
@@ -50,8 +50,18 @@ const NOTE: NoteJson = {
 
 test("formOf reads the human-owned fields from the note", () => {
   const none = { useWhen: [], useWhenText: "", avoidWhen: [], avoidWhenText: "" };
-  assert.deepEqual(formOf(NOTE), { verdict: "", kind: "library", tags: ["text"], tried: false, rating: null, ...none });
-  assert.deepEqual(formOf({ ...NOTE, verdict: null, frontmatter: { tags: "oops", rating: 9 } }), { verdict: "", kind: "", tags: [], tried: false, rating: null, ...none });
+  assert.deepEqual(formOf(NOTE), { verdict: "", kind: "library", tags: ["text"], domains: [], tried: false, rating: null, ...none });
+  assert.deepEqual(formOf({ ...NOTE, verdict: null, frontmatter: { tags: "oops", rating: 9, domains: "api" } }), { verdict: "", kind: "", tags: [], domains: [], tried: false, rating: null, ...none });
+});
+
+test("domains: known values only; the suggested without the confirmed; patchFor confirms and removes", () => {
+  const note = { ...NOTE, frontmatter: { ...NOTE.frontmatter, domains: ["api", "pdfs", "api"], domains_suggested: ["api", "testing", 3] } };
+  assert.deepEqual([noteDomainList(note, "domains"), noteDomainList(note, "domains_suggested")], [["api"], ["testing"]]);
+  const form = formOf(note);
+  assert.deepEqual(form.domains, ["api"]);
+  assert.equal(patchFor(note, form), null);
+  assert.deepEqual(patchFor(note, { ...form, domains: ["testing"] })?.domains, { confirm: ["testing"], remove: ["api"] });
+  assert.deepEqual(patchFor(note, { ...form, domains: ["api", "testing"] })?.domains, { confirm: ["testing"] });
 });
 
 test("withItem: one line, trimmed, once ignoring case; a blank line adds nothing", () => {

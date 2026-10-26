@@ -16,23 +16,24 @@ test("tagListState: missing, empty, or ready", () => {
 // The sidebar's counts and the centre list come from one Note list document per journal.
 
 const note = (over: Partial<NoteSummary>): NoteSummary => ({
-  id: "pkg:npm/x", file: "npm--x.md", name: "x", kind: "library", tags: [], status: "reviewed", verdict: "fine",
+  id: "pkg:npm/x", file: "npm--x.md", name: "x", kind: "library", tags: [], domains: [], domains_suggested: [], status: "reviewed", verdict: "fine",
   tried: false, rating: null, explored: "2026-10-01", read_only: false, ...over,
 });
 
 const NOTES = [
-  note({ id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", tags: ["pdf"] }),
-  note({ id: "pkg:npm/left-pad", file: "npm--left-pad.md", name: "left-pad", status: "inbox", verdict: "" }),
+  note({ id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", tags: ["pdf"], domains: ["tooling"] }),
+  note({ id: "pkg:npm/left-pad", file: "npm--left-pad.md", name: "left-pad", status: "inbox", verdict: "", domains_suggested: ["tooling", "api"] }),
   note({ id: "pkg:github/a/cli", file: "github--a--cli.md", name: "a/cli", kind: "cli", tags: ["pdf", "testing"], status: "inbox", verdict: "" }),
   note({ id: null, file: "npm--broken.md", name: null, kind: null, status: "inbox", verdict: "", read_only: true }),
 ];
 
-test("sidebarCounts: all, inbox, kinds by name, tags by count then name", () => {
+test("sidebarCounts: all, inbox, kinds by name, tags by count then name, domains in the vocabulary's order", () => {
   assert.deepEqual(sidebarCounts(NOTES), {
     all: 4,
     inbox: 3,
     kinds: [{ name: "cli", count: 1 }, { name: "library", count: 2 }],
     tags: [{ name: "pdf", count: 2 }, { name: "testing", count: 1 }],
+    domains: [{ name: "api", count: 1, suggested: 1 }, { name: "tooling", count: 2, suggested: 1 }],
   });
 });
 
@@ -54,6 +55,7 @@ test("filterNotes: inbox, all, one kind, one tag; the document's order is kept",
   assert.deepEqual(names(filterNotes(NOTES, { list: "all" })), names(NOTES));
   assert.deepEqual(names(filterNotes(NOTES, { list: "kind", value: "cli" })), ["github--a--cli.md"]);
   assert.deepEqual(names(filterNotes(NOTES, { list: "tag", value: "pdf" })), ["npm--pdfkit.md", "github--a--cli.md"]);
+  assert.deepEqual(names(filterNotes(NOTES, { list: "domain", value: "tooling" })), ["npm--pdfkit.md", "npm--left-pad.md"]);
 });
 
 test("noteKey: journal and id, or journal and file for a read-only note", () => {

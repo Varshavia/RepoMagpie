@@ -20,9 +20,11 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: `0.2.0-beta.9` (2026-10-24), the fixes from the maintainer's macOS test (#49, [decision 0038](decisions/0038-setup-chooses-found-agents-and-deletes-backups-on-request.md), [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)): `setup` chooses agents found by their command or app, `repomagpie setup --delete-backups`, `doctor` to-dos that name a working action, the note-tool line, "nothing to remove", `library` for a registry package note, and the app following the system theme.
   Also now: [the capture offer](#the-capture-offer-featcapture-nudge) (`feat/capture-nudge`): at the end of a task, the agent offers once to save a dependency decision made in it, with the user's reason as the Verdict; `doctor`'s to-do for entries left in an agent found by its folder only names both ways out; the maintainer's ideas of 2026-10-24 assessed in [ideas](ideas.md). Merged (#51) and released in `0.2.0-beta.10` (2026-10-24); next, the maintainer runs the live scenarios on macOS with the real install and a scratch journal.
   Also now: [Use when at capture](#use-when-at-capture-featuse-when-at-capture) (`feat/use-when-at-capture`), [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 0: `repomagpie note --use-when` and `--avoid-when`, the MCP `note` tool, the skill and the app; with the fix for nested and unclosed HTML comments. Merged (#53) and released in `0.2.0-beta.11` (2026-10-25); next is RFC 0001 Phase 1.
+  Also now: [the next batch](#the-next-batch-featnext-batch) (`feat/next-batch`): RFC 0001 Phase 1 (domains, tag aliases, structured search), the Stop reminder, `repomagpie init --auto`, colour by domain in the graph, graph labels that never overlap, the skill-compliance eval and the project journal made visible. On its branch; next, the maintainer runs the eval's dry scenario.
   Also now: the tester round on `0.2.0-beta.11`: two people, one on macOS and one on Windows, for a week. They follow [TESTING.md](../TESTING.md) and answer the "Beta feedback" issue form; [validation](validation.md#beta-tester-round) maps each question to the hypothesis it tests.
+  Also now: the [manual checks](testing/manual-checks.md) only a person can run on a real machine, pending before the launch, one table per platform.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
-  Also next: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 1 (domains on notes, tag aliases, structured `search`, the expanded retrieval eval) and Phase 2 (ranking with field boosts, aliases, structured boosts and `why`), each with its decision record.
+  Also next: the rest of [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 2 (the field boosts, fuzzy and prefix limits, optional `files`), with its decision record. Then follow-ups from `feat/next-batch`: the graph's cold first open (each note parsed once for both caches), and `npm run check:bundle` checking the other screens' first files against their budget.
 - **Later:** v0.3 Trust, v0.4 Share. Also later: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 3, opt-in semantic search, decided after Phase 2's eval (D3).
 
 | Part | Status |
@@ -208,7 +210,7 @@ UI app (`feat/ui-app`, after `feat/ui-server`):
 **Done when:** in a fresh Claude Code session, "what do I have for browser testing?" triggers the skill and returns the right notes. (Met on 2026-10-06, checked live by the maintainer: a fresh Claude Code session asked "what do I have for browser testing?" loaded the skill on its own, ran `repomagpie search` and returned the maintainer's playwright-cli note.)
 
 ### `repomagpie init` (if time allows; otherwise v0.3)
-- [ ] Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use. Offline by default; `--fetch` also fetches repository metadata ([spec](spec.md), section 2).
+- [x] ~~Read `package.json`, `pyproject.toml` and `Cargo.toml`, and create draft notes for the dependencies already in use.~~ Replaced by `repomagpie init --auto` (0.2, `feat/next-batch`): it reads the manifests, lists the dependencies by what your notes say, and asks for your Verdict on each one without a note. The draft notes are dropped (the maintainer, 2026-10-25).
 
 ### Development practice
 - [x] Before any package file: the maintainer approves the libraries in [spec](spec.md) section 9 and the Node floor. Approved 2026-10-03: commander, MiniSearch, yaml, packageurl-js, typescript (dev), @types/node (dev); `engines.node >=22.12.0`.
@@ -401,8 +403,21 @@ H1 asks whether people will write notes ([validation](validation.md)). The commo
 
 **Done when:** "Use when" and "Avoid when" can be given from the CLI, the MCP tool, the review form and Add, without ever losing human text; the skill asks once and never fills them; the eval shows recall with and without; all checks pass.
 
+### The next batch (`feat/next-batch`)
+[RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 1, two ways to get notes written, the graph, a way to measure the skill, and the project journal made visible.
+- [x] Domains on notes, tag aliases and structured search: `domains` and `domains_suggested`, `repomagpie domains --suggest`, `note --domain`, spellings in `tags.md` and `tags --merge`, `search --domain --tag --match` with `why`, the MCP `vocabulary` tool, the app's domain chips and filters, and the expanded retrieval eval ([decision 0040](decisions/0040-domains-a-second-axis.md), [decision 0041](decisions/0041-structured-search.md)).
+- [x] The Stop reminder for Claude Code, opt-in: `repomagpie setup --capture-reminder` ([decision 0042](decisions/0042-the-stop-reminder.md)).
+- [x] `repomagpie init --auto`: a project's dependencies by what your notes say, then your Verdict on each one without a note; plain `init`'s draft notes dropped.
+- [x] The graph: "Colour by domain" in Draw, and its data fetched while its code loads ([decision 0043](decisions/0043-the-graph-colours-by-domain.md)).
+- [x] The graph's labels never overlap, at any size; tags on one note hidden by default, with a Draw option to show them; tag labels quieter ([decision 0044](decisions/0044-graph-labels-never-overlap.md)).
+- [x] The skill-compliance eval, [`evals/skill/`](../evals/skill/README.md): 25 scenarios for Claude Code, run by the maintainer ([idea 17](ideas.md#17-measuring-skill-compliance)).
+- [ ] The eval's dry scenario, then the full set, run by the maintainer; the README's "as well as that agent follows the skill" line points to the numbers once there are some.
+- [x] The project journal made visible: the README's "Share notes with your team", the app's empty state and its line on a project note, and `doctor`'s line ([idea 15](ideas.md#15-multiplayer-and-team-sync)).
+- [ ] The [manual checks](testing/manual-checks.md) added for `0.2.0-beta.12`, run by the maintainer.
+
+**Done when:** each part's tests and checks pass; the eval's dry scenario shows the install checks can see a denied install; the manual checks for `0.2.0-beta.12` pass.
+
 ## v0.3 Trust
-- [ ] `repomagpie init`, if it missed v0.1.
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.
 - [ ] `repomagpie drift`: lists notes whose upstream changed since the reviewed commit, using existing lockfiles where they exist.
 - [ ] `repomagpie gaps`: dependencies used in a project but missing from the journals.

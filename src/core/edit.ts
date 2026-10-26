@@ -2,8 +2,9 @@
 // edits, checked and applied through the round-trip-safe functions in write.ts. All or nothing:
 // one bad edit and nothing is applied. Pure: text in, text out; never prints.
 import { createHash } from "node:crypto";
+import { domainsProblem } from "./domains.ts";
 import { readNote, SECTION_NAMES, type SectionName } from "./note.ts";
-import { acceptDraft, addSectionItems, itemsProblem, setHumanFields, setSection, setVerdict, type EditResult, type HumanFields } from "./write.ts";
+import { acceptDraft, addSectionItems, itemsProblem, setDomains, setHumanFields, setSection, setVerdict, type EditResult, type HumanFields } from "./write.ts";
 
 export interface NoteEdits {
   verdict?: unknown; // one line; "" clears it
@@ -11,11 +12,12 @@ export interface NoteEdits {
   fields?: unknown; // {"kind", "tags", "tried", "rating", "alternatives"}
   accept_drafts?: unknown; // ["<section name>"]
   add_items?: unknown; // {"Use when": ["<item>"], "Avoid when": ["<item>"]}: the person's items, appended as note --use-when does
+  domains?: unknown; // {"confirm": ["security"], "remove": ["web"]}: the person's domains (decision 0040)
 }
 
 export type EditOutcome = { ok: true; text: string; changed: boolean } | { ok: false; error: string };
 
-const EDIT_KEYS = ["verdict", "sections", "fields", "accept_drafts", "add_items"];
+const EDIT_KEYS = ["verdict", "sections", "fields", "accept_drafts", "add_items", "domains"];
 const ITEM_SECTIONS = ["Use when", "Avoid when"] as const;
 
 // A note's version: the SHA-256 of the file's bytes (decision 0023).
@@ -69,6 +71,15 @@ export function editNote(text: string, edits: NoteEdits): EditOutcome {
       if (problem) return fail(problem);
       steps.push((t) => addSectionItems(t, section, list as string[]));
     }
+  }
+  if (edits.domains !== undefined) {
+    const { domains } = edits;
+    if (!isObject(domains) || Object.keys(domains).some((key) => key !== "confirm" && key !== "remove")) return fail("domains must be an object, such as {\"confirm\": [\"security\"], \"remove\": [\"web\"]}.");
+    // A value to remove may be unknown (doctor reports those); one to confirm must be a domain.
+    const problem = domainsProblem("domains.confirm", domains.confirm);
+    if (problem) return fail(problem);
+    if (domains.remove !== undefined && !(Array.isArray(domains.remove) && domains.remove.every((d) => typeof d === "string"))) return fail("domains.remove takes a list of domains.");
+    steps.push((t) => setDomains(t, { confirm: domains.confirm as string[] | undefined, remove: domains.remove as string[] | undefined }));
   }
 
   let result = text;

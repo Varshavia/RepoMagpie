@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import { allLabels, around, DEFAULT_SOURCES, drawable, edgeStyle, filtersActive, graphState, joinPosition, largest, LAYOUT, layoutSettings, mixRgb, neighbourGroups, neighbours, NO_FILTERS, nodeDetail, nodeLabel, nodeSize, notice, searchNodes, seedPosition, statusLine, type GraphJson, type Shown } from "./graph.ts";
+import { around, DEFAULT_SOURCES, domainColor, drawable, edgeStyle, filtersActive, graphState, joinPosition, LABEL_GAP, labelBox, largeGraph, largest, LAYOUT, layoutSettings, mixRgb, neighbourGroups, neighbours, NO_FILTERS, nodeDetail, nodeLabel, nodeSize, notice, overlap, placeLabels, searchNodes, seedPosition, shownDomains, statusLine, type GraphJson, type LabelCandidate, type PlacedLabel, type Shown } from "./graph.ts";
 
 // The graph page's pure parts (decision 0028): what is drawn, where it starts, how big, and the
 // status line.
@@ -11,7 +11,7 @@ const counts = (tagged = 0, link = 0, alternative = 0, similar = 0) => ({ notes:
 
 const note = (file: string, extra: Partial<Extract<GraphJson["nodes"][number], { type: "note" }>> = {}) => ({
   type: "note" as const, key: `note:${file}`, id: `pkg:npm/${file}`, file: `${file}.md`, name: file, kind: "library", kind_group: "tool" as const,
-  status: "reviewed" as const, tried: false, rating: null, tags: [], language: null, degree: 0, ...extra,
+  status: "reviewed" as const, tried: false, rating: null, tags: [], language: null, domain: null, domain_suggested: false, degree: 0, ...extra,
 });
 
 const DOC: GraphJson = {
@@ -54,21 +54,19 @@ test("nodeSize: in a large graph, tags grow with their note count on the notes' 
   assert.equal(nodeSize("tag", 120, false), nodeSize("tag", 0)); // a small graph: all tags the same, as above
 });
 
-test("allLabels: every label below 150 drawn nodes; above, only the larger ones", () => {
-  assert.equal(allLabels(9), true);
-  assert.equal(allLabels(149), true);
-  assert.equal(allLabels(150), false);
-  assert.equal(allLabels(830), false);
+test("largeGraph: from 150 drawn nodes up, tags are sized by their note count", () => {
+  assert.equal(largeGraph(149), false);
+  assert.equal(largeGraph(150), true);
 });
 
-test("drawable: the default sources are tags, links and alternatives; similarity and missing notes are off", () => {
-  assert.deepEqual(DEFAULT_SOURCES, { tagged: true, link: true, alternative: true, similar: false, ghosts: false });
-  const shown = drawable(DOC, DEFAULT_SOURCES);
+test("drawable: the default sources are tags, links and alternatives; tags on one note, similarity and missing notes are off", () => {
+  assert.deepEqual(DEFAULT_SOURCES, { tagged: true, oneNoteTags: false, link: true, alternative: true, similar: false, ghosts: false });
+  const shown = drawable(DOC, { ...DEFAULT_SOURCES, oneNoteTags: true });
   assert.deepEqual(shown.nodes.map((n) => n.key), ["note:a", "note:b", "note:c", "tag:pdf"]);
   assert.deepEqual(shown.edges.map((e) => e.type), ["tagged", "link", "alternative"]);
   assert.deepEqual(shown.counts, { notes: 3, tags: 1, connections: 3 });
 
-  const all = drawable(DOC, { tagged: true, link: true, alternative: true, similar: true, ghosts: true });
+  const all = drawable(DOC, { tagged: true, oneNoteTags: true, link: true, alternative: true, similar: true, ghosts: true });
   assert.deepEqual(all.nodes.map((n) => n.key), ["note:a", "note:b", "note:c", "tag:pdf", "ghost:x"]);
   assert.equal(all.counts.connections, 5);
 
@@ -76,14 +74,25 @@ test("drawable: the default sources are tags, links and alternatives; similarity
   assert.deepEqual(drawable(DOC, { ...DEFAULT_SOURCES, tagged: false }).nodes.map((n) => n.key), ["note:a", "note:b", "note:c"]);
 });
 
-test("statusLine: in words, singular and plural", () => {
+test("drawable: a tag on one note is neither a node nor an edge by default, and counted; one in the filters or kept by the search is drawn", () => {
+  const shown = drawable(DOC, DEFAULT_SOURCES);
+  assert.deepEqual(shown.nodes.map((n) => n.key), ["note:a", "note:b", "note:c"]);
+  assert.deepEqual(shown.edges.map((e) => e.type), ["link", "alternative"]);
+  assert.deepEqual(shown.counts, { notes: 3, tags: 0, connections: 2, hiddenTags: 1 });
+  assert.deepEqual(drawable(DOC, DEFAULT_SOURCES, { ...NO_FILTERS, tags: ["pdf"] }).counts, { notes: 1, tags: 1, connections: 1 });
+  assert.deepEqual(drawable(DOC, DEFAULT_SOURCES, NO_FILTERS, ["tag:pdf"]).counts, { notes: 3, tags: 1, connections: 3 });
+});
+
+test("statusLine: in words, singular and plural, with the tags on one note left out", () => {
   assert.equal(statusLine({ notes: 214, tags: 31, connections: 486 }), "Showing 214 notes, 31 tags and 486 connections");
   assert.equal(statusLine({ notes: 1, tags: 1, connections: 1 }), "Showing 1 note, 1 tag and 1 connection");
   assert.equal(statusLine({ notes: 0, tags: 0, connections: 0 }), "Showing 0 notes, 0 tags and 0 connections");
+  assert.equal(statusLine({ notes: 39, tags: 22, connections: 98, hiddenTags: 45 }), "Showing 39 notes, 22 tags (45 on one note hidden) and 98 connections");
+  assert.equal(statusLine({ notes: 39, tags: 22, connections: 98, hiddenTags: 0 }), "Showing 39 notes, 22 tags and 98 connections");
 });
 
 test("graphState: no notes, no connections in the journal, connections all switched off, or something to draw", () => {
-  const off = { tagged: false, link: false, alternative: false, similar: false, ghosts: false };
+  const off = { tagged: false, oneNoteTags: false, link: false, alternative: false, similar: false, ghosts: false };
   assert.equal(graphState({ ...DOC, nodes: [], edges: [], counts: counts() }, DEFAULT_SOURCES), "empty");
   assert.equal(graphState({ ...DOC, edges: [] }, DEFAULT_SOURCES), "unconnected");
   assert.equal(graphState(DOC, off), "off");
@@ -93,11 +102,17 @@ test("graphState: no notes, no connections in the journal, connections all switc
   // Only a link to a missing note, with missing notes off: nothing between notes yet.
   assert.equal(graphState({ ...DOC, edges: DOC.edges.filter((e) => e.target === "ghost:x") }, DEFAULT_SOURCES), "unconnected");
   assert.equal(graphState(DOC, DEFAULT_SOURCES), "ready");
+  // Only a tag on one note connects anything: hidden, and the notice says how to draw it.
+  const onlyTag = { ...DOC, edges: DOC.edges.filter((e) => e.type === "tagged") };
+  assert.equal(graphState(onlyTag, DEFAULT_SOURCES), "oneNote");
+  assert.equal(graphState(onlyTag, { ...DEFAULT_SOURCES, oneNoteTags: true }), "ready");
+  assert.equal(graphState(onlyTag, { ...DEFAULT_SOURCES, tagged: false }), "off");
 });
 
-test("notice: the journal has no connections, or they are all switched off", () => {
+test("notice: the journal has no connections, they are all switched off, or only tags on one note would draw any", () => {
   assert.equal(notice("unconnected"), "Your notes aren't connected yet. Add tags, or [[links]] in My notes.");
   assert.equal(notice("off"), "No connections drawn. Turn on Tags or Links to see how your notes connect.");
+  assert.equal(notice("oneNote"), "Each of your tags is on one note. Turn on Tags on one note to draw them.");
   assert.equal(notice("ready"), null);
   assert.equal(notice("empty"), null);
 });
@@ -144,7 +159,7 @@ test("around: local mode keeps the nodes within the depth and the edges between 
   assert.deepEqual(one.edges.map((e) => `${e.source} ${e.target}`), ["note:d note:e", "note:e note:f"]);
   assert.deepEqual(one.counts, { notes: 3, tags: 0, connections: 2 });
   assert.deepEqual(around(CHAIN, "note:e", 2).counts, { notes: 4, tags: 0, connections: 3 });
-  assert.deepEqual(statusLine(around(drawable(DOC, DEFAULT_SOURCES), "tag:pdf", 1).counts), "Showing 1 note, 1 tag and 1 connection");
+  assert.deepEqual(statusLine(around(drawable(DOC, { ...DEFAULT_SOURCES, oneNoteTags: true }), "tag:pdf", 1).counts), "Showing 1 note, 1 tag and 1 connection");
 });
 
 test("searchNodes: up to 8 nodes whose name, file stem or tag contains the text; starts-with first, then by name", () => {
@@ -200,7 +215,7 @@ const FILTERED: GraphJson = {
   ],
   counts: { notes: 4, tags: 2, edges_by_type: { tagged: 4, link: 1, alternative: 1, similar: 1 } },
 };
-const ALL_SOURCES = { tagged: true, link: true, alternative: true, similar: true, ghosts: true };
+const ALL_SOURCES = { tagged: true, oneNoteTags: true, link: true, alternative: true, similar: true, ghosts: true };
 const keys = (shown: Shown) => shown.nodes.map((n) => n.key);
 
 test("drawable with filters: notes by kind group, tags (any of them), status and tried; tags and missing notes follow their notes", () => {
@@ -216,6 +231,8 @@ test("drawable with filters: notes by kind group, tags (any of them), status and
   assert.deepEqual(tools.edges.map((e) => e.type), ["tagged", "link"]);
   assert.deepEqual(tools.counts, { notes: 2, tags: 1, connections: 2 });
   assert.deepEqual(drawable(FILTERED, ALL_SOURCES, { ...NO_FILTERS, kindGroup: "other" }).counts, { notes: 0, tags: 0, connections: 0 });
+  // A tag on two notes is drawn by default.
+  assert.deepEqual(keys(drawable(FILTERED, DEFAULT_SOURCES)), ["note:p", "note:q", "note:r", "note:s", "tag:pdf", "tag:react"]);
   assert.equal(filtersActive(NO_FILTERS), false);
   assert.equal(filtersActive({ ...NO_FILTERS, tags: ["pdf"] }), true);
 });
@@ -245,6 +262,17 @@ test("nodeDetail: in words, what the graph shows by colour", () => {
   assert.equal(nodeDetail({ type: "tag", key: "tag:t", tag: "t", count: 1 }), "Tag, 1 note");
   assert.equal(nodeDetail({ type: "tag", key: "tag:t", tag: "t", count: 12 }), "Tag, 12 notes");
   assert.equal(nodeDetail({ type: "ghost", key: "ghost:x", target: "x", reason: "missing" }), "No note yet");
+  // Colour by domain: the domain instead of the kind group.
+  assert.equal(nodeDetail(note("a", { domain: "database" }), true), "database");
+  assert.equal(nodeDetail(note("a", { domain: "testing", domain_suggested: true, status: "inbox" }), true), "testing (suggested), in the inbox");
+  assert.equal(nodeDetail(note("a"), true), "No domain");
+  assert.equal(nodeDetail({ type: "tag", key: "tag:t", tag: "t", count: 1 }, true), "Tag, 1 note");
+});
+
+test("shownDomains: the domains the drawn notes are coloured by, in the vocabulary's order; domainColor names each token", () => {
+  const shown: Shown = { nodes: [note("a", { domain: "testing" }), note("b", { domain: "security", domain_suggested: true }), note("c"), note("d", { domain: "testing" })], edges: [], counts: { notes: 4, tags: 0, connections: 0 } };
+  assert.deepEqual(shownDomains(shown), ["security", "testing"]);
+  assert.equal(domainColor("ai"), "--domain-ai");
 });
 
 test("joinPosition: a node joining the drawing goes where it was, else next to its first drawn neighbour, else to its seed", () => {
@@ -288,4 +316,141 @@ test("layout: notes without connections stay near the rest instead of drifting t
     assert.ok(ratio <= 1.2, `${connected} connected, ${isolated} alone: ${ratio.toFixed(2)}`);
   }
   assert.equal(layoutSettings(9).strongGravityMode, true);
+});
+
+// Labels (decision 0044). Widths here are a fixed number of pixels per character.
+const width = (label: string, tag: boolean) => label.length * (tag ? 6 : 7);
+const candidate = (key: string, x: number, y: number, extra: Partial<LabelCandidate> = {}): LabelCandidate => ({ key, label: key, x, y, size: 8, tag: false, count: 0, rank: 3, ...extra });
+const placedKeys = (placed: PlacedLabel[]) => placed.map((p) => p.candidate.key);
+
+test("labelBox: the text right of the node, about the font's height; a plate with 4 px of padding; a tag's in the smaller font", () => {
+  assert.deepEqual(labelBox(candidate("zod", 100, 50), 21, false), { x: 109.5, y: 43.5, width: 24, height: 15 });
+  const tag = labelBox(candidate("#pdf", 100, 50, { tag: true, size: 6 }), 24, false);
+  assert.deepEqual({ ...tag, y: Math.round(tag.y * 100) / 100 }, { x: 107.5, y: 43.92, width: 27, height: 14 });
+  assert.deepEqual(labelBox(candidate("zod", 100, 50), 21, true), { x: 112, y: 40, width: 29, height: 20 });
+});
+
+test("overlap: boxes that touch or come within the gap", () => {
+  const a = { x: 0, y: 0, width: 10, height: 10 };
+  assert.equal(overlap(a, { x: 5, y: 5, width: 10, height: 10 }), true);
+  assert.equal(overlap(a, { x: 10, y: 0, width: 10, height: 10 }), false);
+  assert.equal(overlap(a, { x: 11, y: 0, width: 10, height: 10 }, LABEL_GAP), true);
+  assert.equal(overlap(a, { x: 13, y: 0, width: 10, height: 10 }, LABEL_GAP), false);
+});
+
+test("placeLabels: the larger node first, a note before a tag of the same size, tags by note count; a label that would overlap waits", () => {
+  assert.deepEqual(placedKeys(placeLabels([candidate("small", 0, 0), candidate("large", 0, 4, { size: 12 }), candidate("far", 400, 0)], width)), ["large", "far"]);
+  assert.deepEqual(placedKeys(placeLabels([candidate("#t", 0, 0, { tag: true }), candidate("n", 0, 2)], width)), ["n"]);
+  assert.deepEqual(placedKeys(placeLabels([candidate("#few", 0, 0, { tag: true, count: 2 }), candidate("#many", 0, 2, { tag: true, count: 9 })], width)), ["#many"]);
+  // Side by side, a gap apart: both.
+  assert.deepEqual(placedKeys(placeLabels([candidate("a", 0, 0), candidate("b", 0, 30)], width)), ["a", "b"]);
+});
+
+test("placeLabels: the hovered and selected labels are always placed, on plates; the lit node's neighbours come next; nothing overlaps a plate", () => {
+  const placed = placeLabels(
+    [
+      candidate("big", 0, 0, { size: 30 }),
+      candidate("hovered", 0, 3, { rank: 0 }),
+      candidate("selected", 0, 6, { rank: 1 }),
+      candidate("near", 100, 0, { rank: 2, size: 4 }),
+      candidate("rest", 100, 3, { size: 20 }),
+    ],
+    width,
+  );
+  assert.deepEqual(placed.map((p) => [p.candidate.key, p.plate]), [["hovered", true], ["selected", true], ["near", false]]);
+});
+
+// A journal for the label checks: `hubs` tags with that many notes each, `shared` tags on two or
+// three notes, `single` tags on one note, and `links` links between notes. A small PRNG keeps it
+// the same every run.
+function labelJournal(notes: number, hubs: number[], shared: number, single: number, links: number): GraphJson {
+  let seed = 7;
+  const next = (n: number) => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) % n);
+  const name = (i: number) => `note-${i}-${["pdf", "auth", "testing-library", "x", "orm-kit", "browser-automation"][i % 6]}`;
+  const tags = [...hubs, ...Array.from({ length: shared }, (_, i) => 2 + (i % 2)), ...Array.from({ length: single }, () => 1)].map((count, i) => ({ tag: `tag-${i}${i % 3 ? "-topic" : ""}`, count }));
+  const edges: GraphJson["edges"] = [];
+  const degree = new Map<number, number>();
+  const bump = (i: number) => degree.set(i, (degree.get(i) ?? 0) + 1);
+  for (const { tag, count } of tags) {
+    const on = new Set<number>();
+    while (on.size < count) on.add(next(notes));
+    for (const i of on) edges.push({ type: "tagged", source: `note:${name(i)}`, target: `tag:${tag}` }), bump(i);
+  }
+  for (let l = 0; l < links; l++) {
+    const [a, b] = [next(notes), next(notes)];
+    if (a !== b) edges.push({ type: "link", source: `note:${name(a)}`, target: `note:${name(b)}`, count: 1 }), bump(a), bump(b);
+  }
+  const nodes: GraphJson["nodes"] = [
+    ...Array.from({ length: notes }, (_, i) => note(name(i), { degree: degree.get(i) ?? 0 })),
+    ...tags.map(({ tag, count }) => ({ type: "tag" as const, key: `tag:${tag}`, tag, count })),
+  ];
+  return { journal: "personal", nodes, edges, counts: { notes, tags: tags.length, edges_by_type: { tagged: edges.length - links, link: links, alternative: 0, similar: 0 } } };
+}
+
+// The real layout, then the screen as sigma fits it: the graph's bounds in a 1280 × 800 canvas,
+// zoomed in on the centre; only nodes on screen are candidates, and node sizes grow with the
+// square root of the zoom.
+function screenCandidates(shown: Shown, zoom: number, rank = (_key: string): LabelCandidate["rank"] => 3): LabelCandidate[] {
+  const graph = new Graph({ type: "undirected", multi: true });
+  const large = largeGraph(shown.nodes.length);
+  const sizeOf = (n: GraphJson["nodes"][number]) => (n.type === "tag" ? nodeSize("tag", n.count, large) : nodeSize("note", n.type === "note" ? n.degree : 0));
+  for (const n of shown.nodes) graph.addNode(n.key, { ...seedPosition(n.key), size: sizeOf(n) });
+  for (const e of shown.edges) graph.addEdge(e.source, e.target);
+  forceAtlas2.assign(graph, { iterations: LAYOUT.iterations, settings: layoutSettings(graph.order) });
+  const xs = graph.nodes().map((k) => graph.getNodeAttribute(k, "x") as number);
+  const ys = graph.nodes().map((k) => graph.getNodeAttribute(k, "y") as number);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const scale = Math.min(1280 / (maxX - minX || 1), 800 / (maxY - minY || 1)) * zoom;
+  const out: LabelCandidate[] = [];
+  for (const n of shown.nodes) {
+    const x = 640 + (graph.getNodeAttribute(n.key, "x") - (minX + maxX) / 2) * scale;
+    const y = 400 + (graph.getNodeAttribute(n.key, "y") - (minY + maxY) / 2) * scale;
+    if (x < 0 || x > 1280 || y < 0 || y > 800) continue;
+    out.push({ key: n.key, label: nodeLabel(n), x, y, size: sizeOf(n) * Math.sqrt(zoom), tag: n.type === "tag", count: n.type === "tag" ? n.count : 0, rank: rank(n.key) });
+  }
+  return out;
+}
+
+const overlapping = (placed: PlacedLabel[]) => {
+  const pairs: string[] = [];
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      if (placed[i].plate && placed[j].plate) continue; // the hovered and selected plates, drawn by sigma
+      if (overlap(placed[i].box, placed[j].box)) pairs.push(`${placed[i].candidate.key} / ${placed[j].candidate.key}`);
+    }
+  }
+  return pairs;
+};
+
+const LABEL_JOURNALS: [string, GraphJson][] = [
+  ["shaped like the maintainer's (40 notes, 66 tags, most on one note)", labelJournal(40, [14, 10, 8, 6], 6, 56, 10)],
+  ["about 30 nodes", labelJournal(20, [6, 4], 3, 5, 6)],
+  ["800 notes", labelJournal(800, [120, 90, 60, 45, 30, 25, 20, 15], 60, 120, 400)],
+];
+
+for (const [name, doc] of LABEL_JOURNALS) {
+  test(`placeLabels: no two drawn labels overlap, at three zooms, tags on one note shown and hidden: ${name}`, (t) => {
+    for (const oneNoteTags of [false, true]) {
+      const shown = drawable(doc, { ...DEFAULT_SOURCES, oneNoteTags });
+      for (const zoom of [1, 2, 4]) {
+        const candidates = screenCandidates(shown, zoom);
+        const placed = placeLabels(candidates, width);
+        assert.deepEqual(overlapping(placed), [], `tags on one note ${oneNoteTags ? "shown" : "hidden"}, zoom ${zoom}`);
+        t.diagnostic(`${shown.nodes.length} nodes, tags on one note ${oneNoteTags ? "shown" : "hidden"}, zoom ${zoom}: ${placed.length} of ${candidates.length} labels drawn`);
+      }
+    }
+  });
+}
+
+test("placeLabels: with a node selected, it and its neighbours are labelled first, and still nothing overlaps", () => {
+  const doc = LABEL_JOURNALS[0][1];
+  const shown = drawable(doc, DEFAULT_SOURCES);
+  const hub = largest(shown, 1)[0].key;
+  const near = neighbours(shown.edges, hub, 1);
+  // Dimmed nodes have no label (the page's reducer), so only the selection is a candidate.
+  const candidates = screenCandidates(shown, 1, (key) => (key === hub ? 1 : 2)).filter((c) => near.has(c.key));
+  const placed = placeLabels(candidates, width);
+  assert.equal(placed[0].candidate.key, hub);
+  assert.equal(placed[0].plate, true);
+  assert.deepEqual(overlapping(placed), []);
 });

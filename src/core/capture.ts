@@ -2,10 +2,11 @@
 // to an existing one that never overwrites human-owned content (schema rule 2).
 // Pure: text in, text out. The caller finds the existing note, fetches metadata and writes the file.
 import { PackageURL } from "packageurl-js";
+import { suggestDomains } from "./domains.ts";
 import { draftKind, type RepoMetadata } from "./github.ts";
 import { readNote, type SectionName } from "./note.ts";
 import { topicTags, type KnownTags } from "./topic-tags.ts";
-import { addSectionItems, appendSkillLine, renderNote, setToolFields, setVerdict } from "./write.ts";
+import { addSectionItems, appendSkillLine, renderNote, setDomains, setToolFields, setVerdict } from "./write.ts";
 
 export interface CaptureInput {
   purl: string;
@@ -21,6 +22,7 @@ export interface CaptureInput {
   today: string; // YYYY-MM-DD
   known: KnownTags; // for ranking the topics that become a new note's tags (decision 0030)
   tags?: string[]; // a new note's tags as the user chose them in Add's preview, in place of the draft
+  domains?: string[]; // note's --domain: domains the user confirmed (decision 0040), checked by the caller
 }
 
 export interface Capture {
@@ -32,6 +34,7 @@ export interface Capture {
   error: string | null;
   warnings: string[];
   items: Items; // what the user's own --use-when and --avoid-when items did
+  domainsAdded: string[]; // the --domain values written to `domains`
 }
 
 export type ListName = "use_when" | "avoid_when";
@@ -41,10 +44,12 @@ export interface Items {
   present: string[]; // items a section already had, so not written again
 }
 const noItems = (): Items => ({ changed: [], draftsReplaced: [], present: [] });
+const failure = (error: string, name: string | null = null, status: Capture["status"] = null): Capture =>
+  ({ result: "failed", text: null, tags: [], name, status, error, warnings: [], items: noItems(), domainsAdded: [] });
 
 export function captureNote(existing: string | null, input: CaptureInput): Capture {
   if (input.verdict !== undefined && /[\r\n]/.test(input.verdict.trim())) {
-    return { result: "failed", text: null, tags: [], name: null, status: null, error: "The Verdict must be one line of text.", warnings: [], items: noItems() };
+    return failure("The Verdict must be one line of text.");
   }
   return existing === null ? create(input) : update(existing, input);
 }
@@ -68,6 +73,9 @@ function create(input: CaptureInput): Capture {
   const drafts: SectionName[] = ["What it does", ...(useWhen.length ? [] : ["Use when" as const]), ...(avoidWhen.length ? [] : ["Avoid when" as const])];
   const items: Items = { changed: [...(useWhen.length ? ["use_when" as const] : []), ...(avoidWhen.length ? ["avoid_when" as const] : [])], draftsReplaced: [], present: [] };
   const tags = input.tags ?? (m ? topicTags(m.topics, input.purl, input.known) : []);
+  // Suggested from the note's tags and topics (decision 0040); the user's --domain values are confirmed.
+  const domains = [...new Set(input.domains ?? [])];
+  const domainsSuggested = suggestDomains({ tags, topics: m?.topics, domains }, input.known.aliases);
   const text = renderNote({
     id: input.purl,
     name,
@@ -79,6 +87,8 @@ function create(input: CaptureInput): Capture {
     explored: input.today,
     kind: m ? draftKind(m) : startingKind(input.purl),
     tags,
+    domains,
+    domainsSuggested,
     verdict: input.verdict,
     whatItDoes: m?.description ?? undefined,
     useWhen: useWhen.length ? useWhen : input.useWhen,
@@ -87,13 +97,13 @@ function create(input: CaptureInput): Capture {
     skills,
     drafts,
   });
-  return { result: "created", text, tags, name, status: readNote(text).status, error: null, warnings: [], items };
+  return { result: "created", text, tags, name, status: readNote(text).status, error: null, warnings: [], items, domainsAdded: domains };
 }
 
 function update(existing: string, input: CaptureInput): Capture {
   const before = readNote(existing);
   const name = typeof before.frontmatter.name === "string" ? before.frontmatter.name : null;
-  const failed = (error: string): Capture => ({ result: "failed", text: null, tags: [], name, status: before.status, error, warnings: [], items: noItems() });
+  const failed = (error: string): Capture => failure(error, name, before.status);
   if (input.verdict?.trim() && before.verdict) return failed("This note already has a Verdict; edit the file to change it.");
 
   const warnings: string[] = [];
@@ -137,8 +147,16 @@ function update(existing: string, input: CaptureInput): Capture {
     if (added.replacedDraft) items.draftsReplaced.push(list);
     items.present.push(...added.present);
   }
+  // The user's --domain values, in the same write: a note that can't take them fails as a whole.
+  let domainsAdded: string[] = [];
+  if (input.domains?.length) {
+    const set = setDomains(text, { confirm: input.domains });
+    if (set.warnings.length) return failed(set.warnings[0]);
+    text = set.text;
+    domainsAdded = set.confirmed;
+  }
   const changed = text !== existing;
-  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)], items };
+  return { result: changed ? "updated" : "unchanged", text: changed ? text : null, tags: [], name, status: readNote(text).status, error: null, warnings: [...new Set(warnings)], items, domainsAdded };
 }
 
 // The kind of a note made without GitHub data (decision 0039): a registry package (npm, PyPI,

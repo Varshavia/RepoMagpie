@@ -11,6 +11,13 @@ test("rankTopics: in tags.md first, then carried by another note, then the rest;
   assert.deepEqual(rankTopics(topics, DIFY, known), ["python", "workflow", "agent", "llm", "ai", "mcp"]);
 });
 
+test("rankTopics: a topic that is an alias becomes its canonical tag, once (decision 0041)", () => {
+  const aliases = new Map([["postgres", "postgresql"], ["llms", "llm"]]);
+  assert.deepEqual(rankTopics(["llm", "llms", "postgres", "react"], DIFY, { ...none, aliases }), ["llm", "postgresql", "react"]);
+  assert.deepEqual(rankTopics(["postgres"], DIFY, { tagList: ["postgresql"], shared: new Set(), aliases }), ["postgresql"]);
+  assert.deepEqual(rankTopics(["postgres"], "pkg:github/a/postgresql", { ...none, aliases }), []);
+});
+
 test("rankTopics without a tag list or other notes keeps GitHub's order", () => {
   assert.deepEqual(rankTopics(["b", "a", "c"], DIFY, none), ["b", "a", "c"]);
 });

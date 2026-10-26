@@ -1,22 +1,25 @@
 // Search (docs/ui.md §7): the same ranking as magpie search, across both journals; Verdict first.
-// Filters for journal, kind and tag go to the API; status is filtered here, from the results.
+// Filters for journal, kind, domain and tag go to the API; status is filtered here, from the results.
+// Each row says why it matched (decision 0041).
 import { useEffect, useRef, useState, type Ref } from "react";
+import { DOMAINS } from "../../../src/core/domains.ts";
 import { api, type ApiError, type Scope, type SearchResult } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { KINDS } from "../logic/schema.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
 import { SearchRow } from "./rows.tsx";
-import { VirtualList } from "./VirtualList.tsx";
+import { TALL_ROW, VirtualList } from "./VirtualList.tsx";
 
 export interface SearchState {
   query: string;
   journal: Scope | "";
   kind: string;
   tag: string;
+  domain: string;
   status: "" | "reviewed" | "inbox";
 }
 
-export const NO_SEARCH: SearchState = { query: "", journal: "", kind: "", tag: "", status: "" };
+export const NO_SEARCH: SearchState = { query: "", journal: "", kind: "", tag: "", domain: "", status: "" };
 
 export const resultKey = (r: SearchResult) => `${r.journal} id ${r.id}${r.skill ? ` skill ${r.skill}` : ""}`;
 
@@ -53,7 +56,9 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
     const n = ++attempt.current;
     const timer = setTimeout(() => {
       if (!results.length) setState("loading");
-      api.search({ q, journal: search.journal || undefined, kind: search.kind || undefined, tag: search.tag ? [search.tag] : undefined, limit: LIMIT }).then(
+      // The app's tag and domain are filters: only notes that have them (search's match "filter").
+      const structured = Boolean(search.tag || search.domain);
+      api.search({ q, journal: search.journal || undefined, kind: search.kind || undefined, tag: search.tag ? [search.tag] : undefined, domain: search.domain ? [search.domain] : undefined, match: structured ? "filter" : undefined, limit: LIMIT }).then(
         (doc) => {
           if (n !== attempt.current) return;
           onResults(doc.results);
@@ -68,10 +73,10 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
     }, 150);
     return () => clearTimeout(timer);
     // results is read only to keep old results on screen while the next ones load
-  }, [search.query, search.journal, search.kind, search.tag, refresh, retry]);
+  }, [search.query, search.journal, search.kind, search.tag, search.domain, refresh, retry]);
 
   const shown = search.status ? results.filter((r) => r.status === search.status) : results;
-  const filtered = Boolean(search.journal || search.kind || search.tag || search.status);
+  const filtered = Boolean(search.journal || search.kind || search.tag || search.domain || search.status);
 
   return (
     <section className="pane" aria-labelledby="search-title">
@@ -124,6 +129,14 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
             </option>
           ))}
         </select>
+        <select className="select" value={search.domain} onChange={(e) => set("domain", e.target.value)} aria-label="Domain">
+          <option value="">Any domain</option>
+          {DOMAINS.map((d) => (
+            <option key={d.id} value={d.id} title={d.definition}>
+              {d.id}
+            </option>
+          ))}
+        </select>
         <select className="select" value={search.tag} onChange={(e) => set("tag", e.target.value)} aria-label="Tag">
           <option value="">Any tag</option>
           {tags.map((t) => (
@@ -162,6 +175,7 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
           onOpen={(key) => onSelect(key, true)}
           row={(r) => <SearchRow result={r} />}
           listRef={listRef}
+          rowHeight={TALL_ROW}
         />
       ) : (
         <EmptyState

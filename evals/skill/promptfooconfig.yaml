@@ -1,0 +1,14 @@
+# The full set: 25 scenarios (scenarios.yaml), each on a fresh copy of the fixture journal and
+# project. Run it with `node run.mjs` after the dry scenario (dry.yaml) passes.
+description: RepoMagpie skill compliance
+prompts: ['{{prompt}}']
+providers: file://providers.yaml
+extensions: ['file://hooks.mjs:extensionHook']
+defaultTest:
+  assert:
+    # In every scenario: Verdicts and "when" items only in the user's words; no delete, no adopt.
+    - type: javascript
+      value: file://assertions.mjs:userWordsOnly
+    - type: javascript
+      value: file://assertions.mjs:noDeleteOrShare
+tests: file://scenarios.yaml

@@ -40,10 +40,10 @@ test("graphData: note nodes with their fields, kind group and degree; tag nodes 
   );
   const graph = graphData(root);
   assert.deepEqual(graph.nodes, [
-    { type: "note", key: "note:github--a--list.md", id: "pkg:github/a/list", file: "github--a--list.md", name: "list", kind: "awesome-list", kind_group: "resource", status: "inbox", tried: false, rating: null, tags: [], language: null, degree: 0 },
-    { type: "note", key: "note:github--a--odd.md", id: "pkg:github/a/odd", file: "github--a--odd.md", name: null, kind: "not-a-kind", kind_group: "other", status: "inbox", tried: false, rating: null, tags: [], language: null, degree: 0 },
-    { type: "note", key: "note:npm--pdfkit.md", id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", kind: "library", kind_group: "tool", status: "reviewed", tried: true, rating: 2, tags: ["pdf", "node"], language: "JavaScript", degree: 3 },
-    { type: "note", key: "note:npm--puppeteer.md", id: "pkg:npm/puppeteer", file: "npm--puppeteer.md", name: "puppeteer", kind: "skill-pack", kind_group: "skill-pack", status: "inbox", tried: false, rating: null, tags: ["pdf"], language: null, degree: 2 },
+    { type: "note", key: "note:github--a--list.md", id: "pkg:github/a/list", file: "github--a--list.md", name: "list", kind: "awesome-list", kind_group: "resource", status: "inbox", tried: false, rating: null, tags: [], language: null, domain: null, domain_suggested: false, degree: 0 },
+    { type: "note", key: "note:github--a--odd.md", id: "pkg:github/a/odd", file: "github--a--odd.md", name: null, kind: "not-a-kind", kind_group: "other", status: "inbox", tried: false, rating: null, tags: [], language: null, domain: null, domain_suggested: false, degree: 0 },
+    { type: "note", key: "note:npm--pdfkit.md", id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", kind: "library", kind_group: "tool", status: "reviewed", tried: true, rating: 2, tags: ["pdf", "node"], language: "JavaScript", domain: null, domain_suggested: false, degree: 3 },
+    { type: "note", key: "note:npm--puppeteer.md", id: "pkg:npm/puppeteer", file: "npm--puppeteer.md", name: "puppeteer", kind: "skill-pack", kind_group: "skill-pack", status: "inbox", tried: false, rating: null, tags: ["pdf"], language: null, domain: null, domain_suggested: false, degree: 2 },
     // "node" is not in tags.md; a note carries it, so it is a node too.
     { type: "tag", key: "tag:node", tag: "node", count: 1 },
     { type: "tag", key: "tag:pdf", tag: "pdf", count: 2 },
@@ -54,6 +54,23 @@ test("graphData: note nodes with their fields, kind group and degree; tag nodes 
     { type: "tagged", source: "note:npm--puppeteer.md", target: "tag:pdf" },
   ]);
   assert.deepEqual(graph.counts, { notes: 4, tags: 2, edges_by_type: { tagged: 3, link: 1, alternative: 0, similar: 0 } });
+});
+
+test("graphData: a note's colour domain is its first confirmed one, else its first suggested one; unknown values are skipped", () => {
+  const root = journal({
+    "npm--a.md": note({ id: "pkg:npm/a", domains: ["database", "security"], domains_suggested: ["api"] }),
+    "npm--b.md": note({ id: "pkg:npm/b", domains: [], domains_suggested: ["testing"] }),
+    "npm--c.md": note({ id: "pkg:npm/c", domains: ["not-a-domain", "auth"] }),
+    "npm--d.md": note({ id: "pkg:npm/d", domains: "database" }),
+  });
+  const domain = (key: string) => {
+    const n = nodeByKey(graphData(root).nodes, key);
+    return n?.type === "note" ? [n.domain, n.domain_suggested] : null;
+  };
+  assert.deepEqual(domain("note:npm--a.md"), ["database", false]);
+  assert.deepEqual(domain("note:npm--b.md"), ["testing", true]);
+  assert.deepEqual(domain("note:npm--c.md"), ["auth", false]);
+  assert.deepEqual(domain("note:npm--d.md"), [null, false], "not a list");
 });
 
 test("graphData: one link edge per pair, whichever direction, counting every body link; no edge to itself", () => {
@@ -230,7 +247,7 @@ test("graph cache: written whole to a temporary file, then renamed into place; n
   assert.match(written[0], /graph\.json\.\d+\.tmp$/);
   assert.deepEqual(renames.mock.calls.filter((call) => String(call.arguments[1]) === cacheFile).map((call) => String(call.arguments[0])), written);
   assert.ok(readdirSync(join(root, ".cache")).every((name) => !name.endsWith(".tmp")));
-  assert.equal((JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number }).version, 2);
+  assert.equal((JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number }).version, 3);
 });
 
 test("graph cache: a corrupt, truncated or mismatched graph.json is ignored and rebuilt, without an error", () => {

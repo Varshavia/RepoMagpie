@@ -6,6 +6,7 @@ export type View =
   | { page: "all" }
   | { page: "kind"; value: string }
   | { page: "tag"; value: string }
+  | { page: "domain"; value: string }
   | { page: "search" }
   | { page: "add"; target?: string } // target: from an unresolved [[link]]
   | { page: "import" }
@@ -22,6 +23,7 @@ export function listOf(view: View): ListView | null {
       return { list: view.page };
     case "kind":
     case "tag":
+    case "domain":
       return { list: view.page, value: view.value };
     default:
       return null;
@@ -38,6 +40,8 @@ export function viewTitle(view: View): string {
       return `Kind: ${view.value}`;
     case "tag":
       return `Tag: ${view.value}`;
+    case "domain":
+      return `Domain: ${view.value}`;
     case "search":
       return "Search";
     case "add":

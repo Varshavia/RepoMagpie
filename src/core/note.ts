@@ -150,6 +150,10 @@ function checkFields(note: Note, add: (where: string, message: string) => void):
     }
   }
   if (!empty(fm.topics) && !isTextList(fm.topics)) add("frontmatter.topics", "topics must be a list.");
+  // Values outside the vocabulary are kept and reported by doctor, not here (decision 0040).
+  for (const field of ["domains", "domains_suggested"]) {
+    if (!empty(fm[field]) && !isTextList(fm[field])) add(`frontmatter.${field}`, `${field} must be a list of domains, such as [security, database].`);
+  }
   // Lenient read: a malformed value makes only this field unreadable (decision 0027).
   if (!empty(fm.alternatives) && !isTextList(fm.alternatives)) add("frontmatter.alternatives", 'alternatives must be a list of wikilinks, such as ["[[npm--puppeteer]]"].');
   if (!empty(fm.packages)) {

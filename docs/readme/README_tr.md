@@ -43,6 +43,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 - **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ajanın da bir işin sonunda, o işte verilen bir bağımlılık kararını, senin nedeninle, senin sözlerinle Verdict olarak kaydetmeyi bir kez önerir. Notlar, sahibi olduğun Markdown dosyalarıdır.
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
+- **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler (kaçın, notlu, notsuz), sonra notu olmayan her biri için senin Verdict'ini sorar; Enter atlar, `q` durdurur.
 
 **Durum:** erken test edenler için ön sürüm `0.2.0-beta.11`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
 
@@ -55,7 +56,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
    repomagpie setup
    ```
 
-   `setup` ajanlarını komutlarından ya da uygulamalarından bulur (yalnızca klasörü kalmış bir ajan listelenir, seçilmez), hangi dosyada neyi değiştireceğini gösterir, önce sorar ve düzenlediği her dosyanın yedeğini alır; `repomagpie setup --dry-run` yalnızca planı gösterir. [Ajanlar](../agents.md) ya da [elle kurulum](../setup-by-hand.md) sayfasına bak.
+   `setup` ajanlarını komutlarından ya da uygulamalarından bulur (yalnızca klasörü kalmış bir ajan listelenir, seçilmez), hangi dosyada neyi değiştireceğini gösterir, önce sorar ve düzenlediği her dosyanın yedeğini alır; `repomagpie setup --dry-run` yalnızca planı gösterir. [Ajanlar](../agents.md) ya da [elle kurulum](../setup-by-hand.md) sayfasına bak. Claude Code'da `repomagpie setup --capture-reminder` isteğe bağlı bir hatırlatma da ekler: bir oturum notun olmayan bir paketi kurduğunda ya da kaldırdığında, ajana bir kez not önermesi hatırlatılır.
 
 2. Her ajanda neyin bağlı olduğunu kontrol et:
 
@@ -90,6 +91,7 @@ Ek bir model, API anahtarı ya da telemetri yoktur. RepoMagpie zaten kullandığ
 ## Ajanına sor
 
 - **What do I have for browser testing?** (Tarayıcı testi için elimde ne var?) Ajanın günlüklerinde arar ve bulduğu notlarla, Verdict'i başta olmak üzere yanıt verir; küçük bir günlükte her notu tek bir listede okuyabilir.
+- **Veritabanı güvenliği bu projede nasıl olmalı?** Ajanın soruyu alanlara (security, database) ve projenin teknolojilerine eşler; hangi dilde sorduğun fark etmez. Bu paketlere dair notlarınla yanıt verir ve her birinin neden uyduğunu söyler.
 - **Install pdfkit.** (pdfkit'i kur.) Ajanın kurulumdan önce pdfkit'e dair notlarına bakar. Kaçınma notun alternatifleriyle birlikte gelir ve ajanın bir şey kurmadan önce sana sorar.
 - **Which of my tools fit this project?** (Araçlarımdan hangileri bu projeye uyar?) `suggest` projenin manifest dosyalarını ve README'sini okur, eşleşen notları döndürür; ajanın uyanları seçer, nedenini söyler ve projede kullanılan, kaçınmayı not ettiğin bağımlılıkları belirtir.
 
@@ -108,6 +110,19 @@ Ek bir model, API anahtarı ya da telemetri yoktur. RepoMagpie zaten kullandığ
 | Copilot CLI | evet | evet | evet | hook ilk denemeyi durdurur; ajanın sana sorar |
 
 Codex CLI yeni bir hook'u ancak sen ona `/hooks` içinde güvendikten sonra çalıştırır.
+
+## Notlarını ekibinle paylaş
+
+Proje günlüğü, depodaki bir `.magpie/` klasörüdür. Notları kodla birlikte commit'lenir; RepoMagpie'nin hook'u ve `recall` bu notları her katkıcı için, kişinin kendi günlüğünün yanında okur.
+
+```sh
+repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --to project
+git add .magpie && git commit -m "Add our note on pdfkit"
+```
+
+Ya da kendi notlarından birini oraya kopyala: `repomagpie adopt pdfkit`. Bir ekip arkadaşının ajanı `npm install pdfkit` çalıştırmak üzereyken hook projenin notunu bulur ve önce ona sorar. Onun `search` ve `suggest` komutları da notu bulur.
+
+Bir proje günlüğü, deposu kadar görünürdür: depoyu okuyabilen herkes notlarını da okuyabilir ([karar 0013](../decisions/0013-two-journal-scopes.md)).
 
 ## Yerel uygulama
 
@@ -201,7 +216,7 @@ Notların sonra yalnızca adıyla değil, neye ihtiyacın olduğuyla da bulunsun
 <details>
 <summary><strong>Notları ekibimle nasıl paylaşırım?</strong></summary>
 
-Bir notu `--to project` ile yaz ya da kişisel günlüğündeki bir notu `repomagpie adopt <name>` ile kopyala: ikisi de deponun `.magpie/` klasörüne gider. Onu commit'le; ekip arkadaşlarının ajanları da tıpkı seninki gibi recall, search ve suggest sırasında notu görür. Bir proje günlüğü, deposu kadar görünürdür: depoyu okuyabilen herkes notlarını da okuyabilir ([karar 0013](../decisions/0013-two-journal-scopes.md)).
+Bir notu `--to project` ile yaz ya da `repomagpie adopt <name>` ile kopyala, sonra `.magpie/` klasörünü commit'le: [Notlarını ekibinle paylaş](#notlarını-ekibinle-paylaş) bölümüne bak.
 
 </details>
 

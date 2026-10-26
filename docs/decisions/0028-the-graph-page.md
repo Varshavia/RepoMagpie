@@ -1,6 +1,6 @@
 # 0028 — The graph page
 
-**Status:** accepted (2026-10-07). The maintainer approved the dependencies below on 2026-10-07 (CLAUDE.md, section 9). Settles the open questions in the [product](../product.md#graph-specification) graph specification and in [ideas](../ideas.md), idea 10.
+**Status:** accepted (2026-10-07). The maintainer approved the dependencies below on 2026-10-07 (CLAUDE.md, section 9). Settles the open questions in the [product](../product.md#graph-specification) graph specification and in [ideas](../ideas.md), idea 10. The "Tag nodes" row and labelling every node under 150 drawn nodes superseded by [0044](0044-graph-labels-never-overlap.md) (2026-10-26).
 
 ## Context
 [0026](0026-the-app-is-the-workspace.md) makes the graph a page in the local app (v0.2 part 2) and fixes its edge sources: tags as hub nodes, `[[links]]` and `alternatives` on by default, similarity from `topics` and `language` off by default, at most 3 neighbours per note. Part 1 built the data: the link index (`src/core/links.ts`), tags from GitHub topics, and `kind`, `status`, `tried` and `rating` on every note.
@@ -78,3 +78,5 @@ The graph is a visual aid. The accessible path is the search box, the status lin
 - `DESIGN.md` gains graph tokens: four kind-group colours, a tag-node colour, one colour per edge type.
 - The open questions in the [product](../product.md#graph-specification) specification and [ideas](../ideas.md), idea 10, are answered.
 - If sigma 4 becomes stable during v0.2, upgrading is a new approval, not part of this record.
+
+Editorial (2026-10-26): added the pointer to 0044 in the Status line. Substance unchanged.

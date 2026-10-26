@@ -9,12 +9,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import Sigma from "sigma";
 import type { NodeHoverDrawingFunction, NodeLabelDrawingFunction } from "sigma/rendering";
 import type { Settings } from "sigma/settings";
-import { api, type ApiError, type GraphJson, type Scope } from "../api.ts";
+import { api, takeGraph, type ApiError, type GraphJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import {
-  allLabels,
   around,
   DEFAULT_SOURCES,
+  domainColor,
   drawable,
   edgeStyle,
   filtersActive,
@@ -22,6 +22,8 @@ import {
   joinPosition,
   KIND_COLOR,
   KIND_GROUP_LABEL,
+  LABEL_STYLE,
+  largeGraph,
   largest,
   LAYOUT,
   layoutSettings,
@@ -33,23 +35,28 @@ import {
   nodeLabel,
   nodeSize,
   notice,
+  placeLabels,
   searchNodes,
   seedPosition,
+  shownDomains,
   statusLine,
   type Filters,
   type GraphEdge,
   type GraphNode,
   type KindGroup,
+  type LabelCandidate,
+  type PlacedLabel,
   type Shown,
   type Sources,
 } from "../logic/graph.ts";
 import type { LayoutReply, LayoutRequest } from "../layout.worker.ts";
 import { MOD, type Scheme, type Theme } from "../platform.ts";
+import { DOMAIN_IDS } from "../../../src/core/domains.ts";
 import { EmptyState } from "./common.tsx";
 import "./GraphPage.css";
 
 type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; doc: GraphJson };
-type Colors = Record<(typeof TOKENS)[number], string>;
+type Colors = Record<string, string>; // each of TOKENS, as the browser resolves it
 type Depth = 0 | 1 | 2; // local mode: 0 shows everything
 type Point = { x: number; y: number };
 
@@ -66,12 +73,15 @@ const TOKENS = [
   "--canvas",
   "--surface-2",
   "--ink",
-] as const;
+  "--ink-muted",
+  ...DOMAIN_IDS.map(domainColor),
+];
 
 const KIND_GROUPS = Object.entries(KIND_GROUP_LABEL) as [KindGroup, string][];
 
 const SOURCE_TOGGLES: [keyof Sources, string][] = [
   ["tagged", "Tags"],
+  ["oneNoteTags", "Tags on one note"],
   ["link", "Links"],
   ["alternative", "Alternatives"],
   ["similar", "Similar"],
@@ -79,8 +89,8 @@ const SOURCE_TOGGLES: [keyof Sources, string][] = [
 ];
 
 const INBOX_FADE = 0.55; // toward the canvas
+const SUGGESTED_FADE = 0.4; // colour by domain: a suggested domain, toward the canvas
 const DIM = 0.7; // what isn't around the hovered or selected node, toward the canvas
-const LABEL_THRESHOLD = 12; // a larger graph: labels of nodes at least this size on screen
 const LARGEST = 20; // the neighbours list with nothing selected
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
@@ -91,6 +101,7 @@ interface Focus {
   near: Set<string> | null; // the lit node and its neighbours
   visible: Set<string> | null; // local mode
   colors: Colors | null;
+  byDomain: boolean; // "Colour by domain"
 }
 
 // What is drawn: sigma, its graph, what the graph mirrors, and where nodes that left it were.
@@ -100,6 +111,7 @@ interface View {
   fitted: boolean;
   shown: Shown;
   left: Map<string, Point>;
+  labels: LabelLayer;
 }
 
 interface Props {
@@ -124,23 +136,28 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
   const [query, setQuery] = useState("");
   const [sources, setSources] = useState<Sources>(DEFAULT_SOURCES);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [kept, setKept] = useState<string[]>([]); // tags on one note found with the search box: drawn
+  const [centreOn, setCentreOn] = useState<string | null>(null); // such a tag, centred once drawn
   const container = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLSpanElement>(null);
   const notePaneRef = useRef<HTMLElement>(null);
   const drawn = useRef<View | null>(null);
   const worker = useRef<Worker | null>(null);
-  const focus = useRef<Focus>({ hovered: null, selected: null, near: null, visible: null, colors: null });
+  const [byDomain, setByDomain] = useState(false);
+  const focus = useRef<Focus>({ hovered: null, selected: null, near: null, visible: null, colors: null, byDomain: false });
   const focusHandled = useRef<string | null>(null);
   const reduced = useMemo(() => matchMedia(REDUCED_MOTION).matches, []);
 
   // Missing notes are always fetched; their toggle only decides whether they are drawn. A change on
   // disk (`refresh`) fetches again while the graph stays on screen; the new data is synced into it,
   // so what is drawn keeps its place. A failed refetch keeps what is shown; the next change tries again.
+  // The first fetch is usually App's, started while this chunk loaded (takeGraph).
   useEffect(() => {
     let current = true;
     setLoad((l) => (l.status === "ready" ? l : { status: "loading" }));
-    performance.mark("graph:fetch");
-    api.graph(journal, true).then(
+    const early = takeGraph(journal);
+    if (!early) performance.mark("graph:fetch");
+    (early ?? api.graph(journal, true)).then(
       (doc) => {
         if (!current) return;
         performance.mark("graph:data");
@@ -154,7 +171,9 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
   }, [journal, attempt, refresh]);
 
   const doc = load.status === "ready" ? load.doc : null;
-  const shown = useMemo(() => (doc ? drawable(doc, sources, filters) : null), [doc, sources, filters]);
+  const shown = useMemo(() => (doc ? drawable(doc, sources, filters, kept) : null), [doc, sources, filters, kept]);
+  // The search box also finds the tags on one note that aren't drawn; picking one draws it.
+  const findable = useMemo(() => (doc ? drawable(doc, { ...sources, oneNoteTags: true }, filters).nodes : []), [doc, sources, filters]);
   const latest = useRef(shown);
   latest.current = shown;
   const state = doc ? graphState(doc, sources) : null;
@@ -240,18 +259,19 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
     const colors = palette(probe.current);
     focus.current.colors = colors;
     const graph = new Graph({ type: "undirected", multi: true });
-    syncGraph(graph, first, seedPosition, colors);
+    syncGraph(graph, first, seedPosition, colors, focus.current.byDomain);
+    const labels = labelLayer(colors, getComputedStyle(container.current).fontFamily);
     let sigma: Sigma;
     try {
       sigma = new Sigma(graph, container.current, {
-        ...sigmaSettings(colors, getComputedStyle(container.current).fontFamily, reduced, allLabels(graph.order)),
+        ...sigmaSettings(colors, labels, reduced),
+        // labelRank orders the labels (placeLabels): hovered, selected, the lit node's neighbours.
         nodeReducer: (key, data) => {
           const f = focus.current;
           if (f.visible && !f.visible.has(key)) return { ...data, hidden: true };
-          if (key === f.hovered || key === f.selected) return { ...data, forceLabel: true, highlighted: key === f.selected, zIndex: 3 };
-          if (f.near && !f.near.has(key)) return { ...data, color: mixRgb(data.color, f.colors?.["--canvas"] ?? "", DIM), label: null, forceLabel: false, zIndex: 0 };
-          // Local mode shows a small part of the graph: every label in it, as in a small graph.
-          if (f.visible && allLabels(f.visible.size)) return { ...data, forceLabel: true };
+          if (key === f.hovered || key === f.selected) return { ...data, highlighted: key === f.selected, zIndex: 3, labelRank: key === f.hovered ? 0 : 1 };
+          if (f.near && !f.near.has(key)) return { ...data, color: mixRgb(data.color, f.colors?.["--canvas"] ?? "", DIM), label: null, zIndex: 0 };
+          if (f.near) return { ...data, labelRank: 2 };
           return data;
         },
         edgeReducer: (key, data) => {
@@ -267,9 +287,15 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
       setWebgl(false);
       return;
     }
-    drawn.current = { sigma, graph, fitted: false, shown: first, left: new Map() };
-    // For the end-to-end tests: where a node is on screen, so a test can hover and click it as a person would.
-    Object.assign(container.current, { nodePosition: (key: string) => sigma.graphToViewport(graph.getNodeAttributes(key) as Point) });
+    drawn.current = { sigma, graph, fitted: false, shown: first, left: new Map(), labels };
+    sigma.on("beforeRender", labels.reset);
+    sigma.on("afterRender", labels.draw);
+    // For the end-to-end tests: where a node is on screen, so a test can hover and click it as a
+    // person would; and the boxes of the labels drawn in the last frame, plates included.
+    Object.assign(container.current, {
+      nodePosition: (key: string) => sigma.graphToViewport(graph.getNodeAttributes(key) as Point),
+      labelBoxes: () => labels.placed.map(({ candidate, box, plate }) => ({ key: candidate.key, plate, ...box })),
+    });
     // Hover: written to the container directly (no React render on every move); tests read data-hovered.
     sigma.on("enterNode", ({ node }) => {
       focus.current.hovered = node;
@@ -312,14 +338,21 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
     view.shown = shown;
     const at = (key: string) => (view.graph.hasNode(key) ? (view.graph.getNodeAttributes(key) as Point) : view.left.get(key));
     const spread = 0.03 * extent(view.graph);
-    syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), colors, view.left);
+    syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), colors, focus.current.byDomain, view.left);
     if (focus.current.hovered && !view.graph.hasNode(focus.current.hovered)) {
       focus.current.hovered = null;
       Object.assign(view.sigma.getContainer().dataset, { hovered: "" });
     }
-    view.sigma.setSettings({ labelRenderedSizeThreshold: allLabels(view.graph.order) ? 0 : LABEL_THRESHOLD });
     if (worker.current) runLayout();
   }, [shown, runLayout]);
+
+  // A tag on one note picked in the search box: once it is drawn, centre it.
+  useEffect(() => {
+    if (!centreOn || !drawn.current?.graph.hasNode(centreOn)) return;
+    setCentreOn(null);
+    const key = centreOn;
+    requestAnimationFrame(() => centre(key));
+  }, [centreOn, shown, centre]);
 
   // "Show in graph": once the layout has settled, select the note, show its neighbours, centre it.
   useEffect(() => {
@@ -336,9 +369,17 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
     if (!view || !probe.current) return;
     const colors = palette(probe.current);
     focus.current.colors = colors;
-    paint(view.graph, colors);
-    view.sigma.setSettings(sigmaSettings(colors, view.sigma.getSettings().labelFont, reduced, allLabels(view.graph.order)));
+    paint(view.graph, colors, focus.current.byDomain);
+    view.labels.colors = colors;
+    view.sigma.setSettings(sigmaSettings(colors, view.labels, reduced));
   }, [theme, scheme, reduced]);
+
+  // "Colour by domain" recolours the notes too; nothing moves.
+  useEffect(() => {
+    focus.current.byDomain = byDomain;
+    const view = drawn.current;
+    if (view && focus.current.colors) paint(view.graph, focus.current.colors, byDomain);
+  }, [byDomain]);
 
   // Esc clears the selection, then the search; not while a dialog or the note pane has the key.
   const keys = useRef({ selected, query });
@@ -376,8 +417,12 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
   };
 
   const pick = (node: GraphNode) => {
-    go(node);
     setQuery(nodeLabel(node));
+    if (byKey.has(node.key)) return go(node);
+    // A tag on one note, not drawn: draw it, select it, and centre it once it's there.
+    setKept((k) => [...k, node.key]);
+    select(node.key);
+    setCentreOn(node.key);
   };
 
   const openNote = (id: string) => {
@@ -436,7 +481,7 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
       ) : doc && shown ? (
         <>
           <div className="graph-toolbar">
-            <GraphSearch nodes={shown.nodes} query={query} onQuery={setQuery} onPick={pick} onEscape={escape} />
+            <GraphSearch nodes={findable} query={query} onQuery={setQuery} onPick={pick} onEscape={escape} byDomain={byDomain} />
             {current ? (
               <div className="graph-selection">
                 <span className="graph-selected">
@@ -463,9 +508,9 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
               </div>
             ) : null}
           </div>
-          <GraphFilters doc={doc} filters={filters} onFilters={setFilters} sources={sources} onSources={setSources} />
+          <GraphFilters doc={doc} filters={filters} onFilters={setFilters} sources={sources} onSources={setSources} byDomain={byDomain} onByDomain={setByDomain} />
           <div className="graph-body" data-note={noteOpen !== null}>
-            <Neighbours shown={shown} current={current} onOpen={go} />
+            <Neighbours shown={shown} current={current} onOpen={go} byDomain={byDomain} />
             <div className="graph-stage">
               {/* Under reduced motion the canvas stays invisible (it keeps its size, which sigma needs) until the layout settles. */}
               {drawing ? <div className="graph-canvas" ref={container} aria-hidden="true" data-settled={settled} data-waiting={reduced && !settled} data-selected={current?.key ?? ""} /> : <div className="graph-blank" />}
@@ -484,7 +529,7 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
                 ) : null}
               </div>
               {drawing && reduced && !settled ? <p className="graph-arranging">Arranging the graph…</p> : null}
-              <Legend shown={shown} />
+              <Legend shown={shown} byDomain={byDomain} />
             </div>
             {noteOpen ? (
               <aside className="graph-note" ref={notePaneRef} aria-label="Note">
@@ -501,8 +546,16 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
   );
 }
 
-// The filters (which notes) and the toggles (which connections, and missing notes).
-function GraphFilters({ doc, filters, onFilters, sources, onSources }: { doc: GraphJson; filters: Filters; onFilters: (f: Filters) => void; sources: Sources; onSources: (s: Sources) => void }) {
+// The filters (which notes) and the toggles (which connections, missing notes, the colours).
+function GraphFilters({ doc, filters, onFilters, sources, onSources, byDomain, onByDomain }: {
+  doc: GraphJson;
+  filters: Filters;
+  onFilters: (f: Filters) => void;
+  sources: Sources;
+  onSources: (s: Sources) => void;
+  byDomain: boolean;
+  onByDomain: (on: boolean) => void;
+}) {
   const id = useId();
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) => onFilters({ ...filters, [key]: value });
   const tags = doc.nodes.flatMap((n) => (n.type === "tag" ? [n] : [])).sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0));
@@ -572,6 +625,10 @@ function GraphFilters({ doc, filters, onFilters, sources, onSources }: { doc: Gr
             {label}
           </label>
         ))}
+        <label className="check">
+          <input type="checkbox" checked={byDomain} onChange={(e) => onByDomain(e.target.checked)} />
+          Colour by domain
+        </label>
       </div>
     </div>
   );
@@ -579,7 +636,7 @@ function GraphFilters({ doc, filters, onFilters, sources, onSources }: { doc: Gr
 
 // The accessible path (docs/ui.md §7): the selected node's neighbours by edge type, or the nodes
 // with the most connections. A listbox: the arrows move, Enter opens.
-function Neighbours({ shown, current, onOpen }: { shown: Shown; current: GraphNode | null; onOpen: (node: GraphNode) => void }) {
+function Neighbours({ shown, current, onOpen, byDomain }: { shown: Shown; current: GraphNode | null; onOpen: (node: GraphNode) => void; byDomain: boolean }) {
   const id = useId();
   const groups: { label: string; nodes: GraphNode[] }[] = current ? neighbourGroups(shown, current.key) : [{ label: "Most connected", nodes: largest(shown, LARGEST) }];
   const options = groups.flatMap((g) => g.nodes);
@@ -636,7 +693,7 @@ function Neighbours({ shown, current, onOpen }: { shown: Shown; current: GraphNo
                     <span className="label" translate="no" title={nodeLabel(node)}>
                       {nodeLabel(node)}
                     </span>
-                    <span className="detail">{nodeDetail(node)}</span>
+                    <span className="detail">{nodeDetail(node, byDomain)}</span>
                   </li>
                 );
               })}
@@ -652,7 +709,7 @@ function Neighbours({ shown, current, onOpen }: { shown: Shown; current: GraphNo
 
 // The search box: type a name, pick from up to 8 matches (the [[ autocomplete's pattern); the graph
 // selects the node and centres on it.
-function GraphSearch({ nodes, query, onQuery, onPick, onEscape }: { nodes: GraphNode[]; query: string; onQuery: (q: string) => void; onPick: (node: GraphNode) => void; onEscape: () => boolean }) {
+function GraphSearch({ nodes, query, onQuery, onPick, onEscape, byDomain }: { nodes: GraphNode[]; query: string; onQuery: (q: string) => void; onPick: (node: GraphNode) => void; onEscape: () => boolean; byDomain: boolean }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -716,7 +773,7 @@ function GraphSearch({ nodes, query, onQuery, onPick, onEscape }: { nodes: Graph
               <span className="label" translate="no">
                 {nodeLabel(node)}
               </span>
-              <span className="detail">{nodeDetail(node)}</span>
+              <span className="detail">{nodeDetail(node, byDomain)}</span>
             </li>
           ))}
         </ul>
@@ -725,26 +782,48 @@ function GraphSearch({ nodes, query, onQuery, onPick, onEscape }: { nodes: Graph
   );
 }
 
-// Every colour the graph uses, also in words (docs/ui.md §9).
-function Legend({ shown }: { shown: Shown }) {
+// Every colour the graph uses, also in words (docs/ui.md §9). Coloured by domain: the domains
+// present, a dimmer dot for a suggested one, grey for none; there is no inbox fade then.
+function Legend({ shown, byDomain }: { shown: Shown; byDomain: boolean }) {
   const edgeTypes = new Set(shown.edges.map((e) => e.type));
   return (
     <div className="graph-legend" aria-label="Legend" role="group">
       <ul>
-        {KIND_GROUPS.map(([group, label]) => (
-          <li key={group}>
-            <span className="swatch dot" style={{ background: `var(${KIND_COLOR[group]})` }} aria-hidden="true" />
-            {label}
-          </li>
-        ))}
+        {byDomain ? (
+          <>
+            {shownDomains(shown).map((domain) => (
+              <li key={domain}>
+                <span className="swatch dot" style={{ background: `var(${domainColor(domain)})` }} aria-hidden="true" />
+                {domain}
+              </li>
+            ))}
+            <li>
+              <span className="swatch dot suggested" aria-hidden="true" />
+              Dimmer: a suggested domain
+            </li>
+            <li>
+              <span className="swatch dot" style={{ background: "var(--graph-other)" }} aria-hidden="true" />
+              Grey: no domain
+            </li>
+          </>
+        ) : (
+          KIND_GROUPS.map(([group, label]) => (
+            <li key={group}>
+              <span className="swatch dot" style={{ background: `var(${KIND_COLOR[group]})` }} aria-hidden="true" />
+              {label}
+            </li>
+          ))
+        )}
         <li>
           <span className="swatch dot small" style={{ background: "var(--graph-tag)" }} aria-hidden="true" />
           #tag
         </li>
-        <li>
-          <span className="swatch dot faded" aria-hidden="true" />
-          Faded: in the inbox
-        </li>
+        {byDomain ? null : (
+          <li>
+            <span className="swatch dot faded" aria-hidden="true" />
+            Faded: in the inbox
+          </li>
+        )}
         {shown.nodes.some((n) => n.type === "ghost") ? (
           <li>
             <span className="swatch dot faded ghost" aria-hidden="true" />
@@ -809,57 +888,65 @@ const edgeKey = (edge: GraphEdge) => `${edge.type} ${edge.source} ${edge.target}
 // what is missing at `place`, and sets every node's size, labels and colour for the graph's new
 // size. Every node and edge has its colour from the moment sigma sees it: sigma runs the reducers
 // at once, and a node dimmed around a selection is mixed from its colour.
-// Labels: a small graph forces every one; a larger one leaves them to sigma's label grid, which
-// keeps at most one per cell, the largest node first. The hovered and selected nodes are forced by
-// the reducer.
-function syncGraph(graph: Graph, shown: Shown, place: (key: string) => Point, colors: Colors, left?: Map<string, Point>): void {
+// Labels: every node is a candidate on every frame (forceLabel), and the label layer decides which
+// fit (labelLayer, placeLabels).
+function syncGraph(graph: Graph, shown: Shown, place: (key: string) => Point, colors: Colors, byDomain: boolean, left?: Map<string, Point>): void {
   const nodes = new Map(shown.nodes.map((n) => [n.key, n]));
   const edges = new Map(shown.edges.map((e) => [edgeKey(e), e]));
-  const every = allLabels(shown.nodes.length);
+  const large = largeGraph(shown.nodes.length);
   for (const key of graph.filterEdges((key) => !edges.has(key))) graph.dropEdge(key);
   for (const key of graph.filterNodes((key) => !nodes.has(key))) {
     left?.set(key, { x: graph.getNodeAttribute(key, "x"), y: graph.getNodeAttribute(key, "y") });
     graph.dropNode(key);
   }
-  for (const node of shown.nodes) if (!graph.hasNode(node.key)) graph.addNode(node.key, { ...place(node.key), ...nodeAttributes(node, every, colors) });
+  // Into a drawn graph, tags and missing notes join first: a note joining with a tag that joins too
+  // (a tag on one note until then) starts next to it.
+  const fresh = shown.nodes.filter((n) => !graph.hasNode(n.key));
+  const order = graph.order ? [...fresh.filter((n) => n.type !== "note"), ...fresh.filter((n) => n.type === "note")] : fresh;
+  for (const node of order) graph.addNode(node.key, { ...place(node.key), ...nodeAttributes(node, large, colors, byDomain) });
   for (const [key, edge] of edges) {
     if (!graph.hasEdge(key)) graph.addEdgeWithKey(key, edge.source, edge.target, { type: "line", edgeType: edge.type, size: edgeStyle(edge.type).size, color: edgeColor(edge.type, colors) });
   }
-  graph.updateEachNodeAttributes((key, { x, y }) => ({ x, y, ...nodeAttributes(nodes.get(key) as GraphNode, every, colors) }));
+  graph.updateEachNodeAttributes((key, { x, y }) => ({ x, y, ...nodeAttributes(nodes.get(key) as GraphNode, large, colors, byDomain) }));
 }
 
-function nodeAttributes(node: GraphNode, every: boolean, colors: Colors) {
-  const common = { label: nodeLabel(node), forceLabel: every };
-  if (node.type === "note") return { ...common, size: nodeSize("note", node.degree), kindGroup: node.kind_group, inbox: node.status === "inbox", zIndex: 1, color: nodeColor({ kindGroup: node.kind_group, inbox: node.status === "inbox" }, colors) };
-  if (node.type === "tag") return { ...common, size: nodeSize("tag", node.count, !every), tag: true, zIndex: 2, color: nodeColor({ tag: true }, colors) };
-  return { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0, color: nodeColor({ ghost: true }, colors) };
+function nodeAttributes(node: GraphNode, large: boolean, colors: Colors, byDomain: boolean) {
+  const common = { label: nodeLabel(node), forceLabel: true };
+  if (node.type === "note") {
+    const attr = { kindGroup: node.kind_group, inbox: node.status === "inbox", domain: node.domain, domainSuggested: node.domain_suggested };
+    return { ...common, ...attr, size: nodeSize("note", node.degree), zIndex: 1, color: nodeColor(attr, colors, byDomain) };
+  }
+  if (node.type === "tag") return { ...common, size: nodeSize("tag", node.count, large), tag: true, count: node.count, zIndex: 2, color: nodeColor({ tag: true }, colors, byDomain) };
+  return { ...common, size: nodeSize("ghost", 0), ghost: true, zIndex: 0, color: nodeColor({ ghost: true }, colors, byDomain) };
 }
 
-// A note's kind colour (faded toward the canvas in the inbox), a tag's, or a missing note's (faded grey).
-function nodeColor(attr: { tag?: unknown; ghost?: unknown; inbox?: unknown; kindGroup?: unknown }, colors: Colors): string {
-  const base = attr.tag ? colors["--graph-tag"] : attr.ghost ? colors["--graph-other"] : colors[KIND_COLOR[attr.kindGroup as string] as keyof Colors];
+// A note's kind colour (faded toward the canvas in the inbox), a tag's, or a missing note's (faded
+// grey). Coloured by domain, a note takes its domain's colour (dimmer when suggested), or grey.
+function nodeColor(attr: { tag?: unknown; ghost?: unknown; inbox?: unknown; kindGroup?: unknown; domain?: unknown; domainSuggested?: unknown }, colors: Colors, byDomain: boolean): string {
+  if (byDomain && !attr.tag && !attr.ghost) {
+    if (typeof attr.domain !== "string") return colors["--graph-other"];
+    const base = colors[domainColor(attr.domain)];
+    return attr.domainSuggested ? mixRgb(base, colors["--canvas"], SUGGESTED_FADE) : base;
+  }
+  const base = attr.tag ? colors["--graph-tag"] : attr.ghost ? colors["--graph-other"] : colors[KIND_COLOR[attr.kindGroup as string]];
   return attr.inbox || attr.ghost ? mixRgb(base, colors["--canvas"], INBOX_FADE) : base;
 }
 
-const edgeColor = (type: GraphEdge["type"], colors: Colors) => colors[edgeStyle(type).color as keyof Colors];
+const edgeColor = (type: GraphEdge["type"], colors: Colors) => colors[edgeStyle(type).color];
 
-// A theme change: every colour again, nothing moved.
-function paint(graph: Graph, colors: Colors): void {
-  graph.updateEachNodeAttributes((_key, attr) => ({ ...attr, color: nodeColor(attr, colors) }));
+// A theme change, or the colour mode: every colour again, nothing moved.
+function paint(graph: Graph, colors: Colors, byDomain: boolean): void {
+  graph.updateEachNodeAttributes((_key, attr) => ({ ...attr, color: nodeColor(attr, colors, byDomain) }));
   graph.updateEachEdgeAttributes((_key, attr) => ({ ...attr, color: edgeColor(attr.edgeType, colors) }));
 }
 
-function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabel: boolean): Partial<Settings> {
+function sigmaSettings(colors: Colors, labels: LabelLayer, reduced: boolean): Partial<Settings> {
   return {
-    labelFont: font,
-    labelSize: 12,
-    labelWeight: "500",
+    labelFont: labels.font,
+    labelSize: LABEL_STYLE.note.size, // the hover plate's (drawHover)
+    labelWeight: LABEL_STYLE.note.weight,
     labelColor: { color: colors["--ink"] },
-    // A larger graph: one label per grid cell of 160 px, the largest node there, if it is at least
-    // LABEL_THRESHOLD on screen; more cells hold a label as you zoom in.
-    labelRenderedSizeThreshold: everyLabel ? 0 : LABEL_THRESHOLD,
-    labelGridCellSize: 160,
-    labelDensity: 1,
+    labelRenderedSizeThreshold: 0, // every node is a candidate; the label layer decides
     minEdgeThickness: 1,
     zIndex: true,
     stagePadding: 64, // room for the labels of the outermost nodes
@@ -870,27 +957,73 @@ function sigmaSettings(colors: Colors, font: string, reduced: boolean, everyLabe
     zoomDuration: reduced ? 0 : 250,
     inertiaDuration: reduced ? 0 : 150,
     doubleClickZoomingDuration: reduced ? 0 : 200,
-    defaultDrawNodeLabel: drawLabel(colors),
+    defaultDrawNodeLabel: labels.collect,
     defaultDrawNodeHover: drawHover(colors),
   };
 }
 
-// A label in the theme's ink with a halo in the canvas colour, so it stays readable where it
-// crosses nodes and edges.
-function drawLabel(colors: Colors): NodeLabelDrawingFunction {
-  return (context, data, settings) => {
-    if (!data.label) return;
-    const size = settings.labelSize;
-    context.font = `${settings.labelWeight} ${size}px ${settings.labelFont}`;
-    const x = data.x + data.size + 3;
-    const y = data.y + size / 3;
-    context.lineJoin = "round";
-    context.lineWidth = 3;
-    context.strokeStyle = colors["--canvas"];
-    context.strokeText(data.label, x, y);
-    context.fillStyle = colors["--ink"];
-    context.fillText(data.label, x, y);
+// Labels that never overlap (decision 0044). Sigma calls `collect` for each node it would label in
+// a frame; after the frame, `draw` places them (placeLabels) and draws those that fit on sigma's
+// label canvas: note names in the theme's ink, tags smaller in `ink-muted`, each with a halo in the
+// canvas colour, so it stays readable where it crosses nodes and edges. The hovered and selected
+// labels are only reserved here: sigma draws them on their plates (drawHover).
+interface LabelLayer {
+  colors: Colors;
+  font: string;
+  placed: PlacedLabel[]; // the last frame's
+  collect: NodeLabelDrawingFunction;
+  reset: () => void;
+  draw: () => void;
+}
+
+function labelLayer(colors: Colors, font: string): LabelLayer {
+  let candidates: LabelCandidate[] = [];
+  let context: CanvasRenderingContext2D | null = null;
+  const widths = new Map<string, number>(); // text widths, by style and label
+  const style = (tag: boolean) => (tag ? LABEL_STYLE.tag : LABEL_STYLE.note);
+  const fontOf = (tag: boolean) => `${style(tag).weight} ${style(tag).size}px ${layer.font}`;
+  const measure = (label: string, tag: boolean) => {
+    const key = `${tag ? "#" : "n"} ${label}`;
+    let width = widths.get(key);
+    if (width === undefined && context) {
+      context.font = fontOf(tag);
+      width = context.measureText(label).width;
+      widths.set(key, width);
+    }
+    return width ?? 0;
   };
+  const layer: LabelLayer = {
+    colors,
+    font,
+    placed: [],
+    collect: (ctx, data) => {
+      const label = data.label;
+      if (!label) return;
+      context = ctx;
+      const d = data as typeof data & { key?: string; tag?: boolean; count?: number; labelRank?: LabelCandidate["rank"] };
+      candidates.push({ key: String(d.key), label, x: d.x, y: d.y, size: d.size, tag: Boolean(d.tag), count: d.count ?? 0, rank: d.labelRank ?? 3 });
+    },
+    reset: () => {
+      candidates = [];
+    },
+    draw: () => {
+      layer.placed = context ? placeLabels(candidates, measure) : [];
+      if (!context) return;
+      context.lineJoin = "round";
+      context.lineWidth = 3;
+      context.strokeStyle = layer.colors["--canvas"];
+      for (const { candidate: c, plate } of layer.placed) {
+        if (plate) continue;
+        context.font = fontOf(c.tag);
+        const x = c.x + c.size + 3;
+        const y = c.y + style(c.tag).size / 3;
+        context.strokeText(c.label, x, y);
+        context.fillStyle = layer.colors[c.tag ? "--ink-muted" : "--ink"];
+        context.fillText(c.label, x, y);
+      }
+    },
+  };
+  return layer;
 }
 
 // The hovered or selected node's label on a surface-2 plate, in the theme's ink, with a ring around

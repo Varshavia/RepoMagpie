@@ -76,6 +76,13 @@ test("add_items appends the person's items as note --use-when does, with the Ver
   assert.deepEqual(r, { ok: true, text: expected, changed: true });
 });
 
+test("domains: confirm moves a suggestion into domains, remove takes one out, even an unknown value (decision 0040)", () => {
+  const withSuggested = NOTE.replace("tried: false\n", "domains_suggested: [api, web]\ntried: false\n");
+  const r = editNote(withSuggested, { domains: { confirm: ["api"], remove: ["web"] } });
+  assert.deepEqual(r, { ok: true, text: withSuggested.replace("domains_suggested: [api, web]\n", "domains: [api]\ndomains_suggested: []\n"), changed: true });
+  assert.deepEqual(editNote(withSuggested, { domains: {} }), { ok: true, text: withSuggested, changed: false });
+});
+
 test("no edits change nothing", () => {
   assert.deepEqual(editNote(NOTE, {}), { ok: true, text: NOTE, changed: false });
 });
@@ -103,6 +110,12 @@ test("every bad edit is refused as a whole: nothing is applied", () => {
     { add_items: { "Use when": ["x".repeat(501)] } },
     { verdict: "ok", add_items: { "Avoid when": [" "] } },
     { sections: { "Use when": "- a" }, add_items: { "Use when": ["b"] } },
+    { domains: ["security"] },
+    { domains: { confirm: ["pdfs"] } },
+    { domains: { confirm: ["api", "auth", "web", "ai"] } },
+    { domains: { confirm: ["api", "auth", "ai", "tooling"] } },
+    { domains: { remove: "web" } },
+    { domains: { suggest: ["api"] } },
   ];
   for (const edits of bad) {
     const r = editNote(NOTE, edits);

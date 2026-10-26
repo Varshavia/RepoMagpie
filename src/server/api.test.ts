@@ -74,6 +74,8 @@ test("GET /api/search returns exactly magpie search --json", async (t) => {
     ["q=pdf", ["search", "pdf"]],
     ["q=pdf&journal=personal", ["search", "pdf", "--journal", "personal"]],
     ["q=pdf&tag=pdf&kind=library&limit=1", ["search", "pdf", "--tag", "pdf", "--kind", "library", "--limit", "1"]],
+    ["q=pdf&domain=api&domain=testing&tag=pdf&match=filter", ["search", "pdf", "--domain", "api", "--domain", "testing", "--tag", "pdf", "--match", "filter"]],
+    ["q=pdf&domain=pdfs", ["search", "pdf", "--domain", "pdfs"]],
     ["q=nothing-like-this", ["search", "nothing-like-this"]],
     ["q=", ["search", ""]],
   ];
@@ -81,7 +83,7 @@ test("GET /api/search returns exactly magpie search --json", async (t) => {
     const expected = await cli(box, argv, fetch);
     assert.deepEqual(parsed(await http.get(`/api/search?${query}`)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, query);
   }
-  for (const query of ["q=pdf&kind=gadget", "q=pdf&limit=0", "q=pdf&limit=x", "q=pdf&journal=both"]) assert.equal((await http.get(`/api/search?${query}`)).status, 400, query);
+  for (const query of ["q=pdf&kind=gadget", "q=pdf&limit=0", "q=pdf&limit=x", "q=pdf&journal=both", "q=pdf&match=all"]) assert.equal((await http.get(`/api/search?${query}`)).status, 400, query);
 });
 
 test("GET /api/recall returns exactly magpie recall --json", async (t) => {
@@ -159,6 +161,7 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
     [{ target: "chalk", to: "personal" }, ["note", "chalk"], "npm--chalk.md"],
     [{ target: "pkg:npm/chalk", to: "personal", use_when: ["colour in a CLI"], avoid_when: ["browser code"] }, ["note", "pkg:npm/chalk", "--use-when", "colour in a CLI", "--avoid-when", "browser code"], "npm--chalk.md"],
     [{ target: "https://github.com/microsoft/playwright-cli", text: "great for agents", to: "personal" }, ["note", "https://github.com/microsoft/playwright-cli", "great for agents"], "github--microsoft--playwright-cli.md"],
+    [{ target: "https://github.com/microsoft/playwright-cli", to: "personal", domains: ["testing"] }, ["note", "https://github.com/microsoft/playwright-cli", "--domain", "testing"], "github--microsoft--playwright-cli.md"],
     [{ target: "pkg:npm/pdfkit", text: "second verdict", to: "personal" }, ["note", "pkg:npm/pdfkit", "second verdict"], null],
     [{ target: "https://example.com/an-article", to: "personal" }, ["note", "https://example.com/an-article"], null],
   ];
@@ -178,7 +181,7 @@ test("POST /api/note returns exactly magpie note --json and writes the same note
     }
     writeFileSync(tagsMd, tagsBefore);
   }
-  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }, { target: "pkg:npm/x", tags: "pdf" }, { target: "pkg:npm/x", tags: ["Not A Tag"] }, { target: "pkg:npm/x", use_when: "one" }, { target: "pkg:npm/x", avoid_when: [3] }, { target: "pkg:npm/x", use_when: [" "] }, { target: "pkg:npm/x", use_when: ["x".repeat(501)] }]) {
+  for (const body of [{ to: "personal" }, { target: "pkg:npm/x", to: "elsewhere" }, { target: "pkg:npm/x", type: "maven" }, { target: "pkg:npm/x", text: 3 }, { target: "pkg:npm/x", tags: "pdf" }, { target: "pkg:npm/x", tags: ["Not A Tag"] }, { target: "pkg:npm/x", use_when: "one" }, { target: "pkg:npm/x", avoid_when: [3] }, { target: "pkg:npm/x", use_when: [" "] }, { target: "pkg:npm/x", use_when: ["x".repeat(501)] }, { target: "pkg:npm/x", domains: ["pdfs"] }, { target: "pkg:npm/x", domains: "api" }]) {
     assert.equal((await http.write("POST", "/api/note", body)).status, 400, JSON.stringify(body));
   }
 });
@@ -268,6 +271,8 @@ test("GET /api/settings, /api/tags, /api/notes and /api/note return core's share
   assert.deepEqual(parsed(await http.get("/api/notes?journal=personal")), { status: 200, document: noteListDocument("personal", {}, context).document });
   assert.deepEqual(parsed(await http.get("/api/notes?journal=personal&status=inbox&tag=pdf")), { status: 200, document: noteListDocument("personal", { status: "inbox", tags: ["pdf"] }, context).document });
   assert.deepEqual(parsed(await http.get("/api/notes?journal=project&kind=library")), { status: 200, document: noteListDocument("project", { kind: "library" }, context).document });
+  assert.deepEqual(parsed(await http.get("/api/notes?journal=personal&domain=api")), { status: 200, document: noteListDocument("personal", { domain: "api" }, context).document });
+  assert.equal((await http.get("/api/notes?journal=personal&domain=pdfs")).status, 400);
   assert.deepEqual(parsed(await http.get("/api/note?journal=personal&id=pkg%3Anpm%2Fpdfkit")), { status: 200, document: noteDocument("personal", { id: "pkg:npm/pdfkit" }, context).document });
   const broken = parsed(await http.get("/api/note?journal=personal&file=npm--broken.md"));
   assert.deepEqual(broken, { status: 200, document: noteDocument("personal", { file: "npm--broken.md" }, context).document });
@@ -331,6 +336,11 @@ test("PATCH /api/note edits through core and returns the Note document; an old v
   assert.equal(withItems, addSectionItems(after, "Avoid when", ["big PDFs"]).text);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(withItems), add_items: { "My notes": ["x"] } })).status, 400);
   writeFileSync(box.note("npm--pdfkit.md"), after);
+  const domains = parsed(await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, domains: { confirm: ["api"] } }));
+  assert.equal(domains.status, 200);
+  assert.deepEqual((domains.document as { frontmatter: { domains: string[] } }).frontmatter.domains, ["api"]);
+  writeFileSync(box.note("npm--pdfkit.md"), after);
+  assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, domains: { confirm: ["pdfs"] } })).status, 400);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, fields: { name: "x" } })).status, 400);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/nothing", version: current })).status, 404);
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), after);

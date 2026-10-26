@@ -1,4 +1,5 @@
-// Finds package installs in a shell command line (spec section 6), for recall and the hook.
+// Finds package installs in a shell command line (spec section 6), for recall and the hook, and
+// package removals, for the Stop reminder (decision 0042).
 // The command line is split the way .claude/hooks/git-guard.mjs does it (ported, not imported):
 // chains (&&, ||, ;, |), quotes, line continuations (\ and `), $( ... ), redirections, prefixes
 // such as sudo or env, and nested shells (bash -c "..."). Best effort: commands built at runtime
@@ -131,39 +132,53 @@ function positionals(args: string[], valueFlags: readonly string[]): string[] {
 
 const lower = (word: string | undefined) => word?.toLowerCase();
 
-// The package words of one command, given its name and arguments; null when it is no install.
-function packagesOf(name: string, args: string[]): { type: PackageType; words: string[] } | null {
+// What is looked for: installs (recall and the hooks), or removals (the Stop reminder, decision
+// 0042). Each tool's verbs for each.
+export type Action = "install" | "remove";
+const VERBS: Record<Action, { npm: string[]; pnpm: string[]; bun: string[]; yarn: string[]; pip: string[]; uv: string[]; uvPip: string[]; cargo: string[] }> = {
+  install: { npm: ["install", "i", "add"], pnpm: ["add"], bun: ["add"], yarn: ["add"], pip: ["install"], uv: ["add"], uvPip: ["install"], cargo: ["add"] },
+  remove: {
+    npm: ["uninstall", "remove", "rm", "r", "un", "unlink"], pnpm: ["remove", "rm", "uninstall", "un"], bun: ["remove", "rm"], yarn: ["remove"],
+    pip: ["uninstall"], uv: ["remove"], uvPip: ["uninstall"], cargo: ["remove", "rm"],
+  },
+};
+
+// The package words of one command, given its name and arguments; null when it is no install (or,
+// with "remove", no removal).
+function packagesOf(name: string, args: string[], action: Action = "install"): { type: PackageType; words: string[] } | null {
+  const verbs = VERBS[action];
+  const is = (word: string | undefined, list: string[]) => list.includes(lower(word) ?? "");
   if (name === "npm") {
     const p = positionals(args, NPM_VALUES);
-    return ["install", "i", "add"].includes(lower(p[0]) ?? "") ? { type: "npm", words: p.slice(1) } : null;
+    return is(p[0], verbs.npm) ? { type: "npm", words: p.slice(1) } : null;
   }
   if (name === "pnpm" || name === "bun") {
     const p = positionals(args, name === "pnpm" ? PNPM_VALUES : BUN_VALUES);
-    return lower(p[0]) === "add" ? { type: "npm", words: p.slice(1) } : null;
+    return is(p[0], name === "pnpm" ? verbs.pnpm : verbs.bun) ? { type: "npm", words: p.slice(1) } : null;
   }
   if (name === "yarn") {
     const p = positionals(args, YARN_VALUES);
-    if (lower(p[0]) === "add") return { type: "npm", words: p.slice(1) };
-    if (lower(p[0]) === "workspace" && lower(p[2]) === "add") return { type: "npm", words: p.slice(3) };
+    if (is(p[0], verbs.yarn)) return { type: "npm", words: p.slice(1) };
+    if (lower(p[0]) === "workspace" && is(p[2], verbs.yarn)) return { type: "npm", words: p.slice(3) };
     return null;
   }
   if (/^pip(\d+(\.\d+)?)?$/.test(name)) {
     const p = positionals(args, PIP_VALUES);
-    return lower(p[0]) === "install" ? { type: "pypi", words: p.slice(1) } : null;
+    return is(p[0], verbs.pip) ? { type: "pypi", words: p.slice(1) } : null;
   }
   if (/^(python(\d+(\.\d+)?)?|py)$/.test(name)) {
     const m = args.indexOf("-m");
-    return m !== -1 && args[m + 1] === "pip" ? packagesOf("pip", args.slice(m + 2)) : null;
+    return m !== -1 && args[m + 1] === "pip" ? packagesOf("pip", args.slice(m + 2), action) : null;
   }
   if (name === "uv") {
     const p = positionals(args, UV_VALUES);
-    if (lower(p[0]) === "add") return { type: "pypi", words: p.slice(1) };
-    if (lower(p[0]) === "pip" && lower(p[1]) === "install") return { type: "pypi", words: p.slice(2) };
+    if (is(p[0], verbs.uv)) return { type: "pypi", words: p.slice(1) };
+    if (lower(p[0]) === "pip" && is(p[1], verbs.uvPip)) return { type: "pypi", words: p.slice(2) };
     return null;
   }
   if (name === "cargo") {
     const p = positionals(args, CARGO_VALUES).filter((word) => !word.startsWith("+")); // +nightly
-    return lower(p[0]) === "add" ? { type: "cargo", words: p.slice(1) } : null;
+    return is(p[0], verbs.cargo) ? { type: "cargo", words: p.slice(1) } : null;
   }
   return null;
 }
@@ -184,8 +199,8 @@ function registryName(word: string, type: PackageType): string | null {
 export const detectInstalls = (command: string): Install[] => detectCommand(command).installs;
 
 // The installs, and whether part of the command couldn't be read: a PowerShell -EncodedCommand that
-// isn't base64 of UTF-16 text, whose installs nobody can see.
-export function detectCommand(command: string): { installs: Install[]; unreadable: boolean } {
+// isn't base64 of UTF-16 text, whose installs nobody can see. With "remove", the removals instead.
+export function detectCommand(command: string, action: Action = "install"): { installs: Install[]; unreadable: boolean } {
   const found: Install[] = [];
   const seen = new Set<string>();
   const state = { unreadable: false };
@@ -194,7 +209,7 @@ export function detectCommand(command: string): { installs: Install[]; unreadabl
     if (name === null || seen.has(`${type}:${name}`)) return;
     seen.add(`${type}:${name}`);
     found.push({ type, name, spec: word });
-  }, state);
+  }, state, action);
   return { installs: found, unreadable: state.unreadable };
 }
 
@@ -207,7 +222,7 @@ function decodePowerShell(value: string): string | null {
   return /[\u0000-\u0008\u000e-\u001f�]/.test(text) ? null : text;
 }
 
-function walk(cmd: string, depth: number, add: (type: PackageType, word: string) => void, state: { unreadable: boolean }): void {
+function walk(cmd: string, depth: number, add: (type: PackageType, word: string) => void, state: { unreadable: boolean }, action: Action): void {
   const tokens = tokenize(cmd);
   let atCommand = true;
   let inShell = false;
@@ -220,11 +235,11 @@ function walk(cmd: string, depth: number, add: (type: PackageType, word: string)
       const value = tokens[i + 1];
       const decoded = typeof value === "string" ? decodePowerShell(value) : null;
       if (decoded === null) state.unreadable = true;
-      else if (depth < MAX_DEPTH) walk(decoded, depth + 1, add, state);
+      else if (depth < MAX_DEPTH) walk(decoded, depth + 1, add, state, action);
       i++;
       continue;
     }
-    if (inShell && /\s/.test(t) && depth < MAX_DEPTH) walk(t, depth + 1, add, state);
+    if (inShell && /\s/.test(t) && depth < MAX_DEPTH) walk(t, depth + 1, add, state, action);
     if (!atCommand) continue;
     const name = (t.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "");
     if (!t || /^\w+=/.test(t) || t.startsWith("-") || /^\/\w$/.test(t) || /^\d/.test(t) || (PREFIXES.has(name) && !(name === "start" && startProcess(argsOf(tokens, i + 1), true)))) continue;
@@ -237,7 +252,7 @@ function walk(cmd: string, depth: number, add: (type: PackageType, word: string)
     }
     const args = argsOf(tokens, i + 1);
     const started = name === "start-process" || name === "saps" || name === "start" ? startProcess(args, name === "start") : null;
-    const install = started ? packagesOf(started.name, started.args) : packagesOf(name, args);
+    const install = started ? packagesOf(started.name, started.args, action) : packagesOf(name, args, action);
     for (const word of install?.words ?? []) add(install!.type, word);
   }
 }

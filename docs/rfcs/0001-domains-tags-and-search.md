@@ -11,9 +11,13 @@ Accepted in part, 2026-10-24. The maintainer's decisions on §12:
 - **D1: yes.** Notes stay about packages and repositories. Rules about a package go in its note; general project rules stay in CLAUDE.md or AGENTS.md.
 - **D2: the 12 domains in §4.1, and the name `domains`**, as proposed.
 - **D3: decided after Phase 2's eval** (§9): whether Phase 3 happens at all, and which provider comes first.
-- **D4: left to Phase 1's decision record.**
+- **D4: two fields**, `domains` (confirmed by the user) and `domains_suggested` (written by RepoMagpie), in [decision 0040](../decisions/0040-domains-a-second-axis.md).
 
-Phases: Phase 0 is built on the branch `feat/use-when-at-capture`. Phases 1 and 2 are next, and Phase 3 is later, gated by D3 ([roadmap](../roadmap.md)). Each phase that ships becomes a decision record (§13).
+Phases:
+- **Phase 0** shipped in 0.2.0-beta.11 (branch `feat/use-when-at-capture`).
+- **Phase 1 is built** on the branch `feat/next-batch` (2026-10-25): domains, tag aliases, structured search, the MCP `vocabulary` tool, the app's domain chips and filters, and the expanded eval. Decisions [0040](../decisions/0040-domains-a-second-axis.md) (D1, D2, D4) and [0041](../decisions/0041-structured-search.md) (the search contract, with the eval's numbers).
+- **Phase 2, in part:** the structured boosts, alias expansion, near spellings for tags, `why` and `max_chars` came with Phase 1 (0041). Not done: the field-boost changes in §6, fuzzy and prefix limits, and optional `files` (§5.4).
+- **Phase 3** is later, gated by D3 ([roadmap](../roadmap.md)).
 
 ---
 

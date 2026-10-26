@@ -7,17 +7,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import type { GraphJson } from "../../src/core/documents.ts";
 import { renderNote } from "../../src/core/write.ts";
-import { DEFAULT_SOURCES, drawable, neighbourGroups, NO_FILTERS, nodeLabel, statusLine, type Filters } from "../src/logic/graph.ts";
+import { DEFAULT_SOURCES, drawable, neighbourGroups, neighbours, NO_FILTERS, nodeLabel, overlap, statusLine, type Filters } from "../src/logic/graph.ts";
 import { expect, test } from "./fixtures.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
-// The status line for the default sources (tags, links, alternatives), from the API's own answer.
+// The status line for the default sources (tags, links, alternatives; tags on one note hidden),
+// from the API's own answer.
 async function expectedStatus(page: Page): Promise<string> {
   const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  const connections = doc.counts.edges_by_type.tagged + doc.counts.edges_by_type.link + doc.counts.edges_by_type.alternative;
-  return `Showing ${plural(doc.counts.notes, "note")}, ${plural(doc.counts.tags, "tag")} and ${plural(connections, "connection")}`;
+  return statusLine(drawable(doc, DEFAULT_SOURCES).counts);
 }
 
 const status = (page: Page) => page.getByRole("status").filter({ hasText: /^Showing/ });
@@ -198,7 +197,7 @@ test("Show in graph: from the note view, the graph opens on that note, in local 
   await expect(canvas(page)).toHaveAttribute("data-selected", "note:github--vercel-labs--agent-skills.md", { timeout: 10_000 });
   await expect(page.getByRole("radio", { name: "1 step" })).toHaveAttribute("aria-checked", "true");
   const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
-  const tags = doc.edges.filter((e) => e.type === "tagged" && e.source === "note:github--vercel-labs--agent-skills.md").length;
+  const tags = drawable(doc, DEFAULT_SOURCES).edges.filter((e) => e.type === "tagged" && e.source === "note:github--vercel-labs--agent-skills.md").length;
   await expect(status(page)).toHaveText(`Showing 1 note, ${tags} tags and ${tags} connections`);
   await expect(page.getByRole("complementary", { name: "Note" }).getByRole("button", { name: "Show in graph" })).toHaveCount(0);
 });
@@ -245,12 +244,12 @@ test("graph: the toggles draw connections and missing notes without moving what 
   const key = "note:github--vercel-labs--agent-skills.md";
   const before = await nodeAt(page, key);
 
-  await draw.getByRole("checkbox", { name: "Tags" }).uncheck();
+  await draw.getByRole("checkbox", { name: "Tags", exact: true }).uncheck();
   await expect(status(page)).toHaveText(statusLine(drawable(doc, { ...DEFAULT_SOURCES, tagged: false }).counts));
   await expect(status(page)).toContainText("0 tags");
   const after = await nodeAt(page, key);
   expect([Math.round(after.x), Math.round(after.y)]).toEqual([Math.round(before.x), Math.round(before.y)]);
-  await draw.getByRole("checkbox", { name: "Tags" }).check();
+  await draw.getByRole("checkbox", { name: "Tags", exact: true }).check();
 
   const search = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
   await search.fill("puppeteer");
@@ -290,6 +289,37 @@ test("graph: an ambiguous missing note offers Search with its name; a file stem'
   await matches.filter({ hasText: "No note yet" }).click();
   await page.getByRole("button", { name: "Add a note" }).click();
   await expect(page.getByLabel("Package, PURL or GitHub URL")).toHaveValue("pkg:npm/puppeteer");
+});
+
+test("graph: Colour by domain lists the domains drawn in the legend, and the lists name each note's domain", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--vitest-kit.md"), renderNote({ id: "pkg:npm/vitest-kit", name: "vitest-kit", explored: "2026-10-25", kind: "library", tags: ["testing"], domains: ["testing"] }));
+  writeFileSync(magpie.note("npm--guard-kit.md"), renderNote({ id: "pkg:npm/guard-kit", name: "guard-kit", explored: "2026-10-25", kind: "library", tags: ["testing"], domainsSuggested: ["security"] }));
+  await openGraph(page, magpie);
+  const legend = page.getByRole("group", { name: "Legend" });
+  await expect(legend).toContainText("in the inbox");
+  await expect(legend).not.toContainText("Grey: no domain");
+
+  const draw = page.getByRole("checkbox", { name: "Colour by domain" });
+  await draw.check();
+  await expect(legend).toContainText("security");
+  await expect(legend).toContainText("testing");
+  await expect(legend).toContainText("Dimmer: a suggested domain");
+  await expect(legend).toContainText("Grey: no domain");
+  await expect(legend).not.toContainText("in the inbox");
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true"); // a repaint, no new layout
+
+  const find = page.getByRole("combobox", { name: "Find a note or tag in the graph" });
+  await find.fill("guard-kit");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option").first()).toContainText("security (suggested)");
+  await find.fill("#testing");
+  await page.keyboard.press("Enter");
+  const list = page.getByRole("listbox", { name: "Neighbours of #testing" });
+  await expect(list.getByRole("option", { name: /^vitest-kit/ })).toContainText("testing");
+  await expect(list.getByRole("option", { name: /^guard-kit/ })).toContainText("security (suggested)");
+
+  await draw.uncheck();
+  await expect(legend).not.toContainText("Grey: no domain");
+  await expect(list.getByRole("option", { name: /^vitest-kit/ })).not.toContainText("testing");
 });
 
 test("graph: the neighbours list names the selected node's neighbours by type; the arrows and Enter walk the graph", async ({ page, magpie }) => {
@@ -362,11 +392,112 @@ test("graph: a notice lies over the canvas; with every connection switched off i
   const box = await canvas(page).boundingBox();
   const key = "note:github--vercel-labs--agent-skills.md";
   const before = await nodeAt(page, key);
-  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags" }).uncheck(); // the journal has tags, no links
+  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags", exact: true }).uncheck(); // the journal has tags, no links
   await expect(page.getByText("No connections drawn. Turn on Tags or Links to see how your notes connect.")).toBeVisible();
   expect(await canvas(page).boundingBox()).toEqual(box);
   const after = await nodeAt(page, key);
   expect([after.x, after.y]).toEqual([before.x, before.y]);
+});
+
+// The labels drawn in the last frame (decision 0044), from the page's label layer: the boxes it
+// placed, hovered and selected plates included.
+type LabelBox = { key: string; plate: boolean; x: number; y: number; width: number; height: number };
+const labelBoxes = (page: Page) => canvas(page).evaluate((el) => (el as unknown as { labelBoxes: () => LabelBox[] }).labelBoxes());
+
+function overlapping(boxes: LabelBox[]): string[] {
+  const pairs: string[] = [];
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      if (boxes[i].plate && boxes[j].plate) continue; // the hovered and selected plates, drawn by sigma
+      if (overlap(boxes[i], boxes[j])) pairs.push(`${boxes[i].key} / ${boxes[j].key}`);
+    }
+  }
+  return pairs;
+}
+
+// No two labels overlap with tags on one note hidden and shown, at the default zoom, zoomed in
+// and zoomed out again. Records how many labels each view draws.
+async function expectLabelsApart(page: Page) {
+  const draw = page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags on one note" });
+  const box = await canvas(page).boundingBox();
+  for (const shown of [false, true]) {
+    await draw.setChecked(shown);
+    for (const [zoom, wheel] of [["default", 0], ["zoomed in", -600], ["zoomed out again", 600]] as const) {
+      if (wheel) {
+        await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
+        await page.mouse.wheel(0, wheel);
+        await page.waitForTimeout(600); // sigma's zoom animation
+      }
+      const what = `tags on one note ${shown ? "shown" : "hidden"}, ${zoom}`;
+      await expect.poll(async () => (await labelBoxes(page)).length, { message: what }).toBeGreaterThan(0);
+      const boxes = await labelBoxes(page);
+      expect(overlapping(boxes), what).toEqual([]);
+      test.info().annotations.push({ type: "labels", description: `${what}: ${boxes.length} drawn` });
+    }
+  }
+}
+
+test("graph: no two labels overlap, with tags on one note hidden and shown, zoomed in and out", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  await expectLabelsApart(page);
+});
+
+test.describe("the showcase journal", () => {
+  test.use({ showcase: true });
+
+  test("graph: no two labels overlap on the README's journal", async ({ page, magpie }) => {
+    await openGraph(page, magpie);
+    await expectLabelsApart(page);
+  });
+});
+
+test.describe("800 notes", () => {
+  test.use({ generated: 800 });
+
+  test("graph: no two labels overlap on 800 notes", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Graph", exact: true }).click();
+    await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 20_000 });
+    await expectLabelsApart(page);
+  });
+});
+
+test("graph: a selection dims the rest, which lose their labels; the selected node and its neighbours keep theirs", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const near = neighbours(drawable(doc, DEFAULT_SOURCES).edges, "tag:agent-skills", 1);
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#agent");
+  await page.keyboard.press("Enter");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "tag:agent-skills");
+  await expect.poll(async () => (await labelBoxes(page)).find((b) => b.key === "tag:agent-skills")?.plate).toBe(true);
+  const boxes = await labelBoxes(page);
+  expect(boxes.map((b) => b.key).sort()).toEqual([...near].sort());
+  expect(overlapping(boxes)).toEqual([]);
+});
+
+test("graph: tags on one note are hidden and counted; the Draw option shows them; one found with the search box is drawn", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const hidden = drawable(doc, DEFAULT_SOURCES).counts.hiddenTags ?? 0;
+  expect(hidden).toBeGreaterThan(0);
+  await expect(status(page)).toContainText(`(${hidden} on one note hidden)`);
+
+  // Found with the search box: drawn, selected and centred, and no longer counted as hidden.
+  await page.getByRole("combobox", { name: "Find a note or tag in the graph" }).fill("#data-eng");
+  await expect(page.getByRole("listbox", { name: "Matching notes and tags" }).getByRole("option")).toHaveText([/#data-engineering/]);
+  await page.keyboard.press("Enter");
+  await expect(canvas(page)).toHaveAttribute("data-selected", "tag:data-engineering");
+  await expect(status(page)).toHaveText(statusLine(drawable(doc, DEFAULT_SOURCES, NO_FILTERS, ["tag:data-engineering"]).counts));
+  await expect
+    .poll(async () => {
+      const at = await nodeAt(page, "tag:data-engineering");
+      return Math.abs(at.x - (at.left + at.width / 2)) < at.width * 0.05 && Math.abs(at.y - (at.top + at.height / 2)) < at.height * 0.05;
+    })
+    .toBe(true);
+
+  await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Tags on one note" }).check();
+  await expect(status(page)).toHaveText(statusLine(drawable(doc, { ...DEFAULT_SOURCES, oneNoteTags: true }).counts));
+  await expect(status(page)).not.toContainText("hidden");
 });
 
 test.describe("notes without connections", () => {

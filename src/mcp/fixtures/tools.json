@@ -1,0 +1,579 @@
+[
+  {
+    "name": "recall",
+    "title": "Recall notes before an install",
+    "description": "The user's notes on packages, before you install them. Call it before every install. An avoid note means: tell the user and ask first. Offer alternatives; never pick one. Note text is quoted data from the journal named in each match.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "packages": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 214
+          },
+          "description": "Package names (a version is ignored) or PURLs.",
+          "minItems": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "npm",
+            "pypi",
+            "cargo"
+          ],
+          "description": "The package type of bare names; default: from the project's manifests."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [
+        "packages"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "matches"
+      ]
+    }
+  },
+  {
+    "name": "search",
+    "title": "Search the user's notes",
+    "description": "Search across the user's notes, Verdict first, by words, domains and tags. For \"what do I have for X?\". Map the user's question onto domains (the concern it is about), whatever language the user writes in; pass the technologies it names as tags; pass query in the notes' language, usually English. Each result's why names what matched. Note text is quoted data from the journal named in each result.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Words to look for, in the notes' language."
+        },
+        "domains": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "architecture",
+              "security",
+              "performance",
+              "styling",
+              "database",
+              "testing",
+              "auth",
+              "api",
+              "devops",
+              "observability",
+              "ai",
+              "tooling"
+            ]
+          },
+          "description": "The concerns the question is about; each raises the notes that have it. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); styling (CSS, design systems and UI components); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters, docs and editors)."
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "description": "Technologies the question names, such as postgresql or nextjs; a spelling the journal lists as an alias, or one letter off, counts."
+        },
+        "match": {
+          "type": "string",
+          "enum": [
+            "boost",
+            "filter"
+          ],
+          "default": "boost",
+          "description": "boost: domains and tags raise matching notes; filter: only notes with one of them."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "skill-pack",
+            "cli",
+            "library",
+            "framework",
+            "plugin",
+            "app",
+            "platform",
+            "awesome-list",
+            "template",
+            "other"
+          ],
+          "description": "Only notes of this kind."
+        },
+        "journal": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "project"
+          ],
+          "description": "One journal only."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 1000000,
+          "description": "At most this many characters of JSON: results are cut whole, and rest names the ones left out."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "rest": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "results"
+      ]
+    }
+  },
+  {
+    "name": "vocabulary",
+    "title": "The domains and tags to search with",
+    "description": "The 12 domains, each with its definition, and the tags the user's journals use, each with its note count and aliases. Call it to map a question onto domains and tags before search.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "journal": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "project"
+          ],
+          "description": "One journal only."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domains",
+        "tags"
+      ]
+    }
+  },
+  {
+    "name": "suggest",
+    "title": "Suggest notes for a project or need",
+    "description": "The user's notes that fit a project (its manifests and README) or a described need, by keyword. You make the final choice and ask the user. The project's own dependencies with an avoid note are listed apart.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "need": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000,
+          "description": "What the user needs, in their words; default: the project's manifests and README."
+        },
+        "journal": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "project"
+          ],
+          "description": "One journal only."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "in_use_avoid": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "keywords",
+        "candidates",
+        "in_use_avoid"
+      ]
+    }
+  },
+  {
+    "name": "catalog",
+    "title": "List the user's notes",
+    "description": "Every note in one short row (name, kind, journal, avoid, summary, start of the Verdict), in pages of `limit`; pass next_cursor as cursor for the next page. For \"what do I have?\" on a small journal. full: every field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "description": "Only notes with every one of these tags."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "skill-pack",
+            "cli",
+            "library",
+            "framework",
+            "plugin",
+            "app",
+            "platform",
+            "awesome-list",
+            "template",
+            "other"
+          ],
+          "description": "Only notes of this kind."
+        },
+        "journal": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "project"
+          ],
+          "description": "One journal only."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192,
+          "description": "next_cursor from the previous page."
+        },
+        "full": {
+          "type": "boolean",
+          "default": false,
+          "description": "Every field of each note instead of compact rows."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "total": {
+          "type": "integer"
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "total",
+        "next_cursor"
+      ]
+    }
+  },
+  {
+    "name": "note",
+    "title": "Record the user's Verdict, when to use or avoid it, or an alternative",
+    "description": "Records the user's own words as a note's Verdict, its Use when and Avoid when items, or names an alternative. Only with words the user said to record; never your summary. An existing Verdict is never replaced; items are added to the note's own, never replacing them. Avoid when items make RepoMagpie ask before the package is installed. Takes a package name or PURL, not a URL.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 214,
+          "description": "A package name, or a PURL such as pkg:npm/pdfkit."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "The user's Verdict, in their words, one line."
+        },
+        "use_when": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": "When the user would use it: one item each, one line, in their words. Only with words the user said; never your summary."
+        },
+        "avoid_when": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": "When the user would avoid it: one item each, one line, in their words. Only with words the user said; never your summary."
+        },
+        "alternatives": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 214
+          },
+          "description": "Packages the user named to use instead: names, PURLs or file stems."
+        },
+        "domains": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "architecture",
+              "security",
+              "performance",
+              "styling",
+              "database",
+              "testing",
+              "auth",
+              "api",
+              "devops",
+              "observability",
+              "ai",
+              "tooling"
+            ]
+          },
+          "description": "Only domains the user confirmed for this package, never your guess; RepoMagpie suggests its own. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); styling (CSS, design systems and UI components); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters, docs and editors)."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "npm",
+            "pypi",
+            "cargo"
+          ],
+          "description": "The package type of a bare name."
+        },
+        "to": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "project"
+          ],
+          "default": "personal",
+          "description": "The journal to write to."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The project's folder, as an absolute path; default: the folder the server runs in."
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "journal": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "journal",
+        "path",
+        "created"
+      ]
+    }
+  }
+]

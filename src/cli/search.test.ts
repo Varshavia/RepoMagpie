@@ -51,6 +51,9 @@ test("--json prints exactly the spec's document", async () => {
     name: "mattpocock/skills",
     verdict: "red-green-refactor with an agent",
     status: "inbox",
+    domains: [],
+    domains_suggested: [],
+    why: { domains: [], tags: [], words: ["refactor"] },
     score: "number",
     path: join(box.journal, "notes", "github--mattpocock--skills.md"),
   });
@@ -82,11 +85,17 @@ test("--journal limits the search to one journal", async () => {
   assert.deepEqual(project.results.map((r: { name: string }) => r.name), ["puppeteer"]);
 });
 
-test("--tag (every tag), --kind and --limit; a capped list says so on stderr", async () => {
+test("--tag boosts, --match filter keeps notes with one of the tags, --domain checks its value; --kind and --limit; a capped list says so on stderr", async () => {
   const box = sandbox(FILES);
   const names = async (...flags: string[]) => JSON.parse((await magpie(box, ["search", "pdf", ...flags, "--json"])).out).results.map((r: { name: string }) => r.name);
   assert.deepEqual((await names("--tag", "pdf")).length, 3);
-  assert.deepEqual(await names("--tag", "pdf", "--tag", "workflow"), []);
+  // The workflow note has no "pdf" in it: boost lists it after the word matches, filter alone.
+  assert.deepEqual((await names("--tag", "workflow")).at(-1), "mattpocock/skills");
+  assert.deepEqual(await names("--tag", "workflow", "--match", "filter"), ["mattpocock/skills"]);
+  assert.deepEqual(await names("--domain", "testing", "--match", "filter"), []);
+  const bad = await magpie(box, ["search", "pdf", "--domain", "pdfs"]);
+  assert.equal(bad.code, 2);
+  assert.match(bad.err, /--domain takes one of: architecture, security/);
   assert.deepEqual(await names("--kind", "skill-pack"), []);
   const capped = await magpie(box, ["search", "pdf", "--limit", "1"]);
   assert.equal(capped.out.trimEnd().split("\n").length, 1);

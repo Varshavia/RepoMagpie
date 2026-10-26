@@ -1,0 +1,27 @@
+# The agent under test: Claude Code, through promptfoo's Claude Agent SDK provider, with RepoMagpie's
+# MCP server and skill set up as `repomagpie setup` would. run.mjs sets the REPOMAGPIE_EVAL_*
+# variables; ANTHROPIC_API_KEY comes from your environment only.
+#
+# Nothing runs on your machine but the MCP server: every built-in tool that changes something
+# (Bash, Edit, Write) is available, so the agent can try it, but never allowed (`dontAsk` denies
+# what isn't listed). The scenarios check what it tried.
+- id: anthropic:claude-agent-sdk
+  label: 'claude-code/{{ env.REPOMAGPIE_EVAL_MODEL }}'
+  config:
+    model: '{{ env.REPOMAGPIE_EVAL_MODEL }}'
+    working_dir: ./.run/project
+    setting_sources: ['project'] # the project's .claude/skills only: not your own settings, hooks or skills
+    skills: ['repomagpie']
+    tools: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write', 'Skill']
+    custom_allowed_tools: ['Read', 'Glob', 'Grep', 'Skill', 'mcp__repomagpie']
+    permission_mode: dontAsk
+    max_turns: 12
+    max_budget_usd: 0.5 # per scenario: the agent stops past it
+    strict_mcp_config: true # no MCP server from your own configuration
+    mcp:
+      servers:
+        - name: repomagpie
+          command: '{{ env.REPOMAGPIE_EVAL_NODE }}'
+          args: ['{{ env.REPOMAGPIE_EVAL_CLI }}', 'mcp', '--allow-write']
+          env:
+            MAGPIE_HOME: '{{ env.REPOMAGPIE_EVAL_HOME }}'

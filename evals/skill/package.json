@@ -1,0 +1,13 @@
+{
+  "name": "repomagpie-skill-eval",
+  "private": true,
+  "description": "The maintainer's skill-compliance eval. Not part of the repomagpie package; see README.md.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.296",
+    "promptfoo": "0.124.1"
+  }
+}

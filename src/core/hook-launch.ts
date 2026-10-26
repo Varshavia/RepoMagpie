@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { win32 } from "node:path";
 import type { Platform } from "./agents.ts";
 import { NO_CODEGEN } from "./launch.ts";
+import { escapeRegExp } from "./text.ts";
 
 // The `repomagpie hook` subcommand of each agent setup writes a hook for.
 export type HookSub = "codex" | "cursor" | "gemini-cli" | "antigravity" | "copilot";
@@ -102,10 +103,11 @@ export function parseHookCommand(command: string, sub: HookSub, shell: HookShell
     const inner = line === null ? null : parseHookCommand(line, sub, "cmd");
     return inner?.form === "setup" ? { ...inner, launcher: command } : { form: "setup", node: null, entry: null, flags: [], launcher: command };
   }
-  const at = command.match(new RegExp(`\\bhook\\s+${sub}((?:\\s+--[a-z][a-z-]*)*)(?=[\\s;}|]|$)`));
+  const word = escapeRegExp(sub);
+  const at = command.match(new RegExp(`\\bhook\\s+${word}((?:\\s+--[a-z][a-z-]*)*)(?=[\\s;}|]|$)`));
   if (!at) return null;
   const flags = at[1].trim().split(/\s+/).filter(Boolean);
-  if (new RegExp(`^\\s*(?:&\\s*)?['"]?(?:[^'"\\s]*[\\\\/])?(?:repo)?magpie(?:\\.cmd|\\.ps1)?['"]?\\s+hook\\s+${sub}(?:\\s+--[a-z][a-z-]*)*\\s*$`).test(command)) {
+  if (new RegExp(`^\\s*(?:&\\s*)?['"]?(?:[^'"\\s]*[\\\\/])?(?:repo)?magpie(?:\\.cmd|\\.ps1)?['"]?\\s+hook\\s+${word}(?:\\s+--[a-z][a-z-]*)*\\s*$`).test(command)) {
     return { form: "name", node: null, entry: null, flags };
   }
   // The first two quoted strings are node and the entry file in every form setup writes.
