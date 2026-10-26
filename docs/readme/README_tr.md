@@ -45,7 +45,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
 - **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler (kaçın, notlu, notsuz), sonra notu olmayan her biri için senin Verdict'ini sorar; Enter atlar, `q` durdurur.
 
-**Durum:** erken test edenler için ön sürüm `0.2.0-beta.12`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
+**Durum:** erken test edenler için ön sürüm `0.2.0-beta.13`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
 
 ## Hızlı başlangıç
 
