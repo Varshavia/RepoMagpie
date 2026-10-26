@@ -73,7 +73,11 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
 
 1. Commit the release branch, push it, and open a pull request to `main`.
 2. Merge it once CI is green ("Rebase and merge" or a merge commit, not squash).
-3. Tag the merge on `main`: `git switch main`, `git pull`, `git tag v0.2.0-beta.2`, `git push origin v0.2.0-beta.2`.
+3. Tag the merge on `main`, only after it, in this order (two releases were tagged before their merge):
+   1. Merge the release pull request (step 2).
+   2. `git switch main`, then `git pull`.
+   3. `git log -1` shows that merge, and `package.json`'s `version` is the release's (`0.2.0-beta.2`). If either isn't so, stop: the pull hasn't brought the merge yet.
+   4. `git tag v0.2.0-beta.2`, then `git push origin v0.2.0-beta.2`.
 4. The tag starts `.github/workflows/release.yml`. Its first job:
    - checks out with the whole history, then refuses a tag that isn't `v` plus `package.json`'s version, or whose commit isn't on `main`'s history (`scripts/release-check.ts`; it also refuses a shallow checkout);
    - runs every check in step 2 except the benchmarks, and the end-to-end tests;
