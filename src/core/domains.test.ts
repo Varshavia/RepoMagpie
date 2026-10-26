@@ -20,12 +20,12 @@ const ROWS: [string, string[]][] = [
   ["architecture", ["architecture", "software-architecture", "clean-architecture", "design-patterns", "state-management", "microservices", "domain-driven-design", "ddd", "event-sourcing", "cqrs"]],
   ["security", ["security", "cybersecurity", "appsec", "vulnerability", "vulnerabilities", "vulnerability-scanner", "secrets", "secret-management", "encryption", "cryptography", "owasp", "sast", "supply-chain-security", "input-validation", "sanitization"]],
   ["performance", ["performance", "web-performance", "caching", "cache", "profiling", "profiler", "optimization", "benchmark", "benchmarks", "bundle-size", "image-optimization", "lighthouse"]],
-  ["styling", ["css", "css-framework", "tailwind", "tailwindcss", "sass", "scss", "css-in-js", "styled-components", "design-system", "design-systems", "ui-components", "component-library", "ui-library", "shadcn", "shadcn-ui"]],
+  ["styling", ["css", "css-framework", "tailwind", "tailwindcss", "sass", "scss", "css-in-js", "styled-components", "design-system", "design-systems", "ui-components", "component-library", "ui-library", "shadcn", "shadcn-ui", "design", "ui-design", "web-design", "frontend-design", "ui-ux"]],
   ["database", ["database", "databases", "db", "orm", "sql", "nosql", "postgres", "postgresql", "mysql", "sqlite", "mongodb", "migrations", "database-migrations", "query-builder", "vector-database"]],
   ["testing", ["testing", "test", "tests", "unit-testing", "test-automation", "testing-tools", "e2e", "e2e-testing", "end-to-end-testing", "integration-testing", "mocking", "mock", "test-runner", "jest", "vitest", "playwright", "cypress", "mocha"]],
   ["auth", ["auth", "authentication", "authorization", "oauth", "oauth2", "openid-connect", "oidc", "sso", "jwt", "passkeys", "webauthn", "rbac", "permissions", "login"]],
   ["api", ["api", "rest", "rest-api", "restful", "graphql", "grpc", "rpc", "trpc", "openapi", "http-client", "http-server", "api-client", "websocket", "websockets"]],
-  ["devops", ["devops", "docker", "containers", "kubernetes", "k8s", "ci", "ci-cd", "cicd", "continuous-integration", "deployment", "github-actions", "terraform", "ansible", "infrastructure-as-code", "iac", "paas", "heroku", "build-tool"]],
+  ["devops", ["devops", "containers", "kubernetes", "k8s", "ci", "ci-cd", "cicd", "continuous-integration", "continuous-delivery", "continuous-deployment", "deployment", "infrastructure", "github-actions", "terraform", "ansible", "infrastructure-as-code", "iac", "paas", "heroku", "build-tool"]],
   ["observability", ["observability", "logging", "logger", "logs", "monitoring", "metrics", "tracing", "opentelemetry", "apm", "error-tracking", "error-monitoring", "uptime-monitoring", "status-page"]],
   ["ai", ["ai", "artificial-intelligence", "llm", "llms", "large-language-models", "machine-learning", "ml", "deep-learning", "generative-ai", "genai", "ai-agents", "ai-agent", "agentic-ai", "mcp", "model-context-protocol", "embeddings", "rag", "openai", "chatgpt", "langchain", "ollama", "gpt"]],
   ["tooling", ["cli", "command-line", "command-line-tool", "developer-tools", "devtools", "dev-tools", "linter", "linting", "eslint", "formatter", "code-formatter", "prettier", "vscode", "vscode-extension", "documentation-tool"]],
@@ -51,7 +51,51 @@ test("words that name a technology but not its concern, or two concerns, map to 
   }
 });
 
-test("suggestDomains: tags first, then topics; each domain once; at most 3; never one already confirmed", () => {
+test("shipping a Docker image, automating a browser or scraping names no domain; neither does a bare ui or cd", () => {
+  const words = ["docker", "docker-compose", "dockerfile", "browser-automation", "web-automation", "rpa", "crawler", "crawling", "web-crawler",
+    "scraper", "scraping", "web-scraper", "web-scraping", "webscraping", "data-extraction", "ui", "cd", "automation"];
+  for (const word of words) assert.deepEqual(suggestDomains({ topics: [word] }), [], word);
+});
+
+test("playwright names testing, except on a note about browser automation or scraping", () => {
+  assert.deepEqual(suggestDomains({ tags: ["playwright"] }), ["testing"]);
+  assert.deepEqual(suggestDomains({ topics: ["automation", "playwright"] }), ["testing"]);
+  for (const word of ["browser-automation", "crawler", "web-scraping", "rpa", "data-extraction"]) {
+    assert.deepEqual(suggestDomains({ topics: ["playwright", word] }), [], word);
+  }
+});
+
+test("ranking: the domain named by more words first; a generic ai only when nothing else is named", () => {
+  assert.deepEqual(suggestDomains({ topics: ["ai", "orm", "postgres"] }), ["database"]);
+  assert.deepEqual(suggestDomains({ topics: ["artificial-intelligence", "testing"] }), ["testing"]);
+  assert.deepEqual(suggestDomains({ topics: ["ai"] }), ["ai"]);
+  assert.deepEqual(suggestDomains({ topics: ["ai", "llm", "orm"] }), ["ai", "database"], "llm names ai; the generic word adds nothing");
+  assert.deepEqual(suggestDomains({ topics: ["api", "auth", "oauth2", "orm", "sql", "postgres"] }), ["database", "auth", "api"]);
+  const aliases = new Map([["pgsql", "postgresql"]]);
+  assert.deepEqual(suggestDomains({ topics: ["pgsql", "postgresql", "auth", "oauth2"] }, aliases), ["auth", "database"], "a spelling and its tag are one word");
+});
+
+// Real notes from the maintainer's journal, 2026-10-26: their public GitHub topics, as fetched then.
+const REAL: [string, string[], string[]][] = [
+  ["browser-use/browser-use", ["ai-agents", "ai-tools", "browser-agent", "browser-automation", "browser-use", "cdp", "cloud-browser", "computer-use", "headless-browser", "llm", "mcp", "playwright", "python", "remote-browser", "stealth-browser", "web-automation", "web-scraping"], ["ai"]],
+  ["unclecode/crawl4ai", ["ai", "ai-agents", "crawler", "data-extraction", "llm", "markdown", "mcp", "open-source", "playwright", "python", "rag", "scraper", "web-crawler", "web-crawling", "web-scraping"], ["ai"]],
+  ["getmaxun/maxun", ["agents", "api", "automation", "browser-automation", "crawler", "crawling", "data-extraction", "no-code", "nocode", "playwright", "robotic-process-automation", "rpa", "scraper", "self-hosted", "web-scraper", "web-scraping", "web-search", "webscraping"], ["api"]],
+  ["Stirling-Tools/Stirling-PDF", ["docker", "hacktoberfest", "java", "pdf", "pdf-converter", "pdf-editor", "pdf-manipulation", "pdf-merger", "pdf-ocr", "pdf-tools", "pdf-web-apps", "pdfmerger", "self-hosted"], []],
+  ["supabase/supabase", ["ai", "alternative", "auth", "database", "deno", "embeddings", "example", "firebase", "nextjs", "oauth2", "pgvector", "postgis", "postgres", "postgresql", "postgrest", "realtime", "supabase", "vectors", "websockets"], ["database", "auth", "ai"]],
+  ["Leonxlnx/taste-skill", ["agent-skills", "ai-agents", "anti-slop", "claude-code", "codex", "cursor", "design-system", "frontend", "landing-page", "ui-design", "web-design"], ["styling", "ai"]],
+  // Checks that the changes keep: a test runner, a container tool with kubernetes, a component library.
+  ["microsoft/playwright", ["automation", "chrome", "chromium", "e2e-testing", "electron", "end-to-end-testing", "firefox", "javascript", "playwright", "test", "test-automation", "testing", "testing-tools", "web", "webkit"], ["testing"]],
+  ["portainer/portainer", ["docker", "docker-compose", "docker-container", "docker-deployment", "docker-image", "docker-swarm", "docker-ui", "dockerfile", "hacktoberfest", "kubernetes", "moby", "portainer", "ui"], ["devops"]],
+  ["shadcn-ui/ui", ["ai", "base-ui", "components", "gen-ui", "generative-ai", "generative-ui", "laravel", "nextjs", "radix-ui", "react", "react-aria", "react-aria-components", "shadcn", "tailwindcss", "tanstack", "ui", "vite"], ["styling", "ai"]],
+];
+
+for (const [repo, topics, expected] of REAL) {
+  test(`a real note: ${repo} → ${expected.join(", ") || "none"}`, () => {
+    assert.deepEqual(suggestDomains({ topics }), expected);
+  });
+}
+
+test("suggestDomains: on a tie, tags first, then topics; each domain once; at most 3; never one already confirmed", () => {
   assert.deepEqual(suggestDomains({ tags: ["playwright"], topics: ["security", "testing", "orm"] }), ["testing", "security", "database"]);
   assert.deepEqual(suggestDomains({ topics: ["jest", "vitest", "testing"] }), ["testing"]);
   assert.deepEqual(suggestDomains({ topics: ["security", "orm", "testing", "logging", "docker"] }), ["security", "database", "testing"]);
