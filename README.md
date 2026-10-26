@@ -43,7 +43,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 - **Start from a project:** `repomagpie init --auto` lists its dependencies by what your notes say (avoid, noted, no note), then asks for your Verdict on each one without a note; Enter skips, `q` stops.
 
-**Status:** pre-release `0.2.0-beta.12`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.13`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
