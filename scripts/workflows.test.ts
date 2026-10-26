@@ -35,6 +35,13 @@ test("dependabot.yml: npm ignores major updates of sigma and @types/node", () =>
   ]);
 });
 
+// The skill eval's fake project: nothing installs it, so Dependabot leaves it alone.
+test("dependabot.yml: npm skips the eval's fixture project", () => {
+  const config = parse(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8")) as { updates: { "package-ecosystem": string; "exclude-paths"?: string[] }[] };
+  const npm = config.updates.find((u) => u["package-ecosystem"] === "npm");
+  assert.deepEqual(npm?.["exclude-paths"], ["evals/skill/fixture/**"]);
+});
+
 test("every workflow is read-only by default and never runs on pull_request_target", () => {
   assert.ok(workflows.length >= 2);
   for (const { file, flow } of workflows) {

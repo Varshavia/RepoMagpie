@@ -20,6 +20,9 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # The skill eval's fake project: nothing installs it, and an update would only change the eval's input.
+    exclude-paths:
+      - "evals/skill/fixture/**"
   - package-ecosystem: github-actions
     directory: /
     schedule:
