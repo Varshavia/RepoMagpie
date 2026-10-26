@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.13] - 2026-10-26
+
+The fourteenth pre-release: domain suggestions now follow what a package is for. Browser automation and scraping tools aren't "testing", a Docker image doesn't make a project "devops", and a bare "ai" topic no longer comes first. Notes that already got suggestions from `repomagpie domains --suggest` in beta.12 keep them.
+
 ### Fixed
 
-- Suggested domains fit what a package is for. A browser automation or scraping tool no longer gets `testing` from its `playwright` topic, and a project that ships a Docker image no longer gets `devops` from `docker`. The domain named by most of a note's topics and tags comes first, so supabase gets database, auth, then ai. A bare `ai` topic counts only when the note names nothing else. Design topics (`design`, `ui-design`, `web-design`, `frontend-design`, `ui-ux`) now suggest `styling`; `continuous-delivery`, `continuous-deployment` and `infrastructure` suggest `devops`. Notes that already have suggested domains keep them: remove a wrong one in `repomagpie ui`.
+- Suggested domains fit what a package is for. A browser automation or scraping tool no longer gets `testing` from its `playwright` topic, and a project that ships a Docker image no longer gets `devops` from `docker`. The domain named by most of a note's topics and tags comes first, so supabase gets database, auth, then ai. A bare `ai` topic counts only when the note names nothing else. Design topics (`design`, `ui-design`, `web-design`, `frontend-design`, `ui-ux`) now suggest `styling`; `continuous-delivery`, `continuous-deployment` and `infrastructure` suggest `devops`. Notes that already have suggested domains keep them. To remove a wrong one, delete it from the note's `domains_suggested`; in `repomagpie ui`, confirm it with its check button, then click Edit, unpick it and save.
 
 ## [0.2.0-beta.12] - 2026-10-26
 
@@ -298,7 +302,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...HEAD
+[0.2.0-beta.13]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...v0.2.0-beta.13
 [0.2.0-beta.12]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...v0.2.0-beta.12
 [0.2.0-beta.11]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...v0.2.0-beta.11
 [0.2.0-beta.10]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.9...v0.2.0-beta.10
