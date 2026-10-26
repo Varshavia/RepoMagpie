@@ -8,4 +8,4 @@ An RFC (request for comments) here is a design proposal too large for one decisi
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-domains-tags-and-search.md) | Domains, technology tags and semantic search | D1, D2, D4 decided; Phase 0 in 0.2.0-beta.11; Phase 1 and part of Phase 2 built in `feat/next-batch`; the rest of Phase 2 next; Phase 3 later |
+| [0001](0001-domains-tags-and-search.md) | Domains, technology tags and semantic search | D1, D2, D4 decided; Phase 0 in 0.2.0-beta.11; Phase 1 and part of Phase 2 in 0.2.0-beta.12; the rest of Phase 2 next; Phase 3 later |
