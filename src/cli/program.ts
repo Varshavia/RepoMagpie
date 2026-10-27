@@ -4,6 +4,7 @@ import type { AdoptOptions } from "./adopt.ts";
 import type { CatalogOptions } from "./catalog.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { DeleteOptions } from "./delete.ts";
+import type { DiscoverOptions } from "./discover.ts";
 import { DOMAIN_IDS } from "../core/domains.ts";
 import type { DomainsOptions } from "./domains.ts";
 import type { Env } from "../core/journals.ts";
@@ -46,7 +47,7 @@ export interface Io {
   self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
 }
 
-const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "domains", "search", "catalog", "recall", "suggest", "init", "adopt", "delete"]);
+const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "domains", "search", "catalog", "recall", "suggest", "init", "adopt", "delete", "discover"]);
 
 // Runs repomagpie with the given arguments and returns the exit code (spec section 1).
 export async function run(argv: string[], io: Io): Promise<number> {
@@ -133,6 +134,24 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--full", "with --json: every field of each note, instead of compact rows")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./catalog.ts")).catalogCommand(command.optsWithGlobals<CatalogOptions>(), io);
+    });
+
+  program
+    .command("discover")
+    .description("search GitHub for repositories: stars, activity, licence, and whether a journal has them")
+    .argument("[words]", "words to look for in names, descriptions and topics")
+    .addOption(new Option("--domain <domain>", "repositories for this concern, by its GitHub topics").choices(DOMAIN_IDS))
+    .addOption(new Option("--kind <kind>", "repositories of this kind (library, cli, plugin, app and other are estimated)").choices(KINDS))
+    .option("--topic <topic>", "a GitHub topic the repository must have (repeatable)", (topic: string, topics: string[]) => [...topics, topic], [])
+    .option("--language <language>", "the repository's main language, as GitHub names it")
+    .option("--min-stars <n>", "at least n stars", wholeNumber, 10)
+    .option("--updated-within <months>", "pushed to in the last n months; 0 for any time", wholeNumber, 24)
+    .option("--include-archived", "also show archived repositories")
+    .addOption(new Option("--sort <order>", "stars, forks, updated (recently pushed) or best (GitHub's best match)").choices(["stars", "forks", "updated", "best"]).default("stars"))
+    .option("--limit <n>", "results a page, from 1 to 50", discoverLimit, 20)
+    .option("--page <n>", "the page of results", positiveInteger, 1)
+    .action(async (words: string | undefined, _options: unknown, command: Command) => {
+      code = await (await import("./discover.ts")).discoverCommand(words, command.optsWithGlobals<DiscoverOptions>(), io);
     });
 
   program
@@ -304,6 +323,19 @@ function portNumber(value: string): number {
 function catalogLimit(value: string): number {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1 || n > 1000) throw new InvalidArgumentError("Use a whole number from 1 to 1000.");
+  return n;
+}
+
+// discover's --limit: GitHub's search gives at most 100 a page; 50 keeps a page readable (decision 0045).
+function discoverLimit(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 50) throw new InvalidArgumentError("Use a whole number from 1 to 50.");
+  return n;
+}
+
+function wholeNumber(value: string): number {
+  const n = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(n)) throw new InvalidArgumentError("Use a whole number of 0 or more.");
   return n;
 }
 
