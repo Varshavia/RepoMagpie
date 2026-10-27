@@ -193,9 +193,10 @@ test("a search's requests go one after another, never at once", async () => {
 });
 
 test("a kind topics can't name keeps the results whose topics say nothing of their kind, and says the filter is approximate", async () => {
-  const { context } = setup({ [path(`pdf in:name,description,topics ${BASE}`)]: answer(item("a/lib"), item("a/app", { topics: ["self-hosted"] }), item("a/list", { topics: ["awesome-list"] })) });
+  const { context } = setup({ [path(`pdf in:name,description,topics ${BASE}`)]: answer(item("a/lib"), item("a/app", { topics: ["self-hosted"] }), item("a/list", { topics: ["awesome-list"] }), item("a/orm", { topics: ["orm"] })) });
   const library = await runDiscover({ text: "pdf", kind: "library" }, context);
-  assert.deepEqual(library.document.results.map((r) => r.name), ["a/lib"]);
+  assert.deepEqual(library.document.results.map((r) => r.name), ["a/lib", "a/orm"]); // orm names a library (decision 0047)
+  assert.deepEqual(library.document.results.map((r) => r.estimated_kind), [null, "library"]);
   assert.match(library.document.approximate ?? "", /can't search by the kind library/);
   const app = await runDiscover({ text: "pdf", kind: "app" }, context);
   assert.deepEqual(app.document.results.map((r) => r.name), ["a/app"]);

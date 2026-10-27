@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { countSkillFolders, draftKind, fetchRepository, manifestKeywords, packageFromManifest, readmeOpening, readmeStart, type Fetch, type FetchProblem } from "./github.ts";
+import { countSkillFolders, draftKind, fetchRepository, kindFromTopics, manifestKeywords, packageFromManifest, readmeOpening, readmeStart, rootFolders, type Fetch, type FetchProblem } from "./github.ts";
 
 // Recorded GET responses (src/core/fixtures/github/); no test touches the network.
 function recorded(name: string): Record<string, unknown> {
@@ -82,6 +82,7 @@ test("playwright-cli: metadata, skills by folder name, package and bin from the 
       keywords: [],
       readme: "# playwright-cli\n\nPlaywright CLI with SKILLS\n\n### Playwright CLI vs Playwright MCP\n\nThis package provides CLI interface into Playwright. If you are using coding agents, that is the best fit.\n\n### Key Features\n\n- Token-efficient. Does not force page data into LLM.\n\n## Installation",
       action: false,
+      rootFolders: ["scripts", "skills", "tests"], // .claude/ is hidden
     },
     warnings: [],
   });
@@ -390,7 +391,11 @@ const KIND_CASES: [string, Partial<KindInput>, string][] = [
   ["7 framework beats a command and a package", { topics: ["framework"], bin: true, packages: ["pkg:npm/widget"] }, "framework"],
   ["8 a command beats a package", { bin: true, packages: ["pkg:npm/widget"] }, "cli"],
   ["9 a package beats skill folders and a plugin", { packages: ["pkg:pypi/widget"], skillFolders: 6, plugin: true }, "library"],
-  ["10 3 skill folders beat a plugin", { skillFolders: 3, plugin: true }, "skill-pack"],
+  ["10 3 skill folders in a root skills/ beat a plugin", { skillFolders: 3, plugin: true, rootFolders: ["docs", "skills"] }, "skill-pack"],
+  ["10 skill folders next to code don't make a skill pack", { skillFolders: 21, rootFolders: ["packages", "skills"] }, "other"],
+  ["10 apps/ counts as code", { skillFolders: 5, rootFolders: ["apps", "skills"] }, "other"],
+  ["10 skill folders outside a root skills/ don't", { skillFolders: 3, rootFolders: ["docs", "packages"] }, "other"],
+  ["10 an unknown layout doesn't", { skillFolders: 3, rootFolders: null }, "other"],
   ["11 2 skill folders with a plugin manifest: plugin", { skillFolders: 2, plugin: true }, "plugin"],
   ["12 2 skill folders alone: other", { skillFolders: 2 }, "other"],
   ["12 unknown skill folders and packages count as none", { skillFolders: null, packages: null }, "other"],
@@ -413,6 +418,73 @@ test("draftKind: a manifest keyword counts where a topic does; the README decide
   assert.equal(draftKind({ ...BASE, packages: ["pkg:npm/widget"], readme: "# Widget CLI" }), "library"); // a package beats the README
   assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nCharts for apps.\n\n## Use the CLI" }), "other"); // only the first heading and sentence
   assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nPublic client library." }), "other"); // a whole word: not "public"
+});
+
+// --- decision 0047: kind rules, measured ---
+
+test("draftKind: a GitHub Action is other, before platform and app topics, after a template", () => {
+  assert.equal(draftKind({ ...BASE, action: true, topics: ["docker"], packages: ["pkg:npm/widget"] }), "other"); // docker/build-push-action
+  assert.equal(draftKind({ ...BASE, action: true, topics: ["self-hosted", "framework"] }), "other");
+  assert.equal(draftKind({ ...BASE, action: true, template: true }), "template");
+  assert.equal(draftKind({ ...BASE, action: true, name: "acme/skills-action" }), "skill-pack");
+});
+
+test("draftKind: the README's phrases decide before a package, after a command", () => {
+  const cases: [string, string][] = [
+    ["# Langflow\n\nLangflow is a powerful platform for building and deploying AI agents.", "platform"],
+    ["# Supabase\n\nSupabase is the Postgres development platform.", "platform"],
+    ["# Playwright\n\nPlaywright is a framework for Web Testing and Automation.", "framework"],
+    ["# Vitest\n\nNext generation testing framework powered by Vite.", "framework"],
+    ["# Tailwind CSS\n\nA utility-first CSS framework for rapidly building custom user interfaces.", "framework"],
+    ["# Puppeteer\n\nPuppeteer is a JavaScript library which provides a high-level API.", "library"],
+    ["# Radix Primitives\n\nAn open-source UI component library for building design systems.", "library"],
+  ];
+  for (const [readme, kind] of cases) assert.equal(draftKind({ ...BASE, packages: ["pkg:npm/widget"], readme }), kind, readme);
+  assert.equal(draftKind({ ...BASE, bin: true, readme: cases[0][0] }), "cli"); // a command still comes first
+  assert.equal(draftKind({ ...BASE, packages: ["pkg:npm/widget"], readme: "# Widget\n\nWidget draws charts for apps.\n\nA framework for charts." }), "library"); // only the opening
+  assert.equal(draftKind({ ...BASE, packages: ["pkg:npm/widget"], readme: "# Grafana\n\nThe open-source platform for monitoring." }), "library"); // dropped: open-source platform
+});
+
+test("draftKind: the topics testing-framework, ui-library and orm, after the framework topic", () => {
+  assert.equal(draftKind({ ...BASE, topics: ["testing-framework"], bin: true }), "framework"); // cypress
+  assert.equal(draftKind({ ...BASE, topics: ["ui-library"] }), "library"); // chakra
+  assert.equal(draftKind({ ...BASE, topics: ["orm"], bin: true }), "library"); // prisma, drizzle
+  assert.equal(draftKind({ ...BASE, topics: ["orm", "self-hosted"] }), "app");
+  assert.equal(draftKind({ ...BASE, keywords: ["testing-framework"] }), "framework"); // a keyword counts as a topic
+});
+
+test("draftKind: the skill packs stay; a library or a platform that ships skills doesn't become one", () => {
+  const packs: [string, string[], number][] = [
+    ["mattpocock/skills", ["docs", "scripts", "skills"], 14],
+    ["vercel-labs/agent-skills", ["packages", "scripts", "skills"], 7], // packages/ holds its build tool, but the name says skill
+    ["anthropics/skills", ["skills", "spec", "template"], 20], // also a plugin: .claude-plugin/
+    ["acme/agent-pack", ["skills", "spec", "template"], 20], // the same layout without skill in the name
+    ["Leonxlnx/taste-skill", ["assets", "examples", "skills", "tests"], 9],
+  ];
+  for (const [name, rootFolders, skillFolders] of packs) assert.equal(draftKind({ ...BASE, name, rootFolders, skillFolders }), "skill-pack", name);
+  assert.equal(draftKind({ ...BASE, name: "trpc/trpc", rootFolders: ["examples", "packages", "www"], skillFolders: 21 }), "other");
+  assert.equal(draftKind({ ...BASE, name: "acme/charts", rootFolders: ["skills", "src"], skillFolders: 4, packages: ["pkg:npm/charts"] }), "library");
+  assert.equal(draftKind({ ...BASE, name: "acme/cloud", topics: ["paas"], rootFolders: ["apps", "skills"], skillFolders: 5, packages: ["pkg:npm/cloud"] }), "platform");
+});
+
+test("kindFromTopics: an Action is other; the new topics count; Discover, which knows no Action, gets null", () => {
+  assert.equal(kindFromTopics({ name: "a/b", topics: [], template: false, action: true }), "other");
+  assert.equal(kindFromTopics({ name: "a/b", topics: ["orm"], template: false }), "library");
+  assert.equal(kindFromTopics({ name: "a/b", topics: ["orm"], template: false, action: true }), "other");
+  assert.equal(kindFromTopics({ name: "a/b", topics: ["docker"], template: false }), "app");
+  assert.equal(kindFromTopics({ name: "a/b", topics: ["pdf"], template: false }), null);
+});
+
+test("rootFolders: the first segment of each path in a folder, once, sorted, not hidden", () => {
+  assert.deepEqual(rootFolders(["README.md", "skills/a/SKILL.md", "skills/b/SKILL.md", ".claude/x", "docs/a.md", "src/index.ts"]), ["docs", "skills", "src"]);
+  assert.deepEqual(rootFolders(["README.md"]), []);
+});
+
+test("fetchRepository reads the root folders from the file list; none when the list fails", async () => {
+  const noTree = fakeFetch(recorded("microsoft--playwright-cli"), [], (path) => (path.includes("/git/trees/") ? Promise.resolve(new Response("{}", { status: 500 })) : undefined));
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: noTree });
+  assert.ok(r.ok);
+  assert.equal(r.metadata.rootFolders, null);
 });
 
 test("manifestKeywords: package.json keywords, pyproject [project] keywords, Cargo keywords and categories, spelled as topics", () => {

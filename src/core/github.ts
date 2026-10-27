@@ -24,6 +24,7 @@ export interface RepoMetadata {
   keywords?: string[]; // the root manifests' keywords (and Cargo's categories), as topics are spelled
   readme?: string | null; // the README's start, cleaned (readmeStart); null when there is none or it couldn't be read
   action?: boolean; // the root has action.yml or action.yaml: a GitHub Action
+  rootFolders?: string[] | null; // the top-level folders, not hidden ones, for the kind's rule 10 (decision 0047); null likewise
 }
 
 export interface FetchProblem {
@@ -87,6 +88,7 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     keywords: [],
     readme: null,
     action: false,
+    rootFolders: null,
   };
   const warnings: string[] = [];
   const ref = encodeURIComponent(info.default_branch);
@@ -104,6 +106,7 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     metadata.skillFolders = countSkillFolders(files);
     metadata.plugin = files.includes(".claude-plugin/plugin.json") || files.includes(".claude-plugin/marketplace.json");
     metadata.action = files.includes("action.yml") || files.includes("action.yaml");
+    metadata.rootFolders = rootFolders(files);
 
     const packages: string[] = [];
     const keywords: string[] = [];
@@ -224,32 +227,71 @@ export const PLATFORM = ["paas", "baas", "backend-as-a-service", "low-code", "lo
 const APP = ["self-hosted", "webapp", "web-app", "desktop-app", "docker", "nextjs-app"];
 export const SKILL_TOPICS = ["agent-skills", "claude-skills", "skills"];
 
-// Decision 0030's rules 1 to 7, which read only the topics (and the manifests' keywords, decision
-// 0046), the name and the template flag: the first that matches, or null when only the rules on
-// files (8 to 12) could decide. Discover's estimated kind is this (decision 0045).
-export function kindFromTopics(metadata: Pick<RepoMetadata, "name" | "topics" | "template" | "keywords">): string | null {
+// Rule 7a (decision 0047): topics that name a kind, each kept only when it fixed a kind on the eval.
+const TOPIC_KINDS: [string, string][] =[["testing-framework", "framework"], ["ui-library", "library"], ["orm", "library"]];
+
+// Rules 1 to 7a, which read only the topics (and the manifests' keywords, decision 0046), the name and
+// the template flag, plus a GitHub Action's file when it is known (rule 3a, decision 0047): the first
+// that matches, or null when only the rules on files could decide. Discover's estimated kind is this,
+// with no Action file (decision 0045).
+export function kindFromTopics(metadata: Pick<RepoMetadata, "name" | "topics" | "template" | "keywords" | "action">): string | null {
   const words = [...metadata.topics, ...(metadata.keywords ?? [])];
   const has = (topics: string[]) => words.some((topic) => topics.includes(topic));
   if (has(["awesome-list"])) return "awesome-list";
   if (metadata.template || has(TEMPLATE)) return "template";
   if (metadata.name.split("/").at(-1)?.toLowerCase().includes("skill")) return "skill-pack";
+  if (metadata.action) return "other";
   if (has(PLATFORM)) return "platform";
   if (has(APP)) return "app";
   if (has(SKILL_TOPICS)) return "skill-pack";
   if (has(["framework"])) return "framework";
-  return null;
+  return TOPIC_KINDS.find(([topic]) => has([topic]))?.[1] ?? null;
 }
 
-// The drafted kind (spec §2, decision 0030): the first rule that matches. The order and the reason
-// for each place are in the decision. The README decides only what would be `other` (decision 0046).
-export function draftKind(metadata: Pick<RepoMetadata, "name" | "topics" | "template" | "skillFolders" | "packages" | "plugin" | "bin" | "keywords" | "readme">): string {
+// The drafted kind (spec §2, decisions 0030 and 0047): the first rule that matches. The order and the
+// reason for each place are in the decisions. The README's phrases (rule 8a) come before a package;
+// its weakest rule (12) decides only what would be `other` (decision 0046).
+export function draftKind(metadata: Pick<RepoMetadata, "name" | "topics" | "template" | "skillFolders" | "packages" | "plugin" | "bin" | "keywords" | "readme" | "action" | "rootFolders">): string {
   const fromTopics = kindFromTopics(metadata);
   if (fromTopics) return fromTopics;
   if (metadata.bin) return "cli";
+  const phrase = metadata.readme ? readmePhraseKind(metadata.readme) : null;
+  if (phrase) return phrase;
   if (metadata.packages?.length) return "library";
-  if ((metadata.skillFolders ?? 0) >= 3) return "skill-pack";
+  if ((metadata.skillFolders ?? 0) >= 3 && skillsLayout(metadata.rootFolders)) return "skill-pack";
   if (metadata.plugin) return "plugin";
   return (metadata.readme && readmeKind(metadata.readme)) || "other";
+}
+
+// Rule 10's layout (decision 0047): the skills sit in a root skills/ folder, and no root folder holds
+// code (src, packages, lib, apps). A library or framework that ships skills for its users has both.
+const CODE_FOLDERS = ["src", "packages", "lib", "apps"];
+function skillsLayout(rootFolders: string[] | null | undefined): boolean {
+  return Boolean(rootFolders?.includes("skills") && !rootFolders.some((folder) => CODE_FOLDERS.includes(folder)));
+}
+
+// The top-level folders a file list shows, not hidden ones.
+export function rootFolders(files: string[]): string[] {
+  return [...new Set(files.filter((path) => path.includes("/")).map((path) => path.split("/")[0]))].filter((folder) => !folder.startsWith(".")).sort();
+}
+
+// Rule 8a (decision 0047): what the README's first heading or first sentence calls the repository,
+// before a package decides. Each phrase was kept only when it fixed a kind on the eval and added no
+// wrong one.
+const README_PHRASES: [RegExp, string][] = [
+  [/\bplatform for building\b/i, "platform"],
+  [/\bdevelopment platform\b/i, "platform"],
+  [/\ba framework for\b/i, "framework"],
+  [/\btesting framework\b/i, "framework"],
+  [/\bCSS framework\b/i, "framework"],
+  [/\bJavaScript library\b/i, "library"],
+  [/\bcomponent library\b/i, "library"],
+];
+
+export function readmePhraseKind(readme: string): string | null {
+  const { heading, sentence } = readmeOpening(readme);
+  const opening = `${heading ?? ""}\n${sentence ?? ""}`;
+  return README_PHRASES.find(([pattern]) => pattern.test(opening))?.[1] ?? null;
 }
 
 // The weakest rule: what a README's first heading or first sentence calls the repository. An awesome
