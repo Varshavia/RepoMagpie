@@ -23,12 +23,12 @@ How RepoMagpie versions, records and ships releases. What each release contains 
 |---|---|
 | Draft changelog entries under Unreleased during normal work | agent |
 | Draft release notes, on request | agent |
-| Create tags, on `main` only | maintainer, by hand |
+| Create tags, on `main` only | maintainer, with `npm run release:tag` |
 | Stage the version on npm (package `repomagpie`) | the release workflow, on the tag ([decision 0033](decisions/0033-releases-staged-from-ci.md)) |
 | Approve the staged version on npmjs.com, with 2FA | maintainer, by hand |
 | Create GitHub releases | maintainer, by hand |
 
-Agents can't tag, release or publish: git-guard and the deny list block those commands ([CLAUDE.md](../CLAUDE.md), section 1).
+Agents can't tag, release or publish: git-guard and the deny list block those commands, and `npm run release:tag` without `--dry-run` ([CLAUDE.md](../CLAUDE.md), section 1).
 
 ## Releasing a version
 
@@ -57,7 +57,7 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `npm run test:hooks` | no test fails |
 | `npm run build` | exit 0 |
 | `npm run check:build` | the built CLI gives the same output as the source, and the packed package runs as `repomagpie`, as its alias and through `npx` (exit 0) |
-| `npm run check:bundle` | the app is under 200 kB gzipped |
+| `npm run check:bundle` | the app is under 200 kB gzipped, and its first files within decision 0028's line or the allowance ([UI](ui.md) §10) |
 | `npm run check:links` | 0 broken links |
 | `npm run check:commands` | no doc tells someone to run the alias |
 | `npm run check:characters` | no file holds a bidi control or a zero-width character |
@@ -73,7 +73,9 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
 
 1. Commit the release branch, push it, and open a pull request to `main`.
 2. Merge it once CI is green ("Rebase and merge" or a merge commit, not squash).
-3. Tag the merge on `main`, only after it, in this order (two releases were tagged before their merge):
+3. Tag the merge: `git switch main`, `git pull`, then `npm run release:tag`. It checks, in order: on `main` with a clean tree; after `git fetch origin main --tags`, `main` is `origin/main` (not behind, not ahead); `package.json`'s version isn't tagged yet, here or on GitHub; `HEAD` is the merge of `release/v<version>` (or, after "Rebase and merge", that branch's last commit, patch for patch); and the release workflow's own check (`scripts/release-check.ts`). It stops at the first that fails and says what to do. Then it asks you to type the tag (`v0.2.0-beta.2`), creates it with `git tag -a`, pushes it, and prints steps 4 to 10 filled in with the version. `npm run release:tag -- --dry-run` runs the checks only. It needs a terminal to tag, and agents can run only the dry run ([CLAUDE.md](../CLAUDE.md), section 1).
+
+   By hand, if the script can't run, in this order (three releases were tagged before their merge):
    1. Merge the release pull request (step 2).
    2. `git switch main`, then `git pull`.
    3. `git log -1` shows that merge, and `package.json`'s `version` is the release's (`0.2.0-beta.2`). If either isn't so, stop: the pull hasn't brought the merge yet.
