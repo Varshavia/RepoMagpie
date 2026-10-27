@@ -47,6 +47,30 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 
 `skill-pack` · `cli` · `library` · `framework` · `plugin` · `app` · `platform` · `awesome-list` · `template` · `other`
 
+The kind says what the subject is, by how you use it. Each has one deciding question:
+
+| Kind | Deciding question | Examples |
+|---|---|---|
+| `library` | You import it from your code. An SDK is a library. | zod, axios, pdf-lib |
+| `framework` | It calls your code: you build inside it, and it sets the structure your code follows. | nest, vitest, scrapy |
+| `app` | You run it and use it, through its own UI or as a server your code calls (a database, a search engine, a web server). | immich, excalidraw, meilisearch |
+| `platform` | You deploy or build other things on it, often self-hosted, with users and projects. | supabase, coolify, dify |
+| `cli` | Its main use is a command you type. | yt-dlp, trivy, docker compose |
+| `skill-pack` | Its main content is agent skills. | mattpocock/skills |
+| `plugin` | It extends one named host: an editor, an agent, a build tool. | a VS Code extension |
+| `template` | You copy it to start a project. | a starter repository |
+| `awesome-list` | It is a curated list of links. | awesome-javascript |
+| `other` | None of these. A GitHub Action is `other`: there is no kind for one. | actions/checkout |
+
+When two fit, the first rule below that applies decides:
+
+1. **What it is beats what it's about.** A list of tools is an `awesome-list`, and a starter for a framework is a `template`, whatever their topics say.
+2. **Its main content wins.** A plugin whose content is skills is a `skill-pack`; a library or framework that also ships skills for its users stays a `library` or `framework`.
+3. **Its main use wins over how it's shipped.** A command published as a package (yt-dlp on PyPI) is a `cli`; a library with a small command next to it stays a `library`.
+4. **`framework` over `library` when it runs the main flow** (the server, the test run, the crawl) and you fill in the parts. One you mount inside something else, or call when you need it, stays a `library` (trpc, better-auth).
+5. **`platform` over `app` when you build or deploy other things on it**; one you use for its own task stays an `app`, even when it calls itself a platform (grafana, umami).
+6. **Its own name decides only when the questions don't.** A CSS framework has no import and calls no code, so its name settles it (tailwindcss is a `framework`). A name the questions contradict loses: a project calling itself a framework that you copy to start is a `template`.
+
 ### `domains` values
 
 `kind` says what a thing is; a domain says what concern it addresses. The list is fixed, the same in every journal, and shown to agents with these definitions ([decision 0040](decisions/0040-domains-a-second-axis.md)):
@@ -125,7 +149,7 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
    - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`, `domains_suggested`. The tool writes `domains_suggested` at creation, and on existing notes only when you run `repomagpie domains --suggest`, which fills it on notes with neither domain field. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
    - **Human-owned:** `kind`, `tags`, `domains`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `repomagpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
    - The tool writes `tags` after creation only when you ask: an edit in the local app, or "Add GitHub topics as tags" (`repomagpie tags --from-topics`), which adds topics until the note has 8 tags and never removes or reorders one ([decision 0030](decisions/0030-github-topics-become-tags.md)). Either is a human edit.
-   - **At creation only**, the tool may write drafts of `kind` (from GitHub data, [decision 0030](decisions/0030-github-topics-become-tags.md); `library` for a registry package name without it, [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)), `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". From GitHub, the kind reads the root manifests' keywords and, only when it would be `other`, the start of the README; `domains_suggested` also reads the keywords, the README's start and a root `action.yml`, and "What it does" takes the README's first sentence when the repository has no description; the README and the keywords themselves are never written to the note ([decision 0046](decisions/0046-classification-signals.md)). It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
+   - **At creation only**, the tool may write drafts of `kind` (from GitHub data, [decision 0030](decisions/0030-github-topics-become-tags.md); `library` for a registry package name without it, [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)), `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". From GitHub, the kind follows the deciding questions above as far as the repository's data can say: it reads the topics, the root manifests' keywords, the root's files and folders and the start of the README ([decision 0047](decisions/0047-kind-rules-measured.md)); `domains_suggested` also reads the keywords, the README's start and a root `action.yml`, and "What it does" takes the README's first sentence when the repository has no description; the README and the keywords themselves are never written to the note ([decision 0046](decisions/0046-classification-signals.md)). It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
    - **After creation**, the tool never modifies human-owned fields or sections on its own, with one exception: it may append a line for a skill not yet listed under "Notable skills" ([decision 0006](decisions/0006-skills-as-searchable-lines.md)). It never edits, reorders or removes existing lines. "Use when" and "Avoid when" items you give later are appended as rule 7 says.
 3. **Drafts.** A drafted section starts with the line `<!-- magpie:draft -->`. AI may draft only "What it does" and "Use when". "Avoid when" may also be a draft when it comes from the user's own `avoid:` text in `repomagpie import` (rule 7). The Verdict is never a draft. Deleting the marker accepts the draft. Search, suggest and recall label draft text as a draft.
 4. **Notable skills.** The tool writes detected skill names only, as `` - `skill-name` — `` with nothing after the dash. The user completes the ones worth remembering. Lines with nothing after the dash are ignored by search.
