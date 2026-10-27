@@ -203,6 +203,29 @@ test("R6: after the first load the token isn't in the address bar; pages send no
   expect(await page.evaluate(() => document.referrer)).toBe("");
 });
 
+// Discover (decision 0045): GitHub's text is the owner's (decision 0032, rule 8). The fake GitHub's
+// "hostile" result has HTML and a bidi control in its description, a topic and its language, and a
+// javascript: html_url.
+test.describe("Discover", () => {
+  test.use({ fakeGithub: true });
+  test("a result's description, topic and language with HTML show as text with markers; the link is GitHub's", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Discover", exact: true }).click();
+    await page.getByRole("searchbox", { name: "Words" }).fill("hostile");
+    await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+    const card = page.getByRole("list", { name: "Results" }).getByRole("listitem", { name: "evil-org/hostile-repo" });
+    await expect(card.getByText("<b>bold</b>", { exact: false })).toBeVisible();
+    await expect(card.getByText("<U+202E>gnp.exe", { exact: false })).toBeVisible();
+    await expect(card.getByText("<script>document.title='pwned'</script>")).toBeVisible();
+    await expect(card.getByText("<b>TypeScript</b>")).toBeVisible();
+    await expect(card.locator("img, script, b")).toHaveCount(0);
+    const hrefs = await card.locator("a[href]").evaluateAll((links) => links.map((a) => a.getAttribute("href") ?? ""));
+    expect(hrefs).toEqual(["https://github.com/evil-org/hostile-repo"]);
+    expect(await card.textContent()).not.toContain(String.fromCharCode(0x202e));
+    await expect(page).not.toHaveTitle("pwned");
+  });
+});
+
 test("a note that is a link to a file outside the journal shows up as skipped, and its text doesn't", async ({ page, magpie }) => {
   const outside = join(magpie.root, "outside");
   mkdirSync(outside, { recursive: true });

@@ -3,6 +3,7 @@
 // Every document type comes from core, so the app reads exactly what the CLI's --json prints.
 import type { AdoptJson } from "../../src/core/adopt.ts";
 import type { DeleteJson, RestoreJson } from "../../src/core/delete.ts";
+import type { DiscoverJson } from "../../src/core/discover.ts";
 import type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
 import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
@@ -11,7 +12,7 @@ import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { TagsFromTopicsJson } from "../../src/core/tags-from-topics.ts";
 import type { Patch } from "./logic/edits.ts";
 
-export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson };
+export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson, DiscoverJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -99,6 +100,9 @@ export const api = {
   recall: (packages: string[], type?: PackageType) => get<RecallJson>("/api/recall", { package: packages, type }),
   suggest: (params: { description?: string; limit: number }) => get<SuggestJson>("/api/suggest", { description: params.description, limit: String(params.limit) }),
   adopt: (target: string) => write<AdoptJson>("POST", "/api/adopt", { target }),
+  // Discover (decision 0045): GitHub's search, made by magpie ui's server; a failure's document keeps
+  // the search's shape with `problem` (rate limit, offline) and `error`.
+  discover: (params: Record<string, string | undefined>) => get<DiscoverJson>("/api/discover", params),
   // Delete note (decision 0037): a dry run for the confirm dialog, then the move to the trash.
   deleteNote: (journal: Scope, address: Address, version: string, dryRun: boolean) =>
     write<DeleteJson>("POST", "/api/note/delete", { journal, ...addressParams(address), version, dry_run: dryRun }),

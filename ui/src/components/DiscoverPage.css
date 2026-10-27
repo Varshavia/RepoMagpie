@@ -1,0 +1,27 @@
+/* The Discover page's styles, loaded with its chunk like the graph's (decision 0045). */
+
+.discover-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: end; gap: var(--sm) var(--md); }
+.discover-filters .check { min-height: 32px; }
+
+.discover-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sm); }
+.discover-summary ul { margin-top: var(--xxs); padding-left: var(--lg); }
+
+.discover-results { display: flex; flex-direction: column; gap: var(--sm); list-style: none; }
+.discover-card { display: flex; flex-direction: column; gap: var(--xs); padding: var(--md) var(--lg); border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface-1); }
+.discover-head { display: flex; align-items: center; gap: var(--sm); min-width: 0; }
+.discover-select { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--accent); }
+.discover-name { display: inline-flex; align-items: center; gap: var(--xxs); min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-weight: 600; }
+.discover-meta { display: flex; flex-wrap: wrap; gap: var(--xxs) var(--md); color: var(--ink-muted); font-size: 13px; }
+.discover-no-licence { color: var(--warning); }
+/* The description, cleaned by core, cut to two lines. */
+.discover-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.discover-estimated, .discover-in-journal, .discover-added { display: flex; flex-wrap: wrap; align-items: center; gap: var(--xs); color: var(--ink-muted); font-size: 13px; }
+.discover-added { color: var(--ink); }
+.discover-verdict { display: flex; flex-direction: column; gap: var(--md); padding-top: var(--sm); border-top: 1px solid var(--hairline); }

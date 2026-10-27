@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
+import type { DiscoverMemory } from "./components/DiscoverPage.tsx";
 import type { ProjectState } from "./components/fields.tsx";
 import { FromTopicsBanner, FromTopicsButton, useFromTopics } from "./components/FromTopics.tsx";
 import { ImportPage } from "./components/ImportPage.tsx";
@@ -35,6 +36,8 @@ const SCOPES: Scope[] = ["personal", "project"];
 
 // The graph page is its own chunk, with sigma and graphology; the other screens never load it.
 const GraphPage = lazy(() => import("./components/GraphPage.tsx"));
+// Discover too: the first load doesn't grow with it (docs/ui.md §10).
+const DiscoverPage = lazy(() => import("./components/DiscoverPage.tsx"));
 
 export function App() {
   const [settings, setSettings] = useState<SettingsJson | null>(null);
@@ -65,6 +68,7 @@ export function App() {
   const [hit, setHit] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestItem[]>([]);
   const drafts = useRef(new Map<string, Form>()).current;
+  const discovered = useRef<DiscoverMemory | null>(null); // Discover's last search, kept while you open a note
   const listRef = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
 
@@ -338,6 +342,7 @@ export function App() {
     { id: "search", label: "Search", keywords: "find", icon: "search", hint: "/", run: () => go({ page: "search" }) },
     { id: "add", label: "Add a note", keywords: "new url repository package", icon: "plus", run: () => go({ page: "add" }) },
     { id: "import", label: "Import lines", keywords: "bulk", icon: "import", run: () => go({ page: "import" }) },
+    { id: "discover", label: "Discover on GitHub", keywords: "find new repositories stars licence", icon: "external", run: () => go({ page: "discover" }) },
     { id: "recall", label: "Check a package", keywords: "recall hook install", icon: "package", run: () => go({ page: "recall" }) },
     { id: "suggest", label: "Suggest for this project", keywords: "fit candidates dependencies manifest", icon: "folder", run: () => go({ page: "suggest" }) },
     { id: "graph", label: "Open graph", keywords: "map connections links tags network", icon: "graph", hint: "g g", run: () => go({ page: "graph" }) },
@@ -658,6 +663,20 @@ export function App() {
           }
         />
       </Suspense>
+    );
+  } else if (view.page === "discover") {
+    workspace = (
+      <section className="pane page-pane">
+        <Suspense
+          fallback={
+            <p className="page field-help" role="status">
+              Loading Discover…
+            </p>
+          }
+        >
+          <DiscoverPage journal={journal} tokenSet={settings?.github_token_set ?? false} memory={discovered} onOpenNote={openNote} onSaved={afterWrite} />
+        </Suspense>
+      </section>
     );
   } else {
     workspace = (
