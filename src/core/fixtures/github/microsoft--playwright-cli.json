@@ -1,6 +1,6 @@
 {
   "recorded": "2026-10-04",
-  "note": "GET responses from api.github.com, trimmed to the fields magpie reads.",
+  "note": "GET responses from api.github.com, trimmed to the fields magpie reads. The README, recorded on 2026-10-26, is cut to its first sections.",
   "responses": {
     "/repos/microsoft/playwright-cli": {
       "full_name": "microsoft/playwright-cli",
@@ -59,6 +59,7 @@
         { "path": "tests/integration.spec.ts", "type": "blob" }
       ]
     },
-    "/repos/microsoft/playwright-cli/contents/package.json?ref=main": "{\n  \"name\": \"@playwright/cli\",\n  \"version\": \"0.1.22\",\n  \"description\": \"Playwright CLI\",\n  \"repository\": {\n    \"type\": \"git\",\n    \"url\": \"git+https://github.com/microsoft/playwright-cli.git\"\n  },\n  \"homepage\": \"https://playwright.dev\",\n  \"engines\": {\n    \"node\": \">=18\"\n  },\n  \"author\": {\n    \"name\": \"Microsoft Corporation\"\n  },\n  \"license\": \"Apache-2.0\",\n  \"scripts\": {\n    \"test\": \"playwright test\"\n  },\n  \"devDependencies\": {\n    \"@playwright/test\": \"1.64.0-alpha-1790635538000\",\n    \"@types/node\": \"^25.2.1\"\n  },\n  \"dependencies\": {\n    \"playwright\": \"1.64.0-alpha-1790635538000\",\n    \"playwright-core\": \"1.64.0-alpha-1790635538000\"\n  },\n  \"bin\": {\n    \"playwright-cli\": \"playwright-cli.js\"\n  }\n}\n"
+    "/repos/microsoft/playwright-cli/contents/package.json?ref=main": "{\n  \"name\": \"@playwright/cli\",\n  \"version\": \"0.1.22\",\n  \"description\": \"Playwright CLI\",\n  \"repository\": {\n    \"type\": \"git\",\n    \"url\": \"git+https://github.com/microsoft/playwright-cli.git\"\n  },\n  \"homepage\": \"https://playwright.dev\",\n  \"engines\": {\n    \"node\": \">=18\"\n  },\n  \"author\": {\n    \"name\": \"Microsoft Corporation\"\n  },\n  \"license\": \"Apache-2.0\",\n  \"scripts\": {\n    \"test\": \"playwright test\"\n  },\n  \"devDependencies\": {\n    \"@playwright/test\": \"1.64.0-alpha-1790635538000\",\n    \"@types/node\": \"^25.2.1\"\n  },\n  \"dependencies\": {\n    \"playwright\": \"1.64.0-alpha-1790635538000\",\n    \"playwright-core\": \"1.64.0-alpha-1790635538000\"\n  },\n  \"bin\": {\n    \"playwright-cli\": \"playwright-cli.js\"\n  }\n}\n",
+    "/repos/microsoft/playwright-cli/readme": "# playwright-cli\n\nPlaywright CLI with SKILLS\n\n### Playwright CLI vs Playwright MCP\n\nThis package provides CLI interface into Playwright. If you are using **coding agents**, that is the best fit.\n\n### Key Features\n\n- **Token-efficient**. Does not force page data into LLM.\n\n## Installation\n\n```bash\nnpm install -g @playwright/cli@latest\nplaywright-cli --help\n```\n"
   }
 }

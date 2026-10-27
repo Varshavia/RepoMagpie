@@ -30,7 +30,7 @@ export function isDomain(value: unknown): value is Domain {
 
 // Topics and tags that clearly name a concern, and the domain each names. Conservative: a word that
 // names a technology without naming what it is for (react, supabase, rust) maps to nothing; one that
-// could mean two concerns (validation, session, node) maps to nothing. Each row has a test.
+// could mean two concerns (validation, session, node, profiling) maps to nothing. Each row has a test.
 export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   // architecture
   "architecture": "architecture", "software-architecture": "architecture", "clean-architecture": "architecture",
@@ -43,7 +43,7 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "supply-chain-security": "security", "input-validation": "security", "sanitization": "security",
   // performance
   "performance": "performance", "web-performance": "performance", "caching": "performance", "cache": "performance",
-  "profiling": "performance", "profiler": "performance", "optimization": "performance", "benchmark": "performance",
+  "profiler": "performance", "optimization": "performance", "benchmark": "performance",
   "benchmarks": "performance", "bundle-size": "performance", "image-optimization": "performance", "lighthouse": "performance",
   // styling
   "css": "styling", "css-framework": "styling", "tailwind": "styling", "tailwindcss": "styling", "sass": "styling",
@@ -101,17 +101,60 @@ const AUTOMATION = new Set([
   "web-crawling", "scraper", "scraping", "web-scraper", "web-scraping", "webscraping", "data-extraction",
 ]);
 
+// Phrases in a README that name a concern without doubt (decision 0046), matched as whole words,
+// ignoring case, a space or a hyphen alike. Each is half a vote, counted once per README. Narrow on
+// purpose: a README names many things a project isn't for ("run the unit tests", "deploy with
+// Docker"). Measured with npm run eval:classification, phrases that READMEs use for what a project
+// works with or offers on the side were taken out: "AI agents", "MCP server", "model context
+// protocol", "REST API", "GraphQL API", "OpenAPI", "observability", "developer tools", "VS Code
+// extension", "two-factor authentication", "bundle size".
+export const README_TERMS: Readonly<Record<Domain, readonly string[]>> = {
+  architecture: ["clean architecture", "hexagonal architecture", "domain-driven design", "event sourcing", "state management"],
+  security: ["vulnerability scanner", "security scanner", "penetration testing", "secret scanning", "leaked credentials", "supply chain security"],
+  performance: ["web performance", "core web vitals", "performance profiler"],
+  styling: ["design system", "design systems", "design tokens", "component library", "ui components", "css framework", "utility-first css"],
+  database: ["row level security", "relational database", "vector database", "query builder", "database migrations", "sql database", "ORM"],
+  testing: ["end-to-end tests", "end-to-end testing", "e2e tests", "e2e testing", "test runner", "testing framework", "unit testing", "api mocking"],
+  auth: ["single sign-on", "openid connect", "multi-factor authentication", "passkeys", "identity and access management", "role-based access control"],
+  api: ["http client", "api client", "rpc framework"],
+  devops: ["continuous integration", "continuous deployment", "continuous delivery", "ci/cd", "infrastructure as code", "github action", "helm chart"],
+  observability: ["distributed tracing", "error tracking", "log management", "opentelemetry", "uptime monitoring", "performance monitoring"],
+  ai: ["large language model", "large language models", "llm", "llms", "retrieval-augmented generation"],
+  tooling: ["command-line tool", "linter", "code formatter"],
+};
+
+const TERM_PATTERNS: [Domain, RegExp][] = Object.entries(README_TERMS).flatMap(([domain, terms]) =>
+  terms.map((term): [Domain, RegExp] => {
+    const body = term.split(/[\s-]+/).map((part) => part.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).join("[\\s-]+");
+    return [domain as Domain, new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, "iu")];
+  }),
+);
+
+// The README terms each domain has in a text: how many of its terms appear, each once.
+export function readmeTerms(readme: string): Map<Domain, number> {
+  const counts = new Map<Domain, number>();
+  for (const [domain, pattern] of TERM_PATTERNS) if (pattern.test(readme)) counts.set(domain, (counts.get(domain) ?? 0) + 1);
+  return counts;
+}
+
 // The domains a note's topics and tags suggest, at most DOMAIN_LIMIT, the best supported first: a
 // domain named by more of the note's words comes before one named by fewer; on a tie, the one named
 // first, tags before topics. A generic word ("ai") makes a domain a candidate but doesn't support it,
 // and a domain named only by generic words is dropped when the note has another. Never includes a
 // domain the note already has confirmed. `aliases` maps a spelling to its canonical tag, so
 // "postgres" maps as "postgresql".
-export function suggestDomains(note: { tags?: unknown; topics?: unknown; domains?: unknown }, aliases?: ReadonlyMap<string, string>): Domain[] {
+//
+// When a note is created from GitHub (decision 0046), a manifest keyword counts as a topic. A README
+// term and a hint (a GitHub Action's `devops`) are half a vote each; a domain with no full vote
+// needs two halves.
+export function suggestDomains(
+  note: { tags?: unknown; topics?: unknown; domains?: unknown; keywords?: unknown; readme?: unknown; hints?: readonly Domain[] },
+  aliases?: ReadonlyMap<string, string>,
+): Domain[] {
   const texts = (value: unknown) => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
   const confirmed = texts(note.domains);
   const words = new Set<string>();
-  for (const raw of [...texts(note.tags), ...texts(note.topics)]) {
+  for (const raw of [...texts(note.tags), ...texts(note.topics), ...texts(note.keywords)]) {
     const value = raw.toLowerCase();
     words.add(DOMAIN_MAP[value] ? value : (aliases?.get(value) ?? value));
   }
@@ -121,6 +164,12 @@ export function suggestDomains(note: { tags?: unknown; topics?: unknown; domains
     const domain = DOMAIN_MAP[word];
     if (!domain || confirmed.includes(domain) || (word === "playwright" && automation)) continue;
     support.set(domain, (support.get(domain) ?? 0) + (GENERIC.has(word) ? 0 : 1));
+  }
+  const halves = typeof note.readme === "string" ? readmeTerms(note.readme) : new Map<Domain, number>();
+  for (const domain of note.hints ?? []) halves.set(domain, (halves.get(domain) ?? 0) + 1);
+  for (const [domain, count] of halves) {
+    if (confirmed.includes(domain) || (!support.has(domain) && count < 2)) continue;
+    support.set(domain, (support.get(domain) ?? 0) + count / 2);
   }
   for (const [domain, count] of support) if (count === 0 && support.size > 1) support.delete(domain);
   return [...support].sort((a, b) => b[1] - a[1]).slice(0, DOMAIN_LIMIT).map(([domain]) => domain);

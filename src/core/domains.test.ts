@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DOMAIN_IDS, DOMAIN_LIMIT, DOMAIN_MAP, DOMAINS, domainsProblem, isDomain, noteDomains, suggestDomains } from "./domains.ts";
+import { DOMAIN_IDS, DOMAIN_LIMIT, DOMAIN_MAP, DOMAINS, domainsProblem, isDomain, noteDomains, README_TERMS, suggestDomains } from "./domains.ts";
 
 // Decision 0040: the vocabulary, the topic and tag mapping, and suggestion.
 
@@ -19,7 +19,7 @@ test("the vocabulary: the 12 domains of RFC 0001 §4.1, in its order, each with 
 const ROWS: [string, string[]][] = [
   ["architecture", ["architecture", "software-architecture", "clean-architecture", "design-patterns", "state-management", "microservices", "domain-driven-design", "ddd", "event-sourcing", "cqrs"]],
   ["security", ["security", "cybersecurity", "appsec", "vulnerability", "vulnerabilities", "vulnerability-scanner", "secrets", "secret-management", "encryption", "cryptography", "owasp", "sast", "supply-chain-security", "input-validation", "sanitization"]],
-  ["performance", ["performance", "web-performance", "caching", "cache", "profiling", "profiler", "optimization", "benchmark", "benchmarks", "bundle-size", "image-optimization", "lighthouse"]],
+  ["performance", ["performance", "web-performance", "caching", "cache", "profiler", "optimization", "benchmark", "benchmarks", "bundle-size", "image-optimization", "lighthouse"]],
   ["styling", ["css", "css-framework", "tailwind", "tailwindcss", "sass", "scss", "css-in-js", "styled-components", "design-system", "design-systems", "ui-components", "component-library", "ui-library", "shadcn", "shadcn-ui", "design", "ui-design", "web-design", "frontend-design", "ui-ux"]],
   ["database", ["database", "databases", "db", "orm", "sql", "nosql", "postgres", "postgresql", "mysql", "sqlite", "mongodb", "migrations", "database-migrations", "query-builder", "vector-database"]],
   ["testing", ["testing", "test", "tests", "unit-testing", "test-automation", "testing-tools", "e2e", "e2e-testing", "end-to-end-testing", "integration-testing", "mocking", "mock", "test-runner", "jest", "vitest", "playwright", "cypress", "mocha"]],
@@ -46,7 +46,7 @@ test("the mapping has exactly the rows above, and every value is a domain", () =
 });
 
 test("words that name a technology but not its concern, or two concerns, map to nothing", () => {
-  for (const word of ["react", "supabase", "rust", "python", "typescript", "validation", "session", "node", "redis", "editor", "framework", "self-hosted", "pdf", "frontend"]) {
+  for (const word of ["react", "supabase", "rust", "python", "typescript", "validation", "session", "node", "profiling", "redis", "editor", "framework", "self-hosted", "pdf", "frontend"]) {
     assert.deepEqual(suggestDomains({ topics: [word] }), [], word);
   }
 });
@@ -108,6 +108,34 @@ test("suggestDomains: on a tie, tags first, then topics; each domain once; at mo
 test("suggestDomains reads a spelling through the journal's aliases", () => {
   assert.deepEqual(suggestDomains({ tags: ["pgsql"] }), []);
   assert.deepEqual(suggestDomains({ tags: ["pgsql"] }, new Map([["pgsql", "postgresql"]])), ["database"]);
+});
+
+test("decision 0046: a manifest keyword is a topic; a hint and a README term are half a vote each", () => {
+  assert.deepEqual(suggestDomains({ keywords: ["orm"] }), ["database"]);
+  assert.deepEqual(suggestDomains({ hints: ["devops"] }), []); // a GitHub Action alone isn't enough
+  assert.deepEqual(suggestDomains({ hints: ["devops"], readme: "A GitHub Action that checks out your repository." }), ["devops"]);
+  assert.deepEqual(suggestDomains({ topics: ["security"], hints: ["devops"] }), ["security"]); // trufflehog ships an Action too
+  assert.deepEqual(suggestDomains({ readme: "Runs end-to-end tests." }), []); // one term isn't enough
+  assert.deepEqual(suggestDomains({ readme: "Runs end-to-end tests with its own test runner. End-to-end tests again." }), ["testing"]); // two terms, each once
+  assert.deepEqual(suggestDomains({ topics: ["api"], readme: "A design system, with design tokens and a component library." }), ["styling", "api"]); // 1.5 over 1
+  assert.deepEqual(suggestDomains({ topics: ["database"], readme: "Has row level security." }), ["database"]); // the term adds to a voted domain
+  assert.deepEqual(suggestDomains({ topics: ["ai", "css"], readme: "For a large language model." }), ["styling", "ai"]); // a term supports a generic-only domain
+  assert.deepEqual(suggestDomains({ topics: ["ai", "css"] }), ["styling"]);
+  assert.deepEqual(suggestDomains({ readme: "A ui-components kit: a design-system with design tokens" }), ["styling"]); // a hyphen is a space
+  assert.deepEqual(suggestDomains({ readme: "unit testing! testing framework." }), ["testing"]);
+  assert.deepEqual(suggestDomains({ readme: "superlinter and preformatter, LLMsmith" }), []); // whole words only
+  assert.deepEqual(suggestDomains({ domains: ["testing"], readme: "end-to-end tests and a test runner" }), []); // never a confirmed one
+  assert.deepEqual(suggestDomains({ keywords: ["web-scraping", "playwright"] }), []); // the automation rule reads keywords too
+});
+
+test("README terms: each domain has a few, none that DOMAIN_MAP maps elsewhere", () => {
+  for (const domain of DOMAIN_IDS) {
+    assert.ok(README_TERMS[domain].length >= 3, domain);
+    for (const term of README_TERMS[domain]) {
+      const asTopic = term.toLowerCase().replace(/[\s/]+/g, "-");
+      if (DOMAIN_MAP[asTopic]) assert.equal(DOMAIN_MAP[asTopic], domain, term);
+    }
+  }
 });
 
 test("domainsProblem: in the vocabulary, at most 3; the error lists the domains", () => {

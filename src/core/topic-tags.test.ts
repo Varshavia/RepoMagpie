@@ -45,6 +45,13 @@ test("only topics that are valid tags, each once", () => {
   assert.deepEqual(rankTopics(["Pdf", "pdf", "pdf--tools", "-x", "llm", "llm", 7 as unknown as string], DIFY, none), ["pdf", "llm"]);
 });
 
+test("manifest keywords fill the slots topics leave, only with tags the journal knows (decision 0046)", () => {
+  const known = { tagList: ["pdf", "charts"], shared: new Set(["svg"]) };
+  assert.deepEqual(topicTags(["llm"], DIFY, known, ["charts", "svg", "unknown", "llm"]), ["llm", "charts", "svg"]);
+  const eight = ["a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"];
+  assert.deepEqual(topicTags(eight, DIFY, known, ["pdf"]), eight);
+});
+
 test("a registry package has no topics, so no tags", () => {
   assert.deepEqual(topicTags([], "pkg:npm/pdfkit", { tagList: ["pdf"], shared: new Set(["pdf"]) }), []);
 });

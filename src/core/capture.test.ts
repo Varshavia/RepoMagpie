@@ -102,6 +102,23 @@ test("a GitHub repository with metadata: tool-owned fields, drafts and skill lin
   valid(c.text ?? "", "pkg:github/microsoft/playwright-cli");
 });
 
+test("decision 0046: keywords, the README and a GitHub Action shape the drafts; none is written to the note", () => {
+  const metadata: RepoMetadata = {
+    ...PLAYWRIGHT, description: null, topics: [], packages: [], bin: false, skillFolders: 0,
+    keywords: ["testing", "jest"], action: true,
+    readme: "# Widget\n\nWidget runs end-to-end tests in continuous integration. It has a test runner.\n\nUses a large language model.",
+  };
+  const c = captureNote(null, input({ purl: "pkg:github/acme/widget", source: "https://github.com/acme/widget", metadata, known: { tagList: ["jest"], shared: new Set() } }));
+  const note = readNote(c.text ?? "");
+  assert.deepEqual(note.frontmatter.tags, ["jest"]); // a keyword the tag list knows; "testing" isn't in it
+  assert.deepEqual(note.frontmatter.domains_suggested, ["testing", "devops"]); // devops: the Action and a term; ai has one term, not enough
+  assert.equal(note.frontmatter.kind, "other");
+  const whatItDoes = note.sections.find((s) => s.name === "What it does");
+  assert.equal(whatItDoes?.draft, true);
+  assert.equal(whatItDoes?.body.trim(), "<!-- magpie:draft -->\nWidget runs end-to-end tests in continuous integration.");
+  assert.doesNotMatch(c.text ?? "", /test runner|keywords|large language/);
+});
+
 test("tags given for a new note (Add's preview, after removing one) replace the draft; Capture reports the tags written", () => {
   const base = { purl: "pkg:github/microsoft/playwright-cli", source: "https://github.com/microsoft/playwright-cli", metadata: PLAYWRIGHT };
   const drafted = captureNote(null, input(base));
