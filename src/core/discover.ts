@@ -376,8 +376,10 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
 
 // A kind chosen from the results: a kind topics name must be the estimated one; app likewise (its
 // rule reads topics); library, cli, plugin and other are decided by files, so a result whose topics
-// say nothing (estimated null) may be one.
+// say nothing (estimated null) may be one. A few topics name a library too (decision 0047): a
+// library's estimate is `library` or nothing.
 function kindMatches(kind: string, estimated: string | null): boolean {
+  if (kind === "library") return estimated === null || estimated === "library";
   return KIND_TOPICS[kind] || kind === "app" ? estimated === kind : estimated === null;
 }
 
