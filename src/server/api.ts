@@ -20,6 +20,7 @@ import {
   tagListPath,
   type NoteAddress,
 } from "../core/documents.ts";
+import { emptyDiscover, runDiscover, SORTS, type DiscoverInput, type Sort } from "../core/discover.ts";
 import { DOMAIN_IDS, domainsProblem, isDomain } from "../core/domains.ts";
 import type { PackageType } from "../core/identity.ts";
 import { KINDS } from "../core/note.ts";
@@ -61,6 +62,7 @@ const optionalTags = (value: unknown): string[] | undefined | null =>
 
 // The endpoints by path, then method. `open` opens a file in the default app (POST /api/open).
 export function endpoints(context: Context, open: (path: string) => Promise<void>): Record<string, Record<string, Handler>> {
+  let searching: Promise<unknown> = Promise.resolve();
   return {
     "/api/settings": {
       GET: () => ({ status: 200, document: settingsDocument(context) }),
@@ -254,6 +256,41 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const packageType = type(body.type);
         if (packageType === null) return bad(empty, "type must be npm, pypi or cargo.");
         return reply(await runAdopt({ target: body.target, type: packageType }, context));
+      },
+    },
+
+    // Discover (decision 0045): GitHub's search, made by this server, never by the browser. One search
+    // at a time: a second waits for the first, then usually finds its answer in the cache.
+    "/api/discover": {
+      GET: ({ query }) => {
+        const flag = (name: string) => (query.has(name) ? query.get(name) : null);
+        const whole = (name: string) => {
+          const value = flag(name);
+          return value === null ? undefined : /^\d{1,9}$/.test(value) ? Number(value) : NaN;
+        };
+        const sort = flag("sort") ?? undefined;
+        const archived = flag("include_archived");
+        const input: DiscoverInput = {
+          text: query.get("q") ?? "",
+          domain: flag("domain") ?? undefined,
+          kind: flag("kind") ?? undefined,
+          topics: query.getAll("topic"),
+          language: flag("language") ?? undefined,
+          minStars: whole("min_stars"),
+          updatedWithin: whole("updated_within"),
+          includeArchived: archived === "true",
+          sort: sort as Sort | undefined,
+          limit: whole("limit"),
+          page: whole("page"),
+        };
+        for (const name of ["min_stars", "updated_within", "limit", "page"] as const) {
+          if (Number.isNaN(whole(name))) return bad(emptyDiscover(), `${name} must be a whole number.`);
+        }
+        if (archived !== null && archived !== "true" && archived !== "false") return bad(emptyDiscover(), "include_archived must be true or false.");
+        if (sort !== undefined && !SORTS.includes(sort as Sort)) return bad(emptyDiscover(), `sort must be one of: ${SORTS.join(", ")}.`);
+        const run = searching.then(() => runDiscover(input, context));
+        searching = run.catch(() => undefined);
+        return run.then(reply);
       },
     },
 
