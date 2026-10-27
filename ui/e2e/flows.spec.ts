@@ -13,6 +13,7 @@ import { whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
 import { PDFKIT } from "./journal.ts";
+import { recordTimings } from "./measure.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 // Today in local time, as magpie writes it (adopted:).
@@ -1253,6 +1254,7 @@ test.describe("2,000 notes", () => {
     const warm = Date.now() - started;
     info.annotations.push({ type: "first render, 2,000 notes", description: `warm cache ${warm} ms; cold ${cold} ms` });
     console.log(`first render with 2,000 notes: warm cache ${warm} ms; cold (building the cache) ${cold} ms`);
+    recordTimings({ "first render, cold": { ms: cold, budget: null }, "first render, warm": { ms: warm, budget: 1000 } });
 
     await page.getByRole("button", { name: /All notes/ }).click();
     expect(await page.getByRole("option").count()).toBeLessThan(40);

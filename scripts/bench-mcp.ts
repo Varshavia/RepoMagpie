@@ -4,7 +4,7 @@
 // called 20 times in one server; per-call medians against the CLI's budgets (spec §7), which hold
 // with room to spare, since a call pays no process start. Exits 1 over a budget, unless --report-only.
 import { spawn } from "node:child_process";
-import { cli, NOTES, reportOnly, RUNS, withJournal } from "./bench-journal.ts";
+import { cli, log, NOTES, record, reportOnly, RUNS, withJournal } from "./bench-journal.ts";
 
 type Answer = { id: number; result?: unknown; error?: unknown };
 
@@ -66,8 +66,9 @@ await withJournal("mcp", async (root, journal) => {
     starts.push(performance.now() - started);
     await s.stop();
   }
-  console.log(`repomagpie mcp on ${NOTES} notes (Node ${process.version}, ${process.platform})`);
-  console.log(`  cold start to the first answer: first ${starts[0].toFixed(0)} ms (builds the caches), then median ${median(starts.slice(1)).toFixed(0)} ms of 5`);
+  record({ label: "repomagpie mcp cold start to the first answer", cold: starts[0], median: median(starts.slice(1)), p95: null, budget: null });
+  log(`repomagpie mcp on ${NOTES} notes (Node ${process.version}, ${process.platform})`);
+  log(`  cold start to the first answer: first ${starts[0].toFixed(0)} ms (builds the caches), then median ${median(starts.slice(1)).toFixed(0)} ms of 5`);
 
   const s = server(root, journal);
   await s.open();
@@ -80,9 +81,10 @@ await withJournal("mcp", async (root, journal) => {
       times.push(performance.now() - started);
     }
     const m = median(times);
-    console.log(`  ${name}: median ${m.toFixed(0)} ms per call, ${RUNS} calls   budget: under ${budget} ms (the CLI's)`);
+    record({ label: `repomagpie mcp ${name} ${JSON.stringify(args)}`, cold: null, median: m, p95: null, budget });
+    log(`  ${name}: median ${m.toFixed(0)} ms per call, ${RUNS} calls   budget: under ${budget} ms (the CLI's)`);
     if (m >= budget) {
-      console.log(reportOnly ? "  over budget (report only)" : "  over budget");
+      log(reportOnly ? "  over budget (report only)" : "  over budget");
       if (!reportOnly) process.exitCode = 1;
     }
   }

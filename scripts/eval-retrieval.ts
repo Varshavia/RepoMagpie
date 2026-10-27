@@ -12,6 +12,7 @@
 // and by category. The weights of decision 0041 are chosen on the tuning split only: a small grid is
 // printed, and held-out is reported for the defaults. Then suggest with the need, and the catalog's
 // size. Reports only: no threshold. Not in CI. No network; scratch journals, deleted after.
+// `--json` prints only recall@5, recall@10 and MRR over all needs, per run and for suggest.
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -144,32 +145,45 @@ const recallAt = (ranks: Rank[], k: number) => ranks.filter((r) => r !== null &&
 const pct = (hits: number, of: number) => `${hits}/${of} (${Math.round((100 * hits) / (of || 1))} %)`;
 const metrics = (ranks: Rank[]) => `${pct(recallAt(ranks, 5), ranks.length).padEnd(14)}${pct(recallAt(ranks, 10), ranks.length).padEnd(14)}${mrr(ranks).toFixed(2)}`;
 
+// --json: only the numbers over all needs, for npm run measure, instead of the tables below.
+const json = process.argv.includes("--json");
+const print = (line: string) => { if (!json) console.log(line); };
+const numbers = (ranks: Rank[]) => ({ recall_at_5: recallAt(ranks, 5), recall_at_10: recallAt(ranks, 10), mrr: mrr(ranks) });
+if (json) {
+  console.log(JSON.stringify({
+    needs: rows.length,
+    search: Object.fromEntries(RUNS.map((run) => [run, numbers(rows.map((r) => r.ranks[run]))])),
+    suggest: numbers(rows.map((r) => r.suggest)),
+    suggest_use_when: numbers(rows.map((r) => r.suggestUseWhen)),
+  }));
+}
+
 const cell = (rank: Rank) => (rank === null ? "-" : String(rank)).padStart(6);
 const short = (text: string, width: number) => (text.length > width ? `${text.slice(0, width - 1)}…` : text).padEnd(width);
-console.log(`Retrieval eval: ${fixture.repositories.length} notes from GitHub metadata only (no Verdicts, domains only suggested), ${rows.length} needs.`);
-console.log(`Rank of the first expected note in the top 10 ("-": not there). Weights: domain ${WEIGHTS.domain}, tag ${WEIGHTS.tag}, suggested domain ${WEIGHTS.suggested} of a confirmed one.\n`);
-console.log(`${"need".padEnd(58)} ${"category".padEnd(11)} ${"split".padEnd(9)} ${RUNS.map((r) => r.padStart(10)).join("")}`);
-for (const r of rows) console.log(`${short(r.need.need, 58)} ${r.need.category.padEnd(11)} ${r.need.split.padEnd(9)} ${RUNS.map((run) => cell(r.ranks[run]).padStart(10)).join("")}`);
+print(`Retrieval eval: ${fixture.repositories.length} notes from GitHub metadata only (no Verdicts, domains only suggested), ${rows.length} needs.`);
+print(`Rank of the first expected note in the top 10 ("-": not there). Weights: domain ${WEIGHTS.domain}, tag ${WEIGHTS.tag}, suggested domain ${WEIGHTS.suggested} of a confirmed one.\n`);
+print(`${"need".padEnd(58)} ${"category".padEnd(11)} ${"split".padEnd(9)} ${RUNS.map((r) => r.padStart(10)).join("")}`);
+for (const r of rows) print(`${short(r.need.need, 58)} ${r.need.category.padEnd(11)} ${r.need.split.padEnd(9)} ${RUNS.map((run) => cell(r.ranks[run]).padStart(10)).join("")}`);
 
 const table = (title: string, pick: (r: Row) => boolean) => {
   const chosen = rows.filter(pick);
-  console.log(`\n${title} (${chosen.length} needs)`);
-  console.log(`${"".padEnd(14)}${"recall@5".padEnd(14)}${"recall@10".padEnd(14)}MRR`);
-  for (const run of RUNS) console.log(`${run.padEnd(14)}${metrics(chosen.map((r) => r.ranks[run]))}`);
+  print(`\n${title} (${chosen.length} needs)`);
+  print(`${"".padEnd(14)}${"recall@5".padEnd(14)}${"recall@10".padEnd(14)}MRR`);
+  for (const run of RUNS) print(`${run.padEnd(14)}${metrics(chosen.map((r) => r.ranks[run]))}`);
 };
 table("All needs", () => true);
 table("Tuning split", (r) => r.need.split === "tuning");
 table("Held-out split", (r) => r.need.split === "held-out");
 for (const category of ["concern", "technology", "use-case", "turkish"] as const) table(`Category: ${category}`, (r) => r.need.category === category);
 
-console.log(`\nWeights on the tuning split (structured run, no Use when): MRR for each pair, best first`);
+print(`\nWeights on the tuning split (structured run, no Use when): MRR for each pair, best first`);
 for (const g of [...grid].sort((a, b) => b.mrr - a.mrr || a.domain - b.domain || a.tag - b.tag).slice(0, 8)) {
-  console.log(`  domain ${g.domain.toFixed(2)}  tag ${g.tag.toFixed(2)}  MRR ${g.mrr.toFixed(3)}${g.domain === WEIGHTS.domain && g.tag === WEIGHTS.tag ? "  (the defaults)" : ""}`);
+  print(`  domain ${g.domain.toFixed(2)}  tag ${g.tag.toFixed(2)}  MRR ${g.mrr.toFixed(3)}${g.domain === WEIGHTS.domain && g.tag === WEIGHTS.tag ? "  (the defaults)" : ""}`);
 }
 const defaults = grid.find((g) => g.domain === WEIGHTS.domain && g.tag === WEIGHTS.tag);
 const queryOnly = grid.find((g) => g.domain === 0 && g.tag === 0);
-console.log(`  the defaults: MRR ${defaults?.mrr.toFixed(3)} on tuning; held-out is the table above.`);
-console.log(`  the structured query alone (domain 0, tag 0): MRR ${queryOnly?.mrr.toFixed(3)}: what the rewritten words give without domains and tags.`);
+print(`  the defaults: MRR ${defaults?.mrr.toFixed(3)} on tuning; held-out is the table above.`);
+print(`  the structured query alone (domain 0, tag 0): MRR ${queryOnly?.mrr.toFixed(3)}: what the rewritten words give without domains and tags.`);
 
-console.log(`\nsuggest with the need (as before): all ${metrics(rows.map((r) => r.suggest))}; +use when ${metrics(rows.map((r) => r.suggestUseWhen))}  (recall@5, recall@10, MRR)`);
-console.log(`\n${catalog}`);
+print(`\nsuggest with the need (as before): all ${metrics(rows.map((r) => r.suggest))}; +use when ${metrics(rows.map((r) => r.suggestUseWhen))}  (recall@5, recall@10, MRR)`);
+print(`\n${catalog}`);

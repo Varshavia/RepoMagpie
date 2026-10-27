@@ -1,6 +1,8 @@
 // Shared by the benchmarks (spec §7): a generated journal of 2,000 notes in a scratch folder, and
 // timing of the built CLI as separate processes. No network; the folder is deleted afterwards.
 // `--report-only` prints the numbers but never fails on timing (CI runners vary too much).
+// `--json` prints only one JSON array at the end, each entry { label, cold, median, p95, budget }
+// in ms (cold and p95 null where not measured, budget null where there is none), for npm run measure.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,6 +13,15 @@ import { renderNote } from "../src/core/write.ts";
 export const NOTES = 2_000;
 export const RUNS = 20;
 export const reportOnly = process.argv.includes("--report-only");
+const json = process.argv.includes("--json");
+
+export interface BenchResult { label: string; cold: number | null; median: number; p95: number | null; budget: number | null }
+const results: BenchResult[] = [];
+// Human lines go to stdout, unless --json; then the results go there once, when the work is done.
+export const log = (line: string) => { if (!json) console.log(line); };
+export const record = (result: BenchResult) => { results.push(result); };
+// Only a benchmark records results: npm run measure imports withJournal and prints its own JSON.
+process.once("beforeExit", () => { if (json && results.length) process.stdout.write(`${JSON.stringify(results)}\n`); });
 
 export const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 
@@ -108,11 +119,12 @@ function report(label: string, once: () => number, budgetMs: number): void {
   const times = Array.from({ length: RUNS }, once).sort((a, b) => a - b);
   const median = (times[RUNS / 2 - 1] + times[RUNS / 2]) / 2;
   const p95 = times[Math.ceil(RUNS * 0.95) - 1];
-  console.log(`${label} on ${NOTES} notes, ${RUNS} runs after a warm-up (Node ${process.version}, ${process.platform})`);
-  console.log(`  cold (builds the cache): ${cold.toFixed(0)} ms`);
-  console.log(`  median: ${median.toFixed(0)} ms   p95: ${p95.toFixed(0)} ms   budget: under ${budgetMs} ms (median)`);
+  record({ label, cold, median, p95, budget: budgetMs });
+  log(`${label} on ${NOTES} notes, ${RUNS} runs after a warm-up (Node ${process.version}, ${process.platform})`);
+  log(`  cold (builds the cache): ${cold.toFixed(0)} ms`);
+  log(`  median: ${median.toFixed(0)} ms   p95: ${p95.toFixed(0)} ms   budget: under ${budgetMs} ms (median)`);
   if (median >= budgetMs) {
-    console.log(reportOnly ? "  over budget (report only)" : "  over budget");
+    log(reportOnly ? "  over budget (report only)" : "  over budget");
     if (!reportOnly) process.exitCode = 1;
   }
 }

@@ -4,7 +4,7 @@
 // and 800 rows, the journal sizes an agent might read whole (decision 0034). Exits 1 over the budget,
 // unless --report-only.
 import { spawnSync } from "node:child_process";
-import { cli, measure, withJournal } from "./bench-journal.ts";
+import { cli, log, measure, withJournal } from "./bench-journal.ts";
 
 withJournal("catalog", (root, journal) => {
   measure("repomagpie catalog --json --limit 1000", root, ["catalog", "--json", "--limit", "1000", "--home", journal], 500);
@@ -12,7 +12,7 @@ withJournal("catalog", (root, journal) => {
     for (const rows of [100, 800]) {
       const args = ["catalog", "--json", ...(full ? ["--full"] : []), "--limit", String(rows), "--home", journal];
       const out = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: "utf8" }).stdout;
-      console.log(`  ${full ? "--full --json" : "--json"} for ${rows} rows: ${out.length.toLocaleString("en")} characters (${Math.round(out.length / rows)} a row)`);
+      log(`  ${full ? "--full --json" : "--json"} for ${rows} rows: ${out.length.toLocaleString("en")} characters (${Math.round(out.length / rows)} a row)`);
     }
   }
 });

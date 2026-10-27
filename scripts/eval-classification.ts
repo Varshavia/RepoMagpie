@@ -7,7 +7,7 @@
 //   after   with the manifests' keywords, a GitHub Action's file and the README (decision 0046).
 // Kind: accuracy. Domains: precision and recall over every suggestion, and how many repositories got
 // exactly their expected set. Then the misses, and the cases named in the brief. Reports only: no
-// threshold. Not in CI. No network.
+// threshold. Not in CI. No network. `--json` prints only the scores.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +64,11 @@ const NAMED = [
   "microsoft/playwright", "radix-ui/primitives", "chakra-ui/chakra-ui", "actions/checkout", "docker/build-push-action", "sorrycc/awesome-javascript", "punkpeye/awesome-mcp-servers",
 ];
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// --json: only the scores, for npm run measure: { repositories, before, after }, each a Score.
+if (isMain && process.argv.includes("--json")) {
+  console.log(JSON.stringify({ repositories: fixture.repositories.length, before: score(false), after: score(true) }));
+} else if (isMain) {
   const n = fixture.repositories.length;
   const pct = (a: number, b: number) => (b ? `${((100 * a) / b).toFixed(1)}%` : "n/a");
   console.log(`${n} repositories (scripts/fixtures/classification.json)\n`);

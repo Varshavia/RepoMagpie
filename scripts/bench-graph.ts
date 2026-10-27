@@ -4,10 +4,10 @@
 // the caches from disk again. The notes carry GitHub-like topics and a language, so similarity has
 // work to do. Exits 1 over the budget, unless --report-only. Run with `npm run bench`.
 import { graphData } from "../src/core/graph.ts";
-import { measureInProcess, withJournal } from "./bench-journal.ts";
+import { log, measureInProcess, withJournal } from "./bench-journal.ts";
 
 withJournal("graph", (_root, journal) => {
   measureInProcess("graphData (warm, ghosts included)", () => graphData(journal, { ghosts: true }), 300);
   const { counts } = graphData(journal, { ghosts: true });
-  console.log(`  the graph: ${counts.notes} notes, ${counts.tags} tags, edges ${JSON.stringify(counts.edges_by_type)}`);
+  log(`  the graph: ${counts.notes} notes, ${counts.tags} tags, edges ${JSON.stringify(counts.edges_by_type)}`);
 }, false, true);
