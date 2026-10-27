@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test } from "./fixtures.ts";
+import { recordTimings } from "./measure.ts";
 
 // A journal shaped like a real one, the same every time: 30 tags used unevenly (0 to 3 per note),
 // links in about 3 notes out of 10, an alternative in 1 out of 10, kinds of every group, an inbox share.
@@ -91,6 +92,13 @@ test("graph: data, layout and first frame at 2,000 notes", async ({ page, magpie
   const report = `cold: ${round(cold)}; warm: ${round(warm)}; hover: ${hover}; zoom: ${zoom}`;
   info.annotations.push({ type: "graph, 2,000 notes", description: report });
   console.log(`graph page with 2,000 notes: ${report}`);
+  recordTimings({
+    "graph, cold: data": { ms: cold.data, budget: null },
+    "graph, cold: first frame": { ms: cold.drawn, budget: null },
+    "graph, warm: data": { ms: warm.data, budget: null },
+    "graph, warm: settled": { ms: warm.settled, budget: null },
+    "graph, warm: first frame": { ms: warm.drawn, budget: 2000 },
+  });
   // The 2 s budget is for a mid-range laptop with a warm cache. Shared CI runners draw WebGL in
   // software (SwiftShader) on few cores, so CI reports the numbers only, as for the benchmarks.
   if (!process.env.CI) expect(warm.drawn).toBeLessThan(2000);
