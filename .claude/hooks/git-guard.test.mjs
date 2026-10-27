@@ -114,6 +114,19 @@ const BLOCKED = [
   ["PowerShell", "Write-Output hi >> out.txt"],
   ["PowerShell", "Get-Date *> log.txt"],
   ["PowerShell", "Get-ChildItem; 'x' | Out-File -FilePath log.txt"],
+  // The maintainer's tag guard: without --dry-run as its own argument, it tags and pushes.
+  ["Bash", "npm run release:tag"],
+  ["PowerShell", "npm run release:tag"],
+  ["PowerShell", "npm.cmd run release:tag"],
+  ["Bash", "npm run-script release:tag"],
+  ["Bash", "npm run release:tag --dry-run"], // npm keeps a flag before "--" for itself
+  ["Bash", "node scripts/tag-release.ts"],
+  ["Bash", "node scripts/tag-release"],
+  ["PowerShell", "node .\\scripts\\tag-release.ts"],
+  ["Bash", "npx tsx scripts/tag-release.ts"],
+  ["Bash", "git status && npm run release:tag"],
+  ["Bash", 'bash -c "node scripts/tag-release.ts"'],
+  ["Bash", "node scripts/tag-release.ts --dry-run && node scripts/tag-release.ts"],
 ];
 
 const ALLOWED = [
@@ -174,6 +187,13 @@ const ALLOWED = [
   ["PowerShell", "dir > NUL"],
   ["PowerShell", "Get-Content CLAUDE.md | Select-Object -First 5"],
   ["PowerShell", "Get-Date *>&1"],
+  // The tag guard's checks only, and other mentions of it.
+  ["Bash", "npm run release:tag -- --dry-run"],
+  ["PowerShell", "npm run release:tag -- --dry-run"],
+  ["Bash", "node scripts/tag-release.ts --dry-run"],
+  ["Bash", "node --test scripts/tag-release.test.ts"],
+  ["Bash", "grep -n tag-release scripts/tag-release.ts"],
+  ["Bash", "npm run release"],
 ];
 
 for (const [tool, command] of BLOCKED) {

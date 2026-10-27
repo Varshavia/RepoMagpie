@@ -1,5 +1,6 @@
 // PreToolUse hook: agents may run only read-only git subcommands and read-only gh commands,
 // and may not write files from the shell (in-place edits, tee, redirection); they use the Edit/Write tools.
+// The maintainer's tag guard (npm run release:tag) runs for agents only with --dry-run.
 // Based on mattpocock/skills git-guardrails-claude-code, rewritten as an allowlist
 // that understands Bash and PowerShell command lines. Best effort, not a sandbox:
 // commands built at runtime (variables, eval of computed strings) are not detected.
@@ -172,7 +173,25 @@ function writeBlocked(name, args) {
   return null;
 }
 
-// Returns the first forbidden command in cmd as { kind: "git" | "gh" | "write", what }, or null.
+// The maintainer's tag guard (scripts/tag-release.ts) tags and pushes a release. Agents may run it
+// only with --dry-run as the script's own argument: after "--" through a package manager, which
+// would otherwise keep the flag for itself. Returns the forbidden form, or null.
+const RUNNERS = new Set(["node", "npx", "tsx", "bun", "deno"]);
+const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
+function releaseTagBlocked(name, args) {
+  const base = name.replace(/\.(cmd|ps1)$/, "");
+  let own = null;
+  const script = args.findIndex((a) => /(^|[\\/])tag-release(\.[cm]?[jt]s)?$/.test(a));
+  if (RUNNERS.has(base) && script >= 0) own = args.slice(script + 1);
+  else if (PACKAGE_MANAGERS.has(base) && args.includes("release:tag")) {
+    const dashes = args.indexOf("--", args.indexOf("release:tag"));
+    own = dashes < 0 ? [] : args.slice(dashes + 1);
+  }
+  if (own === null || own.includes("--dry-run")) return null;
+  return script >= 0 ? `${base} ${args[script]}` : `${base} run release:tag`;
+}
+
+// Returns the first forbidden command in cmd as { kind: "git" | "gh" | "write" | "release", what }, or null.
 function findBlocked(cmd, depth = 0) {
   const words = tokenize(cmd);
   let atCommand = true;
@@ -203,6 +222,8 @@ function findBlocked(cmd, depth = 0) {
       inShell = true;
       atCommand = true;
     } else {
+      const release = releaseTagBlocked(name, argsOf(words, i + 1));
+      if (release) return { kind: "release", what: release };
       const hit = writeBlocked(name, argsOf(words, i + 1));
       if (hit) return { kind: "write", what: hit };
     }
@@ -217,6 +238,8 @@ const MESSAGES = {
     "and gh api with GET only (no -f, -F, --field, --raw-field, --input). The maintainer does all GitHub writes by hand (see CLAUDE.md section 1).\n",
   write: (what) => `BLOCKED: "${what}" writes a file from the shell. Agents must use the Edit/Write tools to create and change files. ` +
     "Redirection is allowed only to /dev/null, NUL or $null, or between streams (2>&1) (see CLAUDE.md section 1).\n",
+  release: (what) => `BLOCKED: "${what}" tags and pushes a release; only the maintainer runs it. ` +
+    "Agents may run its checks only: npm run release:tag -- --dry-run (see CLAUDE.md section 1).\n",
 };
 
 const command = JSON.parse(readFileSync(0, "utf8")).tool_input?.command;

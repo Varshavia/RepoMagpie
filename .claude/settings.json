@@ -76,7 +76,13 @@
       "PowerShell(gh auth token:*)",
       "PowerShell(gh auth logout:*)",
       "PowerShell(gh api -X:*)",
-      "PowerShell(gh api --method:*)"
+      "PowerShell(gh api --method:*)",
+      "Bash(npm run release:tag)",
+      "Bash(node scripts/tag-release.ts)",
+      "Bash(node scripts/tag-release)",
+      "PowerShell(npm run release:tag)",
+      "PowerShell(node scripts/tag-release.ts)",
+      "PowerShell(node scripts/tag-release)"
     ]
   },
   "hooks": {
