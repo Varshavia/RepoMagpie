@@ -446,6 +446,12 @@ test("readmeStart: badges, images, HTML, comments, code blocks and link targets 
   assert.equal(readmeStart("```\nnever closed\ncode"), "");
 });
 
+test("readmeStart: entities are decoded once, in one pass: an escaped entity stays an entity", () => {
+  assert.equal(readmeStart("Tom &amp; Jerry &lt;3 &quot;cats&quot; &#39;n&#39;&nbsp;mice &gt; dogs"), `Tom & Jerry <3 "cats" 'n' mice > dogs`);
+  assert.equal(readmeStart("Write &amp;lt;b&amp;gt; for bold."), "Write &lt;b&gt; for bold.");
+  assert.equal(readmeStart("&amp;amp; and &copy; stay"), "&amp; and &copy; stay");
+});
+
 test("readmeOpening: the first heading, and the first sentence of the first line of prose", () => {
   assert.deepEqual(readmeOpening("# Widget #\n\nDiscord\nDocs | Discord | Blog post here\n[!IMPORTANT] Moved to a new home now\n- Draws charts for apps. Fast too.\n"), { heading: "Widget", sentence: "Draws charts for apps." });
   assert.deepEqual(readmeOpening("Widget, version 2 of it\n"), { heading: null, sentence: "Widget, version 2 of it" });

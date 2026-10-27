@@ -64,7 +64,7 @@ test("what a journal has is one line of at most about 100 characters, cut at a w
   ]);
   const doc = JSON.parse((await magpie(box, ["discover", "ui", "--json"], { fetch })).out) as { results: { in_journal: unknown[] }[] };
   assert.deepEqual(doc.results.map((r) => r.in_journal), [
-    [{ journal: "personal", id: "pkg:github/acme/ui", verdict: long.replace("\n", " "), what_it_does: null }],
+    [{ journal: "personal", id: "pkg:github/acme/ui", verdict: long.replaceAll("\n", " "), what_it_does: null }],
     [{ journal: "personal", id: "pkg:github/acme/draft", verdict: null, what_it_does: "Renders PDF invoices from HTML templates." }],
     [{ journal: "personal", id: "pkg:github/acme/bare", verdict: null, what_it_does: null }],
   ]);

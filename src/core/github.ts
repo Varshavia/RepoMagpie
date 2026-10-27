@@ -159,6 +159,9 @@ export function manifestKeywords(file: Manifest, text: string): string[] {
   return [...new Set(words)];
 }
 
+// The HTML entities a README's text decodes, in one pass, so "&amp;lt;" stays "&lt;".
+const ENTITIES: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" };
+
 // The start of a README as text: badges, images, HTML tags and comments, code blocks, link targets
 // and reference definitions removed, links kept as their text; hidden characters become markers
 // (decision 0032); the first README_LIMIT characters. Headings keep their #.
@@ -175,7 +178,7 @@ export function readmeStart(markdown: string): string {
     .replace(/^ {0,3}\[[^\]]+\]:\s*\S+.*$/gm, "")
     .replace(/`([^`\n]*)`/g, "$1")
     .replace(/(\*\*|__)(?=\S)([^\n]*?\S)\1/g, "$2")
-    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (_, entity: string) => ENTITIES[entity])
     .split("\n")
     .map((line) => clean(line).replace(/[ \t]+/g, " ").trim())
     .filter((line) => !/^[\s|:*_=-]*$/.test(line) || line === "")
