@@ -382,6 +382,17 @@ test("PATCH /api/note edits through core and returns the Note document; an old v
   const domains = parsed(await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, domains: { confirm: ["api"] } }));
   assert.equal(domains.status, 200);
   assert.deepEqual((domains.document as { frontmatter: { domains: string[] } }).frontmatter.domains, ["api"]);
+  // A suggestion dismissed, then restored with the version the dismiss returned; an old version gets 409.
+  const suggested = after.replace("tried: true\n", "domains_suggested: [api, testing]\ntried: true\n");
+  assert.notEqual(suggested, after);
+  writeFileSync(box.note("npm--pdfkit.md"), suggested);
+  const dismissed = parsed(await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(suggested), domains: { dismiss: ["api"] } }));
+  assert.equal(dismissed.status, 200);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), suggested.replace("[api, testing]", "[testing]"));
+  assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: noteVersion(suggested), domains: { restore: { domain: "api", at: 0 } } })).status, 409);
+  const restored = parsed(await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: (dismissed.document as { version: string }).version, domains: { restore: { domain: "api", at: 0 } } }));
+  assert.equal(restored.status, 200);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), suggested);
   writeFileSync(box.note("npm--pdfkit.md"), after);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, domains: { confirm: ["pdfs"] } })).status, 400);
   assert.equal((await http.write("PATCH", "/api/note", { journal: "personal", id: "pkg:npm/pdfkit", version: current, fields: { name: "x" } })).status, 400);

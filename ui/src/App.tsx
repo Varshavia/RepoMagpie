@@ -301,8 +301,8 @@ export function App() {
   );
 
   const onSaved = useCallback(
-    (doc: NoteJson, message: string) => {
-      toast(message);
+    (doc: NoteJson, message: string, action?: ToastItem["action"]) => {
+      toast(message, action);
       const key = noteKey(doc.journal, doc);
       const before = lists[doc.journal].status === "ready" ? (lists[doc.journal] as { notes: NoteSummary[] }).notes : [];
       const fm = doc.frontmatter;

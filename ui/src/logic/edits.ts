@@ -27,7 +27,7 @@ export interface Patch {
   sections?: Record<string, string>;
   accept_drafts?: string[];
   add_items?: Partial<Record<"Use when" | "Avoid when", string[]>>; // appended as note --use-when does
-  domains?: { confirm?: string[]; remove?: string[] };
+  domains?: { confirm?: string[]; remove?: string[]; dismiss?: string[]; restore?: { domain: string; at: number } };
 }
 
 export function formOf(note: NoteJson): Form {
@@ -91,6 +91,13 @@ export function noteDomainList(note: NoteJson, key: "domains" | "domains_suggest
   const list = (value: unknown) => (Array.isArray(value) ? [...new Set(value.filter(isDomain))] : []);
   const confirmed = list(note.frontmatter.domains);
   return key === "domains" ? confirmed : list(note.frontmatter.domains_suggested).filter((d) => !confirmed.includes(d));
+}
+
+// Where a suggested domain stands in the note's domains_suggested as written (unknown values count),
+// so Undo puts it back there.
+export function suggestedPosition(note: NoteJson, domain: string): number {
+  const written = note.frontmatter.domains_suggested;
+  return Array.isArray(written) ? Math.max(0, written.indexOf(domain)) : 0;
 }
 
 // The Verdict is one line.

@@ -208,6 +208,8 @@ export function appendTagEntries(text: string, tags: string[]): EditResult {
 export interface DomainChange {
   confirm?: string[]; // the user's domains: added to `domains`, taken out of `domains_suggested`
   remove?: string[]; // taken out of wherever they are
+  dismiss?: string[]; // suggestions the user doesn't want: taken out of `domains_suggested` only, never `domains`
+  restore?: { domain: string; at: number }; // a dismissed suggestion back, at its old position (Undo)
   suggest?: string[]; // RepoMagpie's suggestions, written only to a note that has neither field
 }
 
@@ -219,7 +221,8 @@ export interface DomainResult extends EditResult {
 
 // The two domain fields (decision 0040): `domains`, the user's, at most DOMAIN_LIMIT known ones;
 // `domains_suggested`, RepoMagpie's, never holding a confirmed one. Confirming moves a domain from
-// the suggestions to `domains`; removing takes it out of both. A field emptied stays, as [], so
+// the suggestions to `domains`; removing takes it out of both; dismissing, out of the suggestions
+// only, and restoring puts a dismissed one back where it was. A field emptied stays, as [], so
 // `repomagpie domains --suggest` knows the user took the suggestions out. Values that aren't in the
 // vocabulary are kept as written. A field that isn't a list of text is left alone, with a warning.
 export function setDomains(text: string, change: DomainChange): DomainResult {
@@ -232,25 +235,46 @@ export function setDomains(text: string, change: DomainChange): DomainResult {
   const confirmedNow = ((fm.domains ?? []) as string[]).slice();
   const suggestedNow = ((fm.domains_suggested ?? []) as string[]).slice();
   const remove = new Set(change.remove ?? []);
+  const dismiss = new Set(change.dismiss ?? []);
   const confirm = [...new Set(change.confirm ?? [])].filter((d) => !remove.has(d));
   const confirmed = confirm.filter((d) => !confirmedNow.includes(d));
-  const removed = [...remove].filter((d) => confirmedNow.includes(d) || suggestedNow.includes(d));
+  const removed = [...new Set([...remove, ...dismiss])].filter((d) => (remove.has(d) && confirmedNow.includes(d)) || suggestedNow.includes(d));
   const nextDomains = [...confirmedNow.filter((d) => !remove.has(d)), ...confirmed];
   if (new Set(nextDomains.filter(isDomain)).size > DOMAIN_LIMIT) {
     return none(untouched(text, `A note has at most ${DOMAIN_LIMIT} domains; a note with more is a platform. Remove one first.`));
   }
-  let nextSuggested = suggestedNow.filter((d) => !remove.has(d) && !nextDomains.includes(d));
+  const kept = suggestedNow.map((d) => !remove.has(d) && !dismiss.has(d) && !nextDomains.includes(d));
+  let nextSuggested = suggestedNow.filter((_, k) => kept[k]);
+  const back = change.restore;
+  const restoreAt = back && !nextDomains.includes(back.domain) && !nextSuggested.includes(back.domain) ? Math.min(back.at, nextSuggested.length) : -1;
+  if (back && restoreAt !== -1) nextSuggested.splice(restoreAt, 0, back.domain);
   const fresh = fm.domains === undefined && fm.domains_suggested === undefined;
-  const suggested = fresh && !confirmed.length ? [...new Set(change.suggest ?? [])].filter((d) => !nextDomains.includes(d)) : [];
+  const suggested = fresh && !confirmed.length && !back ? [...new Set(change.suggest ?? [])].filter((d) => !nextDomains.includes(d)) : [];
   if (suggested.length) nextSuggested = suggested;
 
   const values: Record<string, unknown> = {};
-  if (confirmed.length || removed.some((d) => confirmedNow.includes(d))) values.domains = nextDomains;
-  if (suggested.length || nextSuggested.length !== suggestedNow.length) values.domains_suggested = nextSuggested;
+  if (confirmed.length || [...remove].some((d) => confirmedNow.includes(d))) values.domains = nextDomains;
+  if (suggested.length || JSON.stringify(nextSuggested) !== JSON.stringify(suggestedNow)) values.domains_suggested = nextSuggested;
   if (!Object.keys(values).length) return none({ text, changed: false, warnings: [] });
+  // Suggestions taken out or put back are edited as text, so the ones that stay keep their own text;
+  // an emptied list is written [] whole.
+  let base = text;
+  const bounds = frontmatterBounds(text);
+  const list = bounds && nextSuggested.length && !suggested.length ? stringList(text.slice(bounds.start, bounds.end), "domains_suggested") : null;
+  if (bounds && list && list.items.length === suggestedNow.length) {
+    const keptAt = kept.flatMap((keep, k) => (keep ? [k] : []));
+    const newBefore = new Map<number, string[]>();
+    const pending: string[] = [];
+    if (back && restoreAt !== -1) {
+      if (restoreAt < keptAt.length) newBefore.set(keptAt[restoreAt], [back.domain]);
+      else pending.push(back.domain);
+    }
+    base = rewriteList(text, bounds, text.slice(bounds.start, bounds.end), list.flow, list.items, kept, newBefore, pending).text;
+    delete values.domains_suggested;
+  }
   // A new key goes after `tags`, where a new note has it; editFrontmatter would put it at the end.
-  const edited = insertAfterTags(text, values);
-  return edited.warnings.length ? none(edited) : { ...edited, confirmed, removed, suggested };
+  const edited = Object.keys(values).length ? insertAfterTags(base, values) : { text: base, changed: false, warnings: [] };
+  return edited.warnings.length ? none(edited) : { ...edited, changed: edited.text !== text, confirmed, removed, suggested };
 }
 
 // Sets frontmatter values; a key the frontmatter doesn't have yet goes after `tags` (domains before
@@ -294,11 +318,9 @@ function editAlternatives(text: string, entries: string[]): EditResult {
   const bounds = frontmatterBounds(text);
   if (!bounds) return untouched(text, "The note has no frontmatter; it was left unchanged.");
   const frontmatter = text.slice(bounds.start, bounds.end);
-  const doc = parseDocument(frontmatter);
-  const pair = isMap(doc.contents) ? (doc.contents.items as Pair[]).find((p) => isScalar(p.key) && p.key.value === "alternatives") : undefined;
-  const seq = pair && isSeq(pair.value) ? pair.value : null;
-  const items = seq && seq.items.length && seq.items.every((item) => isScalar(item) && typeof item.value === "string") ? (seq.items as Scalar<string>[]) : null;
-  if (!seq || !items) return editFrontmatter(text, { alternatives: entries.length ? entries.map(entryText) : REMOVE }, false);
+  const list = stringList(frontmatter, "alternatives");
+  if (!list) return editFrontmatter(text, { alternatives: entries.length ? entries.map(entryText) : REMOVE }, false);
+  const { items } = list;
 
   // Match each requested entry to the first unused entry with its target (ignoring case).
   const targetOf = (item: Scalar<string>) => alternativeLinks([item.value])[0]?.target.toLowerCase() ?? null;
@@ -321,12 +343,26 @@ function editAlternatives(text: string, entries: string[]): EditResult {
   }
   const kept = items.map((item, k) => used.has(k) || targetOf(item) === null);
   if (!kept.some(Boolean) && !newBefore.size && !pending.length) return editFrontmatter(text, { alternatives: REMOVE }, false);
+  return rewriteList(text, bounds, frontmatter, list.flow, items, kept, newBefore, pending);
+}
 
+// A frontmatter key's value when it is a list of at least one string; flow: written [a, b].
+function stringList(frontmatter: string, key: string): { flow: boolean; items: Scalar<string>[] } | null {
+  const doc = parseDocument(frontmatter);
+  const pair = isMap(doc.contents) ? (doc.contents.items as Pair[]).find((p) => isScalar(p.key) && p.key.value === key) : undefined;
+  const seq = pair && isSeq(pair.value) ? pair.value : null;
+  return seq && seq.items.length && seq.items.every((item) => isScalar(item) && typeof item.value === "string") ? { flow: Boolean(seq.flow), items: seq.items as Scalar<string>[] } : null;
+}
+
+// A list rewritten as text: each kept entry keeps its own text (quotes, a comment on its line), a
+// dropped one goes with its line (a block list) or its comma (a flow list), and a new value is
+// written in RepoMagpie's style before entry k (newBefore) or after the last (pending).
+function rewriteList(text: string, bounds: { start: number; end: number; eol: string }, frontmatter: string, flow: boolean, items: Scalar<string>[], kept: boolean[], newBefore: Map<number, string[]>, pending: string[]): EditResult {
   const range = (item: Scalar<string>) => item.range as [number, number, number];
   let start: number;
   let end: number;
   let out = "";
-  if (seq.flow) {
+  if (flow) {
     // Between the first and the last entry: the kept entries' own text, with the list's separator.
     start = range(items[0])[0];
     end = range(items[items.length - 1])[1];

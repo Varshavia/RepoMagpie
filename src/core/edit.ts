@@ -2,7 +2,7 @@
 // edits, checked and applied through the round-trip-safe functions in write.ts. All or nothing:
 // one bad edit and nothing is applied. Pure: text in, text out; never prints.
 import { createHash } from "node:crypto";
-import { domainsProblem } from "./domains.ts";
+import { domainsProblem, isDomain } from "./domains.ts";
 import { readNote, SECTION_NAMES, type SectionName } from "./note.ts";
 import { acceptDraft, addSectionItems, itemsProblem, setDomains, setHumanFields, setSection, setVerdict, type EditResult, type HumanFields } from "./write.ts";
 
@@ -12,13 +12,14 @@ export interface NoteEdits {
   fields?: unknown; // {"kind", "tags", "tried", "rating", "alternatives"}
   accept_drafts?: unknown; // ["<section name>"]
   add_items?: unknown; // {"Use when": ["<item>"], "Avoid when": ["<item>"]}: the person's items, appended as note --use-when does
-  domains?: unknown; // {"confirm": ["security"], "remove": ["web"]}: the person's domains (decision 0040)
+  domains?: unknown; // {"confirm": ["security"], "remove": ["web"]}: the person's domains (decision 0040); "dismiss" takes suggestions out, "restore": {"domain", "at"} puts one back
 }
 
 export type EditOutcome = { ok: true; text: string; changed: boolean } | { ok: false; error: string };
 
 const EDIT_KEYS = ["verdict", "sections", "fields", "accept_drafts", "add_items", "domains"];
 const ITEM_SECTIONS = ["Use when", "Avoid when"] as const;
+const DOMAIN_EDITS = ["confirm", "remove", "dismiss", "restore"];
 
 // A note's version: the SHA-256 of the file's bytes (decision 0023).
 export function noteVersion(bytes: Buffer | string): string {
@@ -74,12 +75,26 @@ export function editNote(text: string, edits: NoteEdits): EditOutcome {
   }
   if (edits.domains !== undefined) {
     const { domains } = edits;
-    if (!isObject(domains) || Object.keys(domains).some((key) => key !== "confirm" && key !== "remove")) return fail("domains must be an object, such as {\"confirm\": [\"security\"], \"remove\": [\"web\"]}.");
-    // A value to remove may be unknown (doctor reports those); one to confirm must be a domain.
+    if (!isObject(domains) || Object.keys(domains).some((key) => !DOMAIN_EDITS.includes(key))) return fail("domains must be an object, such as {\"confirm\": [\"security\"], \"remove\": [\"web\"]}.");
+    // A value to remove or dismiss may be unknown (doctor reports those); one to confirm or restore must be a domain.
     const problem = domainsProblem("domains.confirm", domains.confirm);
     if (problem) return fail(problem);
-    if (domains.remove !== undefined && !(Array.isArray(domains.remove) && domains.remove.every((d) => typeof d === "string"))) return fail("domains.remove takes a list of domains.");
-    steps.push((t) => setDomains(t, { confirm: domains.confirm as string[] | undefined, remove: domains.remove as string[] | undefined }));
+    for (const key of ["remove", "dismiss"]) {
+      const list = domains[key];
+      if (list !== undefined && !(Array.isArray(list) && list.every((d) => typeof d === "string"))) return fail(`domains.${key} takes a list of domains.`);
+    }
+    const { restore } = domains;
+    if (restore !== undefined && !(isObject(restore) && Object.keys(restore).every((key) => key === "domain" || key === "at") && isDomain(restore.domain) && Number.isInteger(restore.at) && (restore.at as number) >= 0)) {
+      return fail("domains.restore must be a domain and its position, such as {\"domain\": \"security\", \"at\": 0}.");
+    }
+    steps.push((t) =>
+      setDomains(t, {
+        confirm: domains.confirm as string[] | undefined,
+        remove: domains.remove as string[] | undefined,
+        dismiss: domains.dismiss as string[] | undefined,
+        restore: restore as { domain: string; at: number } | undefined,
+      }),
+    );
   }
 
   let result = text;

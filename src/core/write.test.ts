@@ -785,6 +785,55 @@ test("setDomains: confirming moves a domain from the suggestions to domains; rem
   assert.equal(setDomains(confirmed.text, { confirm: ["database"] }).changed, false);
 });
 
+test("setDomains dismiss: one suggestion leaves domains_suggested, the rest of the file byte for byte; the last leaves [] (decision 0040)", () => {
+  const start = HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n  - pdf\ndomains: [security]   # mine\n").replace("tried: true", "domains_suggested: [database, \"Odd value\", testing]  # RepoMagpie's\ntried: true");
+  const one = setDomains(start, { dismiss: ["database"] });
+  assert.deepEqual([one.changed, one.removed, one.warnings], [true, ["database"], []]);
+  assert.equal(one.text, start.replace('[database, "Odd value", testing]', '["Odd value", testing]')); // the others as written
+  // An unknown value can be dismissed too; then the last one: the field stays, empty.
+  const two = setDomains(one.text, { dismiss: ["Odd value"] });
+  const last = setDomains(two.text, { dismiss: ["testing"] });
+  assert.equal(last.text, start.replace('[database, "Odd value", testing]', "[]"));
+  assert.equal(setDomains(last.text, { suggest: ["api"] }).changed, false); // domains --suggest leaves it
+  // A block list stays a block list, each line as written; emptied, it is [].
+  const block = HAND_WRITTEN.replace("tried: true", "domains_suggested:\n  - database   # first\n  - 'testing'\ntried: true");
+  const blockOne = setDomains(block, { dismiss: ["database"] });
+  assert.equal(blockOne.text, block.replace("  - database   # first\n", ""));
+  assert.equal(setDomains(blockOne.text, { restore: { domain: "database", at: 0 } }).text, block.replace("  - database   # first\n", "  - database\n"));
+  assert.equal(setDomains(blockOne.text, { dismiss: ["testing"] }).text, HAND_WRITTEN.replace("tried: true", "domains_suggested: []\ntried: true"));
+  // CRLF stays CRLF.
+  const crlf = start.replace(/\n/g, "\r\n");
+  assert.equal(setDomains(crlf, { dismiss: ["database"] }).text, one.text.replace(/\n/g, "\r\n"));
+});
+
+test("setDomains dismiss never touches a confirmed domain; a value the note doesn't suggest changes nothing", () => {
+  // Hand-edited into both fields: dismiss takes it out of the suggestions only.
+  const both = HAND_WRITTEN.replace("tried: true", "domains: [security, api]\ndomains_suggested: [api, testing]\ntried: true");
+  const r = setDomains(both, { dismiss: ["api", "security"] });
+  assert.equal(r.text, both.replace("domains_suggested: [api, testing]", "domains_suggested: [testing]"));
+  assert.deepEqual(r.removed, ["api"]);
+  const start = HAND_WRITTEN.replace("tried: true", "domains_suggested: [database]\ntried: true");
+  for (const value of ["auth", "Database", "", "<script>"]) {
+    const none = setDomains(start, { dismiss: [value] });
+    assert.deepEqual([none.changed, none.text, none.removed], [false, start, []], value);
+  }
+  assert.equal(setDomains(HAND_WRITTEN, { dismiss: ["api"] }).changed, false); // no field: none written
+});
+
+test("setDomains restore: a dismissed suggestion goes back at its old position, once", () => {
+  const start = HAND_WRITTEN.replace("tried: true", "domains_suggested: [database, testing, api]\ntried: true");
+  const dismissed = setDomains(start, { dismiss: ["testing"] });
+  assert.equal(setDomains(dismissed.text, { restore: { domain: "testing", at: 1 } }).text, start);
+  // Past the end: last. Already there, or confirmed: nothing changes.
+  assert.match(setDomains(dismissed.text, { restore: { domain: "testing", at: 9 } }).text, /domains_suggested: \[database, api, testing\]/);
+  assert.equal(setDomains(start, { restore: { domain: "testing", at: 0 } }).changed, false);
+  const confirmed = HAND_WRITTEN.replace("tried: true", "domains: [testing]\ndomains_suggested: []\ntried: true");
+  assert.equal(setDomains(confirmed, { restore: { domain: "testing", at: 0 } }).changed, false);
+  // The last one, from []: back in the empty field.
+  const last = setDomains(HAND_WRITTEN.replace("tried: true", "domains_suggested: [api]\ntried: true"), { dismiss: ["api"] });
+  assert.equal(setDomains(last.text, { restore: { domain: "api", at: 0 } }).text, HAND_WRITTEN.replace("tried: true", "domains_suggested: [api]\ntried: true"));
+});
+
 test("setDomains keeps unknown values, refuses a fourth domain, and leaves a field that isn't a list alone", () => {
   const odd = HAND_WRITTEN.replace("tried: true", "domains: [security, Pdfs]\ntried: true");
   const added = setDomains(odd, { confirm: ["database"] });

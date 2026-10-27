@@ -83,6 +83,16 @@ test("domains: confirm moves a suggestion into domains, remove takes one out, ev
   assert.deepEqual(editNote(withSuggested, { domains: {} }), { ok: true, text: withSuggested, changed: false });
 });
 
+test("domains: dismiss takes a suggestion out, restore puts it back where it was", () => {
+  const withSuggested = NOTE.replace("tried: false\n", "domains_suggested: [api, web, testing]\ntried: false\n");
+  const dismissed = editNote(withSuggested, { domains: { dismiss: ["web"] } });
+  assert.deepEqual(dismissed, { ok: true, text: withSuggested.replace("[api, web, testing]", "[api, testing]"), changed: true });
+  const back = editNote(withSuggested.replace("[api, web, testing]", "[api, testing]"), { domains: { restore: { domain: "testing", at: 2 } } });
+  assert.equal(back.ok && back.changed, false); // already there
+  const restored = editNote(withSuggested.replace("[api, web, testing]", "[web, testing]"), { domains: { restore: { domain: "api", at: 0 } } });
+  assert.deepEqual(restored, { ok: true, text: withSuggested.replace("[api, web, testing]", "[api, web, testing]"), changed: true });
+});
+
 test("no edits change nothing", () => {
   assert.deepEqual(editNote(NOTE, {}), { ok: true, text: NOTE, changed: false });
 });
@@ -116,6 +126,15 @@ test("every bad edit is refused as a whole: nothing is applied", () => {
     { domains: { confirm: ["api", "auth", "ai", "tooling"] } },
     { domains: { remove: "web" } },
     { domains: { suggest: ["api"] } },
+    { domains: { dismiss: "web" } },
+    { domains: { dismiss: [3] } },
+    { domains: { restore: "api" } },
+    { domains: { restore: { domain: "pdfs", at: 0 } } },
+    { domains: { restore: { domain: "<b>api</b>", at: 0 } } },
+    { domains: { restore: { domain: "api", at: -1 } } },
+    { domains: { restore: { domain: "api", at: 1.5 } } },
+    { domains: { restore: { domain: "api" } } },
+    { domains: { restore: { domain: "api", at: 0, extra: true } } },
   ];
   for (const edits of bad) {
     const r = editNote(NOTE, edits);

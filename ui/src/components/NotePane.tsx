@@ -6,7 +6,7 @@ import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef
 import { DOMAIN_LIMIT, DOMAINS } from "../../../src/core/domains.ts";
 import { api, ApiError, type Address, type AdoptJson, type DeleteJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { formOf, noteDomainList, patchFor, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
+import { formOf, noteDomainList, patchFor, suggestedPosition, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
 import { packageLabel, readablePurl, verdictSaysAvoid } from "../logic/schema.ts";
 import { editableBody, externalHref, firstEntries, hasHidden, homePath, isBlank, parseBody, parseInline, visible, type Block, type Inline } from "../logic/text.ts";
@@ -34,7 +34,7 @@ export interface NotePaneProps {
   noTagList: boolean; // the journal has no tags.md
   onCreateTagList: () => void;
   drafts: Map<string, Form>; // unsaved forms, kept while you move between notes
-  onSaved: (note: NoteJson, message: string) => void;
+  onSaved: (note: NoteJson, message: string, action?: { label: string; run: () => void }) => void; // action: Undo in the toast
   onLeave: () => void; // Esc from an editor: back to the list
   onToast: (text: string) => void;
   onBack: () => void; // the back button in the one-pane layout
@@ -83,6 +83,13 @@ export function NotePane(props: NotePaneProps) {
   const editHandled = useRef(editRequest);
   const latest = useRef({ note, form, section });
   latest.current = { note, form, section };
+  const paneOpen = useRef(true); // false once the pane closes: a toast's Undo can still run
+  useEffect(() => {
+    paneOpen.current = true;
+    return () => {
+      paneOpen.current = false;
+    };
+  }, []);
 
   const addressKey = "id" in address ? `id ${address.id}` : `file ${address.file}`;
 
@@ -282,6 +289,46 @@ export function NotePane(props: NotePaneProps) {
     }
   }
 
+  // A suggested domain's ×: out of domains_suggested only, saved now; the toast offers Undo, which
+  // puts it back where it was. Focus moves to the next suggestion's ×, or the note.
+  async function dismissDomain(domain: string, next: string | null) {
+    const from = note;
+    if (!from?.id || !from.version) return;
+    const at = suggestedPosition(from, domain);
+    const ok = await domainEdit(from.id, from.version, { dismiss: [domain] }, `Suggested domain ${domain} removed`, (doc) => ({ label: "Undo", run: () => void undoDismiss(doc, domain, at) }));
+    if (ok) requestAnimationFrame(() => (next ? articleRef.current?.querySelector<HTMLButtonElement>(`[data-dismiss="${next}"]`) : articleRef.current)?.focus());
+  }
+
+  // Undo from the toast: with the note's latest version while it is open here, else the version the
+  // removal returned. A note changed since gets the conflict banner, as any write does.
+  async function undoDismiss(after: NoteJson, domain: string, at: number) {
+    const open = latest.current.note;
+    const current = open?.file === after.file && open.version ? open : after;
+    if (!current.id || !current.version) return;
+    await domainEdit(current.id, current.version, { restore: { domain, at } }, `Suggested domain ${domain} restored`);
+  }
+
+  async function domainEdit(id: string, version: string, domains: NonNullable<Patch["domains"]>, message: string, undo?: (doc: NoteJson) => { label: string; run: () => void }): Promise<boolean> {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const doc = await api.patch({ journal, id, version, domains });
+      setNote(doc);
+      setConflict(null);
+      onSaved(doc, message, undo?.(doc));
+      return true;
+    } catch (error) {
+      const e = error as ApiError;
+      // An Undo after the pane closed: the toast is the only place left to say so.
+      if (!paneOpen.current) onToast(e.message);
+      else if (e.status === 409 && e.document) setConflict(e.document as NoteJson);
+      else setSaveError(e.message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function accept(sectionName: string) {
     if (!note?.id || !note.version) return;
     await submit({ journal, id: note.id, version: note.version, accept_drafts: [sectionName] }, `${sectionName} accepted`);
@@ -414,6 +461,7 @@ export function NotePane(props: NotePaneProps) {
             domains={noteDomainList(note, "domains")}
             suggested={noteDomainList(note, "domains_suggested")}
             onConfirm={note.id && note.version && !note.read_only ? (d) => void confirmDomain(d) : null}
+            onDismiss={note.id && note.version && !note.read_only ? (d, next) => void dismissDomain(d, next) : null}
             busy={saving}
           />
           <div className="actions">
@@ -759,10 +807,11 @@ interface ChipsProps {
   domains: string[];
   suggested: string[];
   onConfirm: ((domain: string) => void) | null; // null: the note can't be edited here
+  onDismiss: ((domain: string, next: string | null) => void) | null; // next: the suggestion to focus after
   busy: boolean;
 }
 
-function Chips({ kind, license, language, packages, tags, domains, suggested, onConfirm, busy }: ChipsProps) {
+function Chips({ kind, license, language, packages, tags, domains, suggested, onConfirm, onDismiss, busy }: ChipsProps) {
   if (!kind && !license && !language && !packages.length && !tags.length && !domains.length && !suggested.length) return null;
   return (
     <ul className="chips" aria-label="Details">
@@ -772,13 +821,18 @@ function Chips({ kind, license, language, packages, tags, domains, suggested, on
           {d}
         </li>
       ))}
-      {suggested.map((d) => (
+      {suggested.map((d, i) => (
         <li key={d} className="chip domain suggested" title={`Suggested domain: ${domainDefinition(d)}`}>
           {d}
           <span className="visually-hidden"> (suggested)</span>
           {onConfirm ? (
             <button type="button" className="chip-remove" onClick={() => onConfirm(d)} disabled={busy || domains.length >= DOMAIN_LIMIT} aria-label={`Confirm the domain ${d}`} title={domains.length >= DOMAIN_LIMIT ? `A note has at most ${DOMAIN_LIMIT} domains` : `Confirm ${d}`}>
               <Icon name="check" size={12} />
+            </button>
+          ) : null}
+          {onDismiss ? (
+            <button type="button" className="chip-remove" data-dismiss={d} onClick={() => onDismiss(d, suggested[i + 1] ?? suggested[i - 1] ?? null)} disabled={busy} aria-label={`Remove suggested domain ${d}`} title={`Remove the suggestion ${d}`}>
+              <Icon name="x" size={12} />
             </button>
           ) : null}
         </li>

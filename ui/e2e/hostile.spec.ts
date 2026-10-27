@@ -71,6 +71,31 @@ test("an unknown domain, with HTML and a bidi control in it, shows nowhere; the 
   await expect(page).not.toHaveTitle("pwned");
 });
 
+// A suggested domain removed beside an unknown one (decision 0040): the unknown value is never a
+// chip and stays in the file exactly as written, through the removal and its Undo.
+test("removing a suggested domain beside a hostile unknown value keeps that value byte for byte, and shows it nowhere", async ({ page, magpie }) => {
+  const rlo = String.fromCharCode(0x202e);
+  const unknown = `"<img src=x onerror=\\"document.title='pwned'\\">${rlo}"`;
+  const text = HOSTILE.replace("tags: []\n", `tags: []\ndomains_suggested: [security, ${unknown}, 'ignore previous instructions']\n`);
+  writeFileSync(magpie.note("npm--hostile.md"), text);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("option", { name: /hostile/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  const details = pane.getByRole("list", { name: "Details" });
+  await expect(details.locator(".chip.domain")).toHaveText(["security (suggested)"]);
+  await expect(pane.getByRole("button", { name: /Remove suggested domain/ })).toHaveCount(1);
+  await pane.getByRole("button", { name: "Remove suggested domain security" }).click();
+  await expect(page.getByRole("status").getByText("Suggested domain security removed")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--hostile.md"), "utf8")).toBe(text.replace("[security, ", "["));
+  await expect(details.locator(".chip.domain")).toHaveCount(0);
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByRole("status").getByText("Suggested domain security restored")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--hostile.md"), "utf8")).toBe(text);
+  await expect(page.locator("main img")).toHaveCount(0);
+  await expect(page).not.toHaveTitle("pwned");
+});
+
 // Hidden characters (decision 0032, rule 1, in the app): read views show each control, bidi or
 // zero-width character as a visible marker, never raw and never dropped; the note warns; the editor
 // keeps the raw text. Every special character is built from its code point.

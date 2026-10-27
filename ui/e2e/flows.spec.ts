@@ -465,6 +465,65 @@ test("domains: the sidebar counts them; a domain lists its notes; a suggested ch
   expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toContain("domains: [tooling]\ndomains_suggested: []\n");
 });
 
+test("domains: a suggested chip's × removes only that suggestion; the toast's Undo puts it back where it was", async ({ page, magpie }) => {
+  withDomains(magpie, UNDERSTAND, "domains: [ai]\ndomains_suggested: [api, tooling, testing]   # RepoMagpie's\n");
+  const before = readFileSync(magpie.note(UNDERSTAND), "utf8");
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /Understand-Anything/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  const remove = pane.getByRole("button", { name: "Remove suggested domain tooling" });
+  await expect(remove).toHaveAttribute("title", "Remove the suggestion tooling");
+  await remove.click();
+  const status = page.getByRole("status");
+  await expect(status.getByText("Suggested domain tooling removed")).toBeVisible();
+  await expect(remove).toHaveCount(0);
+  expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toBe(before.replace("[api, tooling, testing]", "[api, testing]"));
+  const details = pane.getByRole("list", { name: "Details" });
+  await expect(details.locator(".chip.domain:not(.suggested)")).toHaveText(["ai"]);
+
+  await status.getByRole("button", { name: "Undo" }).click();
+  await expect(status.getByText("Suggested domain tooling restored")).toBeVisible();
+  await expect(remove).toBeVisible();
+  expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toBe(before);
+  await expect(details.locator(".chip.domain.suggested")).toHaveText(["api (suggested)", "tooling (suggested)", "testing (suggested)"]);
+});
+
+test("domains: the × is reached by Tab after the check, works with Enter, and passes focus to the next suggestion; the last leaves []", async ({ page, magpie }) => {
+  withDomains(magpie, UNDERSTAND, "domains_suggested: [api, tooling]\n");
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /Understand-Anything/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await pane.getByRole("button", { name: "Confirm the domain api" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(pane.getByRole("button", { name: "Remove suggested domain api" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").getByText("Suggested domain api removed")).toBeVisible();
+  await expect(pane.getByRole("button", { name: "Remove suggested domain tooling" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").getByText("Suggested domain tooling removed")).toBeVisible();
+  await expect(page.getByRole("article")).toBeFocused();
+  expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toContain("\ndomains_suggested: []\ntried:");
+  // The newest toast's Undo, with the keyboard.
+  await page.getByRole("status").getByRole("button", { name: "Undo" }).last().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").getByText("Suggested domain tooling restored")).toBeVisible();
+  expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toContain("\ndomains_suggested: [tooling]\ntried:");
+});
+
+test("domains: removing a suggestion works in the project journal too", async ({ page, magpie }) => {
+  const text = PDFKIT.replace("tried:", "domains_suggested: [api, tooling]\ntried:");
+  writeFileSync(magpie.note("npm--pdfkit.md", "project"), text);
+  await magpie.open(page);
+  await page.getByRole("radio", { name: "Project" }).click();
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await page.locator('section[aria-label="Note"]').getByRole("button", { name: "Remove suggested domain api" }).click();
+  await expect(page.getByRole("status").getByText("Suggested domain api removed")).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8")).toBe(text.replace("[api, tooling]", "[tooling]"));
+});
+
 test("search: the domain filter keeps only notes with it; each row says why it matched", async ({ page, magpie }) => {
   withDomains(magpie, "npm--pdfkit.md", "domains: [tooling]\n");
   await magpie.open(page);
