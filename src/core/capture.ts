@@ -3,7 +3,7 @@
 // Pure: text in, text out. The caller finds the existing note, fetches metadata and writes the file.
 import { PackageURL } from "packageurl-js";
 import { suggestDomains } from "./domains.ts";
-import { draftKind, type RepoMetadata } from "./github.ts";
+import { draftKind, readmeOpening, type RepoMetadata } from "./github.ts";
 import { readNote, type SectionName } from "./note.ts";
 import { topicTags, type KnownTags } from "./topic-tags.ts";
 import { addSectionItems, appendSkillLine, renderNote, setDomains, setToolFields, setVerdict } from "./write.ts";
@@ -72,10 +72,12 @@ function create(input: CaptureInput): Capture {
   // The user's own items are human-written; import's use: and avoid: text is a draft (schema rule 7).
   const drafts: SectionName[] = ["What it does", ...(useWhen.length ? [] : ["Use when" as const]), ...(avoidWhen.length ? [] : ["Avoid when" as const])];
   const items: Items = { changed: [...(useWhen.length ? ["use_when" as const] : []), ...(avoidWhen.length ? ["avoid_when" as const] : [])], draftsReplaced: [], present: [] };
-  const tags = input.tags ?? (m ? topicTags(m.topics, input.purl, input.known) : []);
-  // Suggested from the note's tags and topics (decision 0040); the user's --domain values are confirmed.
+  const tags = input.tags ?? (m ? topicTags(m.topics, input.purl, input.known, m.keywords) : []);
+  // Suggested from the note's tags and topics (decision 0040), and the manifests' keywords, a GitHub
+  // Action's file and the README's start (decision 0046); the user's --domain values are confirmed.
   const domains = [...new Set(input.domains ?? [])];
-  const domainsSuggested = suggestDomains({ tags, topics: m?.topics, domains }, input.known.aliases);
+  const signals = { keywords: m?.keywords, readme: m?.readme, hints: m?.action ? (["devops"] as const) : [] };
+  const domainsSuggested = suggestDomains({ tags, topics: m?.topics, domains, ...signals }, input.known.aliases);
   const text = renderNote({
     id: input.purl,
     name,
@@ -90,7 +92,7 @@ function create(input: CaptureInput): Capture {
     domains,
     domainsSuggested,
     verdict: input.verdict,
-    whatItDoes: m?.description ?? undefined,
+    whatItDoes: m?.description ?? (m?.readme ? readmeOpening(m.readme).sentence : null) ?? undefined,
     useWhen: useWhen.length ? useWhen : input.useWhen,
     avoidWhen: avoidWhen.length ? avoidWhen : input.avoidWhen,
     myNotes: input.myNotes,

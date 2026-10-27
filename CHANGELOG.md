@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Discover: search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox. `repomagpie discover "pdf invoice" --domain api --language TypeScript` lists repositories with stars, forks, the last push, the licence, an estimated kind and domains, and whether a journal already has a note on each; `--json` for your agent. Filters: `--domain`, `--kind`, `--topic`, `--language`, `--min-stars` (10 by default), `--updated-within` (2 years by default), `--include-archived`, `--sort`, `--limit`, `--page`. A kind that only a repository's files can tell, such as `library` or `cli`, is chosen from the estimates, so the filter is approximate and says so. Without `GITHUB_TOKEN`, a domain or kind search sends 2 of GitHub's 10 searches a minute and says which topic it left out; if GitHub's limit stops a search partway, you get the results it found, with a warning. A limit that ends within a minute is waited out once, and the CLI says so. A note you already have shows its Verdict, or "What it does" when it has no Verdict, on one line. Searches are cached for 10 minutes. Discover sends your search words and filters to GitHub's search API, nothing from your journals, and only when you search. The MCP server stays offline: an agent runs `repomagpie discover --json`.
+- A Discover page in `repomagpie ui`, under Add: the same search with filters, result cards, "Add to inbox", "Add with a Verdict…", and several at once with "Add N to inbox", which says what was added, what was there already and what failed, and why. Without `GITHUB_TOKEN` it asks before adding more than 5, since each add uses about 3 to 5 of GitHub's 60 requests an hour.
+
+### Changed
+
+- A new note from a GitHub repository gets a better kind and better suggested domains. RepoMagpie now also reads the start of its README, the keywords in its `package.json`, `pyproject.toml` or `Cargo.toml`, and whether it is a GitHub Action. On 69 public repositories, the kind is right for 24 instead of 21, and 51 of 60 expected domains are suggested instead of 49, with no more wrong ones. A `profiling` topic no longer suggests `performance`: on a tracing library it means something else. A README without a description also gives the "What it does" draft. Notes you already have don't change.
+
 ## [0.2.0-beta.13] - 2026-10-26
 
 The fourteenth pre-release: domain suggestions now follow what a package is for. Browser automation and scraping tools aren't "testing", a Docker image doesn't make a project "devops", and a bare "ai" topic no longer comes first. Notes that already got suggestions from `repomagpie domains --suggest` in beta.12 keep them.

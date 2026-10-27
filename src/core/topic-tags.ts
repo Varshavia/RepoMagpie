@@ -32,7 +32,13 @@ export function rankTopics(topics: readonly unknown[], id: string, known: KnownT
   return usable.sort((a, b) => group(a) - group(b));
 }
 
-// The tags a new note gets from its topics.
-export function topicTags(topics: readonly unknown[], id: string, known: KnownTags): string[] {
-  return rankTopics(topics, id, known).slice(0, TAG_LIMIT);
+// The tags a new note gets from its topics. A manifest keyword (decision 0046) may fill a slot the
+// topics left, only when the journal knows it as a tag: in tags.md or on another note.
+export function topicTags(topics: readonly unknown[], id: string, known: KnownTags, keywords: readonly unknown[] = []): string[] {
+  const tags = rankTopics(topics, id, known).slice(0, TAG_LIMIT);
+  for (const keyword of rankTopics(keywords, id, known)) {
+    if (tags.length >= TAG_LIMIT) break;
+    if (!tags.includes(keyword) && (known.tagList.includes(keyword) || known.shared.has(keyword))) tags.push(keyword);
+  }
+  return tags;
 }

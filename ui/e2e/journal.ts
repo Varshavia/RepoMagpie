@@ -1,11 +1,12 @@
 // End-to-end fixtures: a temporary journal under <repo>/.scratch/e2e/ (never the OS temp folder, never
 // the real ~/.magpie), and magpie ui started on it from the source, serving the built app in dist/ui/.
 // The journal holds the example vault's notes, some of them back in the inbox, a note that can't be
-// read, and a project journal with one note. No network: nothing here fetches from GitHub.
+// read, and a project journal with one note. No network: nothing here fetches from GitHub, and the
+// Discover tests get a fake one (fake-github.ts).
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderNote } from "../../src/core/write.ts";
 import { SHOWCASE_PROJECT, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
 
@@ -167,10 +168,12 @@ export interface Running {
 }
 
 // magpie ui --no-open --json, from the source, on the journal; resolves once it prints its URL.
-export function startMagpie(j: Journal): Promise<Running> {
+// fakeGithub: GitHub answers from fake-github.ts instead of the network (the Discover tests).
+export function startMagpie(j: Journal, options: { fakeGithub?: boolean } = {}): Promise<Running> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: j.home, USERPROFILE: j.home, MAGPIE_HOME: j.journal };
   delete env.GITHUB_TOKEN;
-  const child: ChildProcess = spawn(process.execPath, [join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: j.project, env, stdio: ["ignore", "pipe", "pipe"] });
+  const preload = options.fakeGithub ? ["--import", pathToFileURL(join(REPO, "ui", "e2e", "fake-github.ts")).href] : [];
+  const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: j.project, env, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   let err = "";
   child.stderr?.on("data", (chunk) => (err += chunk));

@@ -197,6 +197,22 @@ test("adopt to project", async ({ page, magpie }) => {
 });
 
 // The README's journal, so the labels can be checked by eye on a graph of its size (decision 0044).
+test.describe("discover", () => {
+  test.use({ fakeGithub: true });
+  test("discover: results, one added, one in the journal", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Discover", exact: true }).click();
+    await shoot(page, "20-discover-first-visit");
+    await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+    await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+    await expect(page.getByText("In your personal journal")).toBeVisible();
+    await page.getByRole("button", { name: "Add google-labs-code/design.md to your inbox" }).click();
+    await expect(page.getByRole("link", { name: "Added" })).toBeFocused();
+    await page.getByRole("checkbox", { name: "Select radix-ui/primitives" }).check();
+    await shoot(page, "21-discover-results");
+  });
+});
+
 test.describe("graph", () => {
   test.use({ showcase: true });
 

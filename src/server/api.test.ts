@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
@@ -42,7 +42,7 @@ A PDF library.
 `;
 const LEFT_PAD = "---\nid: pkg:npm/left-pad\nname: left-pad\nexplored: 2026-10-03\nkind: library\ntags: []\ntried: false\nrating:\nstatus: inbox\n---\n\n## Verdict\n";
 
-async function start(t: TestContext, options: { open?: (path: string) => Promise<void>; assets?: string } = {}) {
+async function start(t: TestContext, options: { open?: (path: string) => Promise<void>; assets?: string; fetch?: Fetch } = {}) {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--left-pad.md": LEFT_PAD,
@@ -51,7 +51,7 @@ async function start(t: TestContext, options: { open?: (path: string) => Promise
     "project/.magpie/notes/npm--pdfkit.md": PDFKIT.replace("avoid: async streams painful; use puppeteer", "fine for invoices"),
     "project/package.json": "{}",
   });
-  const fetch = fakeFetch(recorded("microsoft--playwright-cli"));
+  const fetch = options.fetch ?? fakeFetch(recorded("microsoft--playwright-cli"));
   const context: Context = { home: box.home, env: { MAGPIE_HOME: box.journal }, cwd: box.project, fetch, today: () => "2026-10-04" };
   const opened: string[] = [];
   const server = await startServer({ context, open: options.open ?? (async (path) => { opened.push(path); }), log: () => {}, assets: options.assets });
@@ -84,6 +84,49 @@ test("GET /api/search returns exactly magpie search --json", async (t) => {
     assert.deepEqual(parsed(await http.get(`/api/search?${query}`)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, query);
   }
   for (const query of ["q=pdf&kind=gadget", "q=pdf&limit=0", "q=pdf&limit=x", "q=pdf&journal=both", "q=pdf&match=all"]) assert.equal((await http.get(`/api/search?${query}`)).status, 400, query);
+});
+
+// Every search answers with the recorded page of GitHub's search, whatever its query.
+const [SEARCH] = Object.values(recorded("search"));
+const searchFetch = (calls: string[] = [], delay = 0) =>
+  fakeFetch({}, [], (path) => {
+    if (!path.startsWith("/search/repositories?")) return undefined;
+    calls.push(path);
+    return new Promise((resolve) => setTimeout(() => resolve(new Response(JSON.stringify(SEARCH), { status: 200 })), delay));
+  });
+
+test("GET /api/discover returns exactly repomagpie discover --json; the CLI's flags as the query", async (t) => {
+  const fetch = searchFetch();
+  const { box, http } = await start(t, { fetch });
+  const cache = join(box.journal, ".cache", "discover.json");
+  const fresh = () => existsSync(cache) && unlinkSync(cache); // each side searches, so neither reads the other's answer
+  const cases: [string, string[]][] = [
+    ["q=design+system", ["discover", "design system"]],
+    ["q=ui&domain=styling&kind=library&topic=react&topic=css&language=TypeScript&min_stars=100&updated_within=6&include_archived=true&sort=forks&limit=5&page=2", ["discover", "ui", "--domain", "styling", "--kind", "library", "--topic", "react", "--topic", "css", "--language", "TypeScript", "--min-stars", "100", "--updated-within", "6", "--include-archived", "--sort", "forks", "--limit", "5", "--page", "2"]],
+    ["q=", ["discover"]],
+    ["q=x&page=100", ["discover", "x", "--page", "100"]],
+  ];
+  for (const [query, argv] of cases) {
+    fresh();
+    const expected = await cli(box, argv, fetch);
+    fresh();
+    assert.deepEqual(parsed(await http.get(`/api/discover?${query}`)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, query);
+  }
+  for (const query of ["q=x&domain=web", "q=x&kind=tool", "q=x&limit=x", "q=x&min_stars=-1", "q=x&sort=name", "q=x&include_archived=yes", "q=x&limit=51"]) {
+    assert.equal((await http.get(`/api/discover?${query}`)).status, 400, query);
+  }
+});
+
+test("GET /api/discover: one search at a time; the second gets the first's answer from the cache", async (t) => {
+  const calls: string[] = [];
+  const { http } = await start(t, { fetch: searchFetch(calls, 50) });
+  const [a, b] = await Promise.all([http.get("/api/discover?q=design+system"), http.get("/api/discover?q=design+system")]);
+  assert.equal(calls.length, 1);
+  assert.deepEqual([(JSON.parse(a.body) as { cached: boolean }).cached, (JSON.parse(b.body) as { cached: boolean }).cached].sort(), [false, true]);
+  const offline = await start(t, { fetch: (async () => { throw new TypeError("fetch failed"); }) as Fetch });
+  const failed = parsed(await offline.http.get("/api/discover?q=x"));
+  assert.equal(failed.status, 422);
+  assert.equal((failed.document as { problem: { kind: string } }).problem.kind, "offline");
 });
 
 test("GET /api/recall returns exactly magpie recall --json", async (t) => {

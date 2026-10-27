@@ -46,6 +46,7 @@ The product's category moved:
 | 16 | A community hub and registry | Candidate | after the tester round | Sharing journals; prompt-injection risk |
 | 17 | Measuring skill compliance | Built for Claude Code (`evals/skill/`); no results yet | 0.2 | Turns "as well as the agent follows the skill" into a number |
 | 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
+| 19 | Discover | **Built** ([decision 0045](decisions/0045-discover.md)); five follow-ups are candidates | 0.2 | Finding what to note, not only noting what you found |
 
 ---
 
@@ -311,6 +312,16 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Risks:** an identity that differs from what other tools use.
 - **What decides it:** users noting models and datasets by hand already.
 - **Status:** candidate, after the tester round.
+
+## 19. Discover
+
+- **What it is:** `repomagpie discover` and the app's Discover page search GitHub's repositories by words, a domain, a kind, a language, stars and activity, show stars, forks, the last push, the licence, an estimated kind and domains and whether a journal has a note, and add the chosen ones to the inbox through `repomagpie note <url>` ([decision 0045](decisions/0045-discover.md), [spec](spec.md), [UI](ui.md), §7). New notes are classified with the README's start, manifest keywords and an Action file too ([decision 0046](decisions/0046-classification-signals.md)).
+- **Status:** built (2026-10-26, `feat/discover`). The follow-ups below are candidates, after the tester round:
+  - **A Discover MCP tool:** only with a decision that changes [decision 0034](decisions/0034-the-mcp-server.md)'s promise that the MCP server never opens a network connection. Until then an agent runs `repomagpie discover --json`.
+  - **The agent proposing kind and domains from the README:** the user's agent reads the README and suggests both, the user confirms; RepoMagpie itself still calls no model.
+  - **Learning from the user's corrections:** a kind or domain the user changed after a draft as a signal for the next drafts, kept on the user's machine.
+  - **skills.sh as a source:** search the skills directory too, for skill packs.
+  - **Kind accuracy:** `npm run eval:classification` gets the kind right for 24 of 69 repositories (34.8%; 21 before decision 0046). Of the 45 wrong, 27 come out `other` because no rule fires, 6 are [decision 0030](decisions/0030-github-topics-become-tags.md)'s rule 10 (three folders with a `SKILL.md` make a skill pack) on frameworks, libraries and apps that ship skills for their users (playwright, prisma, trpc, vercel/ai, firecrawl, chakra-ui: 6 of the 7 repositories it calls skill packs), and 12 get another wrong kind. The named cases still wrong: supabase `other` (expected `platform`), playwright `skill-pack` (`framework`), chakra-ui `skill-pack` and radix-ui/primitives `other` (`library`), actions/checkout `library` and docker/build-push-action `app` (`other`). Changing rule 10 or the order changes 0030, so it needs a new record and the eval run before and after.
 
 ---
 

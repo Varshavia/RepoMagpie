@@ -10,6 +10,7 @@ export type View =
   | { page: "search" }
   | { page: "add"; target?: string } // target: from an unresolved [[link]]
   | { page: "import" }
+  | { page: "discover" }
   | { page: "recall" }
   | { page: "suggest" }
   | { page: "graph"; focus?: string } // focus: "Show in graph", the note's node key
@@ -48,6 +49,8 @@ export function viewTitle(view: View): string {
       return "Add a note";
     case "import":
       return "Import";
+    case "discover":
+      return "Discover";
     case "recall":
       return "Check a package";
     case "suggest":

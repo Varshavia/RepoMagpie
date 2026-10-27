@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { countSkillFolders, draftKind, fetchRepository, packageFromManifest, type Fetch } from "./github.ts";
+import { countSkillFolders, draftKind, fetchRepository, manifestKeywords, packageFromManifest, readmeOpening, readmeStart, type Fetch, type FetchProblem } from "./github.ts";
 
 // Recorded GET responses (src/core/fixtures/github/); no test touches the network.
 function recorded(name: string): Record<string, unknown> {
@@ -79,6 +79,9 @@ test("playwright-cli: metadata, skills by folder name, package and bin from the 
       packages: ["pkg:npm/%40playwright/cli"],
       plugin: false,
       bin: true,
+      keywords: [],
+      readme: "# playwright-cli\n\nPlaywright CLI with SKILLS\n\n### Playwright CLI vs Playwright MCP\n\nThis package provides CLI interface into Playwright. If you are using coding agents, that is the best fit.\n\n### Key Features\n\n- Token-efficient. Does not force page data into LLM.\n\n## Installation",
+      action: false,
     },
     warnings: [],
   });
@@ -153,6 +156,7 @@ test("only GET requests to api.github.com, with GitHub's headers and no token wh
     "https://api.github.com/repos/microsoft/playwright-cli",
     "https://api.github.com/repos/microsoft/playwright-cli/git/trees/main?recursive=1",
     "https://api.github.com/repos/microsoft/playwright-cli/contents/package.json?ref=main",
+    "https://api.github.com/repos/microsoft/playwright-cli/readme",
   ]);
   for (const call of calls) {
     assert.equal(call.method, "GET");
@@ -162,6 +166,7 @@ test("only GET requests to api.github.com, with GitHub's headers and no token wh
   }
   assert.equal(calls[0].headers.Accept, "application/vnd.github+json");
   assert.equal(calls[2].headers.Accept, "application/vnd.github.raw+json");
+  assert.equal(calls[3].headers.Accept, "application/vnd.github.raw+json");
 });
 
 test("GITHUB_TOKEN is sent as a bearer token on every request", async () => {
@@ -187,23 +192,57 @@ test("a missing repository is not-found and names it", async () => {
 test("a used-up rate limit says until when, and suggests GITHUB_TOKEN only when none is set", async () => {
   const reset = String(Date.UTC(2026, 9, 4, 14, 5) / 1000);
   const limited = () => new Response("{}", { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset } });
-  const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited) });
+  const now = () => Date.UTC(2026, 9, 4, 14, 1);
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited), now });
   assert.ok(!r.ok);
   assert.equal(r.problem.kind, "rate-limit");
-  assert.match(r.problem.message, /14:05 UTC/);
+  assert.match(r.problem.message, /until 14:05 UTC/);
   assert.match(r.problem.message, /GITHUB_TOKEN/);
+  assert.equal(r.problem.reset, "2026-10-04T14:05:00.000Z");
 
-  const withToken = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited), token: TOKEN });
+  const withToken = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited), token: TOKEN, now });
   assert.ok(!withToken.ok);
   assert.doesNotMatch(withToken.problem.message, /GITHUB_TOKEN/);
 });
 
-test("429 and a secondary rate limit (403 with retry-after) are rate-limit", async () => {
-  for (const response of [() => new Response("{}", { status: 429 }), () => new Response("{}", { status: 403, headers: { "retry-after": "60" } })]) {
-    const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(response) });
+test("a reset time already past is never shown: in a minute instead, and no reset", async () => {
+  const reset = String(Date.UTC(2026, 9, 4, 14, 28) / 1000);
+  const limited = () => new Response("{}", { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset, "x-ratelimit-resource": "search" } });
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited), token: TOKEN, now: () => Date.UTC(2026, 9, 4, 14, 31) });
+  assert.ok(!r.ok);
+  assert.deepEqual(r.problem, { kind: "search-rate-limit", message: "GitHub's search limit is used up; try again in a minute." });
+});
+
+test("a primary limit with retry-after waits retry-after's seconds, not until x-ratelimit-reset", async () => {
+  const limited = () => new Response("{}", { status: 429, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Date.UTC(2026, 9, 4, 15, 0) / 1000), "retry-after": "30" } });
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(limited), token: TOKEN, now: () => Date.UTC(2026, 9, 4, 14, 31) });
+  assert.ok(!r.ok);
+  assert.deepEqual(r.problem, { kind: "rate-limit", message: "GitHub's rate limit is used up; try again in 30 seconds.", reset: "2026-10-04T14:31:30.000Z" });
+});
+
+test("a secondary rate limit (403 or 429 without remaining 0) is its own problem, timed by retry-after, never by a stale x-ratelimit-reset", async () => {
+  const now = () => Date.UTC(2026, 9, 4, 14, 31);
+  // The Windows report: a reset 3 minutes past beside retry-after, with requests still remaining.
+  const stale = String(Date.UTC(2026, 9, 4, 14, 28) / 1000);
+  const cases: [() => Response, FetchProblem][] = [
+    [() => new Response("{}", { status: 403, headers: { "retry-after": "60", "x-ratelimit-remaining": "7", "x-ratelimit-reset": stale, "x-ratelimit-resource": "search" } }),
+      { kind: "secondary-rate-limit", message: "GitHub's secondary rate limit stopped the request (too many requests too fast); try again in 60 seconds.", reset: "2026-10-04T14:32:00.000Z" }],
+    [() => new Response(JSON.stringify({ message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again." }), { status: 403 }),
+      { kind: "secondary-rate-limit", message: "GitHub's secondary rate limit stopped the request (too many requests too fast); try again in a minute." }],
+    [() => new Response("{}", { status: 429 }),
+      { kind: "secondary-rate-limit", message: "GitHub's secondary rate limit stopped the request (too many requests too fast); try again in a minute." }],
+    [() => new Response("{}", { status: 429, headers: { "retry-after": "600" } }),
+      { kind: "secondary-rate-limit", message: "GitHub's secondary rate limit stopped the request (too many requests too fast); wait until 14:41 UTC.", reset: "2026-10-04T14:41:00.000Z" }],
+  ];
+  for (const [response, problem] of cases) {
+    const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(response), now });
     assert.ok(!r.ok);
-    assert.equal(r.problem.kind, "rate-limit");
+    assert.deepEqual(r.problem, problem);
   }
+  // A 403 that isn't a rate limit stays an HTTP error.
+  const forbidden = await fetchRepository(PLAYWRIGHT, { fetch: failWith(() => new Response(JSON.stringify({ message: "Resource not accessible" }), { status: 403 })), now });
+  assert.ok(!forbidden.ok);
+  assert.equal(forbidden.problem.kind, "http");
 });
 
 test("a rejected token is auth", async () => {
@@ -362,6 +401,103 @@ for (const [title, over, kind] of KIND_CASES) {
     assert.equal(draftKind({ ...BASE, ...over }), kind);
   });
 }
+
+// --- decision 0046: keywords, the README, a GitHub Action ---
+
+test("draftKind: a manifest keyword counts where a topic does; the README decides only what would be other", () => {
+  assert.equal(draftKind({ ...BASE, keywords: ["framework"], packages: ["pkg:npm/widget"] }), "framework");
+  assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nA curated awesome list of charts." }), "awesome-list");
+  assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nA starter template for Vite apps." }), "template");
+  assert.equal(draftKind({ ...BASE, readme: "# Widget CLI\n\nCharts in your terminal." }), "cli");
+  assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nA command-line tool for charts." }), "cli");
+  assert.equal(draftKind({ ...BASE, packages: ["pkg:npm/widget"], readme: "# Widget CLI" }), "library"); // a package beats the README
+  assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nCharts for apps.\n\n## Use the CLI" }), "other"); // only the first heading and sentence
+  assert.equal(draftKind({ ...BASE, readme: "# Widget\n\nPublic client library." }), "other"); // a whole word: not "public"
+});
+
+test("manifestKeywords: package.json keywords, pyproject [project] keywords, Cargo keywords and categories, spelled as topics", () => {
+  assert.deepEqual(manifestKeywords("package.json", JSON.stringify({ keywords: ["Testing", "web scraping", "e2e_tests", 3, "x".repeat(51), "testing"] })), ["testing", "web-scraping", "e2e-tests"]);
+  assert.deepEqual(manifestKeywords("package.json", "not json"), []);
+  assert.deepEqual(manifestKeywords("pyproject.toml", `[tool.x]\nkeywords = ["no"]\n[project]\nname = "w"\nkeywords = [\n  "LLM",\n  'agents', # a comment\n]\n`), ["llm", "agents"]);
+  assert.deepEqual(manifestKeywords("Cargo.toml", `[package]\nname = "w"\nkeywords = ["cli", "search"]\ncategories = ["command-line-utilities", "development-tools::testing"]\n`), ["cli", "search", "command-line-utilities", "development-tools", "testing"]);
+  assert.deepEqual(manifestKeywords("Cargo.toml", `[package]\nname = "w"\n`), []);
+});
+
+test("readmeStart: badges, images, HTML, comments, code blocks and link targets go; text, headings and markers stay; 3,000 characters", () => {
+  const md = [
+    "<p align=\"center\"><img src=\"logo.png\"></p>",
+    "[![CI](https://x/badge.svg)](https://x) ![npm](https://y.svg)",
+    "<!-- a hidden comment -->",
+    "# Widget",
+    "",
+    "Widget draws **charts** with [D3](https://d3js.org) and `canvas`. See [docs][1].",
+    "",
+    "```bash",
+    "npm install widget",
+    "```",
+    "",
+    "| a | b |",
+    "|---|---|",
+    "[1]: https://docs",
+    `Hidden ${String.fromCharCode(0x202e)}text.`,
+  ].join("\r\n");
+  assert.equal(readmeStart(md), `# Widget\n\nWidget draws charts with D3 and canvas. See docs.\n\n| a | b |\n\nHidden <U+202E>text.`);
+  assert.equal(readmeStart(`# A\n\n${"word ".repeat(1000)}`).length, 3000);
+  assert.equal(readmeStart("```\nnever closed\ncode"), "");
+});
+
+test("readmeStart: entities are decoded once, in one pass: an escaped entity stays an entity", () => {
+  assert.equal(readmeStart("Tom &amp; Jerry &lt;3 &quot;cats&quot; &#39;n&#39;&nbsp;mice &gt; dogs"), `Tom & Jerry <3 "cats" 'n' mice > dogs`);
+  assert.equal(readmeStart("Write &amp;lt;b&amp;gt; for bold."), "Write &lt;b&gt; for bold.");
+  assert.equal(readmeStart("&amp;amp; and &copy; stay"), "&amp; and &copy; stay");
+});
+
+test("readmeOpening: the first heading, and the first sentence of the first line of prose", () => {
+  assert.deepEqual(readmeOpening("# Widget #\n\nDiscord\nDocs | Discord | Blog post here\n[!IMPORTANT] Moved to a new home now\n- Draws charts for apps. Fast too.\n"), { heading: "Widget", sentence: "Draws charts for apps." });
+  assert.deepEqual(readmeOpening("Widget, version 2 of it\n"), { heading: null, sentence: "Widget, version 2 of it" });
+  assert.deepEqual(readmeOpening(""), { heading: null, sentence: null });
+});
+
+test("readmeKind: an awesome list's title starts with Awesome", () => {
+  assert.equal(draftKind({ ...BASE, readme: "# Awesome MCP Servers\n\nServers, by category." }), "awesome-list");
+  assert.equal(draftKind({ ...BASE, readme: "# Awesomeness\n\nServers, by category." }), "other");
+});
+
+test("the README: read raw; none (404) is no warning; one that can't be read is a warning and no README", async () => {
+  const none = await fetchRepository(KARPATHY, { fetch: fakeFetch(recorded("multica-ai--andrej-karpathy-skills")) });
+  assert.ok(none.ok);
+  assert.equal(none.metadata.readme, null);
+  assert.deepEqual(none.warnings, []);
+  const fetch = fakeFetch(recorded("microsoft--playwright-cli"), [], (path) => (path.endsWith("/readme") ? Promise.resolve(new Response("{}", { status: 500 })) : undefined));
+  const failed = await fetchRepository(PLAYWRIGHT, { fetch });
+  assert.ok(failed.ok);
+  assert.equal(failed.metadata.readme, null);
+  assert.deepEqual(failed.warnings, ["Couldn't read the README: GitHub answered 500. The kind and domains come from the topics and files only."]);
+  // read even when the file list fails
+  const noTree = fakeFetch(recorded("microsoft--playwright-cli"), [], (path) => (path.includes("/git/trees/") ? Promise.resolve(new Response("{}", { status: 500 })) : undefined));
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: noTree });
+  assert.ok(r.ok);
+  assert.match(r.metadata.readme ?? "", /^# playwright-cli/);
+});
+
+test("a root action.yml or action.yaml is a GitHub Action; one in a folder isn't", async () => {
+  for (const [path, action] of [["action.yml", true], ["action.yaml", true], ["sub/action.yml", false]] as const) {
+    const responses = recorded("multica-ai--andrej-karpathy-skills");
+    responses["/repos/multica-ai/andrej-karpathy-skills/git/trees/main?recursive=1"] = { tree: [{ path, type: "blob" }] };
+    const r = await fetchRepository(KARPATHY, { fetch: fakeFetch(responses) });
+    assert.ok(r.ok);
+    assert.equal(r.metadata.action, action, path);
+  }
+});
+
+test("manifest keywords come from every root manifest, each once", async () => {
+  const responses = recorded("microsoft--playwright-cli");
+  const key = "/repos/microsoft/playwright-cli/contents/package.json?ref=main";
+  responses[key] = JSON.stringify({ name: "@playwright/cli", keywords: ["playwright", "Testing", "testing"] });
+  const r = await fetchRepository(PLAYWRIGHT, { fetch: fakeFetch(responses) });
+  assert.ok(r.ok);
+  assert.deepEqual(r.metadata.keywords, ["playwright", "testing"]);
+});
 
 test("countSkillFolders: one per folder holding a SKILL.md, the root included; not inside a hidden folder", () => {
   assert.equal(countSkillFolders(["SKILL.md", "skills/a/SKILL.md", "skills/b/SKILL.md", "skills/b/SKILL.md", "README.md"]), 3);

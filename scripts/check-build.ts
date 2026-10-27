@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { copyFolder, removeFolder } from "../src/core/copy-folder.ts";
 import { HOOK_AGENTS } from "../src/hook/agents.ts";
 
@@ -25,8 +25,10 @@ const root = mkdtempSync(join(base, "run-"));
 const hook = (command: string) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } });
 // quiet: the command prints nothing (the hook on a command that installs nothing). restores: the
 // example note the command moves to the trash, put back before each run; the trash name's UTC stamp
-// may differ between the two runs, so it isn't compared.
-const CASES: { args: string[]; input?: string; quiet?: boolean; restores?: string }[] = [
+// may differ between the two runs, so it isn't compared. github: the run gets recorded answers from
+// GitHub's search instead of the network (src/core/fixtures/fake-github.ts) and starts without
+// Discover's cache, so the second run doesn't read the first's answer.
+const CASES: { args: string[]; input?: string; quiet?: boolean; restores?: string; github?: boolean }[] = [
   { args: ["--version"] },
   { args: ["--help"] },
   { args: ["recall", "@playwright/cli", "--type", "npm", "--json"] },
@@ -47,7 +49,9 @@ const CASES: { args: string[]; input?: string; quiet?: boolean; restores?: strin
   { args: ["hook", "copilot"], input: JSON.stringify({ toolName: "powershell", toolArgs: { command: "npm install @playwright/cli" } }), quiet: true },
   // So does Cursor's.
   { args: ["hook", "cursor"], input: JSON.stringify({ hook_event_name: "beforeShellExecution", command: "npm install @playwright/cli" }), quiet: true },
-  { args: ["delete", "https://github.com/mattpocock/skills", "--yes", "--json"], restores: "github--mattpocock--skills.md" },
+  { args: ["discover", "design system", "--json"], github: true },
+  { args: ["discover", "design system"], github: true },
+  { args: ["delete","https://github.com/mattpocock/skills", "--yes", "--json"], restores: "github--mattpocock--skills.md" },
 ];
 const vault = fileURLToPath(new URL("../examples/vault/notes/", import.meta.url));
 
@@ -72,13 +76,15 @@ try {
   const home = join(root, "home");
   mkdirSync(home);
   const env = { ...process.env, MAGPIE_HOME: join(root, "journal"), NO_COLOR: "1", HOME: home, USERPROFILE: home, APPDATA: join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: join(home, ".config"), CODEX_HOME: join(home, ".codex") };
-  for (const { args, input, quiet, restores } of CASES) {
+  const fakeGithub = pathToFileURL(fileURLToPath(new URL("../src/core/fixtures/fake-github.ts", import.meta.url))).href;
+  for (const { args, input, quiet, restores, github } of CASES) {
     const run = (main: string) => {
       if (restores) {
         removeFolder(join(root, "journal", ".trash"));
         copyFileSync(join(vault, restores), join(root, "journal", "notes", restores));
       }
-      const result = spawnSync(process.execPath, [main, ...args], { cwd: project, input, encoding: "utf8", env });
+      if (github) removeFolder(join(root, "journal", ".cache"));
+      const result = spawnSync(process.execPath, [...(github ? ["--import", fakeGithub] : []), main, ...args], { cwd: project, input, encoding: "utf8", env });
       return restores ? { ...result, stdout: result.stdout.replace(/\.\d{8}-\d{6}Z\.md/g, ".<stamp>.md") } : result;
     };
     const [b, s] = [run(built), run(source)];

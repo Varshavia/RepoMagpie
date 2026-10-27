@@ -1,5 +1,6 @@
 // The global flags, and the context core needs from a command's I/O. Kept apart from the commands
 // so a quick command loads nothing else (spec §7 budgets).
+import type { Fetch } from "../core/github.ts";
 import { takeSkipped } from "../core/note-cache.ts";
 import type { Context } from "../core/save.ts";
 import { clean } from "../core/text.ts";
@@ -12,7 +13,32 @@ export interface GlobalOptions {
 }
 
 export function contextOf(io: Io, options: GlobalOptions): Context {
-  return { home: io.home, env: io.env, cwd: io.cwd, homeFlag: options.home, projectFlag: options.project, fetch: io.fetch, today: io.today };
+  const fetch = io.env.REPOMAGPIE_DEBUG_HTTP === "1" ? debugFetch(io.fetch, io.err) : io.fetch;
+  return { home: io.home, env: io.env, cwd: io.cwd, homeFlag: options.home, projectFlag: options.project, fetch, today: io.today };
+}
+
+// REPOMAGPIE_DEBUG_HTTP=1 (spec §1): one stderr line for each GitHub request, for a diagnosis: this
+// machine's time, the path and query, the status, the Date, Retry-After and X-RateLimit-* headers
+// GitHub answered with, and the body's first 200 characters when the status isn't 200. Nothing we
+// send is printed, so never the token.
+const DEBUG_HEADERS = ["date", "retry-after", "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-used", "x-ratelimit-reset", "x-ratelimit-resource"];
+
+export function debugFetch(fetch: Fetch, err: (text: string) => void): Fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const line = (text: string) => err(`debug http: ${clean(text.replace(/\s+/g, " "))}\n`);
+    let response: Response;
+    try {
+      response = await fetch(input, init);
+    } catch (error) {
+      line(`${new Date().toISOString()} GET ${url.pathname}${url.search} failed: ${(error as Error).name}`);
+      throw error;
+    }
+    const headers = DEBUG_HEADERS.flatMap((name) => (response.headers.has(name) ? [`${name}: ${response.headers.get(name)}`] : []));
+    const body = response.status === 200 ? "" : ` body: ${(await response.clone().text().catch(() => "")).slice(0, 200)}`;
+    line(`${new Date().toISOString()} GET ${url.pathname}${url.search} -> ${response.status}; ${headers.join("; ")}${body}`);
+    return response;
+  }) as Fetch;
 }
 
 // The I/O of a command that prints no colour of its own (note, import, tags, adopt): every line it
