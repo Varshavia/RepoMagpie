@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.14] - 2026-10-27
+
+The fifteenth pre-release: Discover. Search GitHub from the CLI or the app by words, concern and kind, see which repositories you already have a note on, and add the ones you choose to your inbox. New notes from GitHub get a better kind and better suggested domains, and a wrong suggested domain goes in one click, with Undo.
+
 ### Added
 
-- Discover: search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox. `repomagpie discover "pdf invoice" --domain api --language TypeScript` lists repositories with stars, forks, the last push, the licence, an estimated kind and domains, and whether a journal already has a note on each; `--json` for your agent. Filters: `--domain`, `--kind`, `--topic`, `--language`, `--min-stars` (10 by default), `--updated-within` (2 years by default), `--include-archived`, `--sort`, `--limit`, `--page`. A kind that only a repository's files can tell, such as `library` or `cli`, is chosen from the estimates, so the filter is approximate and says so. Without `GITHUB_TOKEN`, a domain or kind search sends 2 of GitHub's 10 searches a minute and says which topic it left out; if GitHub's limit stops a search partway, you get the results it found, with a warning. A limit that ends within a minute is waited out once, and the CLI says so. A note you already have shows its Verdict, or "What it does" when it has no Verdict, on one line. Searches are cached for 10 minutes. Discover sends your search words and filters to GitHub's search API, nothing from your journals, and only when you search. The MCP server stays offline: an agent runs `repomagpie discover --json`.
+- Discover: search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox. `repomagpie discover "pdf invoice" --domain api --language TypeScript` lists repositories with stars, forks, the last push, the licence, an estimated kind and domains, and whether a journal already has a note on each; `--json` for your agent. Filters: `--domain`, `--kind`, `--topic`, `--language`, `--min-stars` (10 by default), `--updated-within` (2 years by default), `--include-archived`, `--sort`, `--limit`, `--page`. A kind that only a repository's files can tell, such as `library` or `cli`, is chosen from the estimates, so the filter is approximate and says so. Without `GITHUB_TOKEN`, a domain or kind search sends 2 of GitHub's 10 searches a minute and says which topic it left out; if GitHub's limit stops a search partway, you get the results it found, with a warning. A limit that ends within a minute is waited out once, and the CLI says so. A note you already have shows its Verdict, or "What it does" when it has no Verdict, on one line. Searches are cached for 10 minutes. Discover sends your search words and filters to GitHub's search API, nothing from your journals, and only when you search. The MCP server stays offline: an agent runs `repomagpie discover --json`. To see why GitHub limits a search, `REPOMAGPIE_DEBUG_HTTP=1` prints each GitHub request's status and rate-limit headers on stderr, never a token.
 - A Discover page in `repomagpie ui`, under Add: the same search with filters, result cards, "Add to inbox", "Add with a Verdict…", and several at once with "Add N to inbox", which says what was added, what was there already and what failed, and why. Without `GITHUB_TOKEN` it asks before adding more than 5, since each add uses about 3 to 5 of GitHub's 60 requests an hour.
 - Remove a suggested domain in `repomagpie ui`: the × beside a suggested domain's check takes that suggestion out of the note, and nothing else changes. The toast offers Undo for 10 seconds, which puts it back where it was. `repomagpie domains --suggest` doesn't bring a removed suggestion back.
 
@@ -312,7 +316,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...HEAD
+[0.2.0-beta.14]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...v0.2.0-beta.14
 [0.2.0-beta.13]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...v0.2.0-beta.13
 [0.2.0-beta.12]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...v0.2.0-beta.12
 [0.2.0-beta.11]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.10...v0.2.0-beta.11

@@ -4,7 +4,7 @@ description: Reads and records the user's own notes on dependencies and tools wi
 license: MIT
 compatibility: Needs the repomagpie MCP server, or a shell and the repomagpie command; both come from the npm package repomagpie (source and releases at github.com/Varshavia/RepoMagpie; Node.js 22.12 or later).
 metadata:
-  version: "0.2.0-beta.13"
+  version: "0.2.0-beta.14"
 ---
 
 # RepoMagpie

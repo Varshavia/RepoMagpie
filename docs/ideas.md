@@ -316,7 +316,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 ## 19. Discover
 
 - **What it is:** `repomagpie discover` and the app's Discover page search GitHub's repositories by words, a domain, a kind, a language, stars and activity, show stars, forks, the last push, the licence, an estimated kind and domains and whether a journal has a note, and add the chosen ones to the inbox through `repomagpie note <url>` ([decision 0045](decisions/0045-discover.md), [spec](spec.md), [UI](ui.md), §7). New notes are classified with the README's start, manifest keywords and an Action file too ([decision 0046](decisions/0046-classification-signals.md)).
-- **Status:** built (2026-10-26, `feat/discover`). The follow-ups below are candidates, after the tester round:
+- **Status:** built (2026-10-26, `feat/discover`), released in `0.2.0-beta.14` (2026-10-27). The follow-ups below are candidates, after the tester round:
   - **A Discover MCP tool:** only with a decision that changes [decision 0034](decisions/0034-the-mcp-server.md)'s promise that the MCP server never opens a network connection. Until then an agent runs `repomagpie discover --json`.
   - **The agent proposing kind and domains from the README:** the user's agent reads the README and suggests both, the user confirms; RepoMagpie itself still calls no model.
   - **Learning from the user's corrections:** a kind or domain the user changed after a draft as a signal for the next drafts, kept on the user's machine.
