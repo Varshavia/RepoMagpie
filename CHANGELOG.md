@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- New notes from GitHub get a better kind: a GitHub Action is `other`, a library or framework that ships agent skills for its users is no longer a skill pack, and the topics `orm`, `ui-library` and `testing-framework` and a few phrases at the start of the README, such as "a framework for" or "component library", name the kind. On 69 public repositories the kind is right for 37 instead of 24; on 30 others, checked only at the end, for 15 instead of 14. Notes you already have don't change.
+
 ## [0.2.0-beta.14] - 2026-10-27
 
 The fifteenth pre-release: Discover. Search GitHub from the CLI or the app by words, concern and kind, see which repositories you already have a note on, and add the ones you choose to your inbox. New notes from GitHub get a better kind and better suggested domains, and a wrong suggested domain goes in one click, with Undo.
