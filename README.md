@@ -45,7 +45,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 - **Discover:** search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox: `repomagpie discover`, or Discover in the app.
 - **Start from a project:** `repomagpie init --auto` lists its dependencies by what your notes say (avoid, noted, no note), then asks for your Verdict on each one without a note; Enter skips, `q` stops.
 
-**Status:** pre-release `0.2.0-beta.13`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.14`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
