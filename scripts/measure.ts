@@ -341,12 +341,15 @@ export function defaultCollectors(commit: string): Record<string, Collector> {
         return numbers;
       }],
       ["eval-classification.ts", () => {
-        const c = scriptJson<{ repositories: number; after: { kindRight: number; suggested: number; right: number; expected: number } }>("eval-classification.ts", ["--json"]);
+        type Scores = { repositories: number; after: { kindRight: number; suggested: number; right: number; expected: number } };
+        const c = scriptJson<Scores & { holdout: Scores }>("eval-classification.ts", ["--json", "--holdout"]);
         return {
           "kind accuracy": higher((100 * c.after.kindRight) / c.repositories, "%"),
           "kind right": higher(c.after.kindRight, "count"),
           "domain precision": higher((100 * c.after.right) / (c.after.suggested || 1), "%"),
           "domain recall": higher((100 * c.after.right) / (c.after.expected || 1), "%"),
+          "held-out kind accuracy": higher((100 * c.holdout.after.kindRight) / c.holdout.repositories, "%"),
+          "held-out kind right": higher(c.holdout.after.kindRight, "count"),
         };
       }],
     ]),
