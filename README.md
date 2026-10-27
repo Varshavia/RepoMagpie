@@ -38,9 +38,11 @@ Do you want to proceed?
 
 In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
-- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers once, at the end of a task, to save a dependency decision made in it, with your reason, in your words, as the Verdict. Notes are Markdown files you own.
+- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers once, at a task's end, to save a dependency decision made in it, with your reason as the Verdict. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
+- **Find by concern:** ask about security, database, testing… in any language; your agent maps the question onto domains and finds the notes that fit, even ones that share no word with it.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
+- **Discover:** search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox: `repomagpie discover`, or Discover in the app.
 - **Start from a project:** `repomagpie init --auto` lists its dependencies by what your notes say (avoid, noted, no note), then asks for your Verdict on each one without a note; Enter skips, `q` stops.
 
 **Status:** pre-release `0.2.0-beta.13`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
@@ -71,7 +73,7 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   `--type npm` says the name is an npm package. Inside a project, RepoMagpie reads that from its manifest; elsewhere it asks.
+   `--type npm` says the name is an npm package. Inside a project, RepoMagpie reads that from its manifest; elsewhere it asks. `--use-when` lets you find the note later by what you need, not only by name. For notes you already have, `repomagpie domains --suggest --dry-run` shows suggested domains (drop `--dry-run` to write them, for you to confirm), and `repomagpie tags --merge postgres postgresql` merges two spellings of a tag.
 
    Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
 
@@ -89,7 +91,7 @@ There is no extra model, no API key and no telemetry. RepoMagpie works through t
 ## Ask your agent
 
 - **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first; on a small journal it can read every note in one list.
-- **How should database security work in this project?** Your agent maps the question onto domains (security, database) and the project's technologies, in any language you ask in, and answers with your notes on those packages, saying why each one fits.
+- **How should database security work in this project?** Your agent answers with your notes in the security and database domains that fit the project's technologies, saying why each one fits.
 - **Install pdfkit.** Your agent recalls pdfkit before the install. Your avoid note comes back with its alternatives, and your agent asks you before it installs anything.
 - **Which of my tools fit this project?** `suggest` reads the project's manifests and README and returns the notes that match; your agent picks the ones that fit, says why, and names any dependency in use that you noted to avoid.
 
@@ -136,7 +138,7 @@ Suggest for this project: the notes that fit, and why each one is a candidate.
 
 ![Suggest in repomagpie ui: microsoft/playwright first, matched on the @playwright/test dependency; pdfkit listed apart as in use with an avoid note, with pdf-lib and puppeteer instead](docs/assets/screen-suggest.png)
 
-See a journal as a graph: notes, their tags, `[[links]]` and alternatives. Click a note to read and edit it beside the graph.
+See a journal as a graph: notes, their tags, `[[links]]` and alternatives, coloured by domain if you choose. Labels never overlap, and a tag on only one note stays hidden until you turn it on. Click a note to read and edit it beside the graph.
 
 ![The graph page in repomagpie ui on the maintainer's own journal: 39 notes, 67 tags and 157 connections, with the most connected tags and notes, such as #llm, #ai, #mcp and #claude-code, listed beside the graph](docs/assets/screen-graph.png)
 
@@ -161,14 +163,14 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 <details>
 <summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
 
-No. Your personal journal is a folder of Markdown files on your machine, a project journal is as visible as its repository, and there is no telemetry. The only network requests go to GitHub's API, when you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository: they read its metadata, file list and root manifests, and send `GITHUB_TOKEN` if you set it, never anything from your journals. `repomagpie ui` listens on `127.0.0.1` only, and `repomagpie mcp` never opens a network connection or a port: it talks to your agent over stdio. Your agent sees the notes it reads, and its model provider gets them as part of the conversation. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+No. Your personal journal is a folder of Markdown files on your machine, a project journal is as visible as its repository, and there is no telemetry. The only network requests go to GitHub's API. When you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository, they read its metadata, file list, root manifests and README. When you search with `repomagpie discover` or the app's Discover page, it sends your search words and filters, nothing else. Both send `GITHUB_TOKEN` if you set it, never anything from your journals. `repomagpie ui` listens on `127.0.0.1` only, and `repomagpie mcp` never opens a network connection or a port: it talks to your agent over stdio. Your agent sees the notes it reads, and its model provider gets them as part of the conversation. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
 
 </details>
 
 <details>
 <summary><strong>Does RepoMagpie use AI?</strong></summary>
 
-Not a model of its own. RepoMagpie's commands match package names and words, and call no model. The AI is the coding agent you already use: through the skill and the MCP tools, it recalls your notes before an install, searches them when you ask what you have, and offers once, at the end of a task, to save a dependency decision. The skill tells it never to write your Verdict for you (only your words, or nothing), never to delete a note unless you ask for that note by name, and never to install a package you noted to avoid without asking you; where your agent has a hook, the hook checks that last one too. RepoMagpie itself sends nothing from your journals anywhere. Your agent's model provider sees what your agent reads, as the answer above says.
+Not a model of its own. RepoMagpie's commands match package names and words, and call no model. The AI is the coding agent you already use: through the skill and the MCP tools, it recalls your notes before an install, searches them when you ask what you have, and offers once, at the end of a task, to save a dependency decision. The skill tells it never to write your Verdict for you (only your words, or nothing), never to delete a note unless you ask for that note by name, and never to install a package you noted to avoid without asking you; where your agent has a hook, the hook checks that last one too.
 
 </details>
 
@@ -203,24 +205,13 @@ Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries,
 <details>
 <summary><strong>Where are my notes, and can I edit them by hand?</strong></summary>
 
-Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`.
-
-Add `--use-when` so your notes are found later by what you need, not only by name: `repomagpie note zod --use-when "checking API input"`.
-
-`repomagpie delete <name>`, or Delete in the app, moves a note to the journal's `.trash/`.
-
-</details>
-
-<details>
-<summary><strong>How do I share notes with my team?</strong></summary>
-
-Write a note with `--to project`, or copy one with `repomagpie adopt <name>`, and commit `.magpie/`: see [Share notes with your team](#share-notes-with-your-team).
+Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`. `repomagpie delete <name>`, or Delete in the app, moves a note to the journal's `.trash/`.
 
 </details>
 
 ## Documentation
 
-- [Spec](docs/spec.md): every command (`search`, `recall`, `catalog`, `adopt`, `import`, `delete` and the rest; `repomagpie --help` lists them), flag and `--json` document
+- [Spec](docs/spec.md): every command (`search`, `recall`, `catalog`, `discover`, `adopt`, `import`, `delete` and the rest; `repomagpie --help` lists them), flag and `--json` document
 - [Agents](docs/agents.md): what each coding agent supports, and [setting up by hand](docs/setup-by-hand.md)
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules

@@ -22,6 +22,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: [Use when at capture](#use-when-at-capture-featuse-when-at-capture) (`feat/use-when-at-capture`), [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 0: `repomagpie note --use-when` and `--avoid-when`, the MCP `note` tool, the skill and the app; with the fix for nested and unclosed HTML comments. Merged (#53) and released in `0.2.0-beta.11` (2026-10-25); next is RFC 0001 Phase 1.
   Also now: [the next batch](#the-next-batch-featnext-batch) (`feat/next-batch`): RFC 0001 Phase 1 (domains, tag aliases, structured search), the Stop reminder, `repomagpie init --auto`, colour by domain in the graph, graph labels that never overlap, the skill-compliance eval and the project journal made visible. Merged (#55) and released in `0.2.0-beta.12` (2026-10-26); next, the maintainer runs the eval's dry scenario and the manual checks for `0.2.0-beta.12`.
   Also now: `0.2.0-beta.13` (2026-10-26): domain suggestions follow what a package is for, from the maintainer's run of `repomagpie domains --suggest` on a real journal (#58).
+  Also now: [Discover](#discover-featdiscover) (`feat/discover`, [decision 0045](decisions/0045-discover.md), [decision 0046](decisions/0046-classification-signals.md)): `repomagpie discover` and the app's Discover page search GitHub and add the chosen repositories to the inbox; new notes are classified with the README, manifest keywords and an Action file too. Built; waiting for review and the manual checks.
   Also now: the tester round on `0.2.0-beta.13`: two people, one on macOS and one on Windows, for a week. They follow [TESTING.md](../TESTING.md) and answer the "Beta feedback" issue form; [validation](validation.md#beta-tester-round) maps each question to the hypothesis it tests.
   Also now: the [manual checks](testing/manual-checks.md) only a person can run on a real machine, pending before the launch, one table per platform.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
@@ -417,6 +418,16 @@ H1 asks whether people will write notes ([validation](validation.md)). The commo
 - [ ] The [manual checks](testing/manual-checks.md) added for `0.2.0-beta.12`, run by the maintainer.
 
 **Done when:** each part's tests and checks pass; the eval's dry scenario shows the install checks can see a denied install; the manual checks for `0.2.0-beta.12` pass.
+
+### Discover (`feat/discover`)
+Find repositories worth a note, not only note the ones you found ([idea 19](ideas.md#19-discover)).
+- [x] `repomagpie discover`: GitHub's search by words, a domain, a kind, topics, a language, stars and activity, with stars, forks, the last push, the licence, an estimated kind and domains, and whether a journal has a note; `--json`, a 10-minute cache, the skill's paragraph ([decision 0045](decisions/0045-discover.md)).
+- [x] Sturdier classification of new notes: the README's start, manifest keywords and an Action file, measured by `npm run eval:classification` on 69 repositories ([decision 0046](decisions/0046-classification-signals.md)).
+- [x] The app's Discover page: filters, result cards, Add to inbox, Add with a Verdict, several at once, the states, More results ([UI](ui.md), §7).
+- [x] Docs: the READMEs, SECURITY.md, the spec, the app's doc, the glossary, ideas, the changelog and the manual checks.
+- [ ] The [manual checks](testing/manual-checks.md) for Discover, run by the maintainer.
+
+**Done when:** `repomagpie discover` and the Discover page search GitHub and add to the inbox through `repomagpie note <url>`; nothing calls GitHub unless the user searches or adds, and the MCP server stays offline; `eval:classification` shows the numbers before and after; every check passes.
 
 ## v0.3 Trust
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.

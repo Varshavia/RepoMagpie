@@ -59,6 +59,9 @@ src/
                delete: moving a note to <journal>/.trash/ and back (Undo), the version check, the notes
                that link to it, .trash/ in a project's .gitignore (decision 0037)
                github: repository metadata and SKILL.md detection
+               discover: repomagpie discover's GitHub search (decision 0045): the queries, merging, the
+               estimated kind and domains, whether a journal has each result, its 10-minute cache;
+               discover-format: counts, ages and licence words, no imports, shared with the app
                capture: what note and import write for one item
                topic-tags: which GitHub topics become tags, ranked; the stop list (decision 0030)
                tags-from-topics: "Add GitHub topics as tags" for the notes of one journal (decision 0030)
@@ -106,9 +109,10 @@ src/
                core), live (fs.watch + signature check), open (the platform's open command)
 ui/            the local app (decision 0022): React and Vite, built into dist/ui/ (npm run build)
   src/         App.tsx, components/ (one per pane and screen), api.ts (the only way to the journals),
-               logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette, graph);
-               the graph page (components/GraphPage.tsx) is its own lazy chunk, and layout.worker.ts
-               runs its ForceAtlas2 layout (decision 0028)
+               logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette, graph, discover);
+               the graph page (components/GraphPage.tsx) and the Discover page (components/DiscoverPage.tsx)
+               are their own lazy chunks, and layout.worker.ts
+               runs the graph's ForceAtlas2 layout (decision 0028)
   e2e/         @playwright/test against repomagpie ui on a temporary journal; screenshots with SCREENS=1, the README's with README_SHOTS=1
 skills/
   repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
@@ -155,10 +159,10 @@ Planned parts of the core and cli layers, by target release. Details: [product](
 `repomagpie import <file>` runs the same flow once per line ([decision 0010](decisions/0010-v0-1-scope.md)).
 
 1. **Resolve the target** to a PURL: a URL, a PURL, or a bare name typed by the nearest manifest ([spec](spec.md), section 4). A skill URL resolves to its parent repository ([decision 0006](decisions/0006-skills-as-searchable-lines.md)).
-2. **URL only, fetch from GitHub:** description, language, license, topics and the file list (no README). Detect `SKILL.md` files and root manifests. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
+2. **URL only, fetch from GitHub:** description, language, license, topics, the file list, the root manifests and the start of the README ([decision 0046](decisions/0046-classification-signals.md)). Detect `SKILL.md` files, root manifests and their keywords, and a root `action.yml`. The README and keywords shape the drafts only; neither is written to the note. A token, if any, comes from the `GITHUB_TOKEN` environment variable. No licence found: record `unknown` ([decision 0020](decisions/0020-unknown-license.md)). If the network fails, write the note without metadata and warn.
 3. **No note yet:** write a new note with:
    - the user's text, as the Verdict (note schema, rule 7);
-   - for a URL: tool-owned fields, drafts of `kind`, `tags` (up to 8 topics, ranked in `core/topic-tags.ts`; new ones appended to `tags.md`, [decision 0030](decisions/0030-github-topics-become-tags.md)) and "What it does" (the GitHub description) ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
+   - for a URL: tool-owned fields, drafts of `kind`, `tags` (up to 8 topics, ranked in `core/topic-tags.ts`; new ones appended to `tags.md`, [decision 0030](decisions/0030-github-topics-become-tags.md)) and "What it does" (the GitHub description, or the README's first sentence without one) ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)), and one empty skill line per detected skill;
    - defaults: `tried: false`, and `status` per note schema rule 1 (`reviewed` once the user gave a Verdict, otherwise `inbox`).
 4. **Note exists:** append skill lines for skills not listed yet, and refresh tool-owned fields. Write the Verdict only if it is empty; never overwrite one ([spec](spec.md), section 2). Never change other human-owned fields or sections (note schema, rule 2).
 5. **Search index:** marked stale; the next command that needs it rebuilds it.

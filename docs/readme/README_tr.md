@@ -40,9 +40,11 @@ Do you want to proceed?
 
 Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
 
-- **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ajanın da bir işin sonunda, o işte verilen bir bağımlılık kararını, senin nedeninle, senin sözlerinle Verdict olarak kaydetmeyi bir kez önerir. Notlar, sahibi olduğun Markdown dosyalarıdır.
+- **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ajanın da bir işin sonunda, o işte verilen bir bağımlılık kararını senin nedeninle Verdict olarak kaydetmeyi bir kez önerir. Notlar, sahibi olduğun Markdown dosyalarıdır.
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
+- **Konuya göre bul:** security, database, testing… hakkında istediğin dilde sor; ajanın soruyu alanlara eşler ve uyan notları, sorunla tek kelimesi ortak olmayanları bile bulur.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
+- **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle ara; yıldızları, etkinliği ve lisansı gör, seçtiklerini gelen kutuna ekle: `repomagpie discover` ya da uygulamadaki Discover.
 - **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler (kaçın, notlu, notsuz), sonra notu olmayan her biri için senin Verdict'ini sorar; Enter atlar, `q` durdurur.
 
 **Durum:** erken test edenler için ön sürüm `0.2.0-beta.13`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
@@ -73,7 +75,7 @@ Claude Code'da: kurulum çalışmadan önce RepoMagpie'nin hook'u sordu.
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   `--type npm`, adın bir npm paketi olduğunu söyler. Bir projenin içinde RepoMagpie bunu manifest dosyasından okur; başka bir yerde sorar.
+   `--type npm`, adın bir npm paketi olduğunu söyler. Bir projenin içinde RepoMagpie bunu manifest dosyasından okur; başka bir yerde sorar. `--use-when`, notu sonra yalnızca adıyla değil, neye ihtiyacın olduğuyla da bulmanı sağlar. Var olan notların için `repomagpie domains --suggest --dry-run` önerilen alanları gösterir (`--dry-run` olmadan onaylaman için yazar), `repomagpie tags --merge postgres postgresql` bir etiketin iki yazılışını birleştirir.
 
    Token olmadan GitHub saatte 60 isteğe izin verir. [GitHub CLI](https://cli.github.com/) kullanıyorsan, sınırı yükseltmek için açık kabuk oturumunda RepoMagpie'ye onun token'ını ver: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de ise `$env:GITHUB_TOKEN = gh auth token`.
 
@@ -91,7 +93,7 @@ Ek bir model, API anahtarı ya da telemetri yoktur. RepoMagpie zaten kullandığ
 ## Ajanına sor
 
 - **What do I have for browser testing?** (Tarayıcı testi için elimde ne var?) Ajanın günlüklerinde arar ve bulduğu notlarla, Verdict'i başta olmak üzere yanıt verir; küçük bir günlükte her notu tek bir listede okuyabilir.
-- **Veritabanı güvenliği bu projede nasıl olmalı?** Ajanın soruyu alanlara (security, database) ve projenin teknolojilerine eşler; hangi dilde sorduğun fark etmez. Bu paketlere dair notlarınla yanıt verir ve her birinin neden uyduğunu söyler.
+- **Veritabanı güvenliği bu projede nasıl olmalı?** Ajanın, security ve database alanlarındaki notlarından projenin teknolojilerine uyanlarla yanıt verir ve her birinin neden uyduğunu söyler.
 - **Install pdfkit.** (pdfkit'i kur.) Ajanın kurulumdan önce pdfkit'e dair notlarına bakar. Kaçınma notun alternatifleriyle birlikte gelir ve ajanın bir şey kurmadan önce sana sorar.
 - **Which of my tools fit this project?** (Araçlarımdan hangileri bu projeye uyar?) `suggest` projenin manifest dosyalarını ve README'sini okur, eşleşen notları döndürür; ajanın uyanları seçer, nedenini söyler ve projede kullanılan, kaçınmayı not ettiğin bağımlılıkları belirtir.
 
@@ -138,7 +140,7 @@ Bu proje için öneri (Suggest for this project): uyan notlar ve her birinin ned
 
 ![repomagpie ui'da Suggest: @playwright/test bağımlılığıyla eşleşen microsoft/playwright ilk sırada; pdfkit, kaçınma notu olan ve kullanımda olan bir paket olarak ayrı listeleniyor, yerine pdf-lib ve puppeteer var](../assets/screen-suggest.png)
 
-Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternatifler. Bir nota tıkla, grafiğin yanında oku ve düzenle.
+Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternatifler; istersen alana göre renkli. Adlar hiç üst üste binmez; tek bir notta olan bir etiket, sen açana kadar gizli kalır. Bir nota tıkla, grafiğin yanında oku ve düzenle.
 
 ![repomagpie ui'daki grafik sayfası, proje sahibinin kendi günlüğünde: 39 not, 67 etiket ve 157 bağlantı; #llm, #ai, #mcp ve #claude-code gibi en çok bağlantısı olan etiketler ve notlar grafiğin yanında listeleniyor](../assets/screen-graph.png)
 
@@ -163,14 +165,14 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <details>
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
-Hayır. Kişisel günlüğün, makinende Markdown dosyalarından oluşan bir klasördür; bir proje günlüğü, deposu kadar görünürdür ve telemetri yoktur. Tek ağ istekleri, `repomagpie note`, `repomagpie import` ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde GitHub'ın API'sine gider: deponun meta verilerini, dosya listesini ve kökteki manifest dosyalarını okur, ayarladıysan `GITHUB_TOKEN`'ı gönderir, günlüklerinden hiçbir şey göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler; `repomagpie mcp` ise hiçbir ağ bağlantısı ya da port açmaz: ajanınla stdio üzerinden konuşur. Ajanının okuduğu notlar, konuşmanın bir parçası olarak ajanın model sağlayıcısına da gider. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+Hayır. Kişisel günlüğün, makinende Markdown dosyalarından oluşan bir klasördür; bir proje günlüğü, deposu kadar görünürdür ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine gider. `repomagpie note`, `repomagpie import` ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde deponun meta verilerini, dosya listesini, kökteki manifest dosyalarını ve README'sini okur. `repomagpie discover` ya da uygulamanın Discover sayfasıyla aradığında arama kelimelerini ve filtrelerini gönderir, başka hiçbir şey göndermez. İkisi de ayarladıysan `GITHUB_TOKEN`'ı gönderir, günlüklerinden hiçbir şey göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler; `repomagpie mcp` ise hiçbir ağ bağlantısı ya da port açmaz: ajanınla stdio üzerinden konuşur. Ajanının okuduğu notlar, konuşmanın bir parçası olarak ajanın model sağlayıcısına da gider. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
 
 </details>
 
 <details>
 <summary><strong>RepoMagpie yapay zekâ kullanıyor mu?</strong></summary>
 
-Kendine ait bir model kullanmaz. RepoMagpie'nin komutları paket adlarını ve kelimeleri eşleştirir, hiçbir modeli çağırmaz. Yapay zekâ, zaten kullandığın kodlama ajanıdır: skill ve MCP araçları üzerinden bir kurulumdan önce notlarını hatırlatır, elinde ne olduğunu sorduğunda onlarda arar ve bir işin sonunda bir bağımlılık kararını kaydetmeyi bir kez önerir. Skill ona Verdict'ini asla senin yerine yazmamasını (yalnızca senin sözlerin ya da hiçbir şey), sen o notu adıyla istemedikçe asla bir notu silmemesini ve kaçınmayı not ettiğin bir paketi sana sormadan asla kurmamasını söyler; ajanında hook varsa bu sonuncusunu hook da kontrol eder. RepoMagpie'nin kendisi günlüklerinden hiçbir şeyi bir yere göndermez. Yukarıdaki yanıtta dendiği gibi, ajanının okuduğunu ajanının model sağlayıcısı da görür.
+Kendine ait bir model kullanmaz. RepoMagpie'nin komutları paket adlarını ve kelimeleri eşleştirir, hiçbir modeli çağırmaz. Yapay zekâ, zaten kullandığın kodlama ajanıdır: skill ve MCP araçları üzerinden bir kurulumdan önce notlarını hatırlatır, elinde ne olduğunu sorduğunda onlarda arar ve bir işin sonunda bir bağımlılık kararını kaydetmeyi bir kez önerir. Skill ona Verdict'ini asla senin yerine yazmamasını (yalnızca senin sözlerin ya da hiçbir şey), sen o notu adıyla istemedikçe asla bir notu silmemesini ve kaçınmayı not ettiğin bir paketi sana sormadan asla kurmamasını söyler; ajanında hook varsa bu sonuncusunu hook da kontrol eder.
 
 </details>
 
@@ -205,18 +207,7 @@ Hayır. RepoMagpie senin ve ekibinin not ettiklerini gösterir: kötü amaçlı 
 <details>
 <summary><strong>Notlarım nerede, onları elle düzenleyebilir miyim?</strong></summary>
 
-Her not, YAML frontmatter'ı olan bir Markdown dosyasıdır: kişisel günlüğün için `~/.magpie/notes/` içinde, bir projeninki için `.magpie/notes/` içinde ([not şeması](../note-schema.md)). Onları herhangi bir editörde düzenle: RepoMagpie, alanları ya da bölümleri eksik olsa da elle yazılmış notları okur ve senin bölümlerini asla yeniden yazmaz. `repomagpie ui` aynı dosyaları tarayıcıda düzenler. Kişisel günlüğü başka bir yerde tutmak için `MAGPIE_HOME`'u ayarla ya da `--home` ver.
-
-Notların sonra yalnızca adıyla değil, neye ihtiyacın olduğuyla da bulunsun diye `--use-when` ekle: `repomagpie note zod --use-when "checking API input"`.
-
-`repomagpie delete <name>` ya da uygulamadaki Delete, bir notu günlüğün `.trash/` klasörüne taşır.
-
-</details>
-
-<details>
-<summary><strong>Notları ekibimle nasıl paylaşırım?</strong></summary>
-
-Bir notu `--to project` ile yaz ya da `repomagpie adopt <name>` ile kopyala, sonra `.magpie/` klasörünü commit'le: [Notlarını ekibinle paylaş](#notlarını-ekibinle-paylaş) bölümüne bak.
+Her not, YAML frontmatter'ı olan bir Markdown dosyasıdır: kişisel günlüğün için `~/.magpie/notes/` içinde, bir projeninki için `.magpie/notes/` içinde ([not şeması](../note-schema.md)). Onları herhangi bir editörde düzenle: RepoMagpie, alanları ya da bölümleri eksik olsa da elle yazılmış notları okur ve senin bölümlerini asla yeniden yazmaz. `repomagpie ui` aynı dosyaları tarayıcıda düzenler. Kişisel günlüğü başka bir yerde tutmak için `MAGPIE_HOME`'u ayarla ya da `--home` ver. `repomagpie delete <name>` ya da uygulamadaki Delete, bir notu günlüğün `.trash/` klasörüne taşır.
 
 </details>
 
@@ -224,7 +215,7 @@ Bir notu `--to project` ile yaz ya da `repomagpie adopt <name>` ile kopyala, son
 
 Belgeler İngilizcedir.
 
-- [Spec](../spec.md): her komut (`search`, `recall`, `catalog`, `adopt`, `import`, `delete` ve diğerleri; `repomagpie --help` hepsini listeler), bayrak ve `--json` belgesi
+- [Spec](../spec.md): her komut (`search`, `recall`, `catalog`, `discover`, `adopt`, `import`, `delete` ve diğerleri; `repomagpie --help` hepsini listeler), bayrak ve `--json` belgesi
 - [Ajanlar](../agents.md): her kodlama ajanının neyi desteklediği ve [elle kurulum](../setup-by-hand.md)
 - [Not şeması](../note-schema.md): bir notun biçimi
 - [Yerel uygulama](../ui.md): ekranlar, API ve güvenlik kuralları
