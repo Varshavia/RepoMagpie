@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The graph opens faster, and reopening it is instant when nothing changed.
+- The hook and recall answer faster right after you change a note.
 
 ## [0.2.0-beta.15] - 2026-10-28
 

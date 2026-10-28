@@ -1,9 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { withJournal } from "../../scripts/bench-journal.ts";
+import { copyFolder, removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { linkIndex } from "./links.ts";
+import { forgetParsed } from "./note-cache.ts";
 import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, type RecallSource } from "./recall.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
@@ -137,25 +141,93 @@ test("the recall cache: an entry of the wrong shape for an unchanged note makes 
   const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
   const good = loadRecallEntries(path).entries;
   const cacheFile = join(path, ".cache", RECALL_CACHE);
-  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, unknown>[] };
-  const zod = cache.data.find((e) => e.file === "npm--zod.md") as Record<string, unknown>;
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, unknown> };
+  const zod = cache.data["npm--zod.md"] as Record<string, unknown>;
   const { keys: _keys, ...noKeys } = zod;
+  // null is no wrong shape: it is the entry of a note without a readable id.
   const wrongs: unknown[] = [
     noKeys, { ...zod, keys: "npm zod" }, { ...zod, keys: [["npm"]] }, { ...zod, keys: [[1, "zod"]] }, { ...zod, keys: [null] },
     { ...zod, verdict: null }, { ...zod, avoidWhen: "never" }, { ...zod, useWhen: [1] }, { ...zod, drafts: ["verdict"] },
-    { ...zod, status: "done" }, { ...zod, file: 5 }, { ...zod, id: null }, { ...zod, name: null }, "nonsense", null, [],
+    { ...zod, status: "done" }, { ...zod, file: 5 }, { ...zod, id: null }, { ...zod, name: null }, "nonsense", [],
+    { ...zod, file: "npm--pdfkit.md" }, { ...zod, file: "../../outside/secret.md" },
     { ...zod, alternatives: undefined }, { ...zod, alternatives: "[[x]]" }, { ...zod, alternatives: ["[[x]]"] },
     { ...zod, alternatives: [{ target: 1, label: null }] }, { ...zod, alternatives: [{ target: "x" }] }, { ...zod, alternatives: [null] },
   ];
   for (const wrong of wrongs) {
-    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e === zod ? wrong : e)) }));
+    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { ...cache.data, "npm--zod.md": wrong } }));
     const loaded = loadRecallEntries(path);
     assert.deepEqual([loaded.rebuilt, loaded.entries], [true, good], JSON.stringify(wrong));
     assert.deepEqual(ids(recall([{ scope: "personal", path, entries: loaded.entries }], "pdfkit", ["npm"])), ["personal pkg:npm/pdfkit exact"]);
     assert.equal(loadRecallEntries(path).rebuilt, false, `the cache was rewritten after ${JSON.stringify(wrong)}`);
   }
-  writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { "npm--zod.md": zod } })); // not a list
+  writeFileSync(cacheFile, JSON.stringify({ ...cache, data: [zod] })); // not a record by file
   assert.deepEqual(loadRecallEntries(path).entries, good);
+});
+
+// The entries a fresh process gets with no cache at all.
+function coldEntries(path: string) {
+  removeFolder(join(path, ".cache"));
+  forgetParsed();
+  return loadRecallEntries(path).entries;
+}
+
+test("the recall cache, per note: one note changed is read again alone, and the entries are those of a cold build", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }), "npm--broken.md": "---\nid: [\n---\n" });
+  assert.deepEqual(loadRecallEntries(path).derived, ["npm--broken.md", "npm--pdfkit.md", "npm--zod.md"]);
+  assert.deepEqual(loadRecallEntries(path).derived, []); // a note without a readable id is cached too
+  writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict: "avoid: too big" }));
+  const changed = loadRecallEntries(path);
+  assert.deepEqual([changed.derived, changed.rebuilt], [["npm--zod.md"], true]);
+  assert.equal(changed.entries.find((e) => e.file === "npm--zod.md")?.verdict, "avoid: too big");
+  assert.deepEqual(changed.entries, coldEntries(path));
+});
+
+test("the recall cache, per note: a note added, removed or renamed", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  loadRecallEntries(path);
+  writeFileSync(join(path, "notes", "npm--puppeteer.md"), PUPPETEER);
+  const added = loadRecallEntries(path);
+  assert.deepEqual(added.derived, ["npm--puppeteer.md"]);
+  assert.deepEqual(added.entries.map((e) => e.file), ["npm--pdfkit.md", "npm--puppeteer.md", "npm--zod.md"]);
+
+  unlinkSync(join(path, "notes", "npm--zod.md"));
+  const removed = loadRecallEntries(path);
+  assert.deepEqual([removed.derived, removed.entries.map((e) => e.file)], [[], ["npm--pdfkit.md", "npm--puppeteer.md"]]);
+  assert.equal(JSON.parse(readFileSync(join(path, ".cache", RECALL_CACHE), "utf8")).data["npm--zod.md"], undefined);
+
+  renameSync(join(path, "notes", "npm--pdfkit.md"), join(path, "notes", "npm--pdf-kit.md"));
+  const renamed = loadRecallEntries(path);
+  assert.deepEqual(renamed.derived, ["npm--pdf-kit.md"]);
+  assert.deepEqual(recall([{ scope: "personal", path, entries: renamed.entries }], "pdfkit", ["npm"]).map((m) => m.path), [join(path, "notes", "npm--pdf-kit.md")]);
+  assert.deepEqual(renamed.entries, coldEntries(path));
+});
+
+test("the recall cache, per note: a version 3 cache (one list for the journal) is rebuilt once", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  const entries = loadRecallEntries(path).entries;
+  const cacheFile = join(path, ".cache", RECALL_CACHE);
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { files: unknown };
+  writeFileSync(cacheFile, JSON.stringify({ version: 3, files: cache.files, data: entries }));
+  const upgraded = loadRecallEntries(path);
+  assert.deepEqual([upgraded.derived, upgraded.entries], [["npm--pdfkit.md", "npm--zod.md"], entries]);
+  assert.equal(loadRecallEntries(path).rebuilt, false);
+});
+
+test("the recall cache, per note: on the example vault and the bench journal, entries after edits are those of a cold build", async () => {
+  const vault = scratchBase("recall-vault");
+  copyFolder(fileURLToPath(new URL("../../examples/vault/", import.meta.url)), vault);
+  await withJournal("recall-per-note", (_root, bench) => {
+    for (const path of [vault, bench]) {
+      const cold = coldEntries(path);
+      assert.deepEqual(loadRecallEntries(path).entries, cold);
+      const [first, ...rest] = readdirSync(join(path, "notes")).filter((f) => f.endsWith(".md")).sort();
+      const last = rest.at(-1) ?? first;
+      writeFileSync(join(path, "notes", last), `${readFileSync(join(path, "notes", last), "utf8")}Edited.\n`);
+      const edited = loadRecallEntries(path);
+      assert.deepEqual(edited.derived, [last]);
+      assert.deepEqual(edited.entries, coldEntries(path));
+    }
+  }, false);
 });
 
 test("a journal without notes writes no cache", () => {
@@ -263,9 +335,9 @@ test("the recall cache: entries keep the alternatives as written; a version 1 ca
   assert.deepEqual(entries.find((e) => e.file === "npm--puppeteer.md")?.alternatives, []);
 
   const cacheFile = join(path, ".cache", RECALL_CACHE);
-  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, unknown>[] };
-  assert.equal(cache.version, 3);
-  const versionOne = cache.data.map(({ alternatives: _alternatives, ...rest }) => rest);
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, Record<string, unknown>> };
+  assert.equal(cache.version, 4);
+  const versionOne = Object.values(cache.data).map(({ alternatives: _alternatives, ...rest }) => rest);
   writeFileSync(cacheFile, JSON.stringify({ version: 1, files: cache.files, data: versionOne }));
   const upgraded = loadRecallEntries(path);
   assert.deepEqual([upgraded.rebuilt, upgraded.entries], [true, entries]);

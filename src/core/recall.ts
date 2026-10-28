@@ -1,18 +1,19 @@
 // Recall (spec §2 recall, §5 matching): the notes in both journals for a package, before it is
 // installed. Each journal's notes are summarised once into <journal>/.cache/recall-index.json
 // (note-cache.ts), so a lookup reads one file instead of every note. Never prints.
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
-import { readNote, sectionItems } from "./note.ts";
-import { isRecord, isTextOrNull, isTexts, noteSignature, readCache, writeCache } from "./note-cache.ts";
+import { sectionItems, type Note } from "./note.ts";
+import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
 import { CAPS, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
-const CACHE_VERSION = 3; // 2: entries carry alternatives; 3: nested and unterminated comments stripped
+// 2: entries carry alternatives; 3: nested and unterminated comments stripped; 4: one entry per note
+// file, by its name (noteEntries)
+const CACHE_VERSION = 4;
 
 type ListName = "use_when" | "avoid_when";
 
@@ -76,19 +77,15 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
   return { sources, warnings: personal.warnings };
 }
 
-// One journal's entries, from the cache when it matches the notes on disk and every entry has the
-// expected shape; otherwise rebuilt from the notes, so a damaged cache can't silence recall or the hook.
-export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean } {
-  const { files, signature } = noteSignature(journal);
-  const cached = readCache(journal, RECALL_CACHE, CACHE_VERSION, signature);
-  // Every entry must also name a note file the listing has: a cache a repository committed can't
-  // send recall to a file elsewhere (decision 0032).
-  if (Array.isArray(cached) && cached.every((e) => isRecallEntry(e) && Object.hasOwn(signature, (e as RecallEntry).file))) {
-    return { entries: cached as RecallEntry[], rebuilt: false };
-  }
-  const entries = files.flatMap((file) => entryOf(readFileSync(join(journal, "notes", file), "utf8"), file) ?? []);
-  if (files.length) writeCache(journal, RECALL_CACHE, CACHE_VERSION, signature, entries);
-  return { entries, rebuilt: true };
+// One journal's entries, in file order. Each is cached per note file (noteEntries): a note added or
+// changed since is read again, alone, and so is one whose cached entry hasn't the expected shape, so a
+// damaged cache can't silence recall or the hook. `rebuilt`: some entry was read again from its note.
+export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean; derived: string[] } {
+  // An entry must name the note file it is kept for: a cache a repository committed can't send recall
+  // to a file elsewhere, nor to another note (decision 0032). A note without a readable id is null.
+  const valid = (e: unknown, file: string) => e === null || (isRecallEntry(e) && (e as RecallEntry).file === file);
+  const { files, data, derived } = noteEntries(journal, RECALL_CACHE, CACHE_VERSION, (file, parse) => entryOf(parse(), file), valid);
+  return { entries: files.flatMap((file) => data[file] ?? []), rebuilt: derived.length > 0, derived };
 }
 
 function isRecallEntry(e: unknown): boolean {
@@ -100,8 +97,7 @@ function isRecallEntry(e: unknown): boolean {
     Array.isArray(e.alternatives) && e.alternatives.every((a) => isRecord(a) && typeof a.target === "string" && isTextOrNull(a.label));
 }
 
-function entryOf(text: string, file: string): RecallEntry | null {
-  const note = readNote(text);
+function entryOf(note: Note, file: string): RecallEntry | null {
   const fm = note.frontmatter;
   if (typeof fm.id !== "string") return null; // a note without a readable id can't match
   const packages = Array.isArray(fm.packages) ? fm.packages.filter((p): p is string => typeof p === "string") : [];

@@ -166,25 +166,28 @@ export function readCacheEntries(journal: string, name: string, version: number)
 // doesn't cost a full re-read. `derive` gets the file's name and `parse`, which reads and parses it
 // (readNote) at most once per modification time and size in this process, whichever cache asks
 // first; it throws as readFileSync does. The result is stored as JSON. `valid`, when given, checks a
-// cached entry's shape; one that fails is derived again, so a damaged cache can't break the caller.
-// `listed`: the journal's noteSignature, when the caller has it already (one listing for two caches).
-export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, parse: () => Note) => T, valid?: (entry: unknown) => boolean, listed = noteSignature(journal)): { files: string[]; data: Record<string, T>; skipped: string[] } {
+// cached entry's shape, given the file it is kept for; one that fails is derived again, so a damaged
+// cache can't break the caller. `listed`: the journal's noteSignature, when the caller has it already
+// (one listing for two caches). `derived`: the files derived again in this call.
+export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, parse: () => Note) => T, valid?: (entry: unknown, file: string) => boolean, listed = noteSignature(journal)): { files: string[]; data: Record<string, T>; skipped: string[]; derived: string[] } {
   const { files, signature, skipped } = listed;
   const cached = readCacheEntries(journal, name, version);
   const data: Record<string, T> = {};
+  const derived: string[] = [];
   let changed = !cached || Object.keys(cached.files).length !== files.length;
   for (const file of files) {
     const before = cached?.files[file];
     const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
-    if (hit && (!valid || valid(hit))) data[file] = hit as T;
+    if (hit !== undefined && (!valid || valid(hit, file))) data[file] = hit as T;
     else {
       data[file] = derive(file, () => parsedNote(journal, file, signature[file]));
+      derived.push(file);
       changed = true;
     }
   }
   if (changed && files.length) writeCache(journal, name, version, signature, data);
   forgetGone(journal, files);
-  return { files, data, skipped };
+  return { files, data, skipped, derived };
 }
 
 // The notes parsed in this process, by journal and file, with the modification time and size they

@@ -38,7 +38,8 @@ src/
                notes: lenient read, strict write, round-trip-safe frontmatter edits
                identity: PURL resolution and file names (decision 0017)
                note-cache: the caches in <journal>/.cache/ and their file signature (search, recall, note list, links,
-               graph); the per-file caches read and parse each note once between them, in one process (decision 0049);
+               graph); all but search's are per note file, so a changed note is read again alone (decision 0050),
+               and they read and parse each note once between them, in one process (decision 0049);
                the file rules of decision 0032: every listing of notes skips links and files over 256 KB,
                and every write into a journal checks the path first (assertWritable)
                wikilinks: the [[wikilink]] syntax, the alternatives field and how a target resolves; shared by
