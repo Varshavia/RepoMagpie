@@ -36,7 +36,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0025 | [Bundle the CLI](0025-bundle-the-cli.md) | accepted |
 | 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
-| 0028 | [The graph page](0028-the-graph-page.md) | accepted (the "Tag nodes" row and labelling every node under 150 superseded by 0044) |
+| 0028 | [The graph page](0028-the-graph-page.md) | accepted (the "Tag nodes" row and labelling every node under 150 superseded by 0044; the first files' size line superseded by 0048) |
 | 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
 | 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted (kind of a registry package note added by 0039; kind rule 10 changed and rules 3a, 7a and 8a added by 0047) |
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
@@ -56,3 +56,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0045 | [Discover: search GitHub from RepoMagpie](0045-discover.md) | accepted (adds to 0034, which it leaves offline) |
 | 0046 | [Classification signals beyond topics](0046-classification-signals.md) | accepted (adds to 0030 and 0040) |
 | 0047 | [Kind rules, measured](0047-kind-rules-measured.md) | accepted (changes 0030's kind rules) |
+| 0048 | [The first files' line, measured](0048-the-first-load-line-measured.md) | accepted (supersedes 0028's first-files line) |

@@ -47,6 +47,7 @@ The product's category moved:
 | 17 | Measuring skill compliance | Built for Claude Code (`evals/skill/`); no results yet | 0.2 | Turns "as well as the agent follows the skill" into a number |
 | 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
 | 19 | Discover | **Built** ([decision 0045](decisions/0045-discover.md)); kind accuracy done ([decision 0047](decisions/0047-kind-rules-measured.md)); six follow-ups are candidates | 0.2 | Finding what to note, not only noting what you found |
+| 20 | The note view's editors, loaded later | Candidate | when the first files need room | The next way to make the app's first files smaller ([decision 0048](decisions/0048-the-first-load-line-measured.md)) |
 
 ---
 
@@ -324,6 +325,16 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
   - **Kind accuracy: done** (2026-10-27, `fix/kind-accuracy`, [decision 0047](decisions/0047-kind-rules-measured.md)). Each kind got a deciding question, a held-out set of 30 repositories was labelled before any rule changed, rule 10 needs a skills-only layout, and an Action is `other`. Three topics and seven README phrases name a kind. The kind is right for 37 of 69 repositories instead of 24, and for 15 of the 30 held out instead of 14, with none turned wrong. The bar on the held-out set (17 of 30) was missed: 11 of the 12 new rules fired on none of the 30.
   - **`repomagpie kinds --suggest`:** for existing notes made from GitHub, show the kind the current rules would draft, so the user can accept it; never automatic. Kinds are drafts at creation only ([decision 0030](decisions/0030-github-topics-become-tags.md), [decision 0018](decisions/0018-ai-drafts-humans-decide.md)), so a better rule reaches only new notes. A read-only dry run on the maintainer's journal (2026-10-27: the notes read, never written; each repository fetched again) found 37 notes from GitHub: the current rules would draft another kind than the note's for 22 of them, and decision 0047's rules change the draft for 3. Most of the 22 differ because the user corrected the kind or an older rule drafted it, so the command shows each one and changes nothing without a yes.
   - **Kind signals from files, the next round:** for repositories without telling topics or phrases, read what the file list and the root manifests already show: Cargo's `[[bin]]` or `src/main.rs`, pyproject's `[project.scripts]`, a Go `main` package at the root, and a monorepo's published `packages/*`. It targets the held-out set's misses: jellyfin, zed, date-fns, TanStack/query and fzf. Measured on a new held-out set of 30, labelled before any rule changes: the set decision 0047 used has been seen.
+
+## 20. The note view's editors, loaded later
+
+- **What it is:** the parts of the note view you only see while editing, the section editors and their `[[` autocomplete (`LinkTextarea`), loaded in a chunk of their own when you first press Edit, or prefetched like the pages in `ui/src/components/later.ts`.
+- **Why it might matter:** the app's first files are 103.0 kB against a line of 104.0 kB ([decision 0048](decisions/0048-the-first-load-line-measured.md)), so the next feature on the first screen has 1 kB of room. The pages the first screen doesn't show are already lazy.
+- **What already exists:** `npm run build:analyze` shows the first script by source: `NotePane.tsx` is 22.0 kB raw, `LinkTextarea.tsx` 2.2 kB, `logic/edits.ts` 2.4 kB. The inbox's review form (`ReviewForm.tsx`, 6.6 kB) and the Alternatives row are on the first screen and stay. Inside the first script, code compresses to about a fifth of its raw size, so moving these may free 1 to 1.5 kB gzipped.
+- **Options:** split the section editor out of `NotePane.tsx` into its own component and load it lazily; or keep it and accept the line.
+- **Risks:** the first Edit on a cold load waits for the chunk (a prefetch covers most cases); `NotePane.tsx` is the app's largest component, and splitting it touches its editing flows and their tests.
+- **What decides it:** a first-screen feature that doesn't fit in the 1 kB.
+- **Status:** candidate, measured on `perf/app-first-load` (2026-10-28).
 
 ---
 

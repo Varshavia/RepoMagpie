@@ -111,8 +111,9 @@ ui/            the local app (decision 0022): React and Vite, built into dist/ui
   src/         App.tsx, components/ (one per pane and screen), api.ts (the only way to the journals),
                logic/ (pure, unit-tested: windowing, keys, text, edits, import labels, palette, graph, discover);
                the graph page (components/GraphPage.tsx) and the Discover page (components/DiscoverPage.tsx)
-               are their own lazy chunks, and layout.worker.ts
-               runs the graph's ForceAtlas2 layout (decision 0028)
+               are their own lazy chunks; the pages and dialogs the first screen doesn't show share one,
+               components/later.ts, prefetched after the first rows (components/lazy.tsx, decision 0048);
+               layout.worker.ts runs the graph's ForceAtlas2 layout (decision 0028)
   e2e/         @playwright/test against repomagpie ui on a temporary journal; screenshots with SCREENS=1, the README's with README_SHOTS=1
 skills/
   repomagpie/  the agent skill (Agent Skills format; the folder name is the skill's name), no code:
