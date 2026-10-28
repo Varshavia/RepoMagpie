@@ -3,8 +3,9 @@
 // the cache. Exits 1 over the budget, unless --report-only. Run with `npm run bench`.
 // The hook gets its journal from MAGPIE_HOME, as in a real setup, so it takes its fast path.
 // It runs twice: on the plain journal, then on one where one note in five has alternatives
-// (decision 0029), package-1500 among them.
-import { writeFileSync } from "node:fs";
+// (decision 0029), package-1500 among them. On the plain journal, recall and the hook also run right
+// after one other note changed (a save in the app, a `note` command, a pull of the project journal).
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bash, prompt, result, say } from "../src/hook/fixtures/stop-transcripts.ts";
 import { measure, withJournal } from "./bench-journal.ts";
@@ -19,6 +20,16 @@ for (const alternatives of [false, true]) {
     measure(`magpie recall package-1500${label}`, root, ["recall", "package-1500"], BUDGET_MS, undefined, env);
     measure(`magpie hook claude-code (an install with a note)${label}`, root, ["hook", "claude-code"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env);
     measure(`magpie hook claude-code (no install)${label}`, root, ["hook", "claude-code"], BUDGET_MS, call("npm test"), env);
+    if (!alternatives) {
+      // One line of another note rewritten before each run: its modification time and text change.
+      const changed = join(journal, "notes", "npm--package-42.md");
+      const original = readFileSync(changed, "utf8");
+      let edits = 0;
+      const change = () => writeFileSync(changed, `${original}Edit ${++edits}.\n`);
+      measure("magpie recall package-1500, one note changed", root, ["recall", "package-1500"], BUDGET_MS, undefined, env, change);
+      measure("magpie hook claude-code (an install with a note), one note changed", root, ["hook", "claude-code"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env, change);
+      writeFileSync(changed, original);
+    }
     // Codex's input has the same shape (decision 0036); an avoid note reads the retry record too.
     measure(`magpie hook codex (an install with a note)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm install package-1500@2 && npm i left-pad"), env);
     measure(`magpie hook codex (no install)${label}`, root, ["hook", "codex"], BUDGET_MS, call("npm test"), env);

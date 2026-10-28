@@ -94,8 +94,10 @@ export async function withJournal(name: string, body: (root: string, journal: st
 
 // Runs the built CLI with `args` once as a warm-up (it builds the cache), then RUNS times; prints
 // the median and p95 against the budget. Sets exit code 1 over budget, unless --report-only.
-export function measure(label: string, root: string, args: string[], budgetMs: number, input?: string, env?: Record<string, string>): void {
+// `prepare`, when given, runs before each run, outside the time (a note changed just before).
+export function measure(label: string, root: string, args: string[], budgetMs: number, input?: string, env?: Record<string, string>, prepare?: () => void): void {
   const once = () => {
+    prepare?.();
     const started = performance.now();
     const child = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: "utf8", input, env: { ...process.env, ...env } });
     if (child.status !== 0) throw new Error(`${label} failed: ${child.stderr}`);
