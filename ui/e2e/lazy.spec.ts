@@ -3,7 +3,8 @@
 // are on screen. Each still opens on the first click or key while that chunk is slow, a chunk that
 // can't load says so with a Reload button, and once it is in, opening a page fetches nothing.
 import type { Page, Route } from "@playwright/test";
-import { expect, test } from "./fixtures.ts";
+import { runSearch } from "../../src/core/search.ts";
+import { expect, test, throttle } from "./fixtures.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 const LATER = /\/assets\/later-[\w-]+\.js$/;
@@ -78,6 +79,39 @@ test("lazy: the palette opens on the first key while its chunk is held; what you
 
   await page.keyboard.press("?");
   await expect(page.getByRole("dialog", { name: "Keyboard" })).toBeVisible();
+});
+
+// The chunk arrives while you type, on a busy machine: the palette renders with what was typed so
+// far, and takes the keys pressed meanwhile in the same step it replaces the shell. No key is lost
+// or reaches a single-key shortcut, and the search is for exactly what was typed.
+test("lazy: keys typed while the palette's chunk arrives all land in it, on a slow CPU; it shows the results for exactly that", async ({ page, magpie }) => {
+  const { document } = runSearch({ query: "design", limit: 6 }, { home: magpie.home, env: { MAGPIE_HOME: magpie.journal }, cwd: magpie.project });
+  const expected = document.results.map((r) => (r.type === "skill" ? `${r.skill} · ${r.name}` : r.name));
+  const release = await holdLater(page);
+  await magpie.open(page);
+  await throttle(page, 4);
+  await page.keyboard.press(`${MOD}+k`);
+  await page.keyboard.type("d");
+  release();
+  await page.keyboard.type("esign", { delay: 15 });
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  const input = palette.getByRole("combobox", { name: "Search notes or run an action" });
+  await expect(input).toHaveValue("design");
+  await expect(input).toBeFocused();
+  await expect(palette.getByRole("group", { name: "Notes and skills" }).getByRole("option").locator(".label")).toHaveText(expected);
+});
+
+test("lazy: Enter pressed while the palette's chunk arrives runs the first action for everything typed, on a slow CPU", async ({ page, magpie }) => {
+  const release = await holdLater(page);
+  await magpie.open(page);
+  await throttle(page, 4);
+  await page.keyboard.press(`${MOD}+k`);
+  await page.keyboard.type("i");
+  release();
+  await page.keyboard.type("mport lines", { delay: 15 });
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: "Import" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("lazy: a chunk that can't load shows Reload in the page's frame, and as a dialog for the palette; Reload brings it back", async ({ page, magpie }) => {

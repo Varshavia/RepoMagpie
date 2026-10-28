@@ -11,7 +11,7 @@ import { readNote } from "../../src/core/note.ts";
 import { fromTopicsSummary } from "../src/logic/edits.ts";
 import { whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
-import { expect, test } from "./fixtures.ts";
+import { expect, test, throttle } from "./fixtures.ts";
 import { PDFKIT } from "./journal.ts";
 import { recordTimings } from "./measure.ts";
 
@@ -511,6 +511,24 @@ test("domains: the × is reached by Tab after the check, works with Enter, and p
   await page.keyboard.press("Enter");
   await expect(page.getByRole("status").getByText("Suggested domain tooling restored")).toBeVisible();
   expect(readFileSync(magpie.note(UNDERSTAND), "utf8")).toContain("\ndomains_suggested: [tooling]\ntried:");
+});
+
+test("domains: on a slow CPU, focus still passes from each removed suggestion's × to the next one", async ({ page, magpie }) => {
+  const suggested = ["api", "tooling", "testing", "database", "security", "devops", "auth"];
+  withDomains(magpie, UNDERSTAND, `domains_suggested: [${suggested.join(", ")}]\n`);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /Understand-Anything/ }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await pane.getByRole("button", { name: "Remove suggested domain api" }).focus();
+  // The × is disabled while the removal saves; the next one can take focus only once the saved
+  // note is on screen, which on a busy machine can come after the next frame.
+  await throttle(page, 6);
+  for (const [i, domain] of suggested.slice(0, -1).entries()) {
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("status").getByText(`Suggested domain ${domain} removed`)).toBeVisible();
+    await expect(pane.getByRole("button", { name: `Remove suggested domain ${suggested[i + 1]}` })).toBeFocused();
+  }
 });
 
 test("domains: removing a suggestion works in the project journal too", async ({ page, magpie }) => {
