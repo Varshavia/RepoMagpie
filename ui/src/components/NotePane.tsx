@@ -79,6 +79,7 @@ export function NotePane(props: NotePaneProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<Adopting>(null);
   const [deleting, setDeleting] = useState(false);
+  const [refocus, setRefocus] = useState<{ next: string | null } | null>(null); // after a suggestion's ×
   const verdictRef = useRef<HTMLTextAreaElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const focusHandled = useRef(0);
@@ -156,6 +157,15 @@ export function NotePane(props: NotePaneProps) {
     if (editing) verdictRef.current?.focus();
     else articleRef.current?.focus();
   }, [note, focusRequest, editing]);
+
+  // After a suggestion's ×: the next suggestion's ×, or the note. Once the saved note is on screen,
+  // not in the next frame: the × buttons stay disabled until then, and a disabled one can't take
+  // focus (a frame can come first on a busy machine).
+  useEffect(() => {
+    if (!refocus || saving) return;
+    setRefocus(null);
+    (refocus.next ? articleRef.current?.querySelector<HTMLButtonElement>(`[data-dismiss="${refocus.next}"]`) : articleRef.current)?.focus();
+  }, [refocus, saving]);
 
   // Unsaved changes: the browser asks before the page closes or reloads.
   useEffect(() => {
@@ -299,7 +309,7 @@ export function NotePane(props: NotePaneProps) {
     if (!from?.id || !from.version) return;
     const at = suggestedPosition(from, domain);
     const ok = await domainEdit(from.id, from.version, { dismiss: [domain] }, `Suggested domain ${domain} removed`, (doc) => ({ label: "Undo", run: () => void undoDismiss(doc, domain, at) }));
-    if (ok) requestAnimationFrame(() => (next ? articleRef.current?.querySelector<HTMLButtonElement>(`[data-dismiss="${next}"]`) : articleRef.current)?.focus());
+    if (ok) setRefocus({ next });
   }
 
   // Undo from the toast: with the note's latest version while it is open here, else the version the
