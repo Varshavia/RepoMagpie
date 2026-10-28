@@ -1,5 +1,6 @@
 // npm run measure: one report of every number an optimisation is judged by (CLAUDE.md §5,
-// "Optimisations"): the package, the CLI's largest chunks, the app's sizes, what an agent reads into
+// "Optimisations"): the package, the CLI's largest chunks, the app's sizes (and its first script's top
+// sources, after npm run build:analyze), what an agent reads into
 // its context, every benchmark's median, the CLI's start, the evals, the tests, and the end-to-end
 // timings when REPOMAGPIE_MEASURE=1 npm run test:e2e recorded them for this commit. It runs the
 // existing measurements and collects their numbers, each with its budget where there is one (spec §7,
@@ -18,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { removeFolder } from "../src/core/copy-folder.ts";
 import { E2E_TIMINGS, type E2eTimings } from "../ui/e2e/measure.ts";
 import type { BenchResult } from "./bench-journal.ts";
+import { ANALYZE_DIR, composition, type Composition } from "./bundle-composition.ts";
 import { BUDGET_KB, bundleSizes, FIRST_LOAD_LINE_KB, sum } from "./bundle-sizes.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -247,6 +249,22 @@ async function mcpLists(): Promise<{ instructions: string; tools: { description:
   return { instructions: String(init.instructions ?? ""), tools: list.tools as { description: string }[] };
 }
 
+// The first script's top 5 sources, raw, from the analyze build (scripts/bundle-composition.ts), when
+// it has the same first script as dist/ui/ (Vite's hash is the same with or without sourcemaps);
+// otherwise a problem that says how to make one.
+export function firstBySource(firstFiles: string[], folder = ANALYZE_DIR): { numbers: Numbers; problem?: string } {
+  const how = "run npm run build:analyze after npm run build";
+  let chunks: Composition[];
+  try {
+    chunks = composition(folder);
+  } catch {
+    return { numbers: {}, problem: `first script by source: no analyze build; ${how}` };
+  }
+  const entry = chunks.find((chunk) => chunk.entry);
+  if (!entry || !firstFiles.includes(entry.chunk)) return { numbers: {}, problem: `first script by source: the analyze build is from another build; ${how}` };
+  return { numbers: Object.fromEntries(entry.parts.slice(0, 5).map((part) => [`first script by source, raw: ${part.source}`, lower(part.bytes, "B")])) };
+}
+
 export function defaultCollectors(commit: string): Record<string, Collector> {
   return {
     package: () => {
@@ -272,13 +290,16 @@ export function defaultCollectors(commit: string): Record<string, Collector> {
         const names = stableNames(files.map((file) => file.name));
         return Object.fromEntries(files.map((file, k) => [`${prefix}${names[k]}`, lower(file.bytes, "B")]));
       };
+      const { numbers: bySource, problem } = firstBySource(sizes.firstLoad.map((file) => file.name));
       return {
         numbers: {
           "total, gzipped": lower(sizes.total, "B", BUDGET_KB * KB),
           "first files (every screen but the lazy ones)": lower(sum(sizes.firstLoad), "B", FIRST_LOAD_LINE_KB * KB),
           ...each("first: ", sizes.firstLoad),
           ...each("lazy: ", sizes.lazy),
+          ...bySource,
         },
+        ...(problem ? { problems: [problem] } : {}),
       };
     },
     agent: async () => {

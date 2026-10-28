@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { scratchBase } from "../src/core/fixtures/scratch.ts";
-import { change, collect, e2eGroup, format, lastSaved, parts, readSaved, renderCompare, renderReport, SLOW, stableNames, type Measure, type Report } from "./measure.ts";
+import { change, collect, e2eGroup, firstBySource, format, lastSaved, parts, readSaved, renderCompare, renderReport, SLOW, stableNames, type Measure, type Report } from "./measure.ts";
 
 // npm run measure: the parts that aren't measurements (collecting, the tables, --compare's
 // arithmetic, the end-to-end file), then one run of the real script with --quick.
@@ -112,6 +112,23 @@ test("the end-to-end timings: missing, from another commit, or this commit's wit
   assert.deepEqual(e2eGroup(commit, file), { not_measured: "they are from commit ddddddd, not ccccccc: run REPOMAGPIE_MEASURE=1 npm run test:e2e first" });
   writeFileSync(file, JSON.stringify({ commit, date: "", timings: { "graph, warm: first frame": { ms: 1303, budget: 2000 }, "graph, cold: first frame": { ms: 1842, budget: null } } }));
   assert.deepEqual(e2eGroup(commit, file), { numbers: { "graph, warm: first frame": ms(1303, 2000), "graph, cold: first frame": ms(1842) } });
+});
+
+test("the first script by source: its top 5 from an analyze build of the same first script; another build or none says how to make one", () => {
+  const folder = join(scratchBase("measure-analyze"), "analyze");
+  const how = "run npm run build:analyze after npm run build";
+  assert.deepEqual(firstBySource(["index-AAAAAAAA.js"], folder), { numbers: {}, problem: `first script by source: no analyze build; ${how}` });
+  mkdirSync(folder);
+  writeFileSync(join(folder, "index.html"), '<script type="module" src="/assets/index-AAAAAAAA.js"></script>');
+  // Six sources of 1 to 6 bytes: "abbccc…", each segment a new source.
+  const sources = ["a", "b", "c", "d", "e", "f"].map((name) => `../node_modules/${name}/index.js`);
+  writeFileSync(join(folder, "index-AAAAAAAA.js"), "abbcccddddeeeeeffffff");
+  writeFileSync(join(folder, "index-AAAAAAAA.js.map"), JSON.stringify({ version: 3, sources, mappings: "AAAA,CCAA,ECAA,GCAA,ICAA,KCAA" }));
+  const bytes = (n: number): Measure => ({ value: n, unit: "B", better: "lower" });
+  assert.deepEqual(firstBySource(["index-AAAAAAAA.js", "index.html"], folder), {
+    numbers: { "first script by source, raw: f": bytes(6), "first script by source, raw: e": bytes(5), "first script by source, raw: d": bytes(4), "first script by source, raw: c": bytes(3), "first script by source, raw: b": bytes(2) },
+  });
+  assert.deepEqual(firstBySource(["index-ZZZZZZZZ.js"], folder), { numbers: {}, problem: `first script by source: the analyze build is from another build; ${how}` });
 });
 
 test("stable names: Vite's 8-character hash becomes *, so builds compare; a name seen twice keeps its hash", () => {

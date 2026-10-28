@@ -37,6 +37,7 @@
     "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
     "typecheck": "tsc --noEmit && tsc --noEmit -p ui",
     "build": "node scripts/build-cli.ts && vite build ui",
+    "build:analyze": "vite build ui --sourcemap --outDir ../.scratch/analyze --emptyOutDir && node scripts/bundle-composition.ts",
     "dev:ui": "vite ui",
     "check:bundle": "node scripts/check-bundle.ts",
     "check:build": "node scripts/check-build.ts",
