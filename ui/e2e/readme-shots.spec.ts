@@ -19,6 +19,8 @@ test("inbox review", async ({ page, magpie }) => {
   await expect(page.getByRole("heading", { level: 2, name: "Egonex-AI/Understand-Anything" })).toBeVisible();
   await page.getByRole("textbox", { name: "Verdict" }).click();
   await page.keyboard.type("Use when entering a large unfamiliar codebase; overkill for small repos with a good README.");
+  // The Verdict at the top, so the suggested domains below it (showcase.ts) are in view too.
+  await page.getByRole("textbox", { name: "Verdict" }).evaluate((el) => (el.closest(".field") ?? el).scrollIntoView({ block: "start" }));
   await shoot(page, "screen-inbox-review");
 });
 
@@ -44,11 +46,12 @@ test("suggest for this project", async ({ page, magpie }) => {
 });
 
 // Nothing selected: a selection dims the rest of the graph and hides its labels, so the shot keeps
-// every label that fits (decision 0044) rather than a note open beside it.
+// every label that fits (decision 0044) rather than a note open beside it. Coloured by domain.
 test("graph", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(page.locator(".graph-canvas")).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+  await page.getByRole("checkbox", { name: "Colour by domain" }).check();
   await expect(page.getByRole("group", { name: "Legend" })).toBeVisible();
   await shoot(page, "screen-graph");
 });
