@@ -80,16 +80,24 @@ test("the merged release on main: every check passes, the typed tag tags and pus
     `Tagged aaaaaaa as ${TAG} and pushed it.`,
     "https://github.com/Varshavia/RepoMagpie/actions/runs/987654",
     "npx -y npm@11.21.0 stage list repomagpie",
-    `$h = (Get-FileHash .\\repomagpie-${VERSION}.tgz -Algorithm SHA256).Hash.Substring(0,8).ToLower()`,
+    "If approve fails with E409, npm's automated review is still running (stage list shows validating).",
+    `npm view repomagpie@${VERSION} version dist.tarball --prefer-online`,
+    `npm pack repomagpie@${VERSION} --prefer-online --pack-destination .scratch`,
+    `$h = (Get-FileHash .\\.scratch\\repomagpie-${VERSION}.tgz -Algorithm SHA256).Hash.Substring(0,8).ToLower()`,
     "gh run view 987654 --log | Select-String $h",
-    `h=$(shasum -a 256 repomagpie-${VERSION}.tgz | cut -c1-8)`,
+    `h=$(shasum -a 256 .scratch/repomagpie-${VERSION}.tgz | cut -c1-8)`,
     "gh run view 987654 --log | grep $h",
     `npm dist-tag add repomagpie@${VERSION} latest`,
+    "npm view repomagpie dist-tags --prefer-online shows beta and latest",
     `gh release create ${TAG} --prerelease --title "${VERSION}" --notes-file .scratch/release-notes-${VERSION}.md`,
     `npm install -g repomagpie@${VERSION}`,
     "repomagpie setup --yes",
     "repomagpie doctor",
   ]) assert.ok(r.out.includes(line), line);
+  // The tarball can be fetched only once approved, and latest moved first: approve, dist-tag, then the SHA.
+  const at = (text: string) => r.out.indexOf(text);
+  assert.ok(at("stage approve") < at("npm dist-tag add") && at("npm dist-tag add") < at("npm pack repomagpie@"), "approve, then dist-tag, then the SHA check");
+  assert.ok(!/npm view(?![^\n]*--prefer-online)/.test(r.out), "every npm view has --prefer-online");
   assert.ok(!r.out.includes("$run"), "with the run's id known, no placeholder line");
   assert.ok(!r.out.includes("isn't there yet"));
   assert.match(r.out, /^[\x20-\x7e\n]*$/, "ASCII only");

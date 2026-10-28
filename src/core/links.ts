@@ -3,9 +3,8 @@
 // each note's outgoing and incoming links; it is built from per-file entries cached like the note
 // list (spec §7), so a warm read doesn't parse every file again. Used by the Note document and the
 // graph. Never prints.
-import { readFileSync } from "node:fs";
-import { readableId, readNote } from "./note.ts";
-import { isRecord, isTextOrNull, noteEntries } from "./note-cache.ts";
+import { readableId, type Note } from "./note.ts";
+import { isRecord, isTextOrNull, noteEntries, type noteSignature } from "./note-cache.ts";
 import { alternativeLinks, findLinks, targetResolver, type FoundLink } from "./wikilinks.ts";
 
 export { alternativeLinks, findLinks, type FoundLink };
@@ -46,8 +45,8 @@ export interface LinkEntries {
 // Each note file's id, name and links as written, from the link cache: files added or changed since
 // it was written are read again. One read of it serves both finding a note by id and the link index
 // (each read stats every note: about 22 ms at 2,000 notes).
-export function linkEntries(journal: string): LinkEntries {
-  return noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, path) => entry(path), isEntry);
+export function linkEntries(journal: string, listed?: ReturnType<typeof noteSignature>): LinkEntries {
+  return noteEntries(journal, LINKS_CACHE, LINKS_VERSION, (_file, parse) => entry(parse), isEntry, listed);
 }
 
 export function linkIndex(journal: string, entries = linkEntries(journal)): LinkIndex {
@@ -95,10 +94,10 @@ function isEntry(e: unknown): boolean {
 }
 
 // One note's id, name and links, as written. A note that can't be read has no id and no links.
-function entry(path: string): Entry {
+function entry(parse: () => Note): Entry {
   let note;
   try {
-    note = readNote(readFileSync(path, "utf8"));
+    note = parse();
   } catch {
     return { id: null, name: null, links: [] };
   }

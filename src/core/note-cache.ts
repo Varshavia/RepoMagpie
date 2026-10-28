@@ -8,6 +8,7 @@
 import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { removeFolder } from "./copy-folder.ts";
+import { readNote, type Note } from "./note.ts";
 
 export type Signature = Record<string, [number, number]>; // note file name → [mtimeMs, size]
 
@@ -161,12 +162,14 @@ export function readCacheEntries(journal: string, name: string, version: number)
 }
 
 // Data derived from each note file, cached per file with its modification time and size (the note
-// list, the link index): only new and changed files are derived again, so a saved note doesn't cost
-// a full re-read. `derive` gets the file's name and path; the result is stored as JSON. `valid`, when
-// given, checks a cached entry's shape; one that fails is derived again, so a damaged cache can't break
-// the caller.
-export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, path: string) => T, valid?: (entry: unknown) => boolean): { files: string[]; data: Record<string, T>; skipped: string[] } {
-  const { files, signature, skipped } = noteSignature(journal);
+// list, the link index, the graph): only new and changed files are derived again, so a saved note
+// doesn't cost a full re-read. `derive` gets the file's name and `parse`, which reads and parses it
+// (readNote) at most once per modification time and size in this process, whichever cache asks
+// first; it throws as readFileSync does. The result is stored as JSON. `valid`, when given, checks a
+// cached entry's shape; one that fails is derived again, so a damaged cache can't break the caller.
+// `listed`: the journal's noteSignature, when the caller has it already (one listing for two caches).
+export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, parse: () => Note) => T, valid?: (entry: unknown) => boolean, listed = noteSignature(journal)): { files: string[]; data: Record<string, T>; skipped: string[] } {
+  const { files, signature, skipped } = listed;
   const cached = readCacheEntries(journal, name, version);
   const data: Record<string, T> = {};
   let changed = !cached || Object.keys(cached.files).length !== files.length;
@@ -175,12 +178,40 @@ export function noteEntries<T>(journal: string, name: string, version: number, d
     const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
     if (hit && (!valid || valid(hit))) data[file] = hit as T;
     else {
-      data[file] = derive(file, join(journal, "notes", file));
+      data[file] = derive(file, () => parsedNote(journal, file, signature[file]));
       changed = true;
     }
   }
   if (changed && files.length) writeCache(journal, name, version, signature, data);
+  forgetGone(journal, files);
   return { files, data, skipped };
+}
+
+// The notes parsed in this process, by journal and file, with the modification time and size they
+// were read at (decision 0049): the three caches' cold builds read and parse each note once, not
+// three times. Never written anywhere; a file listed no more is forgotten.
+const parsed = new Map<string, Map<string, { at: [number, number]; note: Note }>>();
+
+function parsedNote(journal: string, file: string, at: [number, number]): Note {
+  let notes = parsed.get(journal);
+  if (!notes) parsed.set(journal, (notes = new Map()));
+  const kept = notes.get(file);
+  if (kept && kept.at[0] === at[0] && kept.at[1] === at[1]) return kept.note;
+  const note = readNote(readFileSync(join(journal, "notes", file), "utf8"));
+  notes.set(file, { at, note });
+  return note;
+}
+
+function forgetGone(journal: string, files: string[]): void {
+  const notes = parsed.get(journal);
+  if (!notes) return;
+  const listed = new Set(files);
+  for (const file of notes.keys()) if (!listed.has(file)) notes.delete(file);
+}
+
+// For the tests: parse every note again, as a new process would.
+export function forgetParsed(): void {
+  parsed.clear();
 }
 
 // Shape checks for the `valid` argument of noteEntries.

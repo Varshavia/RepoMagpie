@@ -615,6 +615,68 @@ test.describe("an empty journal", () => {
   });
 });
 
+// The positions kept for the session (decision 0049), from the graph's own coordinates; and the
+// layout workers started, as Playwright sees them.
+type Positions = Record<string, { x: number; y: number }>;
+async function positions(page: Page): Promise<Positions> {
+  const doc = await page.evaluate(async () => (await fetch("/api/graph?journal=personal")).json() as Promise<GraphJson>);
+  const keys = drawable(doc, DEFAULT_SOURCES).nodes.map((n) => n.key);
+  return canvas(page).evaluate((el, ks) => Object.fromEntries(ks.map((k) => [k, (el as unknown as { graphPosition: (k: string) => { x: number; y: number } }).graphPosition(k)])), keys);
+}
+function workers(page: Page): string[] {
+  const started: string[] = [];
+  page.on("worker", (worker) => started.push(worker.url()));
+  return started;
+}
+async function reopenGraph(page: Page) {
+  await page.getByRole("button", { name: /Inbox/ }).click();
+  await expect(page.getByRole("listbox", { name: "Inbox" })).toBeVisible();
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+}
+
+test("graph: reopened with nothing changed, it is drawn where it was, and no layout runs", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const before = await positions(page);
+  const started = workers(page);
+  await reopenGraph(page);
+  expect(await positions(page)).toEqual(before);
+  expect(started).toEqual([]);
+  await expect(page.getByRole("button", { name: "Re-run layout" })).toBeEnabled();
+});
+
+test("graph: a note added while the graph was closed joins next to its tag after a short layout; the rest keeps its place", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  const before = await positions(page);
+  await page.getByRole("button", { name: /Inbox/ }).click();
+  writeFileSync(magpie.note("npm--skills-kit.md"), renderNote({ id: "pkg:npm/skills-kit", name: "skills-kit", explored: "2026-10-08", kind: "library", tags: ["data-engineering"] }));
+  await expect(page.getByRole("listbox", { name: "Inbox" }).getByRole("option", { name: /skills-kit/ })).toBeVisible();
+  const started = workers(page);
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+  expect(started).toHaveLength(1);
+  expect(Number(await canvas(page).getAttribute("data-iterations"))).toBeLessThan(300); // a short layout
+  const after = await positions(page);
+  const xs = Object.values(before).map((p) => p.x);
+  const ys = Object.values(before).map((p) => p.y);
+  const side = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const added = after["note:npm--skills-kit.md"];
+  const tag = after["tag:data-engineering"];
+  expect(Math.hypot(added.x - tag.x, added.y - tag.y) / side).toBeLessThan(0.15);
+  // Every node that was there moved less than 5% of the layout's size.
+  for (const [key, was] of Object.entries(before)) expect(Math.hypot(after[key].x - was.x, after[key].y - was.y) / side, key).toBeLessThan(0.05);
+});
+
+test("graph: Re-run layout runs the full layout, also on a graph reopened without one", async ({ page, magpie }) => {
+  await openGraph(page, magpie);
+  await reopenGraph(page);
+  const started = workers(page);
+  await page.getByRole("button", { name: "Re-run layout" }).click();
+  await expect(canvas(page)).toHaveAttribute("data-settled", "true", { timeout: 10_000 });
+  expect(started).toHaveLength(1);
+  await expect(canvas(page)).toHaveAttribute("data-iterations", "300");
+});
+
 test("graph: without WebGL it says so, and the status line still counts", async ({ page, magpie }) => {
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;

@@ -57,3 +57,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0046 | [Classification signals beyond topics](0046-classification-signals.md) | accepted (adds to 0030 and 0040) |
 | 0047 | [Kind rules, measured](0047-kind-rules-measured.md) | accepted (changes 0030's kind rules) |
 | 0048 | [The first files' line, measured](0048-the-first-load-line-measured.md) | accepted (supersedes 0028's first-files line) |
+| 0049 | [The graph opens faster](0049-the-graph-opens-faster.md) | accepted (supersedes parts of 0028's layout) |

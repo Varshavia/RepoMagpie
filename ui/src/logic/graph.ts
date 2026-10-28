@@ -3,6 +3,7 @@
 // sigma: the page (components/GraphPage.tsx) draws what this decides.
 import type { GraphJson } from "../../../src/core/documents.ts";
 import { DOMAIN_IDS, type Domain } from "../../../src/core/domains.ts";
+import { STOP } from "./layout-stop.ts";
 import { visible } from "./text.ts";
 
 export type { GraphJson };
@@ -359,14 +360,15 @@ export function joinPosition(key: string, edges: GraphEdge[], at: (key: string) 
   return seedPosition(key);
 }
 
-// ForceAtlas2 for a fixed number of iterations, then it stops. Barnes-Hut above 1,000 nodes, at
+// ForceAtlas2 until the nodes settle (the stop rule, layout-stop.ts), at most `iterations`; Re-layout
+// runs all of them (decision 0049). Barnes-Hut above 1,000 nodes, at
 // θ 1.0: at 2,030 nodes it settles as far as θ 0.5 in 300 iterations, in 1.07 s instead of 2.28 s
 // (2026-10-08, measured without a browser). Below 1,000 the exact forces are fast enough (800
 // notes: 0.94 s) and settle further than Barnes-Hut.
 // Strong gravity (a pull that grows with the distance to the centre), at 0.3, keeps notes without
 // connections close to the rest; at 0.05 they drifted to a ring far out, and fitting that ring left
 // the connected notes small in the middle. At 1 the clusters flatten into an even disc.
-export const LAYOUT = { iterations: 300, progressEvery: 250 }; // a progress frame at most every 250 ms
+export const LAYOUT = { iterations: STOP.max, progressEvery: 250 }; // a progress frame at most every 250 ms
 
 export function layoutSettings(order: number) {
   return {
