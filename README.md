@@ -12,7 +12,7 @@
 
 [![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP server](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](docs/spec.md#repomagpie-mcp)
-[![Node.js 22.12 or later](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](#platforms)
+[![Node.js 22.12 or later](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](#what-each-agent-gets)
 [![CI status](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](LICENSE)
 
@@ -23,7 +23,7 @@
 
 </div>
 
-Months ago you tried pdfkit and gave up on it. Today your agent is about to install it again, and RepoMagpie asks you first, with your own note:
+Months ago you tried pdfkit and gave up on it. Today your agent is about to install it again, and in Claude Code, RepoMagpie's hook asks you first, with your own note:
 
 ```text
 $ npm install pdfkit
@@ -36,27 +36,25 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-In Claude Code: RepoMagpie's hook asked first, before the install ran.
-
-- **Remember:** write a verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers once, at a task's end, to save a dependency decision made in it, with your reason as the Verdict. Notes are Markdown files you own.
+- **Remember:** write a Verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers, once at a task's end, to save a dependency decision with your reason. Notes are Markdown files you own.
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
-- **Find by concern:** ask about security, database, testing… in any language; your agent maps the question onto domains and finds the notes that fit, even ones that share no word with it.
+- **Find by concern:** ask about security, databases, testing… in any language, and your agent finds the notes that fit, even ones with no word in common.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
-- **Discover:** search GitHub by words, concern and kind, see stars, activity and licence, and add the ones you choose to your inbox: `repomagpie discover`, or Discover in the app.
-- **Start from a project:** `repomagpie init --auto` lists its dependencies by what your notes say (avoid, noted, no note), then asks for your Verdict on each one without a note; Enter skips, `q` stops.
+- **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app.
+- **Start from a project:** `repomagpie init --auto` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
 
 **Status:** pre-release `0.2.0-beta.15`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 
-1. Install the `repomagpie` command and set it up in your coding agents. You need Node.js 22.12 or later. `magpie` works as a short alias when no other `magpie` command is on your `PATH`. <!-- check:commands allow -->
+1. Install the `repomagpie` command and set it up in your coding agents:
 
    ```bash
    npm install -g repomagpie@beta
    repomagpie setup
    ```
 
-   `setup` finds your agents by their command or app (an agent whose folder is all that's left is listed, not chosen), shows what it will change in which file, asks first, and backs up every file it edits; `repomagpie setup --dry-run` only shows the plan. See [agents](docs/agents.md), or [setting up by hand](docs/setup-by-hand.md). In Claude Code, `repomagpie setup --capture-reminder` also adds an opt-in reminder: when a session installed or removed a package you have no note on, the agent is reminded once to offer one.
+   `setup` shows which files it will change, asks first, and backs up each file it edits; `repomagpie setup --dry-run` only shows the plan ([agents](docs/agents.md)).
 
 2. Check what is wired in each agent:
 
@@ -64,18 +62,16 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
    repomagpie doctor
    ```
 
-   `doctor` also lists `setup`'s backups. Each is a whole copy of its file, and copies of `~/.claude.json` can hold sign-in tokens and MCP servers' secrets. `repomagpie setup --delete-backups` deletes them after asking; `--keep-latest` keeps the newest of each file.
+   `doctor` also lists `setup`'s backups, which can hold your agents' secrets ([SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends)); `repomagpie setup --delete-backups` deletes them.
 
-3. Write your first note. Give a package name, or a GitHub URL to also fetch the repository's licence, topics and agent skills:
+3. Write your first note. A GitHub URL also fetches the repository's licence, topics and agent skills, and `--use-when` lets you find the note later by what you need:
 
    ```bash
    repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   `--type npm` says the name is an npm package. Inside a project, RepoMagpie reads that from its manifest; elsewhere it asks. `--use-when` lets you find the note later by what you need, not only by name. For notes you already have, `repomagpie domains --suggest --dry-run` shows suggested domains (drop `--dry-run` to write them, for you to confirm), and `repomagpie tags --merge postgres postgresql` merges two spellings of a tag.
-
-   Without a token, GitHub allows 60 requests an hour. If you use the [GitHub CLI](https://cli.github.com/), give RepoMagpie its token for the current shell to raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+   GitHub allows 60 requests an hour without a token. To raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
 
 > [!IMPORTANT]
 > RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
@@ -84,20 +80,20 @@ In Claude Code: RepoMagpie's hook asked first, before the install ran.
 
 ![How RepoMagpie works: your agent is about to run npm install pdfkit; the skill or the MCP tool recall checks first, and the hook checks the install command as a backstop; both read your personal journal in ~/.magpie and the project journal in .magpie/; your Verdict, "avoid: async streams painful; use puppeteer", comes back, and your agent asks you before the install.](docs/assets/how-it-works.svg)
 
-Before an install, the skill tells your agent to look the package up with the MCP server's `recall` tool, or the `repomagpie recall` command. RepoMagpie reads both journals on your machine and returns your notes; when one says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step.
+Before an install, the skill tells your agent to call `recall`, the MCP tool or the `repomagpie recall` command. When a note says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step.
 
-There is no extra model, no API key and no telemetry. RepoMagpie works through the agent you already use, so it works as well as that agent follows the skill: without a hook, that goes for the check before an install too.
+There is no extra model, no API key and no telemetry. RepoMagpie works as well as your agent follows the skill; without a hook, that includes the check before an install.
 
 ## Ask your agent
 
-- **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first; on a small journal it can read every note in one list.
-- **How should database security work in this project?** Your agent answers with your notes in the security and database domains that fit the project's technologies, saying why each one fits.
-- **Install pdfkit.** Your agent recalls pdfkit before the install. Your avoid note comes back with its alternatives, and your agent asks you before it installs anything.
-- **Which of my tools fit this project?** `suggest` reads the project's manifests and README and returns the notes that match; your agent picks the ones that fit, says why, and names any dependency in use that you noted to avoid.
+- **What do I have for browser testing?** Your agent searches your journals and answers with the notes it finds, Verdict first.
+- **How should database security work in this project?** Your agent answers with your notes in the security and database domains that fit the project, and says why.
+- **Install pdfkit.** Your agent recalls it first, shows your avoid note with its alternatives, and asks you before it installs anything.
+- **Which of my tools fit this project?** `suggest` reads the project's manifests and README; your agent picks the notes that fit and names any dependency in use that you noted to avoid.
 
 ## What each agent gets
 
-What `repomagpie setup` sets up in each agent ([agents](docs/agents.md)):
+What `repomagpie setup` sets up in each agent, on Linux, Windows or macOS with Node.js 22.12 or later ([agents](docs/agents.md)):
 
 | Agent | MCP | Skill | Hook | When a note says to avoid a package |
 |---|---|---|---|---|
@@ -109,26 +105,24 @@ What `repomagpie setup` sets up in each agent ([agents](docs/agents.md)):
 | Antigravity CLI | yes | yes | yes | the hook asks you |
 | Copilot CLI | yes | yes | yes | the hook stops the first try; your agent asks you |
 
-Codex CLI runs a new hook only after you trust it in `/hooks`.
+Codex CLI runs a new hook only after you trust it in `/hooks`. Other agents with MCP or [Agent Skills](https://agentskills.io) can use the server or the skill: see [setting up by hand](docs/setup-by-hand.md). The package has no runtime dependencies, and paths with letters outside ASCII work.
 
 ## Share notes with your team
 
-A project journal is a `.magpie/` folder in the repository. Its notes are committed with the code, and RepoMagpie's hook and `recall` read them for every contributor, next to each person's own journal.
+A project journal is a `.magpie/` folder in the repository, committed with the code. RepoMagpie's hook and `recall` read it for every contributor, next to each person's own journal.
 
 ```sh
 repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --to project
 git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
-Or copy one of your own notes there: `repomagpie adopt pdfkit`. When a teammate's agent is about to run `npm install pdfkit`, the hook finds the project's note and asks them first. Their `search` and `suggest` find it too.
-
-A project journal is as visible as its repository: anyone who can read the repository can read its notes ([decision 0013](docs/decisions/0013-two-journal-scopes.md)).
+Or copy one of your own notes there: `repomagpie adopt pdfkit`. When a teammate's agent is about to run `npm install pdfkit`, the hook asks them first, and their `search` and `suggest` find the note too. Anyone who can read the repository can read its notes.
 
 ## The local app
 
-`repomagpie ui` opens your journals in the browser. Review an inbox note: write the Verdict, set kind, tags and rating, and press Ctrl+Enter.
+`repomagpie ui` opens your journals in the browser. Review an inbox note: write the Verdict, set kind, domains, tags and rating, and press Ctrl+Enter.
 
-![The inbox review in repomagpie ui: a GitHub repository's description and Use when drafts above the Verdict being typed, with tags to pick below](docs/assets/screen-inbox-review.png)
+![The inbox review in repomagpie ui: the Verdict being typed for Understand-Anything, with ai and tooling outlined as suggested domains, and tags to pick below](docs/assets/screen-inbox-review.png)
 
 Check a package: what your journals say before an install, and what the hook does in each agent.
 
@@ -136,11 +130,11 @@ Check a package: what your journals say before an install, and what the hook doe
 
 Suggest for this project: the notes that fit, and why each one is a candidate.
 
-![Suggest in repomagpie ui: microsoft/playwright first, matched on the @playwright/test dependency; pdfkit listed apart as in use with an avoid note, with pdf-lib and puppeteer instead](docs/assets/screen-suggest.png)
+![Suggest in repomagpie ui: microsoft/playwright first, matched on the @playwright/test dependency; pdfkit listed last as in use with an avoid note, with pdf-lib and puppeteer instead](docs/assets/screen-suggest.png)
 
-See a journal as a graph: notes, their tags, `[[links]]` and alternatives, coloured by domain if you choose. Labels never overlap, and a tag on only one note stays hidden until you turn it on. Click a note to read and edit it beside the graph.
+See a journal as a graph: notes, their tags, `[[links]]` and alternatives, coloured by domain if you choose. Click a note to read and edit it beside the graph.
 
-![The graph page in repomagpie ui on the maintainer's own journal: 39 notes, 67 tags and 157 connections, with the most connected tags and notes, such as #llm, #ai, #mcp and #claude-code, listed beside the graph](docs/assets/screen-graph.png)
+![The graph page in repomagpie ui, coloured by domain: 42 notes, 13 tags and 75 connections; the most connected, such as #self-hosting, #ai-agents and #frontend, listed beside it](docs/assets/screen-graph.png)
 
 ## How it compares
 
@@ -150,72 +144,51 @@ See a journal as a graph: notes, their tags, `[[links]]` and alternatives, colou
 | Supply-chain scanners, such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | Malware, vulnerabilities and popularity, from global data | Before an install |
 | RepoMagpie | Your verdicts and your team's | Before an install, when you search, and when you start a project |
 
-A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install.
-
-## Platforms
-
-- Node.js 22.12 or later; the package has no runtime dependencies (the MCP server's libraries are bundled in it). CI runs on Linux, Windows and macOS, with Node 22, 24 and 26.
-- On Windows, Codex CLI, Copilot CLI, Gemini CLI and Cursor start the hook through Windows PowerShell, which adds about 350 ms each time; Antigravity CLI's `cmd` adds about 90 ms. Copilot CLI runs the hook before every tool call, the others before each shell command.
-- Paths with letters outside ASCII, such as a home folder named `C:\Users\Şuat`, are supported.
+A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install. RepoMagpie isn't a scanner: it never claims to detect malware or vulnerabilities, so run one next to it ([vision](docs/vision.md#non-goals)).
 
 ## FAQ
 
 <details>
 <summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
 
-No. Your personal journal is a folder of Markdown files on your machine, a project journal is as visible as its repository, and there is no telemetry. The only network requests go to GitHub's API. When you give `repomagpie note`, `repomagpie import` or the app's Add page a GitHub repository, they read its metadata, file list, root manifests and README. When you search with `repomagpie discover` or the app's Discover page, it sends your search words and filters, nothing else. Both send `GITHUB_TOKEN` if you set it, never anything from your journals. `repomagpie ui` listens on `127.0.0.1` only, and `repomagpie mcp` never opens a network connection or a port: it talks to your agent over stdio. Your agent sees the notes it reads, and its model provider gets them as part of the conversation. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+No. Your journals are Markdown files on your machine, and there is no telemetry. The only network requests are read-only calls to GitHub's API, when you add a note from a GitHub repository or search with `discover`: they send that repository's name or your search, and `GITHUB_TOKEN` if you set it, never your notes. `repomagpie ui` listens on `127.0.0.1` only. Your agent's model provider sees the notes your agent reads. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
 
 </details>
 
 <details>
 <summary><strong>Does RepoMagpie use AI?</strong></summary>
 
-Not a model of its own. RepoMagpie's commands match package names and words, and call no model. The AI is the coding agent you already use: through the skill and the MCP tools, it recalls your notes before an install, searches them when you ask what you have, and offers once, at the end of a task, to save a dependency decision. The skill tells it never to write your Verdict for you (only your words, or nothing), never to delete a note unless you ask for that note by name, and never to install a package you noted to avoid without asking you; where your agent has a hook, the hook checks that last one too.
+Not a model of its own: its commands match names and words, and call no model. The AI is the coding agent you already use, which reads and saves your notes through the skill and the MCP tools. The skill tells it never to write your Verdict for you, never to delete a note you didn't name, and never to install a package you noted to avoid without asking you; a hook checks that last one too.
 
 </details>
 
 <details>
 <summary><strong>Does the hook block installs?</strong></summary>
 
-Never for good, and it never approves one. When a note says to avoid the package, the hook asks you in Claude Code, Gemini CLI and Antigravity CLI; in Codex CLI, Cursor and Copilot CLI it stops the first try, your agent asks you, and the same install then goes through for 10 minutes. A note that doesn't say to avoid the package never stops an install, and neither does an error in RepoMagpie: the hook then does nothing. See the [hook contract](docs/spec.md#6-hook-contract) and [decision 0036](docs/decisions/0036-hooks-in-other-agents.md).
-
-</details>
-
-<details>
-<summary><strong>Is it a security scanner?</strong></summary>
-
-No. RepoMagpie shows what you and your team wrote down: it never claims to detect malware or vulnerabilities, and it never installs anything. Run a scanner such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) next to it ([vision](docs/vision.md#non-goals), [competitors](docs/competitors.md)).
-
-</details>
-
-<details>
-<summary><strong>Which agents does it work with?</strong></summary>
-
-`repomagpie setup` sets up the seven in [What each agent gets](#what-each-agent-gets). Other agents with MCP can use the MCP server, and agents with [Agent Skills](https://agentskills.io) the skill: [setting up by hand](docs/setup-by-hand.md) has the entries to write, and [agents](docs/agents.md) what each agent supports.
+Never for good, and it never approves one. When a note says to avoid the package, the hook asks you, or stops the first try so that your agent asks you ([the table](#what-each-agent-gets)); after a stop, the same install goes through for 10 minutes. Any other note, or an error in RepoMagpie, never stops an install. See the [hook contract](docs/spec.md#6-hook-contract).
 
 </details>
 
 <details>
 <summary><strong>How do I remove it?</strong></summary>
 
-Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, and never restores a backup over your later changes. It leaves your journals (`~/.magpie` and any project's `.magpie/`) and `setup`'s backups: run `repomagpie setup --delete-backups` to delete the backups after asking, then `npm uninstall -g repomagpie`. Antigravity CLI can keep listing a removed entry until you clear `~/.gemini/antigravity-cli/mcp/` ([agents](docs/agents.md#antigravity-cli)).
+Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, never restores a backup over your later changes, and leaves your journals and `setup`'s backups. Then `repomagpie setup --delete-backups` deletes the backups after asking, and `npm uninstall -g repomagpie` removes the command.
 
 </details>
 
 <details>
 <summary><strong>Where are my notes, and can I edit them by hand?</strong></summary>
 
-Each note is one Markdown file with YAML frontmatter: in `~/.magpie/notes/` for your personal journal, and in `.magpie/notes/` for a project's ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. `repomagpie ui` edits the same files in the browser. To keep the personal journal elsewhere, set `MAGPIE_HOME` or pass `--home`. `repomagpie delete <name>`, or Delete in the app, moves a note to the journal's `.trash/`.
+Each note is one Markdown file with YAML frontmatter, in `~/.magpie/notes/` or a project's `.magpie/notes/` ([note schema](docs/note-schema.md)). Edit them in any editor: RepoMagpie reads hand-written notes even with fields or sections missing, and never rewrites your sections. Set `MAGPIE_HOME` or pass `--home` to keep your journal elsewhere. `repomagpie delete` moves a note to the journal's `.trash/`.
 
 </details>
 
 ## Documentation
 
-- [Spec](docs/spec.md): every command (`search`, `recall`, `catalog`, `discover`, `adopt`, `import`, `delete` and the rest; `repomagpie --help` lists them), flag and `--json` document
+- [Spec](docs/spec.md): every command, flag and `--json` document (`repomagpie --help` lists the commands)
 - [Agents](docs/agents.md): what each coding agent supports, and [setting up by hand](docs/setup-by-hand.md)
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules
-- [Roadmap](docs/roadmap.md) and [changelog](CHANGELOG.md)
 - [Testing the beta](TESTING.md): the steps for a week with the beta, and how to send feedback
 - [Vision](docs/vision.md), [competitors](docs/competitors.md) and [decisions](docs/decisions/)
 

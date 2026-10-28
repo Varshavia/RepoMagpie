@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderNote } from "../../src/core/write.ts";
-import { SHOWCASE_PROJECT, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
+import { SHOWCASE_PROJECT, SHOWCASE_SUGGESTED, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 const VAULT = join(REPO, "examples", "vault");
@@ -134,6 +134,8 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
       // LF, as .gitattributes stores them; a Windows checkout may have CRLF.
       let text = readFileSync(join(VAULT, "notes", file), "utf8").replace(/\r\n/g, "\n");
       if (TO_INBOX.includes(file)) text = text.replace(/## Verdict\n[^\n#][^\n]*\n/, "## Verdict\n").replace("status: reviewed", "status: inbox");
+      const suggested = options.showcase ? SHOWCASE_SUGGESTED[file] : undefined;
+      if (suggested) text = text.replace(/^(tags: .*)$/m, `$1\ndomains_suggested: [${suggested.join(", ")}]`);
       writeFileSync(join(notes, file), text);
     }
     if (options.showcase) {

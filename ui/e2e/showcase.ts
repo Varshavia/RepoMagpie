@@ -26,6 +26,12 @@ export const SHOWCASE_TAGS = `
 - \`self-hosting\` — services run on my own server
 `;
 
+// Suggested domains for the example notes the showcase puts back in the inbox, as a capture from
+// GitHub suggests them, so the inbox review shows them.
+export const SHOWCASE_SUGGESTED: Record<string, string[]> = {
+  "github--egonex-ai--understand-anything.md": ["ai", "tooling"],
+};
+
 const stem = (fullName: string) => fileNameFor(`pkg:github/${fullName.toLowerCase()}`).replace(/\.md$/, "");
 const link = (fullName: string) => `[[${stem(fullName)}|${fullName.split("/")[1]}]]`;
 

@@ -204,6 +204,10 @@ That is why `setup` writes the absolute `node` and the absolute entry file, neve
 | Antigravity CLI | `PreToolUse` | yes (`ask`, `force_ask`; `force_ask` tried) | no: `allow`'s `reason` reached neither the agent nor the user (pre-check) | not documented; no errors seen | `cmd /c`, from `~/.gemini/config` (pre-check) |
 | Zed, Goose, Claude Desktop | none documented | | | | |
 
+### The hook's start-up on Windows
+
+The shell an agent starts the hook through adds to every run. Windows PowerShell (Codex CLI, Copilot CLI, Gemini CLI and Cursor) adds about 350 ms each time; Antigravity CLI's `cmd` about 90 ms. Claude Code starts node directly (the exec form), with no shell. Copilot CLI runs the hook before every tool call, the others before each shell command.
+
 ### At the end of a turn
 
 Only Claude Code has the Stop reminder ([decision 0042](decisions/0042-the-stop-reminder.md)). Each of the others has a turn-end event that can make the agent continue. Read on 2026-10-25 from each agent's hooks page (the sources above); nothing here was tried. The event names are quoted. The inputs and outputs marked "to recheck" came from a summary of a long page, not its text: read the page again before building on them.
