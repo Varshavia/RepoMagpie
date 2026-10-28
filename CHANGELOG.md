@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.15] - 2026-10-28
+
+The sixteenth pre-release: new notes from GitHub get a better kind.
+
 ### Changed
 
-- New notes from GitHub get a better kind: a GitHub Action is `other`, a library or framework that ships agent skills for its users is no longer a skill pack, and the topics `orm`, `ui-library` and `testing-framework` and a few phrases at the start of the README, such as "a framework for" or "component library", name the kind. On 69 public repositories the kind is right for 37 instead of 24; on 30 others, checked only at the end, for 15 instead of 14. Notes you already have don't change.
+- New notes from GitHub get a better kind: a GitHub Action is `other`, a library or framework that ships agent skills for its users is no longer a skill pack, and the topics `orm`, `ui-library` and `testing-framework` and a few phrases at the start of the README, such as "a framework for" or "component library", name the kind. On 69 public repositories the kind is right for 37 instead of 24; on 30 others, checked only at the end, for 15 instead of 14. Notes you already have don't change. Discover's estimated kind reads the same topics, so `repomagpie discover --kind library` also keeps repositories tagged `orm` or `ui-library`.
+
+### Fixed
+
+- In `repomagpie ui`, removing a suggested domain with the keyboard moves the focus to the next suggestion again. On a slow machine, the focus could be lost instead, so the next Enter did nothing. The bug came in 0.2.0-beta.14.
 
 ## [0.2.0-beta.14] - 2026-10-27
 
@@ -320,7 +328,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...HEAD
+[0.2.0-beta.15]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...v0.2.0-beta.15
 [0.2.0-beta.14]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...v0.2.0-beta.14
 [0.2.0-beta.13]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...v0.2.0-beta.13
 [0.2.0-beta.12]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.11...v0.2.0-beta.12
