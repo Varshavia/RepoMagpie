@@ -4,14 +4,14 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { scratchBase } from "../src/core/fixtures/scratch.ts";
-import { bundleSizes, entryFiles } from "./bundle-sizes.ts";
+import { bundleSizes, entryFiles, FIRST_LOAD_LINE_KB } from "./bundle-sizes.ts";
 import { checkBundle, type Limits } from "./check-bundle.ts";
 
 // npm run check:bundle's two lines (docs/ui.md §10) on tiny fixture builds: the files are random
 // bytes, so gzip can't shrink them and each weighs about its size. The limits are scaled down with
 // them; the real ones are tested by the build in CI.
 
-const LIMITS: Limits = { budget: 12, line: 5, allowance: 7 };
+const LIMITS: Limits = { budget: 12, line: 5 };
 const page = (tags: string) => `<!doctype html>\n<html><head>\n${tags}\n</head><body><div id="root"></div></body></html>\n`;
 const ENTRY = '<script type="module" crossorigin src="/assets/index-AAAAAAAA.js"></script>\n<link rel="stylesheet" crossorigin href="/assets/index-BBBBBBBB.css">';
 
@@ -28,8 +28,7 @@ test("under both lines: passes without a notice", () => {
   const { lines, errors } = checkBundle(build(page(ENTRY), { "index-AAAAAAAA.js": 2, "index-BBBBBBBB.css": 1, "GraphPage-CCCCCCCC.js": 3 }), LIMITS);
   assert.deepEqual(errors, []);
   assert.ok(lines.some((line) => /kB {2}GraphPage-CCCCCCCC\.js \(lazy\)$/.test(line)));
-  assert.ok(lines.some((line) => /kB {2}first files: index-AAAAAAAA\.js, index-BBBBBBBB\.css, index\.html \(decision 0028's line 5 kB\)$/.test(line)));
-  assert.ok(!lines.some((line) => line.startsWith("first load")));
+  assert.ok(lines.some((line) => /kB {2}first files: index-AAAAAAAA\.js, index-BBBBBBBB\.css, index\.html \(decision 0048's line 5\.0 kB\)$/.test(line)));
 });
 
 test("over the total: fails, the first files under their line", () => {
@@ -38,16 +37,10 @@ test("over the total: fails, the first files under their line", () => {
   assert.match(errors[0], /^The app is over its budget by \d+\.\d kB\.$/);
 });
 
-test("over decision 0028's line but within the allowance: passes, with a notice", () => {
-  const { lines, errors } = checkBundle(build(page(ENTRY), { "index-AAAAAAAA.js": 5, "index-BBBBBBBB.css": 1 }), LIMITS);
-  assert.deepEqual(errors, []);
-  assert.match(lines.at(-1) ?? "", /^first load 6\.\d kB: 1\.\d kB over decision 0028's line \(5 kB\), allowed up to 7 kB until perf\/app-first-load lowers it$/);
-});
-
-test("over the allowance: fails", () => {
-  const { errors } = checkBundle(build(page(ENTRY), { "index-AAAAAAAA.js": 7, "index-BBBBBBBB.css": 1 }), LIMITS);
+test("over decision 0048's line: fails, with no allowance", () => {
+  const { errors } = checkBundle(build(page(ENTRY), { "index-AAAAAAAA.js": 5, "index-BBBBBBBB.css": 1 }), LIMITS);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /^The first files are 8\.\d kB: over the allowance of 7 kB, and 3\.\d kB over decision 0028's line \(5 kB\)\.$/);
+  assert.match(errors[0], /^The first files are 6\.\d kB: 1\.\d kB over decision 0048's line \(5\.0 kB\)\.$/);
 });
 
 test("a module preload is a first file; a style index.html doesn't name is lazy, and a page without a stylesheet works", () => {
@@ -70,9 +63,8 @@ test("a file index.html names that the build doesn't have is an error, not a sma
   assert.throws(() => bundleSizes(build(page(ENTRY), { "index-AAAAAAAA.js": 1 })), /index\.html loads index-BBBBBBBB\.css, which isn't in/);
 });
 
-test("the allowance for the first files may only go down: at most 109.5 kB", () => {
+test("there is no allowance: the first files' line is decision 0048's 104.0 kB, in bundle-sizes.ts", () => {
   const source = readFileSync(new URL("check-bundle.ts", import.meta.url), "utf8");
-  const allowance = /^export const FIRST_LOAD_ALLOWANCE_KB = ([\d.]+);$/m.exec(source);
-  assert.ok(allowance, "FIRST_LOAD_ALLOWANCE_KB is a number in check-bundle.ts");
-  assert.ok(Number(allowance[1]) <= 109.5, `FIRST_LOAD_ALLOWANCE_KB is ${allowance[1]}: it may only go down from 109.5 (decision 0028's line is 102.4)`);
+  assert.doesNotMatch(source, /ALLOWANCE/);
+  assert.equal(FIRST_LOAD_LINE_KB, 104.0);
 });

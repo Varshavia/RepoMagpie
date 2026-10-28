@@ -57,7 +57,7 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `npm run test:hooks` | no test fails |
 | `npm run build` | exit 0 |
 | `npm run check:build` | the built CLI gives the same output as the source, and the packed package runs as `repomagpie`, as its alias and through `npx` (exit 0) |
-| `npm run check:bundle` | the app is under 200 kB gzipped, and its first files within decision 0028's line or the allowance ([UI](ui.md) §10) |
+| `npm run check:bundle` | the app is under 200 kB gzipped, and its first files within decision 0048's line, 104.0 kB ([UI](ui.md) §10) |
 | `npm run check:links` | 0 broken links |
 | `npm run check:commands` | no doc tells someone to run the alias |
 | `npm run check:characters` | no file holds a bidi control or a zero-width character |

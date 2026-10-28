@@ -14,9 +14,12 @@ import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, EmptyState, FieldError, plainClick, SkeletonNote, StatusBadge } from "./common.tsx";
 import type { ProjectState } from "./fields.tsx";
 import { Alternatives } from "./Alternatives.tsx";
-import { DeleteDialog } from "./DeleteDialog.tsx";
+import { LazyFrame, lazyPart } from "./lazy.tsx";
 import { LinkTextarea } from "./LinkTextarea.tsx";
 import { ReviewForm } from "./ReviewForm.tsx";
+
+// Shown only after "Delete note": its own chunk (docs/ui.md §10).
+export const Delete = lazyPart(() => import("./later.ts").then((m) => m.DeleteDialog));
 
 // What a [[link]] in the note needs: the note's resolved links, and where a click goes.
 const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void; search: (name: string) => void } | null>(null);
@@ -494,21 +497,23 @@ export function NotePane(props: NotePaneProps) {
             ) : null}
           </div>
           {deleting && onDeleted && note.version ? (
-            <DeleteDialog
-              journal={journal}
-              address={address}
-              version={note.version}
-              name={name}
-              home={home}
-              onCancel={() => showDelete(false)}
-              onDeleted={(doc) => {
-                deleted.current = true;
-                showDelete(false);
-                onDeleted(doc);
-              }}
-              onConflict={deleteConflict}
-              onOpenNote={onOpenNote}
-            />
+            <LazyFrame fallback={null} onClose={() => showDelete(false)}>
+              <Delete.Part
+                journal={journal}
+                address={address}
+                version={note.version}
+                name={name}
+                home={home}
+                onCancel={() => showDelete(false)}
+                onDeleted={(doc) => {
+                  deleted.current = true;
+                  showDelete(false);
+                  onDeleted(doc);
+                }}
+                onConflict={deleteConflict}
+                onOpenNote={onOpenNote}
+              />
+            </LazyFrame>
           ) : null}
         </header>
 
