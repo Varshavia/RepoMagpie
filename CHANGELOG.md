@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The graph opens faster, and reopening it is instant when nothing changed.
+
 ## [0.2.0-beta.15] - 2026-10-28
 
 The sixteenth pre-release: new notes from GitHub get a better kind.

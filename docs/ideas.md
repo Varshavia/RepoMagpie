@@ -48,6 +48,7 @@ The product's category moved:
 | 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
 | 19 | Discover | **Built** ([decision 0045](decisions/0045-discover.md)); kind accuracy done ([decision 0047](decisions/0047-kind-rules-measured.md)); six follow-ups are candidates | 0.2 | Finding what to note, not only noting what you found |
 | 20 | The note view's editors, loaded later | Candidate | when the first files need room | The next way to make the app's first files smaller ([decision 0048](decisions/0048-the-first-load-line-measured.md)) |
+| 21 | Graph positions across reloads | Candidate | when a warm open feels slow | A reload drawn at once: 965 → about 450 ms at 2,000 notes ([decision 0049](decisions/0049-the-graph-opens-faster.md)) |
 
 ---
 
@@ -335,6 +336,16 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Risks:** the first Edit on a cold load waits for the chunk (a prefetch covers most cases); `NotePane.tsx` is the app's largest component, and splitting it touches its editing flows and their tests.
 - **What decides it:** a first-screen feature that doesn't fit in the 1 kB.
 - **Status:** candidate, measured on `perf/app-first-load` (2026-10-28).
+
+## 21. Graph positions across reloads
+
+- **What it is:** the graph's settled positions written to a cache file, `<journal>/.cache/graph-layout.json`, so a reload draws the graph at once, as a reopen in the same session already does ([decision 0049](decisions/0049-the-graph-opens-faster.md)).
+- **Why it might matter:** at 2,000 notes the first frame after a reload takes 965 ms: the data (344 ms, shared with the app's other first requests) and a layout of 120 iterations. With kept positions it would take about 450 ms. A reopen without a reload already takes 241 ms.
+- **What already exists:** the session's positions (`ui/src/logic/graph-session.ts`): kept in memory by journal, nodes that are new join next to a neighbour, and the rest stays pinned.
+- **Cost:** a file of about 80 kB at 2,000 notes (2,030 positions), and a new write path: the page has to send the positions to the server, which writes the cache.
+- **Risks:** the picture after a reload would depend on what happened in earlier sessions, not only on the journal. [Decision 0028](decisions/0028-the-graph-page.md) says no positions are stored, so this needs a decision that changes it. As a cache, the file can be rebuilt, which [decision 0001](decisions/0001-plain-markdown-storage.md) allows.
+- **What decides it:** a warm open, after a reload, that feels slow in use. Today's 965 ms is within its 2 s budget.
+- **Status:** candidate. The maintainer declined it for now (2026-10-28), after `perf/graph-open`.
 
 ---
 
