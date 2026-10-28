@@ -2,11 +2,10 @@
 // [[links]], alternatives and computed similarity as edges; optionally, unresolved link targets as
 // ghost nodes. Built from the notes, their per-file cache and the link index. A pure read: nothing is
 // written but the caches. Never prints.
-import { readFileSync } from "node:fs";
 import { isDomain, noteDomains, type Domain } from "./domains.ts";
-import { resolvedLinkIndex } from "./links.ts";
-import { readableId, readNote } from "./note.ts";
-import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
+import { linkEntries, resolvedLinkIndex } from "./links.ts";
+import { readableId, type Note } from "./note.ts";
+import { isRecord, isTextOrNull, isTexts, noteEntries, noteSignature } from "./note-cache.ts";
 
 export type KindGroup = "skill-pack" | "tool" | "resource" | "other";
 export type EdgeType = "tagged" | "link" | "alternative" | "similar";
@@ -100,7 +99,8 @@ interface Entry {
 }
 
 export function graphData(journal: string, options: { ghosts?: boolean } = {}): GraphData {
-  const { files, data } = noteEntries(journal, GRAPH_CACHE, GRAPH_VERSION, (_file, path) => entry(path), isEntry);
+  const listed = noteSignature(journal); // one listing for the graph's entries and the link index
+  const { files, data } = noteEntries(journal, GRAPH_CACHE, GRAPH_VERSION, (_file, parse) => entry(parse), isEntry, listed);
   const notes = files.filter((file) => data[file].id !== null);
   const noteKey = (file: string) => `note:${file}`;
   const edges: GraphEdge[] = [];
@@ -121,7 +121,7 @@ export function graphData(journal: string, options: { ghosts?: boolean } = {}): 
   }
 
   // Links and alternatives, one edge per pair and type; to ghosts only when asked.
-  const { outgoing, targets } = resolvedLinkIndex(journal);
+  const { outgoing, targets } = resolvedLinkIndex(journal, linkEntries(journal, listed));
   const pairs = new Map<string, GraphEdge>();
   const ghosts = new Map<string, GhostNode>();
   for (const file of notes) {
@@ -216,10 +216,10 @@ function isEntry(e: unknown): boolean {
 }
 
 // One note's graph fields; no id for a note that can't be read (skipped, as in the link index).
-function entry(path: string): Entry | { id: null } {
+function entry(parse: () => Note): Entry | { id: null } {
   let note;
   try {
-    note = readNote(readFileSync(path, "utf8"));
+    note = parse();
   } catch {
     return { id: null };
   }

@@ -145,7 +145,7 @@ const NOTE_LIST_CACHE = "note-list.json";
 const NOTE_LIST_VERSION = 3; // 2: nested and unterminated comments stripped from the Verdict; 3: domains
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
-  const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, path) => summary(file, readNote(readFileSync(path, "utf8"))), isSummary);
+  const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, parse) => summary(file, parse()), isSummary);
   return { notes: files.map((file) => data[file]), skipped };
 }
 
