@@ -27,9 +27,10 @@ function writeBigJournal(notes: string, count: number): void {
 test.use({ empty: true });
 
 // From the click on Graph to the first frame after the layout settled, with the page's performance
-// marks: cold (the graph cache is built) and warm. Hover and zoom: the gaps between frames while the
-// pointer moves across the graph and the wheel zooms in and out (reported; in SwiftShader they
-// measure the software renderer, not the page).
+// marks: cold (the graph cache is built), reopened in the same session (Inbox, then Graph again), and
+// warm (the server's caches built, the page reloaded). Hover and zoom: the gaps between frames while
+// the pointer moves across the graph and the wheel zooms in and out (reported; in SwiftShader they
+// measure the software renderer, not the page). Run it three times for the median of 3 (measure.ts).
 test("graph: data, layout and first frame at 2,000 notes", async ({ page, magpie }, info) => {
   test.setTimeout(120_000);
   writeBigJournal(magpie.note(""), 2000);
@@ -50,10 +51,12 @@ test("graph: data, layout and first frame at 2,000 notes", async ({ page, magpie
       return { fetch: last("graph:fetch") - start, data: last("graph:data") - start, settled: last("graph:settled") - start, drawn: last("graph:drawn") - start };
     });
     await page.evaluate(() => performance.clearMarks());
-    return times;
+    return { ...times, iterations: await canvas.getAttribute("data-iterations") }; // none when no layout ran
   };
   const cold = await open();
   await page.getByRole("button", { name: /Inbox/ }).click();
+  const reopen = await open();
+  await page.reload();
   const warm = await open();
   await expect(page.getByRole("status").filter({ hasText: /^Showing/ })).toContainText("Showing 2000 notes");
 
@@ -88,13 +91,15 @@ test("graph: data, layout and first frame at 2,000 notes", async ({ page, magpie
     for (let i = 0; i < 20; i++) await page.mouse.wheel(0, i < 10 ? -100 : 100);
     await page.waitForTimeout(400);
   });
-  const round = (t: { fetch: number; data: number; settled: number; drawn: number }) => `fetch starts ${Math.round(t.fetch)} ms, data ${Math.round(t.data)} ms, settled ${Math.round(t.settled)} ms, first frame ${Math.round(t.drawn)} ms`;
-  const report = `cold: ${round(cold)}; warm: ${round(warm)}; hover: ${hover}; zoom: ${zoom}`;
+  const round = (t: { fetch: number; data: number; settled: number; drawn: number; iterations: string | null }) =>
+    `fetch starts ${Math.round(t.fetch)} ms, data ${Math.round(t.data)} ms, layout ${t.iterations ?? "none"}${t.iterations ? " iterations" : ""}, settled ${Math.round(t.settled)} ms, first frame ${Math.round(t.drawn)} ms`;
+  const report = `cold: ${round(cold)}; reopen: ${round(reopen)}; warm: ${round(warm)}; hover: ${hover}; zoom: ${zoom}`;
   info.annotations.push({ type: "graph, 2,000 notes", description: report });
   console.log(`graph page with 2,000 notes: ${report}`);
   recordTimings({
     "graph, cold: data": { ms: cold.data, budget: null },
-    "graph, cold: first frame": { ms: cold.drawn, budget: null },
+    "graph, cold: first frame": { ms: cold.drawn, budget: 1500 },
+    "graph, reopen: first frame": { ms: reopen.drawn, budget: 500 },
     "graph, warm: data": { ms: warm.data, budget: null },
     "graph, warm: settled": { ms: warm.settled, budget: null },
     "graph, warm: first frame": { ms: warm.drawn, budget: 2000 },

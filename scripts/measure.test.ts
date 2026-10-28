@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { scratchBase } from "../src/core/fixtures/scratch.ts";
+import { withRun } from "../ui/e2e/measure.ts";
 import { change, collect, e2eGroup, firstBySource, format, lastSaved, parts, readSaved, renderCompare, renderReport, SLOW, stableNames, type Measure, type Report } from "./measure.ts";
 
 // npm run measure: the parts that aren't measurements (collecting, the tables, --compare's
@@ -112,6 +113,19 @@ test("the end-to-end timings: missing, from another commit, or this commit's wit
   assert.deepEqual(e2eGroup(commit, file), { not_measured: "they are from commit ddddddd, not ccccccc: run REPOMAGPIE_MEASURE=1 npm run test:e2e first" });
   writeFileSync(file, JSON.stringify({ commit, date: "", timings: { "graph, warm: first frame": { ms: 1303, budget: 2000 }, "graph, cold: first frame": { ms: 1842, budget: null } } }));
   assert.deepEqual(e2eGroup(commit, file), { numbers: { "graph, warm: first frame": ms(1303, 2000), "graph, cold: first frame": ms(1842) } });
+});
+
+test("a timing keeps its last three runs, and its number is their median", () => {
+  let t = withRun(undefined, 1500.4, 2000);
+  assert.deepEqual(t, { ms: 1500, budget: 2000, runs: [1500] });
+  t = withRun(t, 1300, 2000);
+  assert.deepEqual(t, { ms: 1400, budget: 2000, runs: [1500, 1300] }); // two: their mean
+  t = withRun(t, 1900, 2000);
+  assert.deepEqual(t, { ms: 1500, budget: 2000, runs: [1500, 1300, 1900] });
+  t = withRun(t, 1000, 2000);
+  assert.deepEqual(t, { ms: 1300, budget: 2000, runs: [1300, 1900, 1000] }); // the oldest goes
+  // A file written before runs were kept: its number counts as one run.
+  assert.deepEqual(withRun({ ms: 1303, budget: 2000 }, 1403, 2000), { ms: 1353, budget: 2000, runs: [1303, 1403] });
 });
 
 test("the first script by source: its top 5 from an analyze build of the same first script; another build or none says how to make one", () => {
