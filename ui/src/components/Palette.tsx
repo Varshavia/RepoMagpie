@@ -1,6 +1,6 @@
 // The command palette (Ctrl/Cmd+K; DESIGN.md, Command palette): notes and skills from magpie search,
 // and every action, grouped. Arrow keys move, Enter runs, Esc closes.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { api, type SearchResult } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { noteResults, rankActions, type NoteSearch, type PaletteAction } from "../logic/palette.ts";
@@ -38,14 +38,6 @@ export function Palette({ actions, onNote, onClose, start }: Props) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const before = start ? start.before : (document.activeElement as HTMLElement | null);
-    const end = input.current?.value.length ?? 0;
-    input.current?.focus();
-    input.current?.setSelectionRange(end, end);
-    return () => before?.focus();
-  }, []);
-
-  useEffect(() => {
     const q = query.trim();
     if (!q) return;
     let current = true;
@@ -74,9 +66,24 @@ export function Palette({ actions, onNote, onClose, start }: Props) {
     else item.action.run();
   };
 
-  useEffect(() => {
-    if (start?.enter) run(items[at]);
+  // On mount, in the commit that replaces the shell, before any key can reach the page: the text
+  // typed into the shell while this rendered (a slow render takes keys meanwhile), the focus, and
+  // Enter pressed there, which runs the first action for that text (no note: the search hasn't
+  // answered yet).
+  const before = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    before.current = start ? start.before : (document.activeElement as HTMLElement | null);
+    const typed = start?.query ?? query;
+    if (typed !== query) setQuery(typed);
+    input.current?.focus();
+    input.current?.setSelectionRange(typed.length, typed.length);
+    const first = rankActions(actions, typed)[0];
+    if (start?.enter && first) run({ kind: "action", key: first.id, action: first });
   }, []);
+
+  // On close, the focus goes back where it was: after the commit, once what is behind the dialog
+  // is no longer inert.
+  useEffect(() => () => before.current?.focus(), []);
 
   const groups: [string, Item[]][] = [
     ["Notes and skills", notes],
