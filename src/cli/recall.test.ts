@@ -77,8 +77,8 @@ test("a damaged recall cache: an entry of the wrong shape is rebuilt from the no
   const box = sandbox(FILES);
   const before = await magpie(box, ["recall", "pdfkit", "--json"]); // builds the caches
   for (const cacheFile of [join(box.journal, ".cache", "recall-index.json"), join(box.project, ".magpie", ".cache", "recall-index.json")]) {
-    const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, unknown>[] };
-    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e.file === "npm--pdfkit.md" ? { ...e, keys: "npm pdfkit", avoidWhen: "never" } : e)) }));
+    const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, Record<string, unknown>> };
+    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { ...cache.data, "npm--pdfkit.md": { ...cache.data["npm--pdfkit.md"], keys: "npm pdfkit", avoidWhen: "never" } } }));
   }
   const after = await magpie(box, ["recall", "pdfkit", "--json"]);
   assert.deepEqual([after.code, after.err, after.out], [before.code, "", before.out]);

@@ -86,6 +86,22 @@ test("R5: a cache crafted to match the notes on disk can't point recall or searc
   for (const result of search.results) assert.ok(!result.path.includes("outside"), result.path);
 });
 
+test("R5: a per-file recall cache entry naming another path, inside the journal or outside it, is never used", async () => {
+  const box = sandbox({ "journal/notes/npm--chalk.md": note({ id: "pkg:npm/chalk", verdict: "colours" }), "journal/notes/npm--kleur.md": note({ id: "pkg:npm/kleur", verdict: "small colours" }) });
+  outside(box, "secret.md", note({ id: "pkg:npm/chalk", verdict: SECRET }));
+  const before = await magpie(box, ["recall", "chalk", "--json"]); // builds the cache, one entry per note file
+  const cacheFile = join(box.journal, ".cache", RECALL_CACHE);
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, Record<string, unknown>> };
+  for (const file of ["../../outside/secret.md", "npm--kleur.md"]) {
+    const forged = { ...cache.data["npm--chalk.md"], file, verdict: SECRET };
+    writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { ...cache.data, "npm--chalk.md": forged } })); // the signature stays
+    const json = await magpie(box, ["recall", "chalk", "--json"]);
+    assert.equal(json.out, before.out, file);
+    const full = await magpie(box, ["recall", "chalk", "--full"], { env: { MAGPIE_HOME: box.journal, NO_COLOR: "1" } });
+    assert.ok(!full.out.includes(SECRET) && !full.out.includes("outside"), full.out);
+  }
+});
+
 test("R13: a note file name with an escape sequence (allowed on Linux) reaches no output", { skip: process.platform === "win32" && "Windows doesn't allow these characters in file names" }, async () => {
   const box = sandbox({ [`journal/notes/npm--chalk${ESC}]52;c;ZWNobw==${c(0x07)}.md`]: note({ id: "pkg:npm/chalk", verdict: "colours" }) });
   for (const argv of [["recall", "chalk"], ["recall", "chalk", "--json"], ["search", "chalk"], ["search", "chalk", "--json"]]) {

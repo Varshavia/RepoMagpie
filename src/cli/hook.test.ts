@@ -22,8 +22,8 @@ test("a damaged recall cache doesn't silence the hook: an entry of the wrong sha
   const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/npm--zod.md": renderNote({ id: "pkg:npm/zod", name: "zod", explored: "2026-10-04", kind: "library", tags: [], verdict: "fine" }) });
   await magpie(box, ["hook", "claude-code"], { stdin: async () => input("npm i pdfkit", box.project) }); // builds the cache
   const cacheFile = join(box.journal, ".cache", "recall-index.json");
-  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, unknown>[] };
-  writeFileSync(cacheFile, JSON.stringify({ ...cache, data: cache.data.map((e) => (e.file === "npm--zod.md" ? { ...e, keys: undefined } : e)) }));
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { data: Record<string, Record<string, unknown>> };
+  writeFileSync(cacheFile, JSON.stringify({ ...cache, data: { ...cache.data, "npm--zod.md": { ...cache.data["npm--zod.md"], keys: undefined } } }));
   const r = await magpie(box, ["hook", "claude-code"], { stdin: async () => input("npm i pdfkit", box.project) });
   assert.deepEqual([r.code, r.err], [0, ""]);
   assert.equal(JSON.parse(r.out).hookSpecificOutput.permissionDecision, "ask");
