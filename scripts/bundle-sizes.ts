@@ -7,9 +7,9 @@ import { basename, extname, join } from "node:path";
 import { gzipSync } from "node:zlib";
 
 // docs/ui.md §10's two lines, in kB of 1,024 bytes: every script and style together, and the first
-// files: 3 kB over 99.4 kB, their size before the graph (decision 0028).
+// files: 104.0 kB, decision 0048's line (it replaced decision 0028's 102.4 kB, measured).
 export const BUDGET_KB = 200;
-export const FIRST_LOAD_LINE_KB = 102.4;
+export const FIRST_LOAD_LINE_KB = 104.0;
 
 export interface Sized { name: string; bytes: number }
 export interface BundleSizes { total: number; firstLoad: Sized[]; lazy: Sized[] }
