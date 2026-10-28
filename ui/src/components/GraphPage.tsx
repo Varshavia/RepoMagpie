@@ -49,6 +49,7 @@ import {
   type Shown,
   type Sources,
 } from "../logic/graph.ts";
+import { keepPositions, reopening } from "../logic/graph-session.ts";
 import type { LayoutReply, LayoutRequest } from "../layout.worker.ts";
 import { MOD, type Scheme, type Theme } from "../platform.ts";
 import { DOMAIN_IDS } from "../../../src/core/domains.ts";
@@ -219,15 +220,18 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
     if (!key) setDepth(0);
   }, []);
 
-  // ForceAtlas2 for a fixed number of iterations, from the positions the nodes have now. Under
-  // reduced motion only the settled layout is drawn. While it runs, the view follows the graph's
-  // bounds; once it settles, the bounds are kept, and the first time the camera fits them.
-  const runLayout = useCallback(() => {
+  // ForceAtlas2 from the positions the nodes have now, until they settle, or with `full` (Re-layout)
+  // for every iteration (decision 0049); the `pinned` nodes stay where they are. Under reduced motion
+  // only the settled layout is drawn. While it runs, the view follows the graph's bounds; once it
+  // settles, the bounds are kept, and the first time the camera fits them.
+  const running = useRef<{ full: boolean; pinned?: Set<string> }>({ full: false }); // a change on disk restarts the same layout
+  const runLayout = useCallback((full: boolean, pinned?: Set<string>) => {
     const view = drawn.current;
     if (!view) return;
     worker.current?.terminate();
     const layout = new Worker(new URL("../layout.worker.ts", import.meta.url), { type: "module" });
     worker.current = layout;
+    running.current = { full, pinned };
     setSettled(false);
     view.sigma.setCustomBBox(null);
     layout.onmessage = (event: MessageEvent<LayoutReply>) => {
@@ -236,30 +240,37 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
       if (!event.data.done) return;
       layout.terminate();
       worker.current = null;
-      // Performance marks for the page's budget (data, layout settled, first frame after it; docs/ui.md §10).
-      performance.mark("graph:settled");
-      view.sigma.once("afterRender", () => performance.mark("graph:drawn"));
-      keepBounds(view.sigma);
-      if (!view.fitted) {
-        view.sigma.getCamera().setState(FITTED);
-        view.fitted = true;
-      }
+      Object.assign(view.sigma.getContainer().dataset, { iterations: String(event.data.iterations) }); // for the end-to-end tests
+      settleView(view);
       setSettled(true);
     };
+    // ForceAtlas2 reads `fixed` from the nodes' attributes into its matrix, here only.
+    for (const key of pinned ?? []) if (view.graph.hasNode(key)) view.graph.setNodeAttribute(key, "fixed", true);
     const { nodes, edges } = graphToByteArrays(view.graph, () => 1);
-    const request: LayoutRequest = { nodes, edges, settings: layoutSettings(view.graph.order), iterations: LAYOUT.iterations, every: LAYOUT.progressEvery, progress: !reduced };
+    for (const key of pinned ?? []) if (view.graph.hasNode(key)) view.graph.removeNodeAttribute(key, "fixed");
+    const request: LayoutRequest = { nodes, edges, settings: layoutSettings(view.graph.order), full, every: LAYOUT.progressEvery, progress: !reduced };
     layout.postMessage(request, [nodes.buffer, edges.buffer]);
   }, [reduced]);
 
-  // Sigma, once per journal: from the nodes' seed positions, then the layout. Later changes (a
-  // filter, a toggle) are synced into the same graph below; nothing already drawn moves.
+  // Sigma, once per journal: from the nodes' seed positions, then the layout. Opened again in the
+  // same session (graph-session.ts, decision 0049): what was drawn is where it was, with no layout
+  // when every node has its place; new nodes join next to a neighbour, and a short layout places them
+  // with the rest pinned. Later
+  // changes (a filter, a toggle) are synced into the same graph below; nothing already drawn moves.
   useEffect(() => {
     const first = latest.current;
     if (!drawing || !first || !container.current || !probe.current) return;
     const colors = palette(probe.current);
     focus.current.colors = colors;
     const graph = new Graph({ type: "undirected", multi: true });
-    syncGraph(graph, first, seedPosition, colors, focus.current.byDomain);
+    const reopened = reopening(journal, first.nodes.map((n) => n.key));
+    if (reopened.plan === "layout") syncGraph(graph, first, seedPosition, colors, focus.current.byDomain);
+    else {
+      const { positions } = reopened;
+      const at = (key: string) => positions.get(key) ?? (graph.hasNode(key) ? (graph.getNodeAttributes(key) as Point) : undefined);
+      const spread = 0.03 * extent(positions.values());
+      syncGraph(graph, first, (key) => joinPosition(key, first.edges, at, spread), colors, focus.current.byDomain);
+    }
     const labels = labelLayer(colors, getComputedStyle(container.current).fontFamily);
     let sigma: Sigma;
     try {
@@ -287,13 +298,16 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
       setWebgl(false);
       return;
     }
-    drawn.current = { sigma, graph, fitted: false, shown: first, left: new Map(), labels };
+    const view: View = { sigma, graph, fitted: false, shown: first, left: new Map(), labels };
+    drawn.current = view;
     sigma.on("beforeRender", labels.reset);
     sigma.on("afterRender", labels.draw);
     // For the end-to-end tests: where a node is on screen, so a test can hover and click it as a
-    // person would; and the boxes of the labels drawn in the last frame, plates included.
+    // person would; where it is in the graph's coordinates; and the boxes of the labels drawn in the
+    // last frame, plates included.
     Object.assign(container.current, {
       nodePosition: (key: string) => sigma.graphToViewport(graph.getNodeAttributes(key) as Point),
+      graphPosition: (key: string) => ({ x: graph.getNodeAttribute(key, "x") as number, y: graph.getNodeAttribute(key, "y") as number }),
       labelBoxes: () => labels.placed.map(({ candidate, box, plate }) => ({ key: candidate.key, plate, ...box })),
     });
     // Hover: written to the container directly (no React render on every move); tests read data-hovered.
@@ -316,15 +330,24 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
       sigma.refresh();
     });
     resized.observe(container.current);
-    runLayout();
+    if (reopened.plan === "same") {
+      settleView(view);
+      setSettled(true);
+    } else runLayout(false, reopened.plan === "join" ? reopened.pinned : undefined);
     return () => {
       resized.disconnect();
+      // A settled layout is kept for the session, with where the nodes that left it were.
+      if (!worker.current) {
+        const positions = new Map(view.left);
+        graph.forEachNode((key, { x, y }) => positions.set(key, { x, y }));
+        keepPositions(journal, positions);
+      }
       worker.current?.terminate();
       worker.current = null;
       sigma.kill();
       drawn.current = null;
     };
-  }, [drawing, reduced, runLayout, refocus, select]);
+  }, [journal, drawing, reduced, runLayout, refocus, select]);
 
   // A filter, a toggle or a change on disk: the graph drops what is no longer drawn and adds what
   // now is, where it was before, or next to a neighbour. The view keeps its bounds, so the camera
@@ -337,13 +360,13 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
     if (!view || !shown || !colors || view.shown === shown) return;
     view.shown = shown;
     const at = (key: string) => (view.graph.hasNode(key) ? (view.graph.getNodeAttributes(key) as Point) : view.left.get(key));
-    const spread = 0.03 * extent(view.graph);
+    const spread = 0.03 * extent(view.graph.mapNodes((_key, point) => point as Point));
     syncGraph(view.graph, shown, (key) => joinPosition(key, shown.edges, at, spread), colors, focus.current.byDomain, view.left);
     if (focus.current.hovered && !view.graph.hasNode(focus.current.hovered)) {
       focus.current.hovered = null;
       Object.assign(view.sigma.getContainer().dataset, { hovered: "" });
     }
-    if (worker.current) runLayout();
+    if (worker.current) runLayout(running.current.full, running.current.pinned);
   }, [shown, runLayout]);
 
   // A tag on one note picked in the search box: once it is drawn, centre it.
@@ -443,7 +466,7 @@ export default function GraphPage({ journal, theme, scheme, focus: focusOn, refr
         </p>
         {drawing ? (
           <div className="graph-actions">
-            <button type="button" className="button ghost" onClick={runLayout} disabled={!settled}>
+            <button type="button" className="button ghost" onClick={() => runLayout(true)} disabled={!settled}>
               <Icon name="reload" />
               Re-run layout
             </button>
@@ -873,13 +896,28 @@ function keepBounds(sigma: Sigma): void {
 
 const FITTED = { x: 0.5, y: 0.5, ratio: 1, angle: 0 };
 
-// The larger side of the graph's bounds, in graph coordinates.
-function extent(graph: Graph): number {
+// The layout has settled, or a graph opened again needs none: performance marks for the page's
+// budget (data, layout settled, first frame after it; docs/ui.md §10), the bounds kept, and the
+// first time the camera fits them.
+function settleView(view: View): void {
+  performance.mark("graph:settled");
+  view.sigma.once("afterRender", () => performance.mark("graph:drawn"));
+  keepBounds(view.sigma);
+  if (!view.fitted) {
+    view.sigma.getCamera().setState(FITTED);
+    view.fitted = true;
+  }
+}
+
+// The larger side of these points' bounds, in graph coordinates.
+function extent(points: Iterable<Point>): number {
+  let count = 0;
   let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
-  graph.forEachNode((_key, { x, y }) => {
+  for (const { x, y } of points) {
+    count++;
     [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
-  });
-  return graph.order > 1 ? Math.max(maxX - minX, maxY - minY) : 100;
+  }
+  return count > 1 ? Math.max(maxX - minX, maxY - minY) : 100;
 }
 
 const edgeKey = (edge: GraphEdge) => `${edge.type} ${edge.source} ${edge.target}`;
