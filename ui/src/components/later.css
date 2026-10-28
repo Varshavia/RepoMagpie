@@ -1,0 +1,79 @@
+/* The styles only the parts in later.ts use: they load with that chunk, after styles.css, in the
+   order they had there (docs/ui.md §10). */
+
+/* Add's preview: a new note's tags, each with a remove button (decision 0030). */
+.chip.tag.removable { padding-right: var(--xxs); }
+.chip.tag.removable > span::before { content: "#"; color: var(--ink-subtle); }
+
+/* The delete dialog: what moves where, the notes that link to it, then the buttons. */
+.delete-dialog { width: min(480px, 100%); }
+.delete-dialog .pane-title { overflow-wrap: anywhere; }
+.dialog-body { display: flex; flex-direction: column; gap: var(--md); padding: var(--lg); overflow-y: auto; font-size: 14px; line-height: 1.5; }
+.dialog-body .mono { overflow-wrap: anywhere; }
+.dialog-actions { padding: 0 var(--lg) var(--lg); }
+
+.palette-list { overflow-y: auto; overscroll-behavior: contain; padding: var(--xs) 0 var(--sm); }
+
+.palette-group {
+  padding: var(--sm) var(--lg) var(--xs);
+  color: var(--ink-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  min-height: 32px;
+  margin: 0 var(--xs);
+  padding: 0 var(--md);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.palette-item[aria-selected="true"] { background: var(--accent-wash); }
+.palette-item .label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-item .detail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); font-size: 13px; }
+.palette-item kbd { margin-left: auto; }
+.palette-item .icon { color: var(--ink-muted); }
+.palette-empty { padding: var(--md) var(--lg); color: var(--ink-muted); }
+
+.keymap { width: 100%; border-collapse: collapse; }
+.keymap td { padding: var(--sm) var(--lg); border-top: 1px solid var(--hairline-strong); }
+.keymap td:first-child { width: 1%; white-space: nowrap; }
+
+/* ---------- Pages: add, import, recall, settings, suggest ---------- */
+
+.preview { display: flex; flex-direction: column; gap: var(--md); padding: var(--lg); border-radius: var(--r-lg); background: var(--surface-1); }
+.preview-name { font-size: 15px; font-weight: 600; }
+
+.result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.result-table th, .result-table .nowrap { white-space: nowrap; }
+.result-table th { padding: var(--xs) var(--sm); color: var(--ink-subtle); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-align: left; text-transform: uppercase; }
+.result-table td { padding: var(--sm); border-top: 1px solid var(--hairline); vertical-align: top; overflow-wrap: anywhere; }
+.result-table .result { display: inline-flex; align-items: center; gap: var(--xs); white-space: nowrap; font-weight: 500; }
+.result.created, .result.updated { color: var(--success); }
+.result.unchanged { color: var(--ink-muted); }
+.result.failed { color: var(--danger); }
+
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sm) var(--xl); }
+.facts dt { color: var(--ink-muted); }
+.facts dd { overflow-wrap: anywhere; }
+
+.mono-input { font-family: var(--mono); font-size: 13px; }
+.link-list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sm); list-style: none; }
+.hook-line { display: flex; align-items: center; gap: var(--xs); color: var(--ink-muted); font-size: 13px; }
+.hook-line.ask { color: var(--danger); }
+.hook-line.ask .icon, .hook-line .icon { flex: none; }
+
+.recall-card { display: flex; flex-direction: column; gap: var(--xs); padding: var(--md) var(--lg); border-left: 2px solid var(--hairline-strong); }
+.recall-card.ask { border-left-color: var(--danger); }
+.recall-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--md); }
+.recall-line .section-label { padding-top: 3px; }
+.recall-alternatives { display: flex; flex-direction: column; gap: var(--xs); margin: 0; padding: 0; list-style: none; }
+
+.suggest-form { display: flex; flex-direction: column; gap: var(--xs); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); }
+.suggest-form .field-help { overflow-wrap: anywhere; }

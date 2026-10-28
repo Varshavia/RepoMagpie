@@ -2,21 +2,16 @@
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
-import { AddPage } from "./components/AddPage.tsx";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { DiscoverMemory } from "./components/DiscoverPage.tsx";
 import type { ProjectState } from "./components/fields.tsx";
 import { FromTopicsBanner, FromTopicsButton, useFromTopics } from "./components/FromTopics.tsx";
-import { ImportPage } from "./components/ImportPage.tsx";
-import { KeyMapDialog } from "./components/KeyMapDialog.tsx";
-import { NotePane, type NotePaneProps } from "./components/NotePane.tsx";
-import { Palette, type Command } from "./components/Palette.tsx";
-import { RecallPage } from "./components/RecallPage.tsx";
+import { LazyFrame, lazyPart, prefetch } from "./components/lazy.tsx";
+import { Delete, NotePane, type NotePaneProps } from "./components/NotePane.tsx";
+import type { Command, PaletteStart } from "./components/Palette.tsx";
 import { NoteRow } from "./components/rows.tsx";
 import { NO_SEARCH, resultKey, SearchPane, type SearchState } from "./components/SearchPane.tsx";
-import { SettingsPage } from "./components/SettingsPage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
-import { SuggestPane } from "./components/SuggestPane.tsx";
 import { VirtualList } from "./components/VirtualList.tsx";
 import { Icon } from "./icons.tsx";
 import type { Form } from "./logic/edits.ts";
@@ -38,6 +33,14 @@ const SCOPES: Scope[] = ["personal", "project"];
 const GraphPage = lazy(() => import("./components/GraphPage.tsx"));
 // Discover too: the first load doesn't grow with it (docs/ui.md §10).
 const DiscoverPage = lazy(() => import("./components/DiscoverPage.tsx"));
+// The pages and dialogs the first screen doesn't show (docs/ui.md §10).
+const Add = lazyPart(() => import("./components/later.ts").then((m) => m.AddPage));
+const Import = lazyPart(() => import("./components/later.ts").then((m) => m.ImportPage));
+const Recall = lazyPart(() => import("./components/later.ts").then((m) => m.RecallPage));
+const Settings = lazyPart(() => import("./components/later.ts").then((m) => m.SettingsPage));
+const Suggest = lazyPart(() => import("./components/later.ts").then((m) => m.SuggestPane));
+const PaletteDialog = lazyPart(() => import("./components/later.ts").then((m) => m.Palette));
+const KeyMap = lazyPart(() => import("./components/later.ts").then((m) => m.KeyMapDialog));
 
 export function App() {
   const [settings, setSettings] = useState<SettingsJson | null>(null);
@@ -58,6 +61,7 @@ export function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [help, setHelp] = useState(false);
   const [palette, setPalette] = useState(false);
+  const paletteStart = useRef<PaletteStart>({ query: "", enter: false, before: null });
   const [modal, setModal] = useState(false); // the delete dialog is open
   const [notice, setNotice] = useState<string | null>(null); // an Undo that couldn't put the note back
   const [pane, setPane] = useState<"list" | "note">("list");
@@ -191,6 +195,16 @@ export function App() {
   const counts = useMemo(() => (notes ? sidebarCounts(notes) : null), [notes]);
   const listKey = list ? `${list.list} ${"value" in list ? list.value : ""}` : "";
   const items = useMemo(() => (notes && list ? filterNotes(notes, list) : []), [notes, listKey]);
+
+  // Once the first rows are on screen, the parts the first screen doesn't show load while the browser
+  // is idle, so they open at once (docs/ui.md §10). Not the graph and Discover: they are larger.
+  const prefetched = useRef(false);
+  useEffect(() => {
+    if (state.status === "loading" || prefetched.current) return;
+    prefetched.current = true;
+    prefetch([Add, Settings, Recall, Suggest, Import, PaletteDialog, KeyMap, Delete]);
+  }, [state.status]);
+
   const keyOf = useCallback((n: NoteSummary) => noteKey(journal, n), [journal]);
   // The selection falls back to the first row when it isn't in the list.
   const current = items.find((n) => keyOf(n) === selected) ?? items[0] ?? null;
@@ -409,6 +423,7 @@ export function App() {
         setHelp(true);
         return;
       case "palette":
+        paletteStart.current = { query: "", enter: false, before: document.activeElement as HTMLElement | null };
         setPalette(true);
         return;
       case "save":
@@ -617,18 +632,27 @@ export function App() {
   } else if (view.page === "suggest") {
     workspace = (
       <>
-        <SuggestPane
-          items={suggestions}
-          onItems={setSuggestions}
-          selected={currentSuggestion ? suggestKey(currentSuggestion) : null}
-          onSelect={openResult}
-          projectRoot={projectRoot}
-          listRef={listRef}
-          refresh={live.personal.tick + live.project.tick}
-          onOpenNote={openNote}
-          onAdd={addInJournal}
-          onSearch={searchName}
-        />
+        <LazyFrame
+          pane
+          fallback={
+            <section className="pane">
+              <SkeletonRows label="Loading Suggest" />
+            </section>
+          }
+        >
+          <Suggest.Part
+            items={suggestions}
+            onItems={setSuggestions}
+            selected={currentSuggestion ? suggestKey(currentSuggestion) : null}
+            onSelect={openResult}
+            projectRoot={projectRoot}
+            listRef={listRef}
+            refresh={live.personal.tick + live.project.tick}
+            onOpenNote={openNote}
+            onAdd={addInJournal}
+            onSearch={searchName}
+          />
+        </LazyFrame>
         <section className="pane" aria-label="Note">
           {currentSuggestion?.id ? (
             notePane(currentSuggestion.journal, { id: currentSuggestion.id }, suggestKey(currentSuggestion))
@@ -681,22 +705,24 @@ export function App() {
   } else {
     workspace = (
       <section className="pane page-pane">
-        {view.page === "add" ? (
-          <AddPage
-            key={view.target ?? ""}
-            project={projectState}
-            defaultJournal={journal}
-            initialTarget={view.target}
-            onOpenNote={openNote}
-            onSaved={afterWrite}
-          />
-        ) : view.page === "import" ? (
-          <ImportPage project={projectState} defaultJournal={journal} onImported={afterWrite} />
-        ) : view.page === "recall" ? (
-          <RecallPage home={home} onOpenNote={openNote} onAdd={addInJournal} onSearch={searchName} />
-        ) : (
-          <SettingsPage settings={settings} error={settingsError} theme={theme} scheme={scheme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
-        )}
+        <LazyFrame key={view.page} fallback={<PageLoading />}>
+          {view.page === "add" ? (
+            <Add.Part
+              key={view.target ?? ""}
+              project={projectState}
+              defaultJournal={journal}
+              initialTarget={view.target}
+              onOpenNote={openNote}
+              onSaved={afterWrite}
+            />
+          ) : view.page === "import" ? (
+            <Import.Part project={projectState} defaultJournal={journal} onImported={afterWrite} />
+          ) : view.page === "recall" ? (
+            <Recall.Part home={home} onOpenNote={openNote} onAdd={addInJournal} onSearch={searchName} />
+          ) : (
+            <Settings.Part settings={settings} error={settingsError} theme={theme} scheme={scheme} onTheme={pickTheme} onKeys={() => setHelp(true)} />
+          )}
+        </LazyFrame>
       </section>
     );
   }
@@ -742,8 +768,18 @@ export function App() {
       <main id="main" tabIndex={-1} inert={behind} className={list || view.page === "search" || view.page === "suggest" ? "workspace" : "workspace single"} data-pane={pane} aria-label={viewTitle(view)}>
         {workspace}
       </main>
-      {palette ? <Palette actions={commands} onNote={(r) => r.id && openNote(r.journal, r.id)} onClose={() => setPalette(false)} /> : null}
-      {help ? <KeyMapDialog onClose={() => setHelp(false)} /> : null}
+      {/* A dialog's key opens it on the first press: until its chunk is here, the palette shows its
+          shell, which takes what you type, and the keyboard map nothing. */}
+      {palette ? (
+        <LazyFrame fallback={<PaletteShell start={paletteStart.current} onClose={() => setPalette(false)} />} onClose={() => setPalette(false)}>
+          <PaletteDialog.Part actions={commands} onNote={(r) => r.id && openNote(r.journal, r.id)} onClose={() => setPalette(false)} start={paletteStart.current} />
+        </LazyFrame>
+      ) : null}
+      {help ? (
+        <LazyFrame fallback={null} onClose={() => setHelp(false)}>
+          <KeyMap.Part onClose={() => setHelp(false)} />
+        </LazyFrame>
+      ) : null}
       <Toasts toasts={toasts} />
     </div>
   );
@@ -766,6 +802,52 @@ function SkippedFiles({ skipped }: { skipped: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// A page's frame while its chunk loads: a quiet line where the page will be, no spinner.
+function PageLoading() {
+  return (
+    <p className="page field-help" role="status">
+      Loading…
+    </p>
+  );
+}
+
+// The palette's frame while its chunk loads: the same dialog and input, so what you type lands in it
+// (and not in a single-key shortcut); the palette starts with it, and runs its first item if Enter
+// was pressed.
+function PaletteShell({ start, onClose }: { start: PaletteStart; onClose: () => void }) {
+  const close = () => {
+    start.before?.focus();
+    onClose();
+  };
+  return (
+    <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div className="dialog-head">
+          <Icon name="command" size={20} />
+          <input
+            autoFocus
+            className="palette-input"
+            aria-label="Search notes or run an action"
+            placeholder="Search notes or run an action…"
+            defaultValue={start.query}
+            onChange={(e) => (start.query = e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                start.enter = true;
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+              }
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

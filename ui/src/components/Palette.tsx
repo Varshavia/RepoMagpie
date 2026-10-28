@@ -12,24 +12,36 @@ export interface Command extends PaletteAction {
   run: () => void;
 }
 
+// What happened before the palette's chunk was in (App's PaletteShell): what was typed, whether
+// Enter was pressed (the first item runs at once), and where the focus was when its key was
+// pressed, to go back to on close.
+export interface PaletteStart {
+  query: string;
+  enter: boolean;
+  before: HTMLElement | null;
+}
+
 interface Props {
   actions: Command[];
   onNote: (result: SearchResult) => void;
   onClose: () => void;
+  start?: PaletteStart;
 }
 
 type Item = { kind: "note"; key: string; result: SearchResult } | { kind: "action"; key: string; action: Command };
 
-export function Palette({ actions, onNote, onClose }: Props) {
+export function Palette({ actions, onNote, onClose, start }: Props) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(start?.query ?? "");
   const [last, setLast] = useState<NoteSearch<SearchResult> | null>(null);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
+    const before = start ? start.before : (document.activeElement as HTMLElement | null);
+    const end = input.current?.value.length ?? 0;
     input.current?.focus();
+    input.current?.setSelectionRange(end, end);
     return () => before?.focus();
   }, []);
 
@@ -61,6 +73,10 @@ export function Palette({ actions, onNote, onClose }: Props) {
     if (item.kind === "note") onNote(item.result);
     else item.action.run();
   };
+
+  useEffect(() => {
+    if (start?.enter) run(items[at]);
+  }, []);
 
   const groups: [string, Item[]][] = [
     ["Notes and skills", notes],
