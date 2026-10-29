@@ -43,7 +43,7 @@ Do you want to proceed?
 - **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app.
 - **Start from a project:** `repomagpie init --auto` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
 
-**Status:** pre-release `0.2.0-beta.15`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** pre-release `0.2.0-beta.16`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Quick start
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.16] - 2026-10-29
+
+The seventeenth pre-release: the graph opens faster, the hook and recall answer faster right after you change a note, and the README is shorter, with screenshots of today's app.
+
 ### Changed
 
 - The graph opens faster, and reopening it is instant when nothing changed.
@@ -333,7 +337,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.16...HEAD
+[0.2.0-beta.16]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...v0.2.0-beta.16
 [0.2.0-beta.15]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...v0.2.0-beta.15
 [0.2.0-beta.14]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...v0.2.0-beta.14
 [0.2.0-beta.13]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.12...v0.2.0-beta.13
