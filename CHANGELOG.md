@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Outside a git repository, RepoMagpie no longer picks up a project journal from a parent folder; pass `--project`. A `.magpie/` folder in a shared folder above yours, such as another user's or the drive's root, was read as your project's journal by the hook, `recall`, `search` and `suggest`. `repomagpie note --to project` and `repomagpie adopt` outside a repository now ask for `--project` instead of creating `.magpie/` in the current folder, and `repomagpie doctor` says so on its project line.
+
+### Security
+
+- The link `repomagpie ui` prints works once. Opened again, it says the link was used: go to `http://127.0.0.1:<port>/` in the browser that has the app open, or start `repomagpie ui` again. Reloads and new tabs in that browser keep working. A copy of the link, for example in the list of running processes, opens nothing once you have used it. The link, the app's cookie and the token for changes are now three different secrets. [SECURITY.md](SECURITY.md#the-local-app) says what this protects against and what it doesn't.
+- Tag characters (U+E0000 to U+E007F) and the supplementary variation selectors (U+E0100 to U+E01EF) in note text now show as markers such as `<U+E0041>`, like the other hidden characters: in the terminal, in `--json`, in the hook's messages, in the app, and in notes made from GitHub. Tag characters can spell text you don't see while an agent still reads it. The app's warning about hidden characters covers them too. Emoji keep their variation selector (U+FE0F). Flag emoji built from tag characters, such as England's, now show markers after the black flag.
+
 ## [0.2.0-beta.17] - 2026-10-30
 
 The eighteenth pre-release: security fixes, and the hook sees more ways of installing a package. Update, then run `repomagpie setup` again, so Claude Code's hook also covers its Monitor tool.

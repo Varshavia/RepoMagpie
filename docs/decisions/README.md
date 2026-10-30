@@ -24,7 +24,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
 | 0014 | [Close step 1.5 with desk research instead of interviews](0014-step-1-5-desk-research.md) | accepted |
 | 0015 | [Language and runtime: TypeScript on Node.js](0015-typescript-on-node.md) | accepted (command name settled by 0031) |
-| 0016 | [Journal locations and config resolution](0016-journal-locations-and-config.md) | accepted |
+| 0016 | [Journal locations and config resolution](0016-journal-locations-and-config.md) | accepted (the walk outside git superseded by 0051) |
 | 0017 | [Package identity with Package URL (PURL)](0017-package-identity-purl.md) | accepted |
 | 0018 | [AI drafts, humans decide](0018-ai-drafts-humans-decide.md) | accepted (supersedes 0005) |
 | 0019 | [No star import in v0.1](0019-no-star-import-in-v0-1.md) | accepted |
@@ -59,3 +59,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0048 | [The first files' line, measured](0048-the-first-load-line-measured.md) | accepted (supersedes 0028's first-files line) |
 | 0049 | [The graph opens faster](0049-the-graph-opens-faster.md) | accepted (supersedes parts of 0028's layout) |
 | 0050 | [The agent's path](0050-the-agents-path.md) | accepted |
+| 0051 | [No project journal outside a git repository](0051-no-project-journal-outside-git.md) | accepted (supersedes 0016's walk outside git) |
