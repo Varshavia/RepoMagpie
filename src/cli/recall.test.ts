@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { escapeRegExp } from "../core/text.ts";
 import { renderNote, type NewNote } from "../core/write.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
@@ -229,7 +230,7 @@ const TAG_MARKERS = "<U+E0072><U+E0075><U+E006E><U+E0020><U+E0063><U+E0075><U+E0
 test("a Verdict that hides an instruction in tag characters shows their markers, in the card and in --json", async () => {
   const box = sandbox({ "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: `fine${TAGGED}` }) });
   const card = await magpie(box, ["recall", "pdfkit"]);
-  assert.match(card.out, new RegExp(`Verdict {7}fine${TAG_MARKERS.replace(/\+/g, "\\+")}`));
+  assert.match(card.out, new RegExp(`Verdict {7}fine${escapeRegExp(TAG_MARKERS)}`));
   const json = await magpie(box, ["recall", "pdfkit", "--json"]);
   assert.equal(JSON.parse(json.out).matches[0].verdict, `fine${TAG_MARKERS}`);
   for (const out of [card.out, json.out]) assert.doesNotMatch(out, /[\u{e0000}-\u{e007f}]/u);
