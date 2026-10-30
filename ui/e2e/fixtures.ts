@@ -1,5 +1,5 @@
 // The `magpie` fixture: a fresh journal and a running magpie ui for each test, with the page opened
-// through the session URL (the token becomes a cookie, as for a person).
+// through the session URL (the token becomes a cookie, as for a person), then through / once used.
 import { test as base, expect, type Page } from "@playwright/test";
 import { makeJournal, removeJournal, startMagpie, type Journal, type Running } from "./journal.ts";
 
@@ -37,11 +37,13 @@ export const test = base.extend<{ magpie: Magpie; generated: number; empty: bool
   magpie: async ({ generated, empty, screens, showcase, fakeGithub }, use) => {
     const journal = makeJournal({ generated, empty, screens, showcase });
     const server = await startMagpie(journal, { fakeGithub });
+    let opened = false; // the printed URL works once; then the cookie opens the app, as for a person
     await use({
       ...journal,
       server,
       open: async (page) => {
-        await page.goto(server.url);
+        await page.goto(opened ? new URL("/", server.url).href : server.url);
+        opened = true;
         await expect(page.getByRole("navigation", { name: "Journals and screens" })).toBeVisible();
       },
     });

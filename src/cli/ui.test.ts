@@ -32,6 +32,14 @@ test("magpie ui prints the URL with the token on stdout, opens it, and stops wit
   await assert.rejects(send(port, { headers: { host: `127.0.0.1:${port}` } }), /ECONNREFUSED/);
 });
 
+test("magpie ui says the printed URL works once, on stderr, so stdout is still only the URL", async () => {
+  const box = sandbox();
+  const r = await magpie(box, ["ui", "--no-open"], { untilStopped: async () => {} });
+  assert.match(r.out, URL_LINE);
+  assert.match(r.err, /The link works once/);
+  assert.match(r.err, /reload or open new tabs with http:\/\/127\.0\.0\.1:\d+\//);
+});
+
 test("--no-open prints the URL and opens nothing", async () => {
   const box = sandbox();
   const opened: string[] = [];
@@ -141,7 +149,8 @@ test("--home chooses the personal journal the server reads", async () => {
     out: (text) => { url += text; },
     untilStopped: async () => {
       const [, port, token] = url.match(URL_LINE) ?? [];
-      const host = { host: `127.0.0.1:${port}`, cookie: `magpie_${port}=${token}` };
+      const exchange = await send(Number(port), { path: `/?token=${token}`, headers: { host: `127.0.0.1:${port}` } });
+      const host = { host: `127.0.0.1:${port}`, cookie: (exchange.headers["set-cookie"] ?? [""])[0].split(";")[0] };
       settings = JSON.parse((await send(Number(port), { path: "/api/settings", headers: host })).body);
     },
   });

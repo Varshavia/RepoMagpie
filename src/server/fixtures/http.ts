@@ -35,7 +35,7 @@ export function send(port: number, options: Send = {}): Promise<Reply> {
 }
 
 // An open GET /api/events stream with the session cookie. `until` waits for its text to match.
-export function events(server: { port: number; token: string }) {
+export function events(server: { port: number; cookie: string }) {
   let text = "";
   let status = 0;
   let ended = false;
@@ -44,7 +44,7 @@ export function events(server: { port: number; token: string }) {
     host: "127.0.0.1",
     port: server.port,
     path: "/api/events",
-    headers: { host: `127.0.0.1:${server.port}`, cookie: `magpie_${server.port}=${server.token}` },
+    headers: { host: `127.0.0.1:${server.port}`, cookie: `magpie_${server.port}=${server.cookie}` },
   }, (res) => {
     status = res.statusCode ?? 0;
     res.setEncoding("utf8");
@@ -86,10 +86,10 @@ export function events(server: { port: number; token: string }) {
 
 // Requests as the app makes them: the right Host and the session cookie; writes also carry the
 // Origin, the X-Magpie-Token header and a JSON body. Any header can be overridden or left out.
-export function client(server: { port: number; token: string }) {
+export function client(server: { port: number; cookie: string; writeToken: string }) {
   const base = (): Record<string, string | undefined> => ({
     host: `127.0.0.1:${server.port}`,
-    cookie: `magpie_${server.port}=${server.token}`,
+    cookie: `magpie_${server.port}=${server.cookie}`,
   });
   return {
     get: (path: string, headers: Record<string, string | undefined> = {}) => send(server.port, { path, headers: { ...base(), ...headers } }),
@@ -101,7 +101,7 @@ export function client(server: { port: number; token: string }) {
         headers: {
           ...base(),
           origin: `http://127.0.0.1:${server.port}`,
-          "x-magpie-token": server.token,
+          "x-magpie-token": server.writeToken,
           "content-type": "application/json",
           ...headers,
         },

@@ -25,8 +25,8 @@ async function start(t: TestContext, requestTimeoutMs?: number) {
 }
 
 // The headers of a write that passes every check, plus `extra`.
-const authed = (port: number, token: string, extra: Record<string, string>) =>
-  ({ host: `127.0.0.1:${port}`, cookie: `magpie_${port}=${token}`, origin: `http://127.0.0.1:${port}`, "x-magpie-token": token, "content-type": "application/json", ...extra });
+const authed = ({ port, cookie, writeToken }: { port: number; cookie: string; writeToken: string }, extra: Record<string, string>) =>
+  ({ host: `127.0.0.1:${port}`, cookie: `magpie_${port}=${cookie}`, origin: `http://127.0.0.1:${port}`, "x-magpie-token": writeToken, "content-type": "application/json", ...extra });
 
 // A write with these headers, whose body is `first`, then nothing more, while it waits.
 function hangingWrite(port: number, headers: Record<string, string>, first: string): Promise<{ status: number | null; ms: number }> {
@@ -44,14 +44,14 @@ function hangingWrite(port: number, headers: Record<string, string>, first: stri
 
 test("R7: a write that says its body is 50 MB gets 413 at once, without the server reading it", async (t) => {
   const server = await start(t);
-  const r = await hangingWrite(server.port, authed(server.port, server.token, { "content-length": String(50 * 1024 * 1024) }), "{");
+  const r = await hangingWrite(server.port, authed(server,{ "content-length": String(50 * 1024 * 1024) }), "{");
   assert.equal(r.status, 413);
   assert.ok(r.ms < 2000, `${r.ms} ms`);
 });
 
 test("R7: a body that never ends is cut off after the request timeout", async (t) => {
   const server = await start(t, 500);
-  const r = await hangingWrite(server.port, authed(server.port, server.token, { "transfer-encoding": "chunked" }), "{");
+  const r = await hangingWrite(server.port, authed(server,{ "transfer-encoding": "chunked" }), "{");
   assert.ok(r.status === 408 || r.status === null, String(r.status));
   assert.ok(r.ms < 5000, `${r.ms} ms`);
 });
@@ -86,7 +86,7 @@ test("R7: the Host, cookie, Origin and token checks come before any of the body 
   const server = await start(t);
   const port = server.port;
   const without = (key: string, value?: string) => {
-    const headers: Record<string, string> = authed(port, server.token, { "content-length": String(50 * 1024 * 1024) });
+    const headers: Record<string, string> = authed(server,{ "content-length": String(50 * 1024 * 1024) });
     if (value === undefined) delete headers[key];
     else headers[key] = value;
     return headers;
@@ -107,7 +107,7 @@ test("R7: the Host, cookie, Origin and token checks come before any of the body 
 test("R7: a body without Content-Length is kept to 1 MB and cut off at 2 MB, not at the timeout", async (t) => {
   const server = await start(t);
   const port = server.port;
-  const r = await floodingWrite(port, authed(port, server.token, { "transfer-encoding": "chunked" }));
+  const r = await floodingWrite(port, authed(server,{ "transfer-encoding": "chunked" }));
   // A sender that goes on past the 1 MB of grace is cut off; it may not read the 413 first.
   assert.ok(r.status === 413 || r.status === null, String(r.status));
   assert.ok(r.ms < 5000, `${r.ms} ms`);

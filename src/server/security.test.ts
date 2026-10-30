@@ -55,7 +55,80 @@ test("the token is exchanged once for an HttpOnly, SameSite=Strict cookie, with 
   const r = await send(server.port, { path: `/?token=${server.token}`, headers: { host: `127.0.0.1:${server.port}` } });
   assert.equal(r.status, 303);
   assert.equal(r.headers.location, "/");
-  assert.deepEqual(r.headers["set-cookie"], [`magpie_${server.port}=${server.token}; HttpOnly; SameSite=Strict; Path=/`]);
+  assert.deepEqual(r.headers["set-cookie"], [`magpie_${server.port}=${server.cookie}; HttpOnly; SameSite=Strict; Path=/`]);
+});
+
+// As a browser gets them: the opening URL exchanged for the cookie, then the page's meta tag.
+async function exchange(server: { port: number; token: string }) {
+  const host = `127.0.0.1:${server.port}`;
+  const r = await send(server.port, { path: `/?token=${server.token}`, headers: { host } });
+  assert.equal(r.status, 303);
+  const cookie = (r.headers["set-cookie"] ?? [""])[0].split(";")[0];
+  const page = await send(server.port, { path: "/", headers: { host, cookie } });
+  const write = /<meta name="magpie-token" content="([0-9a-f]*)">/.exec(page.body)?.[1] ?? "";
+  return { cookie, value: cookie.split("=")[1], write };
+}
+
+test("the opening URL's token works once: used again, it gets a page that says so and where to go", async (t) => {
+  const { server } = await start(t);
+  const host = `127.0.0.1:${server.port}`;
+  await exchange(server);
+  const page = await send(server.port, { path: `/?token=${server.token}`, headers: { host, accept: "text/html,application/xhtml+xml" } });
+  assert.equal(page.status, 401);
+  assert.match(String(page.headers["content-type"]), /^text\/html/);
+  assert.equal(page.headers["set-cookie"], undefined);
+  assert.match(page.body, /already used/);
+  assert.match(page.body, new RegExp(`http://127\\.0\\.0\\.1:${server.port}/`));
+  assert.match(page.body, /start repomagpie ui again/);
+  const api = await send(server.port, { path: `/?token=${server.token}`, headers: { host } });
+  assert.equal(api.status, 401);
+  const { error } = JSON.parse(api.body) as { error: string };
+  assert.match(error, /already used/);
+  assert.match(error, new RegExp(`http://127\\.0\\.0\\.1:${server.port}/`));
+});
+
+test("a wrong token doesn't use up the opening URL's token", async (t) => {
+  const { server } = await start(t);
+  const host = { host: `127.0.0.1:${server.port}` };
+  for (const wrong of ["0".repeat(64), "", server.token.slice(1)]) assert.equal((await send(server.port, { path: `/?token=${wrong}`, headers: host })).status, 401);
+  await exchange(server);
+});
+
+test("the session cookie keeps working after the opening URL's token is used", async (t) => {
+  const { server } = await start(t);
+  const { cookie } = await exchange(server);
+  const headers = { host: `127.0.0.1:${server.port}`, cookie };
+  assert.equal((await send(server.port, { path: `/?token=${server.token}`, headers: { host: headers.host } })).status, 401);
+  assert.equal((await send(server.port, { path: "/", headers })).status, 200);
+  assert.equal((await send(server.port, { path: "/api/settings", headers })).status, 200);
+});
+
+test("the opening URL's token, the session cookie and the write token are three different secrets", async (t) => {
+  const { server } = await start(t);
+  const { value, write } = await exchange(server);
+  for (const secret of [server.token, value, write]) assert.match(secret, /^[0-9a-f]{64}$/); // 32 random bytes each
+  assert.notEqual(value, server.token);
+  assert.notEqual(write, server.token);
+  assert.notEqual(write, value);
+  const host = `127.0.0.1:${server.port}`;
+  for (const other of [server.token, write]) {
+    assert.equal((await send(server.port, { path: "/api/settings", headers: { host, cookie: `magpie_${server.port}=${other}` } })).status, 401);
+  }
+});
+
+test("a write with the session cookie's value, or the URL's token, in the X-Magpie-Token header gets 403", async (t) => {
+  const { server, box } = await start(t);
+  const { cookie, value, write } = await exchange(server);
+  const post = (token: string) => send(server.port, {
+    method: "POST",
+    path: "/api/note",
+    body: JSON.stringify({ target: "pkg:npm/left-pad", to: "personal" }),
+    headers: { host: `127.0.0.1:${server.port}`, cookie, origin: `http://127.0.0.1:${server.port}`, "x-magpie-token": token, "content-type": "application/json" },
+  });
+  assert.equal((await post(value)).status, 403);
+  assert.equal((await post(server.token)).status, 403);
+  assert.equal(existsSync(box.note("npm--left-pad.md")), false);
+  assert.notEqual((await post(write)).status, 403);
 });
 
 test("a wrong token, and a request without token or cookie, get 401", async (t) => {
@@ -183,7 +256,7 @@ test("a body over 1 MB gets 413, with or without Content-Length", async (t) => {
     path: "/api/import",
     body: big,
     chunked: true,
-    headers: { host: `127.0.0.1:${server.port}`, cookie: `magpie_${server.port}=${server.token}`, origin: `http://127.0.0.1:${server.port}`, "x-magpie-token": server.token, "content-type": "application/json" },
+    headers: { host: `127.0.0.1:${server.port}`, cookie: `magpie_${server.port}=${server.cookie}`, origin: `http://127.0.0.1:${server.port}`, "x-magpie-token": server.writeToken, "content-type": "application/json" },
   });
   assert.equal(chunked.status, 413);
   const almost = JSON.stringify({ text: "", to: "personal", pad: "x".repeat(1024 * 1024 - 40) });
@@ -273,10 +346,10 @@ test("Content-Security-Policy and the other headers", async (t) => {
 test("the page carries the token in a meta tag only for a request with the session cookie", async (t) => {
   const { http, server } = await start(t);
   const page = await http.get("/");
-  assert.match(page.body, new RegExp(`<meta name="magpie-token" content="${server.token}">`));
+  assert.match(page.body, new RegExp(`<meta name="magpie-token" content="${server.writeToken}">`));
   const without = await http.get("/", { cookie: undefined });
   assert.equal(without.status, 401);
-  assert.doesNotMatch(without.body, new RegExp(server.token));
+  assert.doesNotMatch(without.body, new RegExp(server.writeToken));
 });
 
 test("GITHUB_TOKEN never reaches the browser: no response contains its value", async (t) => {

@@ -1265,9 +1265,10 @@ test.describe("2,000 notes", () => {
     // The first note open too: its links come from the link cache, which this run builds.
     await expect(page.locator("#note-title")).toBeVisible();
 
-    await page.context().clearCookies();
+    // The printed URL works once: the warm load is a new load of / with the session cookie.
+    await page.goto("about:blank");
     started = Date.now();
-    await page.goto(magpie.server.url);
+    await page.goto(new URL("/", magpie.server.url).href);
     await expect(firstRow).toBeVisible();
     const warm = Date.now() - started;
     info.annotations.push({ type: "first render, 2,000 notes", description: `warm cache ${warm} ms; cold ${cold} ms` });
