@@ -4,13 +4,13 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
-import { findProjectJournal, findProjectRoot, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
+import { findProjectJournal, findProjectRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
 import { setupBackups } from "./backups.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { mcpByHand, mcpRemovable } from "./setup.ts";
-import { findHooks, PRE_TOOL_USE, STOP, type HookKind } from "./setup-hook.ts";
+import { findHooks, lacksMonitor, PRE_TOOL_USE, STOP, type HookKind } from "./setup-hook.ts";
 import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
 import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
 import { DOMAIN_IDS, noteDomains } from "./domains.ts";
@@ -152,12 +152,16 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // Run in the home folder, ~/.claude/settings.json is the user's settings and the project's: listed once.
   const hookFiles = [claudeSettings(where), ...projectSettings(request).filter((file) => !samePath(file, claudeSettings(where)))].filter((file) => existsSync(file));
   const plainHook = new Map<string, boolean>(); // false: setup gives a snippet instead of editing it
+  const sharedMatcher = new Map<string, boolean>(); // our entry shares a group, whose matcher lacks Monitor, with another hook
   const hook = hookFiles.map((file) => {
     const read = readConfig(file);
     if ("error" in read) return { file, entries: [], error: redactText(read.error) };
     const parsed = readJsonc(read.text);
     if ("error" in parsed) return { file, entries: [], error: parsed.error };
     plainHook.set(file, parsed.plain);
+    const found = findHooks(parsed.value);
+    const groups = (parsed.value as { hooks?: Record<string, { matcher?: unknown }[]> } | null)?.hooks?.[PRE_TOOL_USE.event];
+    if (typeof found !== "string") sharedMatcher.set(file, found.some((f) => f.form !== "other" && !f.alone && lacksMonitor(groups?.[f.group]?.matcher)));
     return { file, entries: hookEntries(parsed.value, where) };
   });
   const userSettings = claudeSettings(where);
@@ -178,6 +182,10 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   for (const { file, entries, error } of hook) {
     if (error) problems.push(`Couldn't read ${tilde(file)}: ${error}.`);
     if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. ${hookFix(file, "to change it")}`);
+    // Monitor runs shell commands too. setup adds it to a group of ours alone, never to a shared one.
+    if (entries.some((e) => e.form !== "other" && lacksMonitor(e.matcher))) {
+      problems.push(`The Claude Code hook in ${tilde(file)} doesn't run on Claude Code's Monitor tool, which also runs shell commands. ${sharedMatcher.get(file) ? "Add Monitor to its matcher by hand: its group holds another hook too." : hookFix(file, "to add it")}`);
+    }
     if (file === userSettings && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. ${hookFix(file, "to start node directly")}`);
     for (const e of entries.filter((x) => x.form === "exec")) {
       if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(file, "again")}`);
@@ -262,9 +270,9 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
         allow_write: entry.args.includes("--allow-write"),
         // node's flag before the script: the server can't run generated code (decision 0034).
         code_generation_off: script !== null && entry.args.indexOf(NO_CODEGEN) >= 0 && entry.args.indexOf(NO_CODEGEN) < entry.args.indexOf(script),
-        node_found: entry.command !== null && (isAbsolute(entry.command) ? isFile(entry.command) : onPath(entry.command, where).length > 0),
+        node_found: entry.command !== null && (isAbsolute(entry.command) ? isFile(entry.command, where) : onPath(entry.command, where).length > 0),
         entry: script,
-        entry_found: script !== null && isFile(script),
+        entry_found: script !== null && isFile(script, where),
         version: pkg?.name === "repomagpie" ? pkg.version : null,
       },
     };
@@ -375,8 +383,8 @@ function agentHookReport(spec: HookSpec, where: Where, plain: Map<Agent["id"], b
       command: redactText(command),
       node: f.parsed.node ?? program,
       entry: f.parsed.entry,
-      node_found: f.parsed.form === "setup" ? f.parsed.node !== null && isFile(f.parsed.node) : program !== null ? (isAbsolute(program) ? isFile(program) : onPath(program.replace(/\.(cmd|ps1)$/i, ""), where).length > 0) : null,
-      entry_found: f.parsed.form === "setup" ? f.parsed.entry !== null && isFile(f.parsed.entry) : null,
+      node_found: f.parsed.form === "setup" ? f.parsed.node !== null && isFile(f.parsed.node, where) : program !== null ? (isAbsolute(program) ? isFile(program, where) : onPath(program.replace(/\.(cmd|ps1)$/i, ""), where).length > 0) : null,
+      entry_found: f.parsed.form === "setup" ? f.parsed.entry !== null && isFile(f.parsed.entry, where) : null,
       flags: f.parsed.flags,
       trust,
     };
@@ -423,8 +431,8 @@ function hookEntries(settings: unknown, where: Where, kind: HookKind = PRE_TOOL_
       command: redactText(f.command),
       args: f.args && redactArgs(f.args),
       form: f.form,
-      node_found: exec ? (isAbsolute(f.command) ? isFile(f.command) : onPath(f.command, where).length > 0) : null,
-      entry_found: exec ? script !== null && isFile(script) : null,
+      node_found: exec ? (isAbsolute(f.command) ? isFile(f.command, where) : onPath(f.command, where).length > 0) : null,
+      entry_found: exec ? script !== null && isFile(script, where) : null,
       code_generation_off: exec ? script !== null && (f.args as string[]).indexOf(NO_CODEGEN) >= 0 && (f.args as string[]).indexOf(NO_CODEGEN) < (f.args as string[]).indexOf(script) : null,
     };
   });
@@ -480,7 +488,11 @@ function linkTarget(path: string): string | null {
   }
 }
 
-const isFile = (path: string) => {
+// A file a config names, unless it is on another machine outside the user's home: a project's
+// settings are its committers', and looking there would send that machine the user's Windows sign-in
+// hash. It counts as not found.
+const isFile = (path: string, where: Where) => {
+  if (!usable(path, where.home, where.platform)) return false;
   try {
     return statSync(path).isFile();
   } catch {

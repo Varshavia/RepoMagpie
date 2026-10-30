@@ -21,7 +21,18 @@ export interface HookKind {
   sub: "claude-code" | "claude-code-stop";
   matcher: string | null;
 }
-export const PRE_TOOL_USE: HookKind = { event: "PreToolUse", sub: "claude-code", matcher: "Bash|PowerShell" };
+// Monitor runs a shell command in the background with Bash's permission rules, and a matcher names
+// tools exactly (code.claude.com/docs/en/tools-reference): an install there is one too.
+export const PRE_TOOL_USE: HookKind = { event: "PreToolUse", sub: "claude-code", matcher: "Bash|PowerShell|Monitor" };
+
+// A group matcher that leaves out the Monitor tool: a list of tool names without it. No matcher, an
+// empty one or "*" matches every tool.
+export const lacksMonitor = (matcher: unknown) => typeof matcher === "string" && matcher !== "" && matcher !== "*" && !matcher.split("|").includes("Monitor");
+const groupMatcher = (settings: unknown, kind: HookKind, f: FoundHook) =>
+  (settings as { hooks: Record<string, { matcher?: unknown }[]> }).hooks[kind.event][f.group]?.matcher;
+// Our entry alone in a group whose matcher lacks Monitor: setup adds it. A shared group's matcher
+// also decides another hook's tools, so setup leaves it, and doctor names it.
+const needsMonitor = (settings: unknown, kind: HookKind, f: FoundHook) => kind === PRE_TOOL_USE && f.alone && lacksMonitor(groupMatcher(settings, kind, f));
 export const STOP: HookKind = { event: "Stop", sub: "claude-code-stop", matcher: null };
 
 // The entry setup writes: the exec form (the node, and the arguments up to "claude-code"), or the
@@ -110,7 +121,7 @@ export function planHook(file: string, root: string, remove: boolean, stamp: str
   }
   if (!add && !mine.length) return base;
   if ("error" in target) return { ...base, action: "refused", reason: target.error };
-  const done = mine.length === 1 && matches(mine[0], wanted(target, mine[0].flags, kind));
+  const done = mine.length === 1 && matches(mine[0], wanted(target, mine[0].flags, kind)) && !needsMonitor(read.value, kind, mine[0]);
   if (done) return base;
   if (!mine.length && found.length) return { ...base, reason: "a hook entry already runs RepoMagpie another way; setup keeps it" };
   if (!read.plain) return { ...base, action: "manual", reason: COMMENTS, snippet: JSON.stringify({ hooks: { [kind.event]: [group(target, [], kind)] } }, null, 2) };
@@ -160,6 +171,11 @@ export function applyHook(plan: HookPlan, root: string, target: HookTarget, kind
           text = removeAt(text as string, at(mine[1]));
           continue;
         }
+        if (needsMonitor(settings, kind, mine[0])) {
+          const matcher = groupMatcher(settings, kind, mine[0]) as string;
+          text = replaceAt(text as string, ["hooks", event, mine[0].group, "matcher"], `${matcher}|Monitor`);
+          continue;
+        }
         break;
       }
     }
@@ -168,8 +184,9 @@ export function applyHook(plan: HookPlan, root: string, target: HookTarget, kind
     return fail((error as Error).message);
   }
   // Read it back.
-  const after = findHooks(parseJson(readFileSync(plan.file, "utf8")), kind);
+  const settings = parseJson(readFileSync(plan.file, "utf8"));
+  const after = findHooks(settings, kind);
   const left = typeof after === "string" ? [] : after.filter((f) => f.form !== "other");
-  const ok = plan.action === "remove" ? !left.length : left.length === 1 && matches(left[0], wanted(target as Exclude<HookTarget, { error: string }>, left[0].flags, kind));
+  const ok = plan.action === "remove" ? !left.length : left.length === 1 && matches(left[0], wanted(target as Exclude<HookTarget, { error: string }>, left[0].flags, kind)) && !needsMonitor(settings, kind, left[0]);
   return ok ? { ...plan, result: "done" } : fail(`${plan.file} doesn't hold the hook as expected after the change.`);
 }

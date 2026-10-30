@@ -2,9 +2,9 @@
 // command and its folder → package installs → notes → the texts. Each adapter reads its agent's
 // input, calls recallFor, and writes its agent's output from the texts below. Note text is quoted
 // and labelled with who wrote it, cleaned and capped.
-import { sep, win32 } from "node:path";
+import { sep } from "node:path";
 import { detectCommand, type Install } from "../core/install-detect.ts";
-import type { Env } from "../core/journals.ts";
+import { usable, type Env } from "../core/journals.ts";
 import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { CAPS, clean, cut, nameConcern, quote } from "../core/text.ts";
 
@@ -43,9 +43,6 @@ const MORE_NAMES = 5;
 // The packages one command may have looked up. Real installs name a few; a command of 100,000 names
 // (1.8 MB) took 17 s on a 2,000-note journal, while the agent waits. The rest are named as unchecked.
 const LOOKUPS = 100;
-// A folder from the agent's input longer than this can't be a real one (Linux's PATH_MAX), and
-// walking up one of 60,000 parts to find a project journal took minutes: it is ignored.
-const FOLDER_LENGTH = 4096;
 
 // The input as JSON, or undefined. A leading byte-order mark is dropped, as a Windows PowerShell
 // pipe (and Cursor) sends one.
@@ -76,22 +73,20 @@ export function recallFor(command: string, folder: string | null, ctx: HookConte
   const many = installs.length > LOOKUPS
     ? `RepoMagpie: this command installs ${installs.length.toLocaleString("en-US")} packages; only the first ${LOOKUPS} were looked up in your journals.`
     : null;
-  const unchecked = [many, hidden].filter(Boolean).join("\n") || null;
+  // A note over 256 KB isn't read (decision 0032 rule 6), so its Verdict is unknown: say so
+  // rather than nothing. The paths are note files, so quoted text, never the hook's own words.
+  const tooBig = sources.flatMap((s) => s.tooBig ?? []);
+  const unread = tooBig.length
+    ? `RepoMagpie: ${tooBig.length === 1 ? "a note file in your journals is" : `${tooBig.length} note files in your journals are`} over 256 KB, so ${tooBig.length === 1 ? "it wasn't" : "they weren't"} read; ${tooBig.length === 1 ? "it" : "one"} may be a note on this package: ${shortList(tooBig.map((path) => quote(cut(tilde(path, ctx.home), HOOK_CAPS.path))))}.`
+    : null;
+  const unchecked = [many, hidden, unread].filter(Boolean).join("\n") || null;
   if (!matches.length && !unchecked) return null;
   const avoid = ctx.informOnly ? [] : matches.filter((m) => m.confidence === "exact" && isAvoid(m));
   return { cwd, matches, avoid, stopped, unchecked, home: ctx.home };
 }
 
-// Whether a folder from the agent's input is looked in for a project journal: not too long, no NUL,
-// and, on Windows, not on another machine (\\server\share, //server) unless the hook already runs
-// there. Looking connects to that machine, which sends it the user's Windows sign-in hash and can
-// take seconds; the model chooses Antigravity CLI's Cwd and Gemini CLI's dir_path.
-export function usable(folder: string, start: string, platform = process.platform): boolean {
-  if (folder.length > FOLDER_LENGTH || folder.includes("\0")) return false;
-  if (platform !== "win32" || !/^[\\/]{2}/.test(folder)) return true;
-  const inside = win32.relative(start, folder); // Windows' rules, whichever system runs this
-  return !inside.startsWith("..") && !win32.isAbsolute(inside) && /^[\\/]{2}/.test(start);
-}
+// The check for a folder from the agent's input, shared with doctor and the MCP server.
+export { usable };
 
 const withUnchecked = (r: Recalled, text: string, separator: string) => [text, r.unchecked].filter(Boolean).join(separator);
 
@@ -116,8 +111,12 @@ export const shortList = (items: string[], separator = ", ") =>
 
 // The package being installed, as the command named it: not note text.
 export const packageName = (m: RecallMatch) => cut(clean(m.query), CAPS.name);
-const notePath = (m: RecallMatch, { home }: { home: string }) =>
-  cut(clean(home && m.path.startsWith(home + sep) ? `~${m.path.slice(home.length)}` : m.path), HOOK_CAPS.path);
+const tilde = (path: string, home: string) => (home && path.startsWith(home + sep) ? `~${path.slice(home.length)}` : path);
+// A project note's path is quoted: its file name is the repository's text (decision 0032 rule 3).
+const notePath = (m: RecallMatch, { home }: { home: string }) => {
+  const path = cut(clean(tilde(m.path, home)), HOOK_CAPS.path);
+  return personal(m) ? path : quote(path);
+};
 const quoted = (text: string, limit: number) => quote(cut(clean(text), limit));
 const verdictOf = (m: RecallMatch) => (m.verdict === null ? null : quoted(m.verdict, HOOK_CAPS.verdict));
 const avoidWhenOf = (m: RecallMatch) => (m.avoid_when.length ? quoted(m.avoid_when.join("; "), HOOK_CAPS.avoidWhen) : null);

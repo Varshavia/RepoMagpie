@@ -79,7 +79,7 @@ test("--help prints the settings snippet and the --inform-only advice", async ()
   const box = sandbox();
   const r = await magpie(box, ["hook", "claude-code", "--help"]);
   assert.equal(r.code, 0);
-  assert.match(r.out, /"matcher": "Bash\|PowerShell"/);
+  assert.match(r.out, /"matcher": "Bash\|PowerShell\|Monitor"/);
   assert.match(r.out, /"command": "repomagpie hook claude-code"/);
   assert.match(r.out, /--inform-only/);
   assert.match(r.out, /never edits/);

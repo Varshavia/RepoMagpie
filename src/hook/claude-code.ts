@@ -7,7 +7,9 @@ import { agentContext, askReason, parseInput, recallFor, userMessage, type HookC
 
 export type { HookContext } from "./core.ts";
 
-const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
+// Monitor runs a shell command in the background, with Bash's permission rules (Claude Code's tools
+// reference, "Monitor tool").
+const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
 // Cursor runs Claude Code's hooks too, and its input carries fields Claude Code's never has. The
 // Cursor adapter answers there, so this one stays silent (decision 0036, "One answer per agent").
 export const CURSOR_FIELDS = ["cursor_version", "conversation_id", "generation_id", "workspace_roots"];

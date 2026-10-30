@@ -37,7 +37,7 @@ test("user scope: the exec form goes last in PreToolUse after the file's own hoo
   assert.deepEqual([plan.action, plan.backup], ["add", `${s.file}.repomagpie-backup-${STAMP}`]);
   assert.equal(applyHook(plan, s.home, EXEC).result, "done");
   assert.equal(readFileSync(`${s.file}.repomagpie-backup-${STAMP}`, "utf8"), GUARD);
-  assert.deepEqual(hooks(s.read())[1], { matcher: "Bash|PowerShell", hooks: [exec()] });
+  assert.deepEqual(hooks(s.read())[1], { matcher: "Bash|PowerShell|Monitor", hooks: [exec()] });
   assert.ok(s.read().startsWith(GUARD.slice(0, GUARD.indexOf('"hooks": [{'))));
   assert.equal(planHook(s.file, s.home, false, "20261014-130000", EXEC).action, "keep");
 });
@@ -45,7 +45,7 @@ test("user scope: the exec form goes last in PreToolUse after the file's own hoo
 test("no settings.json, or one without hooks: the hook is the file's only change", () => {
   const none = scratch();
   none.run(EXEC);
-  assert.deepEqual(JSON.parse(none.read()), { hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [exec()] }] } });
+  assert.deepEqual(JSON.parse(none.read()), { hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [exec()] }] } });
   const bare = scratch('{\n  "model": "opus"\n}\n');
   bare.run(EXEC);
   assert.ok(bare.read().startsWith('{\n  "model": "opus",\n  "hooks": {\n    "PreToolUse": [\n'));
@@ -70,7 +70,7 @@ test("user scope: an old and a current entry together become one exec entry", ()
     { matcher: "Bash|PowerShell", hooks: [{ type: "command", command: "repomagpie hook claude-code" }] },
   ] } }, null, 2));
   s.run(EXEC);
-  assert.deepEqual(hooks(s.read()), [{ matcher: "Bash", hooks: [exec()] }]);
+  assert.deepEqual(hooks(s.read()), [{ matcher: "Bash|Monitor", hooks: [exec()] }]); // Monitor added
 });
 
 test("project scope: the shell form; the old magpie entry changed in place, its flags kept", () => {
@@ -78,7 +78,7 @@ test("project scope: the shell form; the old magpie entry changed in place, its 
   const s = scratch(old);
   assert.equal(planHook(s.file, s.home, false, STAMP, SHELL).action, "migrate");
   s.run(SHELL);
-  assert.equal(s.read(), old.replace('{ "type": "command", "command": "magpie hook claude-code --inform-only" }', '{\n            "type": "command",\n            "command": "repomagpie hook claude-code --inform-only"\n          }'));
+  assert.equal(s.read(), old.replace('{ "type": "command", "command": "magpie hook claude-code --inform-only" }', '{\n            "type": "command",\n            "command": "repomagpie hook claude-code --inform-only"\n          }').replace('"matcher": "Bash"', '"matcher": "Bash|Monitor"'));
   assert.equal(planHook(s.file, s.home, false, "20261014-130000", SHELL).action, "keep");
   const fresh = scratch();
   fresh.run(SHELL);
@@ -107,7 +107,7 @@ test("never edited: comments (a snippet instead), a linked folder, PreToolUse th
   const comments = scratch(`// mine\n${GUARD}`);
   const manual = planHook(comments.file, comments.home, false, STAMP, EXEC);
   assert.equal(manual.action, "manual");
-  assert.deepEqual(JSON.parse(manual.snippet ?? ""), { hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [exec()] }] } });
+  assert.deepEqual(JSON.parse(manual.snippet ?? ""), { hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [exec()] }] } });
 
   const linked = scratch();
   const elsewhere = join(linked.root, "elsewhere");
@@ -157,6 +157,27 @@ test("the Stop reminder in a project's shell form, and a Stop that isn't a list"
   const wrong = scratch('{"hooks": {"Stop": {}}}');
   assert.match(planHook(wrong.file, wrong.home, false, STAMP, EXEC, STOP).reason ?? "", /hooks\.Stop isn't a list/);
   assert.equal(planHook(wrong.file, wrong.home, false, STAMP, EXEC).action, "add", "the PreToolUse hook doesn't mind");
+});
+
+// Claude Code's Monitor tool runs shell commands with Bash's permission rules, and a hook matcher
+// names tools exactly (code.claude.com/docs/en/tools-reference): the hook matches it too.
+test("the hook's matcher includes Monitor; setup adds it to an entry of ours that lacks it, leaving a shared group's alone", () => {
+  const s = scratch();
+  s.run(EXEC);
+  assert.equal(hooks(s.read())[0].matcher, "Bash|PowerShell|Monitor");
+  const old = scratch(JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [exec("--inform-only")] }] } }, null, 2));
+  assert.equal(planHook(old.file, old.home, false, STAMP, EXEC).action, "migrate");
+  assert.equal(old.run(EXEC).result, "done");
+  assert.deepEqual(hooks(old.read()), [{ matcher: "Bash|PowerShell|Monitor", hooks: [exec("--inform-only")] }]);
+  assert.equal(planHook(old.file, old.home, false, "20261014-130000", EXEC).action, "keep");
+  // A group with another hook beside ours: changing its matcher would change that hook too.
+  const shared = scratch(JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "node guard.mjs" }, exec()] }] } }, null, 2));
+  assert.equal(planHook(shared.file, shared.home, false, STAMP, EXEC).action, "keep");
+  // No matcher, or "*", matches every tool already.
+  for (const matcher of [undefined, "*", ""]) {
+    const all = scratch(JSON.stringify({ hooks: { PreToolUse: [{ ...(matcher === undefined ? {} : { matcher }), hooks: [exec()] }] } }, null, 2));
+    assert.equal(planHook(all.file, all.home, false, STAMP, EXEC).action, "keep", String(matcher));
+  }
 });
 
 test("a subcommand with regex characters is matched literally", () => {
