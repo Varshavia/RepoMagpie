@@ -173,7 +173,7 @@ const SHORT_KEYWORDS = new Set(["ai", "ui", "ux", "db", "js", "ts", "ml", "ci"])
 // keeps its word (user's → user); any other contraction (doesn't, I'm) is no keyword, and the
 // length leaves out the letters of an abbreviation (e.g., i.e.).
 export function keywordsOf(texts: string[]): string[] {
-  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4}>/g, " ")
+  const words = texts.flatMap((text) => text.toLowerCase().replace(/<u\+[0-9a-f]{4,5}>/g, " ")
     .replace(/['’]s\b/g, "").replace(/[a-z]+['’][a-z]+/g, " ").split(/[^a-z0-9]+/));
   return [...new Set(words.filter((word) => (word.length >= 3 || SHORT_KEYWORDS.has(word)) && !STOP_WORDS.has(word) && !COMMON_WORDS.has(word) && !/^\d+$/.test(word)))];
 }

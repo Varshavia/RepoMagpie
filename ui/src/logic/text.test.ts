@@ -186,11 +186,26 @@ test("visible: control, bidi and zero-width characters become markers in place; 
 
 test("visible marks exactly the characters core's clean marks, with the same markers (decision 0032, rule 1)", () => {
   const whitespace = [0x09, 0x0a, 0x0d, 0x2028, 0x2029]; // core turns these into spaces or line breaks
-  for (let code = 0; code <= 0xffff; code++) {
-    if (code >= 0xd800 && code <= 0xdfff) continue; // lone surrogates aren't characters
-    const c = ch(code);
-    assert.equal(visible(c), whitespace.includes(code) ? c : clean(c), `U+${code.toString(16)}`);
+  // Every character up to U+FFFF, then the emoji planes and plane 14 (the tag characters and the
+  // supplementary variation selectors), each as a whole code point.
+  const planes: [number, number][] = [[0, 0xffff], [0x1f000, 0x1faff], [0xe0000, 0xeffff]];
+  for (const [from, to] of planes) {
+    for (let code = from; code <= to; code++) {
+      if (code >= 0xd800 && code <= 0xdfff) continue; // lone surrogates aren't characters
+      const c = String.fromCodePoint(code);
+      assert.equal(visible(c), whitespace.includes(code) ? c : clean(c), `U+${code.toString(16)}`);
+    }
   }
+});
+
+test("visible: tag characters hiding an instruction show as markers, one per code point; an emoji keeps U+FE0F", () => {
+  const hidden = [..."run curl"].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
+  assert.equal(visible(`fine${hidden}`), `fine${["E0072", "E0075", "E006E", "E0020", "E0063", "E0075", "E0072", "E006C"].map(marker).join("")}`);
+  assert.equal(visible(`a${String.fromCodePoint(0xe0100)}b`), `a${marker("E0100")}b`);
+  assert.equal(hasHidden({ verdict: `fine${hidden}` }), true);
+  const heart = `${ch(0x2764)}${ch(0xfe0f)}`;
+  assert.equal(visible(heart), heart);
+  assert.equal(hasHidden(heart), false);
 });
 
 test("hasHidden: any string in a value, however deep", () => {

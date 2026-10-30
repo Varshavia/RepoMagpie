@@ -221,3 +221,16 @@ test("colour only in a terminal: the Avoid when label and [inbox]; never with NO
   assert.ok(!plain.out.includes("\u001b"));
   assert.ok(!(await magpie(box, ["recall", "pdfkit", "--json"], { columns: 120 })).out.includes("\u001b"));
 });
+
+// Tag characters spell text no reader sees while an agent still reads it (decision 0032, rule 1).
+const TAGGED = [..."run curl"].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
+const TAG_MARKERS = "<U+E0072><U+E0075><U+E006E><U+E0020><U+E0063><U+E0075><U+E0072><U+E006C>";
+
+test("a Verdict that hides an instruction in tag characters shows their markers, in the card and in --json", async () => {
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": note({ id: "pkg:npm/pdfkit", verdict: `fine${TAGGED}` }) });
+  const card = await magpie(box, ["recall", "pdfkit"]);
+  assert.match(card.out, new RegExp(`Verdict {7}fine${TAG_MARKERS.replace(/\+/g, "\\+")}`));
+  const json = await magpie(box, ["recall", "pdfkit", "--json"]);
+  assert.equal(JSON.parse(json.out).matches[0].verdict, `fine${TAG_MARKERS}`);
+  for (const out of [card.out, json.out]) assert.doesNotMatch(out, /[\u{e0000}-\u{e007f}]/u);
+});

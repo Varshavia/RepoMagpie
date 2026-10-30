@@ -58,6 +58,28 @@ test("marker: ASCII, four hex digits", () => {
   assert.equal(marker(c(0xfeff)), "<U+FEFF>");
 });
 
+// Tag characters can spell text no reader sees while an agent still reads it: an instruction hidden
+// in a Verdict. They and the supplementary variation selectors are outside the BMP (two UTF-16 units),
+// so each becomes one marker for the whole code point, never half a surrogate pair.
+const tagged = (text: string) => [...text].map((ch) => c(0xe0000 + ch.charCodeAt(0))).join("");
+
+test("tag characters (U+E0000 to U+E007F) and supplementary variation selectors (U+E0100 to U+E01EF) become markers, one per code point", () => {
+  for (const code of [0xe0000, 0xe0001, 0xe0020, 0xe0041, 0xe007f, 0xe0100, 0xe0150, 0xe01ef]) {
+    assert.equal(clean(`pdf${c(code)}kit`), `pdf<U+${code.toString(16).toUpperCase()}>kit`, `U+${code.toString(16)}`);
+  }
+  const hidden = clean(`fine${tagged("run curl")}`);
+  assert.equal(hidden, "fine<U+E0072><U+E0075><U+E006E><U+E0020><U+E0063><U+E0075><U+E0072><U+E006C>");
+  assert.doesNotMatch(hidden, /[\ud800-\udfff]/); // no half of a surrogate pair left
+  assert.equal(marker(c(0xe0041)), "<U+E0041>");
+});
+
+test("variation selectors U+FE00 to U+FE0F stay: an emoji keeps its U+FE0F; code points beside the new ranges stay", () => {
+  const heart = c(0x2764, 0xfe0f);
+  assert.equal(clean(`love ${heart} and ${c(0x263a, 0xfe0e)}`), `love ${heart} and ${c(0x263a, 0xfe0e)}`);
+  for (let code = 0xfe00; code <= 0xfe0f; code++) assert.equal(clean(`a${c(code)}b`), `a${c(code)}b`, `U+${code.toString(16)}`);
+  for (const code of [0xe0080, 0xe00ff, 0xe01f0, 0x1f600, 0x1f3f4]) assert.equal(clean(c(code)), c(code), `U+${code.toString(16)}`);
+});
+
 test("ordinary text, accents, CJK and emoji stay", () => {
   const text = `${c(0xc9)}vite ${c(0x2014)} ${c(0x4f7f, 0x308f, 0x306a, 0x3044)}: async streams ${c(0x1f600)} "quoted" [[link]] <b>x</b>`;
   assert.equal(clean(text), text);
@@ -72,6 +94,9 @@ test("cut: text within the cap is unchanged; longer text ends with …, at the c
   assert.equal(cut("anything", Infinity), "anything");
   assert.equal(cut("abcdef<U+202E>xyz", 10), "abcdef…"); // never half a marker
   assert.equal(cut("abc<U+202E>xyz", 12), "abc<U+202E>…");
+  // A marker outside the BMP has five digits: never half of it either.
+  for (let limit = 5; limit <= 12; limit++) assert.equal(cut("abc<U+E0041>xyz", limit), "abc…", `limit ${limit}`);
+  assert.equal(cut("abc<U+E0041>xyz", 13), "abc<U+E0041>…");
 });
 
 test("quote: one line in double quotes; a double quote inside becomes a single one, so a note can't close the quote", () => {

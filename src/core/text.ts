@@ -19,13 +19,16 @@ export const CAPS = {
 
 // Every character class here is built from code points, so this source holds no invisible or
 // control character, and a reader sees exactly which ones are marked.
-const char = (code: number) => String.fromCharCode(code);
+const char = (code: number) => String.fromCodePoint(code);
 const set = (...ranges: [number, number?][]) => ranges.map(([from, to]) => (to ? `${char(from)}-${char(to)}` : char(from))).join("");
 
 // Hidden characters: C0 but tab and the line breaks, DEL and C1; the Arabic letter mark; zero-width
 // space, non-joiner and joiner, and the LTR and RTL marks (U+200B to U+200F); the bidi embeddings and
-// overrides (U+202A to U+202E); the word joiner; the bidi isolates (U+2066 to U+2069); the BOM.
-const CHARACTERS = new RegExp(`[${set([0x00, 0x08], [0x0b, 0x0c], [0x0e, 0x1f], [0x7f, 0x9f], [0x61c], [0x200b, 0x200f], [0x202a, 0x202e], [0x2060], [0x2066, 0x2069], [0xfeff])}]`, "g");
+// overrides (U+202A to U+202E); the word joiner; the bidi isolates (U+2066 to U+2069); the BOM; the
+// tag characters (U+E0000 to U+E007F), which can spell text a reader doesn't see; the supplementary
+// variation selectors (U+E0100 to U+E01EF). Not U+FE00 to U+FE0F: emoji use U+FE0E and U+FE0F. The
+// "u" flag matches by code point, so a character outside the BMP is one match, never half of one.
+const CHARACTERS = new RegExp(`[${set([0x00, 0x08], [0x0b, 0x0c], [0x0e, 0x1f], [0x7f, 0x9f], [0x61c], [0x200b, 0x200f], [0x202a, 0x202e], [0x2060], [0x2066, 0x2069], [0xfeff], [0xe0000, 0xe007f], [0xe0100, 0xe01ef])}]`, "gu");
 // Line breaks: CRLF, CR, and the line and paragraph separators (U+2028, U+2029).
 const LINE_BREAKS = new RegExp(`\\r\\n|[\\r${set([0x2028, 0x2029])}]`, "g");
 
@@ -33,7 +36,7 @@ const LINE_BREAKS = new RegExp(`\\r\\n|[\\r${set([0x2028, 0x2029])}]`, "g");
 // Text for a RegExp that matches it literally: every metacharacter escaped, the backslash included.
 export const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export const marker = (character: string) => `<U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}>`;
+export const marker = (character: string) => `<U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}>`;
 
 // The text with every hidden character shown as its marker, never raw and never dropped (decision
 // 0032, rule 1). An escape sequence keeps its other characters as plain text: without its ESC it does
@@ -59,7 +62,7 @@ export function cut(text: string, limit: number): string {
   let end = limit - 1;
   const last = text.charCodeAt(end - 1);
   if (last >= 0xd800 && last <= 0xdbff) end--;
-  return `${text.slice(0, end).replace(/<(U(\+[0-9A-F]{0,4})?)?$/, "")}…`;
+  return `${text.slice(0, end).replace(/<(U(\+[0-9A-F]{0,5})?)?$/, "")}…`; // a marker has 4 or 5 digits
 }
 
 // Note text quoted in a sentence (decision 0032, rule 3): one line, in double quotes. A double
