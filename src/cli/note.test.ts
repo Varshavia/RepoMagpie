@@ -294,6 +294,19 @@ test("--to project without a project journal creates .magpie/ at the git root an
   assert.ok(existsSync(join(journal, "notes", "npm--pdfkit.md")));
 });
 
+// Home is the scratch root here, so the walk stops there and never sees its .git fence.
+test("--to project outside a git repository fails and says to use --project; nothing is written; --project works", async () => {
+  const box = sandbox({ "outside/": null });
+  const outside = { home: box.root, cwd: join(box.root, "outside") };
+  const r = await magpie(box, ["note", "pkg:npm/pdfkit", "ok", "--to", "project"], outside);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /outside a git repository, use --project <path>/);
+  assert.equal(existsSync(join(box.root, "outside", ".magpie")), false);
+  const flagged = await magpie(box, ["note", "pkg:npm/pdfkit", "ok", "--to", "project", "--project", "."], outside);
+  assert.equal(flagged.code, 0, flagged.err);
+  assert.ok(existsSync(join(box.root, "outside", ".magpie", "notes", "npm--pdfkit.md")));
+});
+
 test("--to project --json reports the journal as project and the creation as a warning", async () => {
   const box = sandbox();
   const r = await magpie(box, ["note", "pkg:npm/pdfkit", "--to", "project", "--json"]);
@@ -365,10 +378,11 @@ test("the home directory's own .magpie is never the project journal, even with a
   assert.equal(existsSync(join(homeJournal, "notes", "npm--chalk.md")), false);
   assert.equal(existsSync(join(homeJournal, ".gitignore")), false);
 
-  // Below home, outside any repository: the project journal is created in the working directory.
+  // Below home, outside any repository: no project journal without --project.
   const below = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project"], { cwd: join(box.home, "code") });
-  assert.equal(below.code, 0, below.err);
-  assert.ok(existsSync(join(box.home, "code", ".magpie", "notes", "npm--chalk.md")));
+  assert.equal(below.code, 1, below.err);
+  assert.match(below.err, /outside a git repository, use --project <path>/);
+  assert.equal(existsSync(join(box.home, "code", ".magpie")), false);
 });
 
 test("search never reads the home directory's own .magpie as the project journal", async () => {

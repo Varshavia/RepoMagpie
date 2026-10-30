@@ -30,20 +30,21 @@ export function externalHref(url: string): string | null {
 
 // Hidden characters (decision 0032, rule 1, in the app): the C0 controls but tab and line breaks,
 // DEL and C1; the Arabic letter mark; zero-width space, non-joiner and joiner, and the LTR and RTL
-// marks; the bidi embeddings and overrides; the word joiner; the bidi isolates; the BOM. The same
-// characters, and markers, as core's clean (text.test.ts keeps them equal). Built from code points,
-// so this source holds none of them.
-const char = (code: number) => String.fromCharCode(code);
+// marks; the bidi embeddings and overrides; the word joiner; the bidi isolates; the BOM; the tag
+// characters and the supplementary variation selectors (U+E0000 to U+E007F, U+E0100 to U+E01EF). The
+// same characters, and markers, as core's clean (text.test.ts keeps them equal). Built from code
+// points, so this source holds none of them; the "u" flag matches each by code point, never half.
+const char = (code: number) => String.fromCodePoint(code);
 const range = (from: number, to: number) => `${char(from)}-${char(to)}`;
-const HIDDEN_CLASS = `[${range(0x00, 0x08)}${char(0x0b)}${char(0x0c)}${range(0x0e, 0x1f)}${range(0x7f, 0x9f)}${char(0x61c)}${range(0x200b, 0x200f)}${range(0x202a, 0x202e)}${char(0x2060)}${range(0x2066, 0x2069)}${char(0xfeff)}]`;
-const HIDDEN = new RegExp(HIDDEN_CLASS, "g");
-const HAS_HIDDEN = new RegExp(HIDDEN_CLASS);
+const HIDDEN_CLASS = `[${range(0x00, 0x08)}${char(0x0b)}${char(0x0c)}${range(0x0e, 0x1f)}${range(0x7f, 0x9f)}${char(0x61c)}${range(0x200b, 0x200f)}${range(0x202a, 0x202e)}${char(0x2060)}${range(0x2066, 0x2069)}${char(0xfeff)}${range(0xe0000, 0xe007f)}${range(0xe0100, 0xe01ef)}]`;
+const HIDDEN = new RegExp(HIDDEN_CLASS, "gu");
+const HAS_HIDDEN = new RegExp(HIDDEN_CLASS, "u");
 
 // Note text for a read view: each hidden character becomes a visible marker in its place, the
 // ASCII form core uses (<U+202E>), never shown raw and never dropped. Editors keep the raw text.
 // Text from the API already has its markers; this is for the documents that keep the file's text.
 export function visible(text: string): string {
-  return text.replace(HIDDEN, (c) => `<U+${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}>`);
+  return text.replace(HIDDEN, (c) => `<U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}>`);
 }
 
 // Whether any string in a value, however deep, holds a hidden character.

@@ -40,6 +40,20 @@ test("recall's document names the note files it couldn't read because they are o
   assert.deepEqual(run.document.skipped, [`${join(path, "notes", "github--evil--thing.md")} is over 256 KB`]);
 });
 
+// Outside a git repository, a .magpie/ in a shared parent folder is no project journal (spec §3).
+// The scratch base is the home folder here, so the walk stops there and never sees its .git fence.
+test("outside a git repository, recall ignores a .magpie/ in a parent folder, and --project still reads it", () => {
+  const base = scratchBase("recall-outside");
+  mkdirSync(join(base, "shared", ".magpie", "notes"), { recursive: true });
+  writeFileSync(join(base, "shared", ".magpie", "notes", "npm--pdfkit.md"), PDFKIT);
+  const cwd = join(base, "shared", "me", "work");
+  mkdirSync(cwd, { recursive: true });
+  const place = { home: base, env: { MAGPIE_HOME: join(base, "personal") }, cwd };
+  assert.deepEqual(runRecall(["pdfkit"], "npm", place).document.matches, []);
+  const flagged = runRecall(["pdfkit"], "npm", { ...place, projectFlag: join(base, "shared") }).document.matches;
+  assert.deepEqual(flagged.map((m) => `${m.journal} ${m.id}`), ["project pkg:npm/pdfkit"]);
+});
+
 test("exact: a note whose id has the same type and name; the version and extras are dropped", () => {
   const s = sources(["personal", journal({ "npm--pdfkit.md": PDFKIT })]);
   for (const query of ["pdfkit", "pdfkit@1.2.0", "pkg:npm/pdfkit@1.0.0", "PDFKit"]) {

@@ -240,6 +240,10 @@ test("keywords: lowercase words, each once, without stop words and numbers; pack
   assert.deepEqual(keywordsOf(["Let an agent test all of it, and also just more"]), ["agent", "test"]);
 });
 
+test("keywords: a hidden character's marker is a word break, also a five-digit one outside the BMP", () => {
+  assert.deepEqual(keywordsOf(["pdf<U+202E>render", "stream<U+E0041><U+E0072>parser"]), ["pdf", "render", "stream", "parser"]);
+});
+
 test("keywords: no word under 3 letters, nothing from a contraction or an abbreviation; a possessive keeps its word", () => {
   assert.deepEqual(keywordsOf(["it doesn't render, e.g. invoices"]), ["render", "invoices"]);
   assert.deepEqual(keywordsOf(["I'm sure we're stuck: can't won’t shouldn't, i.e. vs. a.k.a. etc."]), ["sure", "stuck"]);

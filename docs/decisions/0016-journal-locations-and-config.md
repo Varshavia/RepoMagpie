@@ -1,6 +1,6 @@
 # 0016 — Journal locations and config resolution
 
-**Status:** accepted (2026-10-03)
+**Status:** accepted (2026-10-03). The project journal's walk outside a git repository superseded by [0051](0051-no-project-journal-outside-git.md) (2026-10-30): none without `--project`.
 
 ## Context
 [Decision 0013](0013-two-journal-scopes.md) set up two journals, a personal one and a project one, and left it to step 2 to decide where they live and how `magpie` finds them.

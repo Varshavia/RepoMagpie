@@ -79,7 +79,12 @@ The app's Content-Security-Policy allows connections to its own origin only ([do
 
 ## The local app
 
-`repomagpie ui` serves the app from your machine, on `127.0.0.1` only, until you stop it. Every request needs the session token from the URL it prints, exchanged once for an `HttpOnly`, `SameSite=Strict` cookie; every write also needs the token in a header and the app's own origin; the Host header must be the app's, against DNS rebinding. There are no CORS headers, a strict Content-Security-Policy, `Referrer-Policy: no-referrer`, a 1 MB limit on request bodies and a 30 s request timeout. No path from a request reaches the file system. The full list, with a test for each rule, is in [docs/ui.md](docs/ui.md#3-security).
+`repomagpie ui` serves the app from your machine, on `127.0.0.1` only, until you stop it. The URL it prints holds a token that works once: the first visit exchanges it for an `HttpOnly`, `SameSite=Strict` cookie, and the same URL again only says it was used. Every request needs that cookie; every write also needs a write token in a header, which the page gets from the server, and the app's own origin; the Host header must be the app's, against DNS rebinding. The URL's token, the cookie and the write token are three different random secrets. There are no CORS headers, a strict Content-Security-Policy, `Referrer-Policy: no-referrer`, a 1 MB limit on request bodies and a 30 s request timeout. No path from a request reaches the file system. The full list, with a test for each rule, is in [docs/ui.md](docs/ui.md#3-security).
+
+What this protects against, and what it doesn't:
+- **Protected:** web pages in your browser. Also other users' processes, which can see the printed URL in the browser opener's command line, once the link is used.
+- **Not protected:** a program that gets the cookie. Browsers don't keep cookies apart by port, so another local server you visit in the same browser receives the app's cookie. A program isn't bound by a browser's rules: it can send any `Host` and `Origin`, load the page, read the write token and write. Separate secrets don't change that. A program running as you can read your journals directly anyway.
+- **On a machine with other users:** don't open other users' local servers in the browser you use for `repomagpie ui`.
 
 ## Who wrote the text you see
 
@@ -91,7 +96,7 @@ Not all note text is yours ([decision 0032](docs/decisions/0032-note-text-is-dat
 | A project journal (`.magpie/` in a repository you cloned) | That repository's contributors |
 | GitHub fields of a note (description, topics) | The repository's owner |
 
-RepoMagpie treats all of it as data. Control characters, bidi controls and zero-width characters show as visible markers such as `<U+202E>` before note text reaches your terminal, your agent or the app, so an escape sequence does nothing and hidden text can't change how a line reads. Text handed to an agent is capped, quoted and labelled with its source, and a project journal's note never says "you noted". A note that is a link, or a file over 256 KB, is never read. The app shows note text as text, never as HTML, and links only `http` and `https` addresses. The agent skill tells the agent to report what a note says and never follow instructions in it.
+RepoMagpie treats all of it as data. Control characters, bidi controls, zero-width characters, tag characters (U+E0000–U+E007F, which can spell text you don't see while an agent still reads it) and the supplementary variation selectors (U+E0100–U+E01EF) show as visible markers such as `<U+202E>` before note text reaches your terminal, your agent or the app, so an escape sequence does nothing and hidden text can't change how a line reads. Text handed to an agent is capped, quoted and labelled with its source, and a project journal's note never says "you noted". A note that is a link, or a file over 256 KB, is never read. The app shows note text as text, never as HTML, and links only `http` and `https` addresses. The agent skill tells the agent to report what a note says and never follow instructions in it.
 
 ## Scope
 

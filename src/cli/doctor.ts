@@ -78,7 +78,7 @@ export function render(r: DoctorJson, home: string): string {
     for (const u of j.unknown_domains) lines.push(`            unknown domain: ${u.file}: ${u.values.join(", ")}`);
   }
   // Information, not a to-do: a project journal is a choice to share notes through git.
-  if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here${r.git_repository ? "; repomagpie note <x> --to project starts one, shared through git" : ""}`);
+  if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here; ${r.git_repository ? "repomagpie note <x> --to project starts one, shared through git" : "outside a git repository, use --project <path>"}`);
 
   lines.push("");
   if (r.problems.length) lines.push("To do", ...r.problems.map((p) => `  - ${p}`));

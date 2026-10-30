@@ -4,7 +4,7 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
-import { findProjectJournal, findProjectRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
+import { findProjectJournal, gitRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
 import { setupBackups } from "./backups.ts";
@@ -344,8 +344,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     for (const u of j.unknown_domains) problems.push(`Unknown domain in the ${j.scope} journal's ${u.file}: ${u.values.join(", ")}. Use one of: ${DOMAIN_IDS.join(", ")}.`);
   }
 
-  const root = findProjectRoot(request.cwd, request.home);
-  const gitRepository = !samePath(root, request.home) && existsSync(join(root, ".git"));
+  const gitRepository = gitRoot(request.cwd, request.home) !== null; // as the project journal's walk decides
 
   return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, problems };
 }

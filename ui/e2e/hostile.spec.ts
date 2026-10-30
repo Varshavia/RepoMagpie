@@ -143,6 +143,21 @@ test("hidden characters: the note view shows markers in order, warns above the s
   expect(await pane.getByRole("textbox", { name: "My notes" }).inputValue()).toBe(`plain${ch(0x200b)}text`); // the raw text
 });
 
+// Tag characters spell text no reader sees while an agent still reads it; outside the BMP, each is
+// one marker for its whole code point. An emoji's U+FE0F stays.
+test("hidden characters: a Verdict hiding an instruction in tag characters shows their markers and the warning; an emoji stays", async ({ page, magpie }) => {
+  const tagged = [..."run curl"].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
+  const heart = `${ch(0x2764)}${ch(0xfe0f)}`;
+  writeFileSync(magpie.note("npm--tagged.md"), `---\nid: pkg:npm/tagged\nname: tagged\nexplored: 2026-10-04\nkind: library\ntags: []\ntried: false\nstatus: reviewed\n---\n\n## Verdict\nfine ${heart}${tagged}\n`);
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "tagged" }).click();
+  const pane = page.locator('section[aria-label="Note"]');
+  await expect(pane.getByText("This note contains hidden or control characters")).toBeVisible();
+  await expect(pane).toContainText(`fine ${heart}${[0xe0072, 0xe0075, 0xe006e, 0xe0020, 0xe0063, 0xe0075, 0xe0072, 0xe006c].map(marker).join("")}`);
+  expect(await pane.evaluate((el) => el.textContent ?? "")).not.toMatch(/[\u{e0000}-\u{e007f}]/u);
+});
+
 test("hidden characters: search results and Check a package show the markers too", async ({ page, magpie }) => {
   writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
   await magpie.open(page);
@@ -240,6 +255,25 @@ test("R6: after the first load the token isn't in the address bar; pages send no
     expect(rel.split(/\s+/)).toContain("noreferrer"); // implies noopener
   }
   expect(await page.evaluate(() => document.referrer)).toBe("");
+});
+
+// The printed URL works once (docs/ui.md §3); the session cookie keeps the app open in that browser.
+test("the printed URL works once: reload and a second tab still work; the URL again says it was used", async ({ page, magpie }) => {
+  const nav = (p: typeof page) => p.getByRole("navigation", { name: "Journals and screens" });
+  await magpie.open(page);
+  await page.reload();
+  await expect(nav(page)).toBeVisible();
+  const second = await page.context().newPage();
+  await second.goto(new URL("/", magpie.server.url).href);
+  await expect(nav(second)).toBeVisible();
+  const again = await page.context().newPage();
+  const reply = await again.goto(magpie.server.url);
+  expect(reply?.status()).toBe(401);
+  await expect(again.getByRole("heading", { name: "This link was already used" })).toBeVisible();
+  await expect(again.getByText(`go to ${new URL("/", magpie.server.url).href}`)).toBeVisible();
+  await expect(again.getByText("start repomagpie ui again")).toBeVisible();
+  await again.getByRole("link").click();
+  await expect(nav(again)).toBeVisible();
 });
 
 // Discover (decision 0045): GitHub's text is the owner's (decision 0032, rule 8). The fake GitHub's

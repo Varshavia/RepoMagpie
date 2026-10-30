@@ -56,21 +56,22 @@ export function resolvePersonalJournal(options: { home: string; env: Env; cwd: s
   return { path: resolve(dirname(file), expanded), source: "config", warnings: [] };
 }
 
-// --project, or the first .magpie/ folder walking up from the working directory.
+// --project, or the first .magpie/ folder walking up from the working directory to the git root.
 // --project names the project root, like git -C; a path to the .magpie folder itself also works.
-// The walk stops at the git root (a folder containing .git), the home directory or the filesystem
-// root. It never takes the personal journal's folder, nor the home directory's own .magpie. A .magpie
-// that is a link is never a project journal (decision 0032, rule 5): the repository chose where it
-// points. It is skipped for the report.
+// Outside a git repository there is none without --project: a .magpie in a shared parent folder
+// (another user's, or the drive's root) is nobody's project. The walk stops at the git root (a
+// folder containing .git), never above it. It never takes the personal journal's folder, nor the
+// home directory's own .magpie. A .magpie that is a link is never a project journal (decision 0032,
+// rule 5): the repository chose where it points. It is skipped for the report.
 export function findProjectJournal(options: { cwd: string; home: string; personalJournal: string; flag?: string }): string | null {
   const { cwd, home, personalJournal, flag } = options;
   if (flag) {
     const path = flagJournal(cwd, flag);
     return isLink(path) ? (skip(linkProblem(path)), null) : path;
   }
+  if (!gitRoot(cwd, home)) return null;
   const personal = comparable(personalJournal);
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
-    if (samePath(dir, home)) return null;
     const candidate = join(dir, ".magpie");
     if (comparable(candidate) === personal) {
       // The personal journal's folder, which may be a link the user made: never the project journal.
@@ -95,12 +96,17 @@ export function isLink(path: string): boolean {
 }
 
 // The nearest folder with .git, walking up; outside git, the working directory itself.
-// The walk stops at the home directory: a git repository at home (dotfiles) is not a project.
 export function findProjectRoot(cwd: string, home: string): string {
+  return gitRoot(cwd, home) ?? resolve(cwd);
+}
+
+// The nearest folder with .git, walking up, or null outside git. The walk stops at the home
+// directory: a git repository at home (dotfiles) is not a project.
+export function gitRoot(cwd: string, home: string): string | null {
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
-    if (samePath(dir, home)) return resolve(cwd);
+    if (samePath(dir, home)) return null;
     if (existsSync(join(dir, ".git"))) return dir;
-    if (dirname(dir) === dir) return resolve(cwd);
+    if (dirname(dir) === dir) return null;
   }
 }
 

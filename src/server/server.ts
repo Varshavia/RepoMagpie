@@ -1,7 +1,8 @@
 // magpie ui's server (decision 0021, docs/ui.md): node:http on 127.0.0.1 only, while the command
 // runs. Every request passes the security rules of docs/ui.md §3 in this order: Host, the session
-// (token exchange or cookie), the route and method, then for writes the Origin, the X-Magpie-Token
-// header, the content type and the body size. Then api.ts calls core. No CORS headers, ever.
+// (the opening URL's single exchange, or the cookie), the route and method, then for writes the
+// Origin, the X-Magpie-Token header, the content type and the body size. Then api.ts calls core.
+// No CORS headers, ever.
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -26,8 +27,10 @@ export interface ServerOptions {
 export interface UiServer {
   address: string;
   port: number;
-  token: string;
-  url: string; // the opening URL, with the session token
+  token: string; // the opening URL's token: it works once
+  cookie: string; // the session cookie's value
+  writeToken: string; // the X-Magpie-Token the page gets from its meta tag
+  url: string; // the opening URL, with the token
   close: () => Promise<void>;
 }
 
@@ -49,20 +52,18 @@ const TOKEN_META = '<meta name="magpie-token" content="">';
 const BUG = "Something went wrong in RepoMagpie. The terminal running repomagpie ui shows the details.";
 
 export async function startServer(options: ServerOptions): Promise<UiServer> {
-  const token = randomBytes(32).toString("hex");
-  const tokenBytes = Buffer.from(token);
+  // Three secrets, so one that leaks isn't the others: the opening URL's token (in the opener's
+  // command line and on stdout), the cookie's value, and the write token the page reads.
+  const [token, session, write] = [secret(), secret(), secret()];
+  let used = false; // the opening URL's token, once exchanged
   const assets = loadAssets(options.assets ?? DEFAULT_ASSETS);
   const api = endpoints(options.context, options.open);
   const streams = new Set<ServerResponse>();
   let port = 0;
 
-  const isToken = (value: string | undefined) => {
-    const bytes = Buffer.from(value ?? "");
-    return bytes.length === tokenBytes.length && timingSafeEqual(bytes, tokenBytes);
-  };
   const cookieName = () => `magpie_${port}`;
   const hasSession = (req: IncomingMessage) =>
-    isToken((req.headers.cookie ?? "").split(/;\s*/).find((pair) => pair.startsWith(`${cookieName()}=`))?.slice(cookieName().length + 1));
+    same((req.headers.cookie ?? "").split(/;\s*/).find((pair) => pair.startsWith(`${cookieName()}=`))?.slice(cookieName().length + 1), session);
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     res.setHeader("Content-Security-Policy", CSP);
@@ -77,10 +78,13 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     if (req.headers.host !== `${HOST}:${port}` && req.headers.host !== `localhost:${port}`) {
       return json(res, 403, { error: `This server answers only requests to ${HOST}:${port}.` });
     }
-    // The token in the opening URL is exchanged once for the cookie, and leaves the address bar.
+    // The token in the opening URL is exchanged once for the cookie, and leaves the address bar. A
+    // wrong token doesn't use it up; the right one used again gets where to go instead.
     if (path === "/" && method === "GET" && query.has("token")) {
-      if (!isToken(query.get("token") ?? undefined)) return json(res, 401, { error: "Wrong session token. Open the URL repomagpie ui printed." });
-      res.writeHead(303, { Location: "/", "Set-Cookie": `${cookieName()}=${token}; HttpOnly; SameSite=Strict; Path=/` });
+      if (!same(query.get("token") ?? undefined, token)) return json(res, 401, { error: "Wrong session token. Open the URL repomagpie ui printed." });
+      if (used) return alreadyUsed(req, res, `http://${HOST}:${port}/`);
+      used = true;
+      res.writeHead(303, { Location: "/", "Set-Cookie": `${cookieName()}=${session}; HttpOnly; SameSite=Strict; Path=/` });
       res.end();
       return;
     }
@@ -90,8 +94,8 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       const file = path === "/" ? assets.get("index.html") : assets.get(path.slice("/assets/".length));
       if (!file) return json(res, 404, { error: assets.size ? "Not found." : NOT_BUILT });
       if (method !== "GET") return notAllowed(res, ["GET"]);
-      // The page gets the token for the X-Magpie-Token header, only with the session cookie.
-      const body = path === "/" ? Buffer.from(file.body.toString("utf8").replace(TOKEN_META, `<meta name="magpie-token" content="${token}">`)) : file.body;
+      // The page gets the write token for the X-Magpie-Token header, only with the session cookie.
+      const body = path === "/" ? Buffer.from(file.body.toString("utf8").replace(TOKEN_META, `<meta name="magpie-token" content="${write}">`)) : file.body;
       res.writeHead(200, { "Content-Type": file.type, "Content-Length": body.length });
       res.end(body);
       return;
@@ -115,7 +119,7 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       // Pages on other local ports are same-site for cookies, so the origin is checked as well.
       const origin = req.headers.origin;
       if (origin !== `http://${HOST}:${port}` && origin !== `http://localhost:${port}`) return json(res, 403, { error: "Writes are accepted only from the app itself." });
-      if (!isToken(header(req, "x-magpie-token"))) return json(res, 403, { error: "A write needs the X-Magpie-Token header." });
+      if (!same(header(req, "x-magpie-token"), write)) return json(res, 403, { error: "A write needs the X-Magpie-Token header." });
       if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
         return json(res, 415, { error: "Writes accept Content-Type: application/json only." });
       }
@@ -178,6 +182,8 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
     address: address.address,
     port,
     token,
+    cookie: session,
+    writeToken: write,
     url: `http://${HOST}:${port}/?token=${token}`,
     close: () => {
       stopWatching();
@@ -189,6 +195,24 @@ export async function startServer(options: ServerOptions): Promise<UiServer> {
       });
     },
   };
+}
+
+const secret = () => randomBytes(32).toString("hex");
+
+// Whether `value` is `expected`, compared in constant time.
+function same(value: string | undefined, expected: string): boolean {
+  const bytes = Buffer.from(value ?? "");
+  const wanted = Buffer.from(expected);
+  return bytes.length === wanted.length && timingSafeEqual(bytes, wanted);
+}
+
+// The opening URL used a second time: a page for a browser, JSON for anything else, saying what to do.
+function alreadyUsed(req: IncomingMessage, res: ServerResponse, app: string): void {
+  const message = `This link was already used. If this browser already has the app open, go to ${app}. Otherwise, stop repomagpie ui and start repomagpie ui again for a new link.`;
+  if (!/\btext\/html\b/.test(req.headers.accept ?? "")) return json(res, 401, { error: message });
+  const body = Buffer.from(`<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>RepoMagpie: link already used</title></head><body><h1>This link was already used</h1><p>If this browser already has the app open, go to <a href="/">${app}</a>.</p><p>Otherwise, stop repomagpie ui and start repomagpie ui again for a new link.</p></body></html>\n`);
+  res.writeHead(401, { "Content-Type": "text/html; charset=utf-8", "Content-Length": body.length });
+  res.end(body);
 }
 
 function json(res: ServerResponse, status: number, document: unknown): void {

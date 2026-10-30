@@ -30,3 +30,5 @@ Options considered:
 - Plain Markdown stays the only source of truth: the server keeps no state beyond the session token and the search cache ([spec](../spec.md), section 7).
 - v0.1 grows. The roadmap orders the work: recall → UI server → UI app → suggest and adopt → skill and launch.
 - A static, read-only export (option A) remains possible later, for nests.
+
+Editorial (2026-10-30): "session token" as the glossary now defines it: the printed URL's token, which works once, with the cookie and the write header each holding a different secret ([UI](../ui.md), "Security"). Substance unchanged.

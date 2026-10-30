@@ -33,6 +33,7 @@ export async function uiCommand(options: UiOptions, io: Io): Promise<number> {
   else {
     for (const warning of locateJournal("personal", context).warnings) io.err(`warning: ${warning}\n`);
     io.out(`${server.url}\n`);
+    io.err(`The link works once; then reload or open new tabs with http://127.0.0.1:${server.port}/ in the same browser.\n`);
     io.err("Press Ctrl+C to stop.\n");
   }
   if (options.open) {

@@ -66,6 +66,20 @@ test("text from config files reaches the terminal with markers, never raw", asyn
   assert.equal(JSON.parse(json.out).agents.find((a: { id: string }) => a.id === "cursor").mcp.command, "node<U+202E>exe");
 });
 
+// Home is the scratch root here, so the walk stops there and never sees its .git fence.
+test("journals: outside a git repository, a parent folder's .magpie is no project journal, and the line says to use --project", async () => {
+  const b = box();
+  mkdirSync(join(b.root, "shared", ".magpie", "notes"), { recursive: true });
+  mkdirSync(join(b.root, "shared", "me"), { recursive: true });
+  const outside = { env: b.env, home: b.root, cwd: join(b.root, "shared", "me") };
+  const r = await magpie(b, ["doctor"], outside);
+  assert.match(r.out, /^ {2}project {3}none here; outside a git repository, use --project <path>$/m);
+  assert.ok(!/^ {2}- .*--project/m.test(r.out), "information, not a to-do");
+  const json = JSON.parse((await magpie(b, ["doctor", "--json"], outside)).out);
+  assert.deepEqual(json.journals.map((j: { scope: string }) => j.scope), ["personal"]);
+  assert.match((await magpie(b, ["doctor", "--project", join(b.root, "shared")], outside)).out, /^ {2}project {2}.*\.magpie {2}0 notes$/m);
+});
+
 test("journals: in a git repository without .magpie, one line says how a project journal starts; elsewhere only none here; never a to-do", async () => {
   const b = box();
   const inGit = await magpie(b, ["doctor"], { env: b.env });
@@ -76,7 +90,7 @@ test("journals: in a git repository without .magpie, one line says how a project
   // The home folder is no project, even with a .git there (dotfiles).
   mkdirSync(join(b.home, ".git"));
   const atHome = await magpie(b, ["doctor"], { env: b.env, cwd: b.home });
-  assert.match(atHome.out, /^ {2}project {3}none here$/m);
+  assert.match(atHome.out, /^ {2}project {3}none here; outside a git repository, use --project <path>$/m);
   assert.equal(JSON.parse((await magpie(b, ["doctor", "--json"], { env: b.env, cwd: b.home })).out).git_repository, false);
 
   // With a project journal, its own row instead.

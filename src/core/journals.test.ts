@@ -155,9 +155,32 @@ test("stops at the home directory: a .magpie above it is not taken", () => {
 });
 
 test("below the home directory, a project's .magpie is still found", () => {
-  const root = fixture({ "home/code/app/.magpie/": null, "home/code/app/src/": null });
+  const root = fixture({ "home/code/app/.git/": null, "home/code/app/.magpie/": null, "home/code/app/src/": null });
   const home = join(root, "home");
   assert.equal(findProjectJournal({ cwd: join(home, "code", "app", "src"), home, personalJournal: join(home, ".magpie") }), join(home, "code", "app", ".magpie"));
+});
+
+// Outside a git repository, no project journal is looked for: a .magpie/ in a shared parent folder
+// (another user's, or the drive's root) would otherwise be read as the team's. --project still works.
+test("outside a git repository, a .magpie/ in a parent folder is not taken", () => {
+  const root = fixture({ "shared/.magpie/": null, "shared/me/work/": null });
+  assert.equal(find(root, join(root, "shared", "me", "work")), null);
+});
+
+test("outside a git repository, not even the working directory's .magpie/ is taken", () => {
+  const root = fixture({ ".magpie/": null });
+  assert.equal(find(root, root), null);
+});
+
+test("outside a git repository, --project still names the project journal", () => {
+  const root = fixture({ "shared/.magpie/": null, "work/": null });
+  assert.equal(find(root, join(root, "work"), "../shared"), join(root, "shared", ".magpie"));
+});
+
+test("inside a repository, its .magpie/ is found from a subfolder, and one above its root is not", () => {
+  const root = fixture({ ".magpie/": null, "repo/.git/": null, "repo/.magpie/": null, "repo/src/deep/": null, "other/.git/": null, "other/src/": null });
+  assert.equal(find(root, join(root, "repo", "src", "deep")), join(root, "repo", ".magpie"));
+  assert.equal(find(root, join(root, "other", "src")), null);
 });
 
 test("--project with a path to the .magpie folder itself is used as given", () => {

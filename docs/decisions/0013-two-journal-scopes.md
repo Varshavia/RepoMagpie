@@ -18,3 +18,5 @@ How `magpie` finds both journals, and how it labels which journal a result came 
 - The team journal (idea 8) is part of v0.1, as the project journal.
 - A project journal is as visible as its repository: in a public repository, it is public. `adopt` is the explicit step from private to shared.
 - Decision 0003 still holds: this repository holds only the example vault, and nobody's personal journal.
+
+Editorial (2026-10-30): added a pointer to [0051](0051-no-project-journal-outside-git.md), which applies "inside a project repository" to discovery: outside a git repository a project journal is used only when `--project` names it. Substance unchanged.
