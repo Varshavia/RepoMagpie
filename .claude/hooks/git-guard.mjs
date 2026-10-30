@@ -24,31 +24,81 @@ const WRITE_CMDLETS = new Set(["set-content", "add-content", "out-file"]);
 const NULL_TARGETS = new Set(["/dev/null", "nul", "$null"]);
 const SEP = Symbol("separator");
 
+// The index of the ")" that closes the "$(" at cmd[i], with the quotes inside it read as their own
+// (Bash: "$(echo "(")" holds a quoted "("); -1 when it never closes.
+function closeParen(cmd, i, mode) {
+  const escape = mode === "bash" ? "\\" : "`";
+  let depth = 1, quote = null;
+  for (let j = i + 2; j < cmd.length; j++) {
+    const c = cmd[j];
+    if (c === escape && quote !== "'") j++;
+    else if (quote) { if (c === quote) quote = null; }
+    else if (c === "'" || c === '"') quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return j;
+  }
+  return -1;
+}
+
 // Split a Bash or PowerShell command line into words, separators and redirections.
 // An unquoted > or >> becomes { redirect: target }; stream forms like 2>&1 are dropped.
-function tokenize(cmd) {
+// `mode` is how a character escapes the next one: "bash" (a backslash; a backtick runs a command)
+// or "pwsh" (a backtick; a backslash is a letter). The caller reads each line both ways.
+// A # starting a word comments out the rest of the line. A heredoc's body is read line by line, so
+// an apostrophe in it ("it's") can't swallow the lines after it; its lines still count as commands.
+// A quote or "$(" that never closes makes the result `unreadable` (heredoc lines, `lenient`, end it
+// at the line's end instead).
+function tokenize(cmd, mode = "bash", lenient = false) {
   const out = [];
   let word = null;
   let quote = null;
+  const heredocs = []; // delimiters whose bodies start after the current line
+  const escape = mode === "bash" ? "\\" : "`";
   const end = () => { if (word !== null) out.push(word); word = null; };
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
     if (quote === '"' && ch === "$" && cmd[i + 1] === "(") {
       // $( ... ) inside double quotes still runs: tokenize its body as commands.
-      let depth = 0, j = i + 1;
-      for (; j < cmd.length; j++) {
-        if (cmd[j] === "(") depth++;
-        else if (cmd[j] === ")" && --depth === 0) break;
-      }
-      out.push(SEP, ...tokenize(cmd.slice(i + 2, j)), SEP);
+      const j = closeParen(cmd, i, mode);
+      if (j < 0) { if (!lenient) out.unreadable = true; break; }
+      const inner = tokenize(cmd.slice(i + 2, j), mode, lenient);
+      if (inner.unreadable && !lenient) out.unreadable = true;
+      out.push(SEP, ...inner, SEP);
       i = j;
     } else if (quote) {
       if (ch === quote) quote = null;
       else if (quote === '"' && (ch === "\\" || ch === "`") && cmd[i + 1] === '"') word += cmd[++i];
+      else if (quote === '"' && ch === escape && i + 1 < cmd.length) word += cmd[++i];
       else word += ch;
     } else if ((ch === "\\" || ch === "`") && /^\r?\n/.test(cmd.slice(i + 1))) {
       end(); // line continuation
       i += cmd[i + 1] === "\r" ? 2 : 1;
+    } else if (ch === escape && i + 1 < cmd.length) {
+      word = (word ?? "") + cmd[++i]; // an escaped character is a letter: \' or `' opens no quote, g\it is git
+    } else if (ch === "#" && word === null) {
+      while (i + 1 < cmd.length && cmd[i + 1] !== "\n") i++; // a comment, up to the line break
+    } else if (ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
+      // A heredoc: <<WORD, <<-WORD, <<'WORD', <<"WORD". The delimiter is noted; the body follows the line.
+      end();
+      const m = cmd.slice(i + 2).match(/^-?[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|([^\s;&|<>()]+))/);
+      if (m) {
+        heredocs.push(m[1] ?? m[2] ?? m[3].replace(/\\/g, ""));
+        i += 1 + m[0].length;
+      } else i++;
+    } else if (ch === "\n" && heredocs.length) {
+      end();
+      out.push(SEP);
+      let j = i + 1;
+      for (const delimiter of heredocs.splice(0)) {
+        while (j < cmd.length) {
+          const stop = cmd.indexOf("\n", j);
+          const line = cmd.slice(j, stop < 0 ? cmd.length : stop).replace(/\r$/, "");
+          j = stop < 0 ? cmd.length : stop + 1;
+          if (line.replace(/^\t+/, "") === delimiter) break;
+          out.push(SEP, ...tokenize(line, mode, true), SEP);
+        }
+      }
+      i = j - 1; // the next character starts a new command
     } else if (ch === "'" || ch === '"') {
       quote = ch;
       word ??= "";
@@ -89,6 +139,7 @@ function tokenize(cmd) {
     }
   }
   end();
+  if (quote && !lenient) out.unreadable = true;
   return out;
 }
 
@@ -191,33 +242,72 @@ function releaseTagBlocked(name, args) {
   return script >= 0 ? `${base} ${args[script]}` : `${base} run release:tag`;
 }
 
-// Returns the first forbidden command in cmd as { kind: "git" | "gh" | "write" | "release", what }, or null.
-function findBlocked(cmd, depth = 0) {
-  const words = tokenize(cmd);
+// Each prefix's options whose value is the next word: `sudo -u me git push` runs git, not
+// "me". An option written with its value attached (-uroot, --user=root) is one word anyway.
+const PREFIX_VALUES = {
+  sudo: ["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-T", "--command-timeout", "-U", "--other-user", "-r", "--role", "-t", "--type"],
+  env: ["-u", "--unset", "-C", "--chdir"],
+  timeout: ["-s", "--signal", "-k", "--kill-after"],
+  nice: ["-n", "--adjustment"],
+  stdbuf: ["-i", "--input", "-o", "--output", "-e", "--error"],
+  time: ["-f", "--format", "-o", "--output"],
+  xargs: ["-a", "--arg-file", "-d", "--delimiter", "-E", "-e", "--eof", "-I", "-i", "--replace", "-L", "-l", "--max-lines", "-n", "--max-args", "-P", "--max-procs", "-s", "--max-chars", "--process-slot-var"],
+};
+
+// Returns the first forbidden command in cmd as { kind: "git" | "gh" | "write" | "release" | "unreadable", what },
+// or null. The line is read as Bash and as PowerShell, and blocked if either reading finds one.
+// Only the tool's own shell (`native`) decides that a line can't be read: `echo don\'t` is fine Bash.
+function findBlocked(cmd, depth = 0, native = "bash") {
+  for (const mode of ["bash", "pwsh"]) {
+    const hit = findBlockedAs(cmd, mode, depth, native);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function findBlockedAs(cmd, mode, depth, native) {
+  const words = tokenize(cmd, mode, mode !== native);
+  if (words.unreadable) return { kind: "unreadable", what: cmd.length > 60 ? `${cmd.slice(0, 60)}…` : cmd };
   let atCommand = true;
   let inShell = false;
+  let prefix = null; // the prefix whose options are being read
+  let viaXargs = false; // the command's arguments come partly from stdin
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
-    if (w === SEP) { atCommand = true; inShell = false; continue; }
+    if (w === SEP) { atCommand = true; inShell = false; prefix = null; viaXargs = false; continue; }
     if (typeof w === "object") {
       if (w.redirect && !NULL_TARGETS.has(w.redirect.toLowerCase())) return { kind: "write", what: `> ${w.redirect}` };
       continue;
     }
     if (inShell && /\s/.test(w) && depth < 3) {
-      const hit = findBlocked(w, depth + 1);
+      const hit = findBlocked(w, depth + 1, native);
       if (hit) return hit;
     }
     if (w === "-exec" || w === "-execdir") { atCommand = true; continue; }
     if (!atCommand) continue;
+    if (prefix && PREFIX_VALUES[prefix]?.includes(w)) { i++; continue; } // the option's value
+    if (prefix === "env" && (w === "-S" || w === "--split-string") && typeof words[i + 1] === "string" && depth < 3) {
+      const hit = findBlocked(words[i + 1], depth + 1, native); // env -S "git push" runs the string's words
+      if (hit) return hit;
+      i++;
+      continue;
+    }
     const name = w.split(/[\\/]/).pop().toLowerCase().replace(/\.exe$/, "");
-    if (/^\w+=/.test(w) || /^-/.test(w) || /^\/\w$/.test(w) || /^\d/.test(w) || PREFIXES.has(name)) continue;
+    if (/^\w+=/.test(w) || /^-/.test(w) || /^\/\/?\w$/.test(w) || /^\d/.test(w)) continue; // //c: cmd's /c in Git Bash
+    if (PREFIXES.has(name)) {
+      prefix = name;
+      if (name === "xargs") viaXargs = true;
+      continue;
+    }
     atCommand = false;
     if (name === "git") {
       const sub = gitSubcommand(words, i + 1);
       if (sub !== null && !ALLOWED.has(sub)) return { kind: "git", what: `git ${sub}` };
+      if (sub === null && viaXargs) return { kind: "git", what: "xargs git" }; // the subcommand comes from stdin
     } else if (name === "gh") {
       const hit = ghBlocked(words, i + 1);
       if (hit) return { kind: "gh", what: hit };
+      if (viaXargs && !argsOf(words, i + 1).some((a) => !a.startsWith("-"))) return { kind: "gh", what: "xargs gh" };
     } else if (SHELLS.has(name)) {
       inShell = true;
       atCommand = true;
@@ -240,10 +330,13 @@ const MESSAGES = {
     "Redirection is allowed only to /dev/null, NUL or $null, or between streams (2>&1) (see CLAUDE.md section 1).\n",
   release: (what) => `BLOCKED: "${what}" tags and pushes a release; only the maintainer runs it. ` +
     "Agents may run its checks only: npm run release:tag -- --dry-run (see CLAUDE.md section 1).\n",
+  unreadable: (what) => `BLOCKED: "${what}" has a quote or $( that never closes, so git-guard can't tell what it runs. ` +
+    "Close it, or write the text to a file with the Write tool (see CLAUDE.md section 1).\n",
 };
 
-const command = JSON.parse(readFileSync(0, "utf8")).tool_input?.command;
-const blocked = typeof command === "string" && findBlocked(command);
+const input = JSON.parse(readFileSync(0, "utf8"));
+const command = input.tool_input?.command;
+const blocked = typeof command === "string" && findBlocked(command, 0, input.tool_name === "PowerShell" ? "pwsh" : "bash");
 if (blocked) {
   process.stderr.write(MESSAGES[blocked.kind](blocked.what));
   process.exit(2);
