@@ -45,3 +45,6 @@ evals/skill/fixture/journal/.cache/
 .agents/
 .claude/skills/
 skills-lock.json
+
+# The skill eval's own install (evals/skill/package.json pins its two dependencies)
+evals/skill/package-lock.json
