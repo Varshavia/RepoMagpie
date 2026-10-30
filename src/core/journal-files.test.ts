@@ -156,8 +156,10 @@ test("the maintainer's setup: a home folder that is a git repository never makes
   const r = await magpie(box, ["recall", "chalk", "--json"], { ...defaultJournal, cwd: join(box.home, "code", "app") });
   const matches = JSON.parse(r.out).matches;
   assert.deepEqual(matches.map((m: { journal: string }) => m.journal), ["personal"], "read once, as the personal journal");
+  // Home's repository is no project, so app is outside one: no project journal without --project.
   const write = await magpie(box, ["note", "pkg:npm/zod", "ok", "--to", "project"], { ...defaultJournal, cwd: join(box.home, "code", "app") });
-  assert.equal(write.code, 0);
-  assert.ok(existsSync(join(box.home, "code", "app", ".magpie", "notes", "npm--zod.md")), "the project root is the working directory, not home");
+  assert.equal(write.code, 1);
+  assert.match(write.err, /outside a git repository, use --project <path>/);
+  assert.ok(!existsSync(join(box.home, "code", "app", ".magpie")));
   assert.ok(!existsSync(join(box.home, ".magpie", "notes", "npm--zod.md")));
 });

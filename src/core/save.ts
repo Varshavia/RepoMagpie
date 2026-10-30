@@ -15,6 +15,7 @@ import {
   findProjectJournal,
   findProjectRoot,
   flagJournal,
+  gitRoot,
   homeJournal,
   isLink,
   journalAliases,
@@ -50,8 +51,9 @@ export interface Journal {
 }
 
 // The journal to write to (spec §3). A project journal that doesn't exist yet is created on the
-// first write, at the git root or in the working directory (spec §2 note step 5). The personal
-// journal's folder is never taken as the project journal, nor as its project root.
+// first write, at the git root, or where --project names (spec §2 note step 5); outside a git
+// repository without --project, there is none. The personal journal's folder is never taken as
+// the project journal, nor as its project root.
 export function locateJournal(scope: Journal["scope"], place: Place): Journal {
   const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
   if (scope === "personal") return { path: personal.path, scope, warnings: personal.warnings, error: null };
@@ -64,7 +66,9 @@ export function locateJournal(scope: Journal["scope"], place: Place): Journal {
       ? `${path} is reserved for the default personal journal, so it can't be the project journal. ${hint}`
       : isLink(path)
         ? `${linkProblem(path).message}, so it can't be the project journal (decision 0032).`
-        : null;
+        : !found && !place.projectFlag && !gitRoot(place.cwd, place.home)
+          ? "No project journal here: outside a git repository, use --project <path>."
+          : null;
   return { path, scope, warnings: personal.warnings, error };
 }
 
