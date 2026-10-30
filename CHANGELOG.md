@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.18] - 2026-10-30
+
+The nineteenth pre-release: security fixes. The link `repomagpie ui` prints works once, and outside a git repository a project journal needs `--project`.
+
 ### Changed
 
 - Outside a git repository, RepoMagpie no longer picks up a project journal from a parent folder; pass `--project`. A `.magpie/` folder in a shared folder above yours, such as another user's or the drive's root, was read as your project's journal by the hook, `recall`, `search` and `suggest`. `repomagpie note --to project` and `repomagpie adopt` outside a repository now ask for `--project` instead of creating `.magpie/` in the current folder, and `repomagpie doctor` says so on its project line.
@@ -367,7 +371,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.17...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.18...HEAD
+[0.2.0-beta.18]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.17...v0.2.0-beta.18
 [0.2.0-beta.17]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.16...v0.2.0-beta.17
 [0.2.0-beta.16]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...v0.2.0-beta.16
 [0.2.0-beta.15]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...v0.2.0-beta.15
