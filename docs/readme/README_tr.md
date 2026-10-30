@@ -45,7 +45,7 @@ Do you want to proceed?
 - **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama.
 - **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
 
-**Durum:** erken test edenler için ön sürüm `0.2.0-beta.16`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
+**Durum:** erken test edenler için ön sürüm `0.2.0-beta.17`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
 
 ## Hızlı başlangıç
 
