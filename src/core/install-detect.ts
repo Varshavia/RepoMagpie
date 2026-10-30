@@ -18,7 +18,7 @@ type Token = string | typeof SEP | { redirect: string };
 // Words that can precede the real command. On Windows: cmd's `call` (a batch file runs npm.cmd
 // with it) and `start`, PowerShell's dot-sourcing; then wsl, and npx or corepack running a manager.
 const PREFIXES = new Set(["sudo", "env", "command", "builtin", "exec", "time", "nice", "nohup", "timeout", "stdbuf", "xargs",
-  "if", "then", "else", "elif", "do", "while", "until", "!", "call", "start", ".", "wsl", "npx", "corepack"]);
+  "if", "then", "else", "elif", "do", "while", "until", "!", "call", "start", ".", "wsl", "npx", "bunx", "corepack"]);
 // Shells whose arguments are themselves a command line, and PowerShell's Invoke-Expression.
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "pwsh", "powershell", "cmd", "iex", "invoke-expression"]);
 const POWERSHELL = new Set(["pwsh", "powershell"]);
@@ -136,7 +136,12 @@ const lower = (word: string | undefined) => word?.toLowerCase();
 // 0042). Each tool's verbs for each.
 export type Action = "install" | "remove";
 const VERBS: Record<Action, { npm: string[]; pnpm: string[]; bun: string[]; yarn: string[]; pip: string[]; uv: string[]; uvPip: string[]; cargo: string[] }> = {
-  install: { npm: ["install", "i", "add"], pnpm: ["add"], bun: ["add"], yarn: ["add"], pip: ["install"], uv: ["add"], uvPip: ["install"], cargo: ["add"] },
+  // npm's own list (docs.npmjs.com/cli/v11/commands/npm-install, "aliases: add, i, in, ins, inst, insta,
+  // instal, isnt, isnta, isntal, isntall"), and install-test, "alias: it", which takes the same arguments.
+  install: {
+    npm: ["install", "i", "add", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal", "isntall", "install-test", "it"],
+    pnpm: ["add", "install", "i"], bun: ["add", "install", "i"], yarn: ["add"], pip: ["install"], uv: ["add"], uvPip: ["install"], cargo: ["add"],
+  },
   remove: {
     npm: ["uninstall", "remove", "rm", "r", "un", "unlink"], pnpm: ["remove", "rm", "uninstall", "un"], bun: ["remove", "rm"], yarn: ["remove"],
     pip: ["uninstall"], uv: ["remove"], uvPip: ["uninstall"], cargo: ["remove", "rm"],
@@ -152,6 +157,9 @@ function packagesOf(name: string, args: string[], action: Action = "install"): {
     const p = positionals(args, NPM_VALUES);
     return is(p[0], verbs.npm) ? { type: "npm", words: p.slice(1) } : null;
   }
+  if ((name === "pnpm" || name === "yarn") && lower(positionals(args, name === "pnpm" ? PNPM_VALUES : YARN_VALUES)[0]) === "dlx") {
+    return ran(args.slice(args.findIndex((a) => lower(a) === "dlx") + 1), action);
+  }
   if (name === "pnpm" || name === "bun") {
     const p = positionals(args, name === "pnpm" ? PNPM_VALUES : BUN_VALUES);
     return is(p[0], name === "pnpm" ? verbs.pnpm : verbs.bun) ? { type: "npm", words: p.slice(1) } : null;
@@ -160,6 +168,7 @@ function packagesOf(name: string, args: string[], action: Action = "install"): {
     const p = positionals(args, YARN_VALUES);
     if (is(p[0], verbs.yarn)) return { type: "npm", words: p.slice(1) };
     if (lower(p[0]) === "workspace" && is(p[2], verbs.yarn)) return { type: "npm", words: p.slice(3) };
+    if (lower(p[0]) === "global" && is(p[1], verbs.yarn)) return { type: "npm", words: p.slice(2) }; // Yarn 1
     return null;
   }
   if (/^pip(\d+(\.\d+)?)?$/.test(name)) {
@@ -167,8 +176,11 @@ function packagesOf(name: string, args: string[], action: Action = "install"): {
     return is(p[0], verbs.pip) ? { type: "pypi", words: p.slice(1) } : null;
   }
   if (/^(python(\d+(\.\d+)?)?|py)$/.test(name)) {
-    const m = args.indexOf("-m");
-    return m !== -1 && args[m + 1] === "pip" ? packagesOf("pip", args.slice(m + 2), action) : null;
+    // -m pip, or -mpip: CPython and the py launcher take the module name attached too.
+    const m = args.findIndex((a) => a === "-m" || a === "-mpip");
+    if (m === -1) return null;
+    if (args[m] === "-mpip") return packagesOf("pip", args.slice(m + 1), action);
+    return args[m + 1] === "pip" ? packagesOf("pip", args.slice(m + 2), action) : null;
   }
   if (name === "uv") {
     const p = positionals(args, UV_VALUES);
@@ -183,17 +195,33 @@ function packagesOf(name: string, args: string[], action: Action = "install"): {
   return null;
 }
 
+// A manager's name as a command: its file name, lowercased, without a Windows extension, and, for
+// a JavaScript manager, without the version npx, bunx, corepack, pnpm dlx and yarn dlx take
+// (npm@latest, pnpm@9).
+function commandName(word: string): string {
+  const name = (word.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "");
+  return name.replace(/^(npm|pnpm|yarn|bun)@[^@/\\]+$/, "$1");
+}
+
+// The command pnpm dlx or yarn dlx runs: the first word that isn't a flag, and what follows it.
+function ran(args: string[], action: Action): { type: PackageType; words: string[] } | null {
+  const k = args.findIndex((a) => !a.startsWith("-"));
+  return k === -1 ? null : packagesOf(commandName(args[k]), args.slice(k + 1), action);
+}
+
 // A registry package as written, or null for a path, URL, git source, tarball or other non-name.
 function registryName(word: string, type: PackageType): string | null {
   if (/^[.~/\\]/.test(word) || /^[a-z][\w+.-]*:/i.test(word) || /\.(tgz|tar|tar\.gz|tar\.bz2|zip|whl)$/i.test(word)) return null;
   if (type === "npm") {
-    // An npm alias, my-alias@npm:real@2, installs "real".
-    if (/^[^@:]+@npm:/.test(word)) return registryName(word.slice(word.indexOf("@npm:") + 5), type);
+    // An npm alias, my-alias@npm:real@2 or @x/y@npm:real, installs "real".
+    if (NPM_ALIAS.test(word)) return registryName(word.slice(word.indexOf("@npm:") + 5), type);
     if (word.includes("/") && !word.startsWith("@")) return null; // user/repo is a GitHub shorthand
   } else if (/[/\\]/.test(word)) return null;
   const name = normalizePackage(word, type);
   return /^(@[\w.~-]+\/)?[\w.~-]+$/.test(name) ? name : null;
 }
+
+const NPM_ALIAS = /^(@[^@/:]+\/)?[^@/:]+@npm:/;
 
 // Every package install in the command line, in order, each package once.
 export const detectInstalls = (command: string): Install[] => detectCommand(command).installs;
@@ -205,10 +233,13 @@ export function detectCommand(command: string, action: Action = "install"): { in
   const seen = new Set<string>();
   const state = { unreadable: false };
   walk(command, 0, (type, word) => {
-    const name = registryName(word, type);
-    if (name === null || seen.has(`${type}:${name}`)) return;
-    seen.add(`${type}:${name}`);
-    found.push({ type, name, spec: word });
+    // An npm alias installs the real package under the alias's name: both are looked up.
+    const alias = type === "npm" && NPM_ALIAS.test(word) ? registryName(word.slice(0, word.indexOf("@npm:")), type) : null;
+    for (const name of [registryName(word, type), alias]) {
+      if (name === null || seen.has(`${type}:${name}`)) continue;
+      seen.add(`${type}:${name}`);
+      found.push({ type, name, spec: word });
+    }
   }, state, action);
   return { installs: found, unreadable: state.unreadable };
 }
@@ -241,7 +272,7 @@ function walk(cmd: string, depth: number, add: (type: PackageType, word: string)
     }
     if (inShell && /\s/.test(t) && depth < MAX_DEPTH) walk(t, depth + 1, add, state, action);
     if (!atCommand) continue;
-    const name = (t.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "");
+    const name = commandName(t);
     if (!t || /^\w+=/.test(t) || t.startsWith("-") || /^\/\w$/.test(t) || /^\d/.test(t) || (PREFIXES.has(name) && !(name === "start" && startProcess(argsOf(tokens, i + 1), true)))) continue;
     atCommand = false;
     if (SHELLS.has(name)) {

@@ -25,7 +25,7 @@ const CASES: [string, string[]][] = [
   ["npm i -D typescript @types/node", ["npm:typescript", "npm:@types/node"]],
   ["npm install pdfkit@1.2.0 @scope/name@^3", ["npm:pdfkit", "npm:@scope/name"]],
   ['npm install "chalk@>=5 <6"', ["npm:chalk"]],
-  ["npm install my-alias@npm:real-pkg@2", ["npm:real-pkg"]],
+  ["npm install my-alias@npm:real-pkg@2", ["npm:real-pkg", "npm:my-alias"]], // the real package, then the alias's name
   ["pip install 'requests[socks]>=2' flask==3.0 Django~=5.0", ["pypi:requests", "pypi:flask", "pypi:Django"]],
   ["pip install requests @ https://example.com/requests.whl", ["pypi:requests"]],
   ["cargo add serde@1.0 serde_json --features derive", ["cargo:serde", "cargo:serde_json"]],
@@ -87,6 +87,52 @@ const CASES: [string, string[]][] = [
   ["npm list pdfkit --all", []],
   ["npm view pdfkit version", []],
   ["npm explain pdfkit", []],
+
+  // Every name a manager installs under. npm's docs: npm-install, "aliases: add,
+  // i, in, ins, inst, insta, instal, isnt, isnta, isntal, isntall"; npm-install-test, "alias: it",
+  // with "exactly the same arguments as npm install". bun's install and i; Yarn 1's global add.
+  ["npm in pdfkit", ["npm:pdfkit"]],
+  ["npm ins pdfkit", ["npm:pdfkit"]],
+  ["npm inst pdfkit", ["npm:pdfkit"]],
+  ["npm insta pdfkit", ["npm:pdfkit"]],
+  ["npm instal pdfkit", ["npm:pdfkit"]],
+  ["npm isnt pdfkit", ["npm:pdfkit"]],
+  ["npm isnta pdfkit", ["npm:pdfkit"]],
+  ["npm isntal pdfkit", ["npm:pdfkit"]],
+  ["npm isntall pdfkit", ["npm:pdfkit"]],
+  ["npm install-test pdfkit", ["npm:pdfkit"]],
+  ["npm it pdfkit", ["npm:pdfkit"]],
+  ["bun i pdfkit", ["npm:pdfkit"]],
+  ["bun install pdfkit", ["npm:pdfkit"]],
+  ["yarn global add pdfkit", ["npm:pdfkit"]],
+  ["pnpm i pdfkit", ["npm:pdfkit"]],
+  ["pnpm install pdfkit", ["npm:pdfkit"]],
+  ["npm it", []],
+  ["bun install", []],
+  ["bun i", []],
+  ["pnpm i", []],
+
+  // pip run by Python with -m attached: CPython and the py launcher both take it
+  ["python -mpip install requests", ["pypi:requests"]],
+  ["python3 -mpip install requests", ["pypi:requests"]],
+  ["py -mpip install requests", ["pypi:requests"]],
+  ["python -mpipx install requests", []],
+
+  // A manager at a version, run by another
+  ["npx -y npm@latest install pdfkit", ["npm:pdfkit"]],
+  ["npx npm@10.9.0 i pdfkit", ["npm:pdfkit"]],
+  ["corepack pnpm@9 add pdfkit", ["npm:pdfkit"]],
+  ["corepack yarn@1.22.22 add pdfkit", ["npm:pdfkit"]],
+  ["bunx npm@latest install pdfkit", ["npm:pdfkit"]],
+  ["pnpm dlx npm@10 install pdfkit", ["npm:pdfkit"]],
+  ["yarn dlx npm@10 install pdfkit", ["npm:pdfkit"]],
+  ["bunx create-vite app", []],
+  ["pnpm dlx create-vite app", []],
+  ["yarn dlx create-vite app", []],
+
+  // A scoped alias installs the real package; both names are looked up
+  ["npm install --save-exact @types/react@npm:types-react@rc", ["npm:types-react", "npm:@types/react"]],
+  ["npm i @x/y@npm:@evil/real@1", ["npm:@evil/real", "npm:@x/y"]],
 
   // The same package twice is reported once
   ["npm i pdfkit && npm i pdfkit@2", ["npm:pdfkit"]],
