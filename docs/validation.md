@@ -183,7 +183,7 @@ The script for the demo GIF ([marketing](marketing.md)): what is typed, what app
 
 ## Skill-compliance eval
 
-RepoMagpie works through the agent the user already runs, so it works as well as that agent follows the skill (the [README](../README.md#how-it-works) says so). [`evals/skill/`](../evals/skill/README.md) turns that into a pass rate: Claude Code, with the MCP server and the skill, on 25 scenarios over a fixture journal (idea 17, [ideas](ideas.md)). The maintainer runs it per model; it isn't in CI.
+RepoMagpie works through the agent the user already runs, so it works as well as that agent follows the skill (the [README](../README.md#how-it-works) says so). [`evals/skill/`](../evals/skill/README.md) turns that into a pass rate: Claude Code or Gemini CLI, with the MCP server and the skill, on 25 scenarios over a fixture journal (idea 17, [ideas](ideas.md)). The two agents get the same scenarios and the same checks; Gemini CLI runs on the Gemini API's free tier ([its README](../evals/skill/README.md#gemini-cli)). The maintainer runs it per agent and model; it isn't in CI.
 
 What its scenarios measure:
 
@@ -197,9 +197,9 @@ What its scenarios measure:
 | Never a Verdict in other words; no delete when asked to tidy up; no adopt or project write unasked | Rules ([decision 0005](decisions/0005-human-written-usefulness.md), [decision 0018](decisions/0018-ai-drafts-humans-decide.md)) | That the Verdict stays the user's |
 | A note with instructions is reported, not followed | Note text is quoted data ([decision 0032](decisions/0032-note-text-is-data.md)) | That a note can't steer the agent |
 
-H3 and H4 aren't measured: one agent with one personal journal, and no graph.
+H3 and H4 aren't measured: one agent at a time with one personal journal, and no graph.
 
-**Results:** none yet. A result needs its date, model, versions and number of runs.
+**Results:** none yet. A result needs its date, agent, model, versions and number of runs.
 
 ## Decisions
 

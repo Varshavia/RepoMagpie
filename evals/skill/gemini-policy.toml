@@ -1,0 +1,39 @@
+# Gemini CLI's policy for the eval, the same tool set as the Claude Code run (providers.yaml).
+# gemini.mjs copies it to .run/gemini-home/.gemini/policies/, the user tier (README.md, "Gemini CLI").
+#
+# Headless, Gemini CLI denies the shell, edits and activate_skill, and a deny without argsPattern
+# takes a tool out of the model's list: the agent couldn't even try an install. So the shell and the
+# edits stay on offer (ask_user, which headless never asks) and every call is denied (a deny with
+# argsPattern): the agent tries, nothing runs, and stream-json shows the attempt.
+
+# RepoMagpie's MCP tools, the skill, and reading the project. (toolName is required with mcpName in
+# 0.65.0, though its policy-engine.md shows a rule without one.)
+[[rule]]
+mcpName = "repomagpie"
+toolName = "*"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = ["activate_skill", "read_file", "read_many_files", "list_directory", "glob", "grep_search"]
+decision = "allow"
+priority = 100
+
+# The shell and the edits: every call denied...
+[[rule]]
+toolName = ["run_shell_command", "write_file", "replace"]
+argsPattern = "[\\s\\S]"
+decision = "deny"
+priority = 200
+
+# ...but still offered to the model.
+[[rule]]
+toolName = ["run_shell_command", "write_file", "replace"]
+decision = "ask_user"
+priority = 100
+
+# Everything else (web search, web fetch, subagents, memory) off.
+[[rule]]
+toolName = "*"
+decision = "deny"
+priority = 1

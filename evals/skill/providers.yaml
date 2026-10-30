@@ -5,6 +5,9 @@
 # Nothing runs on your machine but the MCP server: every built-in tool that changes something
 # (Bash, Edit, Write) is available, so the agent can try it, but never allowed (`dontAsk` denies
 # what isn't listed). The scenarios check what it tried.
+#
+# Gemini CLI's provider is gemini-provider.mjs: `node run.mjs --agent gemini-cli` passes it to
+# promptfoo in place of this file (README.md, "Gemini CLI").
 - id: anthropic:claude-agent-sdk
   label: 'claude-code/{{ env.REPOMAGPIE_EVAL_MODEL }}'
   config:

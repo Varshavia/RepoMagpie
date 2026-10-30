@@ -44,7 +44,7 @@ The product's category moved:
 | 14 | Just-in-time context | Candidate | after the tester round | Token cost per task |
 | 15 | Multiplayer and team sync | Visibility built (README, app, doctor); sync stays git | 0.2 | H3: the project journal exists; visibility was the gap |
 | 16 | A community hub and registry | Candidate | after the tester round | Sharing journals; prompt-injection risk |
-| 17 | Measuring skill compliance | Built for Claude Code (`evals/skill/`); no results yet | 0.2 | Turns "as well as the agent follows the skill" into a number |
+| 17 | Measuring skill compliance | Built for Claude Code and Gemini CLI (`evals/skill/`); no results yet | 0.2 | Turns "as well as the agent follows the skill" into a number |
 | 18 | Hugging Face notes | Candidate | after the tester round | Models and datasets are dependencies too |
 | 19 | Discover | **Built** ([decision 0045](decisions/0045-discover.md)); kind accuracy done ([decision 0047](decisions/0047-kind-rules-measured.md)); six follow-ups are candidates | 0.2 | Finding what to note, not only noting what you found |
 | 20 | The note view's editors, loaded later | Candidate | when the first files need room | The next way to make the app's first files smaller ([decision 0048](decisions/0048-the-first-load-line-measured.md)) |
@@ -303,7 +303,7 @@ Checked 2026-10-03 against each client's documentation. Hook support is not univ
 - **Options:** an eval tool that drives each agent's CLI non-interactively on a scratch journal; or a scripted set of manual runs, recorded the same way each time.
 - **Risks:** runs cost money and time per agent and model; results drift with each agent release.
 - **What decides it:** a behaviour change in the skill that needs evidence across agents, or a tester report that an agent ignores the skill.
-- **Status:** built for Claude Code (2026-10-25): [`evals/skill/`](../evals/skill/README.md), promptfoo with the Claude Agent SDK, 25 scenarios, run by the maintainer, not in CI ([validation](validation.md#skill-compliance-eval)). No results yet. Other agents would each need their own provider.
+- **Status:** built for Claude Code (2026-10-25): [`evals/skill/`](../evals/skill/README.md), promptfoo with the Claude Agent SDK, 25 scenarios, run by the maintainer, not in CI ([validation](validation.md#skill-compliance-eval)). Gemini CLI added (2026-10-30): the same scenarios on the Gemini API's free tier, through its headless mode (`node run.mjs --agent gemini-cli`). No results yet. Other agents would each need their own provider.
 
 ## 18. Hugging Face notes
 

@@ -1,4 +1,4 @@
-# 25 scenarios, each a request to Claude Code in the fixture project (fixture/project), with the
+# 25 scenarios, each a request to the agent (Claude Code or Gemini CLI) in the fixture project (fixture/project), with the
 # fixture journal (fixture/journal) as the personal journal. `metadata.rule` names the skill's
 # section the scenario checks. A scenario that needs an earlier part of the session tells it in the
 # prompt, in brackets: the provider sends one message per scenario.
