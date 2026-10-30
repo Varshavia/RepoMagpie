@@ -127,6 +127,34 @@ const BLOCKED = [
   ["Bash", "git status && npm run release:tag"],
   ["Bash", 'bash -c "node scripts/tag-release.ts"'],
   ["Bash", "node scripts/tag-release.ts --dry-run && node scripts/tag-release.ts"],
+  // Escapes, comments, heredoc lines and quotes inside $( ) don't hide a command
+  ["Bash", "echo \\'; gh pr create --fill"],
+  ["Bash", "echo \\'; git push"],
+  ["Bash", "cat <<EOF\nit's fine\nEOF\ngh pr create --fill"],
+  ["Bash", "cat <<'EOF'\nit's fine\nEOF\ngit push"],
+  ["Bash", "cat <<EOF\ngit push\nEOF"], // heredoc text is still scanned as commands, on purpose
+  ["Bash", "echo ok # won't\ngh pr create"],
+  ["Bash", "echo ok # won't\ngh api repos/o/r -f title=x"],
+  ["Bash", "# it's\necho hi > out.txt"],
+  ["Bash", 'echo "$(echo "(")"; git push'],
+  ["Bash", 'echo "$(echo "(")"; gh pr create'],
+  ["Bash", "g\\it push"],
+  ["PowerShell", "echo `'; git push"],
+  ["PowerShell", "g`it push"],
+  // ... and a line that can't be read is blocked, not guessed
+  ["Bash", "echo 'unterminated; git push"],
+  ["Bash", 'echo "$(git push'],
+  // A prefix's option value isn't the command; xargs hides git's subcommand; cmd //c
+  ["Bash", "env -u FOO git push"],
+  ["Bash", "env -u FOO gh pr create --fill"],
+  ["Bash", "sudo -u me git push"],
+  ["Bash", "timeout -s KILL 60 git push"],
+  ["Bash", "xargs -a f git add"],
+  ["Bash", "echo push | xargs git"],
+  ["Bash", "echo pr create | xargs gh"],
+  ["Bash", "cmd //c git push"],
+  ["Bash", "cmd //c gh pr create --fill"],
+  ["Bash", 'env -S "git push"'],
 ];
 
 const ALLOWED = [
@@ -194,6 +222,20 @@ const ALLOWED = [
   ["Bash", "node --test scripts/tag-release.test.ts"],
   ["Bash", "grep -n tag-release scripts/tag-release.ts"],
   ["Bash", "npm run release"],
+  // Escapes, comments, heredocs and prefix options: everyday commands still work
+  ["Bash", "cat <<'EOF'\nit's fine, don't worry\nEOF\ngit status"],
+  ["Bash", "echo ok # it's a comment\ngit log -1"],
+  ["Bash", 'echo "don\'t" && git diff'],
+  ["Bash", "echo don\\'t"],
+  ["Bash", 'echo "$(echo "(")"; git status'],
+  ["Bash", "git log --format='%h #%s' -3"],
+  ["Bash", "env -u FOO npm test"],
+  ["Bash", "sudo -u me ls"],
+  ["Bash", "timeout -s KILL 60 npm test"],
+  ["Bash", "xargs -a f grep x"],
+  ["Bash", "echo HEAD | xargs git show"],
+  ["Bash", "cmd //c dir"],
+  ["PowerShell", "Write-Output \"a`tb\"; git status"],
 ];
 
 for (const [tool, command] of BLOCKED) {

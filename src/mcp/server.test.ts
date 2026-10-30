@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { join, sep } from "node:path";
 import { magpie, sandbox } from "../cli/fixtures/sandbox.ts";
 import { DOMAIN_IDS, DOMAINS } from "../core/domains.ts";
@@ -292,6 +293,27 @@ test("jitless.ts turns zod's code generation off and keeps the rest of its share
   shared.__zod_globalConfig = { locale: "kept" };
   await import("./jitless.ts");
   assert.deepEqual(shared.__zod_globalConfig, { locale: "kept", jitless: true });
+});
+
+// Looking in a folder on another machine sends it the user's Windows sign-in hash: on
+// Windows, a project on another machine is refused before anything is looked at, as the hooks do,
+// unless the server already runs in that folder.
+test("projectFolder: on Windows, a folder on another machine is refused without touching it", (t) => {
+  const real = fs.statSync;
+  // A stub: a two-slash path never reaches the real statSync, which would connect to that machine.
+  const stats = t.mock.method(fs, "statSync", ((path: fs.PathLike, ...rest: unknown[]) => {
+    if (/^[\\/]{2}/.test(String(path))) throw Object.assign(new Error("stub: no network"), { code: "ENOENT" });
+    return (real as (...args: unknown[]) => unknown)(path, ...rest);
+  }) as typeof fs.statSync);
+  syncBuiltinESMExports();
+  t.after(() => {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+  });
+  for (const value of ["\\\\192.0.2.1\\share", "//192.0.2.1/share", "\\\\192.0.2.1@SSL\\dav", "\\\\192.0.2.1\\share\\project"]) {
+    assert.deepEqual(projectFolder(value, "C:\\work\\app", "win32"), { error: "project can't be a folder on another machine." }, value);
+  }
+  assert.deepEqual(stats.mock.calls.map((call) => String(call.arguments[0])).filter((path) => /^[\\/]{2}/.test(path)), []);
 });
 
 test("projectFolder: the rules without a server", () => {

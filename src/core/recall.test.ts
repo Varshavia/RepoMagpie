@@ -8,7 +8,7 @@ import { copyFolder, removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { linkIndex } from "./links.ts";
 import { forgetParsed } from "./note-cache.ts";
-import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, type RecallSource } from "./recall.ts";
+import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, runRecall, type RecallSource } from "./recall.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
 // Recall (spec §2 recall, §5 matching) over journals in scratch folders.
@@ -29,6 +29,16 @@ const sources = (...journals: [RecallSource["scope"], string][]): RecallSource[]
 const ids = (matches: { journal: string; id: string; confidence: string }[]) => matches.map((m) => `${m.journal} ${m.id} ${m.confidence}`);
 
 const PDFKIT = note({ id: "pkg:npm/pdfkit", verdict: "avoid: async streams painful; use puppeteer", avoidWhen: ["you need streamed output for large PDFs"] });
+
+// A note over 256 KB isn't read (decision 0032 rule 6): recall --json says which, so "no note" is
+// never the whole answer.
+test("recall's document names the note files it couldn't read because they are over 256 KB", () => {
+  const big = PDFKIT.replace("## Verdict", `## My notes\n${"x".repeat(300 * 1024)}\n\n## Verdict`);
+  const path = journal({ "github--evil--thing.md": big, "npm--zod.md": note({ id: "pkg:npm/zod" }) });
+  const run = runRecall(["pdfkit"], "npm", { home: scratchBase("recall-home"), env: { MAGPIE_HOME: path }, cwd: scratchBase("recall-cwd") });
+  assert.deepEqual(run.document.matches, []);
+  assert.deepEqual(run.document.skipped, [`${join(path, "notes", "github--evil--thing.md")} is over 256 KB`]);
+});
 
 test("exact: a note whose id has the same type and name; the version and extras are dropped", () => {
   const s = sources(["personal", journal({ "npm--pdfkit.md": PDFKIT })]);

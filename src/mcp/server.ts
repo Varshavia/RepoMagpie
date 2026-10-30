@@ -8,7 +8,7 @@ import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/server/valida
 import { catalogForAgent, compactForAgent, runCatalog } from "../core/catalog.ts";
 import { DOMAIN_IDS, DOMAIN_LIMIT, DOMAINS } from "../core/domains.ts";
 import type { PackageType } from "../core/identity.ts";
-import type { Place } from "../core/journals.ts";
+import { usable, type Place } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
 import { takeSkipped } from "../core/note-cache.ts";
 import type { Outcome } from "../core/outcome.ts";
@@ -206,12 +206,14 @@ export function buildServer(options: McpOptions): McpServer {
 // argument, or the server's own folder. An absolute path without "..", control characters or a
 // Windows device name, to a folder that exists.
 const DEVICE = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i;
-export function projectFolder(value: unknown, cwd: string): { cwd: string } | { error: string } {
+export function projectFolder(value: unknown, cwd: string, platform = process.platform): { cwd: string } | { error: string } {
   if (value === undefined) return { cwd };
   if (typeof value !== "string" || !value) return { error: "project must be a folder's absolute path." };
   if (value.length > LIMITS.project) return { error: `project is longer than ${LIMITS.project} characters.` };
   if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) return { error: "project holds a control character." };
   if (/^[\\/]{2}[?.][\\/]/.test(value)) return { error: "project can't be a device path." };
+  // Looking connects to that machine and sends it the user's Windows sign-in hash, as the hooks know.
+  if (!usable(value, cwd, platform)) return { error: "project can't be a folder on another machine." };
   if (!isAbsolute(value)) return { error: "project must be an absolute path." };
   const parts = value.split(/[\\/]+/);
   if (parts.includes("..")) return { error: "project can't contain \"..\"." };

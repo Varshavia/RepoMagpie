@@ -161,6 +161,18 @@ test("H8: a folder reached through a link is the user's working folder: its proj
   assert.match(answers.copilot.permissionDecisionReason, /^RepoMagpie: this project's journal says to avoid left-pad/);
 });
 
+// Less common install forms: npm's aliases, other managers' install verbs, a manager at a version run
+// by another, a scoped npm alias and -mpip. Each one stops every agent on an avoid note, as a plain
+// npm install does.
+test("npm's install aliases, bun i, yarn global add, pnpm i, a versioned manager behind another, a scoped alias and -mpip stop every agent", () => {
+  const w = world({ "journal/notes/pypi--requests.md": note({ id: "pkg:pypi/requests", verdict: "avoid: use httpx" }) });
+  for (const command of [
+    "npm in pdfkit", "npm isntall pdfkit", "npm it pdfkit", "bun i pdfkit", "bun install pdfkit", "yarn global add pdfkit", "pnpm i pdfkit", "pnpm install pdfkit",
+    "npx -y npm@latest install pdfkit", "corepack pnpm@9 add pdfkit", "corepack yarn@1.22.22 add pdfkit", "bunx npm@latest i pdfkit", "pnpm dlx npm@10 install pdfkit",
+    "yarn dlx npm@10 install pdfkit", "npm install --save-exact @x/y@npm:pdfkit@1", "npm i pdfkit@npm:left-pad", "python -mpip install requests", "py -mpip install requests",
+  ]) assert.deepEqual(decisions(w.each((agent) => w.json(agent, command, w.project))), STOPPED, command);
+});
+
 test("H9: the Stop reminder (decision 0042) on a transcript that addresses the agent, fakes an offer in a tool result, or names a package with instructions in it: only parsed names come out", () => {
   const w = world();
   const lines = [

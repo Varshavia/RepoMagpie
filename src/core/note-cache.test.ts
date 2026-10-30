@@ -43,6 +43,33 @@ function journal(): string {
 
 const tmpFiles = (root: string) => (existsSync(join(root, ".cache")) ? readdirSync(join(root, ".cache")).filter((name) => name.endsWith(".tmp")) : []);
 
+// A teammate can commit a file or link at a cache's temporary name. The temporary file is
+// created new, under a name nobody can guess, so whatever sits at the old pid-only name is left alone.
+test("writeCache never writes into or moves a file already at the pid-only temporary name", () => {
+  const root = journal();
+  mkdirSync(join(root, ".cache"));
+  const planted = join(root, ".cache", `x.json.${process.pid}.tmp`);
+  writeFileSync(planted, "original");
+  writeCache(root, "x.json", 1, {}, { ok: true });
+  assert.equal(readFileSync(planted, "utf8"), "original");
+  assert.deepEqual(readCache(root, "x.json", 1, {}), { ok: true });
+});
+
+test("writeCache never writes through a link at the pid-only temporary name", (t) => {
+  const root = journal();
+  mkdirSync(join(root, ".cache"));
+  const outside = join(root, "..", "outside.txt");
+  writeFileSync(outside, "original");
+  try {
+    symlinkSync(outside, join(root, ".cache", `x.json.${process.pid}.tmp`));
+  } catch {
+    return t.skip("no symbolic links here (Windows without the privilege); the test above covers the exclusive create");
+  }
+  writeCache(root, "x.json", 1, {}, { ok: true });
+  assert.equal(readFileSync(outside, "utf8"), "original");
+  assert.equal(fs.lstatSync(join(root, ".cache", "x.json")).isSymbolicLink(), false);
+});
+
 for (const code of ["EPERM", "EACCES", "EBUSY"]) {
   test(`writeCache: a rename held twice (${code}) is tried again, and the cache is written`, (t) => {
     const root = journal();

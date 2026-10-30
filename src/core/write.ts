@@ -490,14 +490,23 @@ export interface ItemsResult extends EditResult {
 // ignoring case, isn't added again. A section the edit can't safely reach is left alone, with a
 // warning: one that appears twice, or holds a code fence or a comment that doesn't close.
 export function addSectionItems(text: string, name: "Use when" | "Avoid when", items: string[]): ItemsResult {
-  const result = (edit: EditResult, added: string[] = [], present: string[] = [], replacedDraft = false): ItemsResult =>
-    edit.warnings.length ? { ...edit, added: [], present: [], replacedDraft: false } : { ...edit, added, present, replacedDraft };
+  const refuse = (why: string) => result(untouched(text, `The note's "${name}" section ${why}, so nothing was written; edit the file instead.`));
+  // The note as read must show every added item in the section: an earlier section's fence that
+  // doesn't close (```chalk``` is fine reads as one) would hide them, and the CLI would claim an
+  // ask the hook never makes.
+  const result = (edit: EditResult, added: string[] = [], present: string[] = [], replacedDraft = false): ItemsResult => {
+    if (edit.warnings.length) return { ...edit, added: [], present: [], replacedDraft: false };
+    if (added.length) {
+      const shown = readNote(edit.text).sections.filter((s) => s.name === name).flatMap((s) => sectionItems(s.body).map((item) => item.toLowerCase()));
+      if (!added.every((item) => shown.includes(item.toLowerCase()))) return refuse("would be inside a code fence or comment that doesn't close earlier in the note");
+    }
+    return { ...edit, added, present, replacedDraft };
+  };
   const bounds = readableFrontmatter(text);
   if (!bounds) return result(untouched(text, "The note has no readable frontmatter; it was left unchanged."));
   const lines = text.split("\n");
   const headings = findHeadings(lines, bodyStart(text, bounds));
   const found = headings.flatMap((h, k) => (h.name === name.toLowerCase() ? [k] : []));
-  const refuse = (why: string) => result(untouched(text, `The note's "${name}" section ${why}, so nothing was written; edit the file instead.`));
   if (found.length > 1) return refuse("appears more than once");
 
   const wanted: string[] = [];

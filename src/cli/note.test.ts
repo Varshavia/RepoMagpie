@@ -547,6 +547,21 @@ test("an existing note: an empty section gets the items; one with items keeps ev
   assert.equal(readFileSync(path, "utf8"), before.replace("A line I wrote by hand.\n", "A line I wrote by hand.\n- receipts\n"));
 });
 
+// "```chalk``` is fine" renders as inline code on GitHub but opens a fence for RepoMagpie,
+// so an Avoid when section added after it would be inside the fence and never ask.
+test("an Avoid when item that would land inside a fence that doesn't close is refused: no file change, no \"will ask\"", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  await magpie(box, ["note", "chalk", "--json"]);
+  const path = box.note("npm--chalk.md");
+  const text = readFileSync(path, "utf8").replace(/## Use when\n/, "## Use when\n```chalk``` is fine for colours\n").replace(/## Avoid when\n[^#]*/, "");
+  writeFileSync(path, text);
+  const r = await magpie(box, ["note", "chalk", "--avoid-when", "never in production"]);
+  assert.notEqual(r.code, 0);
+  assert.match(r.err, /"Avoid when" section would be inside a code fence or comment that doesn't close earlier in the note, so nothing was written/);
+  assert.doesNotMatch(r.err, /will ask/);
+  assert.equal(readFileSync(path, "utf8"), text);
+});
+
 test("an existing note with a drafted Use when: the user's items replace the draft", async () => {
   const drafted = renderNote({ id: "pkg:npm/pdfkit", name: "pdfkit", explored: "2026-10-24", kind: "library", tags: [], useWhen: ["an agent's guess"], drafts: ["Use when"] });
   const box = sandbox({ "project/package.json": "{}", "journal/notes/npm--pdfkit.md": drafted });

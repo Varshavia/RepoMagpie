@@ -159,6 +159,20 @@ test("hidden characters: search results and Check a package show the markers too
   expect(await card.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
 });
 
+// Add's preview of a note that exists shows its name and Verdict, which may be a
+// repository's text: markers and the warning, never a raw character.
+test("hidden characters: Add's preview of an existing note shows markers and the warning", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel("Package, PURL or GitHub URL").fill("pkg:npm/hidden");
+  await page.getByRole("button", { name: "Preview" }).click();
+  const preview = page.locator('section[aria-label="Preview"]');
+  await expect(preview.getByText("This note contains hidden or control characters")).toBeVisible();
+  await expect(preview).toContainText(SHOWN_VERDICT);
+  expect(await preview.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);
+});
+
 test("hidden characters: a Use when item typed in Add shows markers in the form, is written as typed, and shows markers on the note", async ({ page, magpie }) => {
   const typed = `invoices ${ch(0x202e)}fdp${ch(0x07)}`;
   await magpie.open(page);

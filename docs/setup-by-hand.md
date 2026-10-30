@@ -49,7 +49,7 @@ Add this to `~/.claude/settings.json`, or to a project's `.claude/settings.json`
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash|PowerShell",
+      { "matcher": "Bash|PowerShell|Monitor",
         "hooks": [ { "type": "command", "command": "repomagpie hook claude-code" } ] }
     ]
   }

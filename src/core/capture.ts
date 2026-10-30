@@ -4,7 +4,8 @@
 import { PackageURL } from "packageurl-js";
 import { suggestDomains } from "./domains.ts";
 import { draftKind, readmeOpening, type RepoMetadata } from "./github.ts";
-import { readNote, type SectionName } from "./note.ts";
+import { readNote, sectionItems, type SectionName } from "./note.ts";
+import { clean } from "./text.ts";
 import { topicTags, type KnownTags } from "./topic-tags.ts";
 import { addSectionItems, appendSkillLine, renderNote, setDomains, setToolFields, setVerdict } from "./write.ts";
 
@@ -92,7 +93,7 @@ function create(input: CaptureInput): Capture {
     domains,
     domainsSuggested,
     verdict: input.verdict,
-    whatItDoes: m?.description ?? (m?.readme ? readmeOpening(m.readme).sentence : null) ?? undefined,
+    whatItDoes: plainLine(m?.description ?? (m?.readme ? readmeOpening(m.readme).sentence : null)),
     useWhen: useWhen.length ? useWhen : input.useWhen,
     avoidWhen: avoidWhen.length ? avoidWhen : input.avoidWhen,
     myNotes: input.myNotes,
@@ -116,13 +117,24 @@ function update(existing: string, input: CaptureInput): Capture {
   let text = existing;
   const m = input.metadata;
   if (m) {
+    // A PURL the manifests no longer name stays while the note has the user's own Verdict or Avoid
+    // when: dropping it would end their avoid note on that package.
+    let packages = m.packages;
+    const had = Array.isArray(before.frontmatter.packages) ? before.frontmatter.packages.filter((p): p is string => typeof p === "string") : [];
+    const human = before.verdict !== "" || before.sections.some((s) => s.name === "Avoid when" && !s.draft && sectionItems(s.body).length > 0);
+    const dropped = packages ? had.filter((p) => !packages?.includes(p)) : [];
+    if (packages && dropped.length && human) {
+      packages = [...packages, ...dropped];
+      const one = dropped.length === 1;
+      warnings.push(`${dropped.join(", ")} ${one ? "is" : "are"} no longer in the repository's manifests; the note keeps ${one ? "it" : "them"} because it has your Verdict or Avoid when. Remove ${one ? "it" : "them"} from packages in the note if that's right.`);
+    }
     const fields = setToolFields(text, {
       name: m.name,
       url: m.url,
       language: m.language,
       license: m.license,
       topics: m.topics,
-      ...(m.packages ? { packages: m.packages } : {}),
+      ...(packages ? { packages } : {}),
     });
     text = fields.text;
     warnings.push(...fields.warnings);
@@ -188,6 +200,17 @@ function registryUrl(purl: string, name: string): string {
   return `https://crates.io/crates/${name}`;
 }
 
+// A skill URL's last part, for create and update alike: it is the link's text (decision 0032 rule 8),
+// so hidden characters become markers, a line break a space, and a backtick, which
+// would end the skill's code span, a quote.
 function skillName(skillPath: string | undefined): string | undefined {
-  return skillPath?.split("/").filter((part) => part).at(-1);
+  const last = skillPath?.split("/").filter((part) => part).at(-1);
+  return last === undefined ? undefined : clean(last).replace(/`/g, "'").trim() || undefined;
+}
+
+// A repository's description, or its README's first sentence, as What it does: one line that
+// can't start a heading or a fence, so it adds no section to the note.
+function plainLine(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  return clean(text).trim().replace(/^(#|```|~~~)/, "\\$1");
 }

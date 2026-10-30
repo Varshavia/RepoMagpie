@@ -5,6 +5,7 @@ import { api, type ApiError, type NotePreviewJson, type PackageType, type SavedN
 import { Icon } from "../icons.tsx";
 import { addTopicSuggestions, oneLine, withItem } from "../logic/edits.ts";
 import { packageLabel, readablePurl } from "../logic/schema.ts";
+import { hasHidden, visible } from "../logic/text.ts";
 import { IS_MAC, MOD } from "../platform.ts";
 import { Banner, DraftBadge, FieldError } from "./common.tsx";
 import { ItemsField, JournalChoice, TopicChips, TypeChoice, type ProjectState } from "./fields.tsx";
@@ -207,14 +208,22 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
   );
 }
 
+// Every string shown comes from a note or a repository (an existing project note is the
+// repository's text): hidden characters show as markers, with a warning (decision 0032 rule 1).
 function Preview({ preview, tags, onRemoveTag, onOpen, children }: { preview: NotePreviewJson; tags: string[]; onRemoveTag?: (tag: string) => void; onOpen: () => void; children?: ReactNode }) {
   const packages = preview.packages.map((p) => packageLabel(p).name);
-  const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...packages].filter((c): c is string => Boolean(c));
-  const id = preview.id && readablePurl(preview.id);
+  const chips = [preview.kind, preview.license === "unknown" ? "licence unknown" : preview.license, preview.language, ...packages].filter((c): c is string => Boolean(c)).map(visible);
+  const id = preview.id && visible(readablePurl(preview.id));
+  const name = preview.name === null ? null : visible(preview.name);
   return (
     <section className="page-section preview" aria-label="Preview">
+      {hasHidden([preview, tags]) ? (
+        <Banner tone="warning">
+          This note contains hidden or control characters. They show here as markers such as &lt;U+202E&gt;, so the text reads as it is stored.
+        </Banner>
+      ) : null}
       <div className="note-title-row">
-        <h2 className="preview-name">{preview.name ?? id}</h2>
+        <h2 className="preview-name">{name ?? id}</h2>
         <span className="badge plain">{preview.exists ? "Already in this journal" : "New note"}</span>
       </div>
       <p className="mono note-purl">{id}</p>
@@ -227,7 +236,7 @@ function Preview({ preview, tags, onRemoveTag, onOpen, children }: { preview: No
             </button>
           }
         >
-          {`This note already has a Verdict: “${preview.verdict}”. Edit it in the note.`}
+          {`This note already has a Verdict: “${visible(preview.verdict)}”. Edit it in the note.`}
         </Banner>
       ) : null}
       {preview.what_it_does ? (
@@ -236,7 +245,7 @@ function Preview({ preview, tags, onRemoveTag, onOpen, children }: { preview: No
             <h3 className="section-label">What it does</h3>
             <DraftBadge />
           </div>
-          <p>{preview.what_it_does}</p>
+          <p>{visible(preview.what_it_does)}</p>
         </div>
       ) : null}
       {chips.length || tags.length ? (
@@ -249,24 +258,24 @@ function Preview({ preview, tags, onRemoveTag, onOpen, children }: { preview: No
           {tags.map((t) =>
             onRemoveTag ? (
               <li key={t} className="chip tag removable">
-                <span translate="no">{t}</span>
-                <button type="button" className="chip-remove" onClick={() => onRemoveTag(t)} aria-label={`Remove tag ${t}`} title="Remove">
+                <span translate="no">{visible(t)}</span>
+                <button type="button" className="chip-remove" onClick={() => onRemoveTag(t)} aria-label={`Remove tag ${visible(t)}`} title="Remove">
                   <Icon name="x" size={12} />
                 </button>
               </li>
             ) : (
               <li key={t}>
-                <span className="chip tag">{t}</span>
+                <span className="chip tag">{visible(t)}</span>
               </li>
             ),
           )}
         </ul>
       ) : null}
       {children}
-      {preview.skills.length ? <p className="field-help">{`${preview.skills.length} ${preview.skills.length === 1 ? "skill" : "skills"}: ${preview.skills.join(", ")}`}</p> : null}
+      {preview.skills.length ? <p className="field-help">{`${preview.skills.length} ${preview.skills.length === 1 ? "skill" : "skills"}: ${preview.skills.map(visible).join(", ")}`}</p> : null}
       {preview.warnings.map((w) => (
         <Banner tone="warning" key={w}>
-          {w}
+          {visible(w)}
         </Banner>
       ))}
     </section>
