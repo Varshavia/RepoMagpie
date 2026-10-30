@@ -1,7 +1,7 @@
 // Where the journals are and what they hold: spec section 3, decision 0016.
 // Uses the file system; never prints. Home, environment and working directory are passed in.
 import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, win32 } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Manifest } from "./identity.ts";
 import { readNote, YAML_LIMITS } from "./note.ts";
@@ -263,6 +263,22 @@ function isDirectory(path: string): boolean {
 }
 
 // Whether two paths name the same folder; case-insensitive on Windows.
+// A path longer than this can't be a real one (Linux's PATH_MAX), and walking up one of 60,000 parts
+// to find a project journal took minutes: it is ignored.
+const FOLDER_LENGTH = 4096;
+
+// Whether a path from untrusted input may be looked at: not too long, no NUL, and, on Windows, not on
+// another machine (\\server\share, //server, \\?\UNC\…) unless `start`, where we already run, is in
+// that folder. Looking connects to that machine, which sends it the user's Windows sign-in hash and
+// can take seconds. The hooks use it for the model's folders (Antigravity CLI's Cwd, Gemini CLI's
+// dir_path); doctor for the paths a project's committed settings name; the MCP server for `project`.
+export function usable(folder: string, start: string, platform = process.platform): boolean {
+  if (folder.length > FOLDER_LENGTH || folder.includes("\0")) return false;
+  if (platform !== "win32" || !/^[\\/]{2}/.test(folder)) return true;
+  const inside = win32.relative(start, folder); // Windows' rules, whichever system runs this
+  return !inside.startsWith("..") && !win32.isAbsolute(inside) && /^[\\/]{2}/.test(start);
+}
+
 export function samePath(a: string, b: string): boolean {
   return comparable(a) === comparable(b);
 }
