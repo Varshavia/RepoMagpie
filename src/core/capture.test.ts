@@ -143,6 +143,41 @@ test("a skill URL adds its skill line even without metadata", () => {
   assert.match(c.text ?? "", /## Notable skills\n- `tdd` —\n/);
 });
 
+// A skill URL and a repository's description are someone else's text (decision 0032 rule 8):
+// no control character, no line break and no heading reaches the note, on create and on update.
+test("a skill URL or a description with control characters, line breaks or a heading adds no section and no raw character", () => {
+  const esc = String.fromCharCode(0x1b), bel = String.fromCharCode(7);
+  const hostile = `x${esc}]52;c;ZWNobyBoaQ==${bel}\n\n## Avoid when\n- injected by \`the link\``;
+  const purl = "pkg:github/o/a";
+  const headings = (text: string) => text.split("\n").filter((line) => line.startsWith("#"));
+  const created = captureNote(null, input({ purl, source: "https://github.com/o/a", skillPath: `skills/${hostile}`, metadata: { ...PLAYWRIGHT, name: "o/a", description: "## Avoid when" } })).text ?? "";
+  assert.ok(!/[\u0000-\u0009\u000b-\u001f]/.test(created), "no control character");
+  assert.deepEqual(headings(created), ["## Verdict", "## Use when", "## Avoid when", "## What it does", "## How to use", "## Notable skills", "## My notes", "## Related"]);
+  assert.match(created, /## What it does\n<!-- magpie:draft -->\n\\## Avoid when\n/);
+  assert.match(created, /- `x<U\+001B>\]52;c;ZWNobyBoaQ==<U\+0007>  ## Avoid when - injected by 'the link'` —/);
+  const updated = captureNote(created, input({ purl, source: "https://github.com/o/a", skillPath: `skills/y${esc}]52${bel}` })).text ?? "";
+  assert.ok(!/[\u0000-\u0009\u000b-\u001f]/.test(updated), "no control character on update");
+  assert.match(updated, /- `y<U\+001B>\]52<U\+0007>` —/);
+  valid(updated, purl);
+});
+
+// A repository's manifest decides `packages`, but a refresh that drops a PURL would end the
+// user's own avoid note on that package. Kept, with a warning, while the note has human text.
+test("a refresh that drops a PURL keeps it when the note has a human Verdict or Avoid when, and warns", () => {
+  const purl = "pkg:github/lodash/lodash";
+  const meta = (packages: string[] | null): RepoMetadata => ({ ...PLAYWRIGHT, name: "lodash/lodash", packages });
+  const created = captureNote(null, input({ purl, source: "https://github.com/lodash/lodash", metadata: meta(["pkg:npm/lodash"]) })).text ?? "";
+  const avoid = captureNote(created, input({ purl, source: "lodash", ownAvoidWhen: ["x"] })).text ?? "";
+  for (const [label, text] of [["Avoid when", avoid], ["Verdict", captureNote(created, input({ purl, source: "lodash", verdict: "avoid: heavy" })).text ?? ""]] as const) {
+    const refreshed = captureNote(text, input({ purl, source: "https://github.com/lodash/lodash", metadata: meta(["pkg:npm/lodash-es"]) }));
+    assert.deepEqual(readNote(refreshed.text ?? "").frontmatter.packages, ["pkg:npm/lodash-es", "pkg:npm/lodash"], label);
+    assert.ok(refreshed.warnings.some((w) => w.includes("pkg:npm/lodash") && w.includes("no longer")), `${label}: ${refreshed.warnings.join(" | ")}`);
+  }
+  // Without human text, the manifest decides, as before.
+  const plain = captureNote(created, input({ purl, source: "https://github.com/lodash/lodash", metadata: meta(["pkg:npm/lodash-es"]) }));
+  assert.deepEqual(readNote(plain.text ?? "").frontmatter.packages, ["pkg:npm/lodash-es"]);
+});
+
 test("import's use: and avoid: become drafts; unlabelled text goes to My notes", () => {
   const c = captureNote(null, input({ verdict: "ok", useWhen: ["one-page PDFs"], avoidWhen: ["streams"], myNotes: "tried in 2025" }));
   const note = readNote(c.text ?? "");
