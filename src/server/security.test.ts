@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
 import { noteVersion } from "../core/edit.ts";
+import { escapeRegExp } from "../core/text.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import { client, send, type Reply } from "./fixtures/http.ts";
 import { startServer } from "./server.ts";
@@ -78,13 +79,13 @@ test("the opening URL's token works once: used again, it gets a page that says s
   assert.match(String(page.headers["content-type"]), /^text\/html/);
   assert.equal(page.headers["set-cookie"], undefined);
   assert.match(page.body, /already used/);
-  assert.match(page.body, new RegExp(`http://127\\.0\\.0\\.1:${server.port}/`));
+  assert.match(page.body, new RegExp(escapeRegExp(`http://127.0.0.1:${server.port}/`)));
   assert.match(page.body, /start repomagpie ui again/);
   const api = await send(server.port, { path: `/?token=${server.token}`, headers: { host } });
   assert.equal(api.status, 401);
   const { error } = JSON.parse(api.body) as { error: string };
   assert.match(error, /already used/);
-  assert.match(error, new RegExp(`http://127\\.0\\.0\\.1:${server.port}/`));
+  assert.match(error, new RegExp(escapeRegExp(`http://127.0.0.1:${server.port}/`)));
 });
 
 test("a wrong token doesn't use up the opening URL's token", async (t) => {
@@ -346,10 +347,10 @@ test("Content-Security-Policy and the other headers", async (t) => {
 test("the page carries the token in a meta tag only for a request with the session cookie", async (t) => {
   const { http, server } = await start(t);
   const page = await http.get("/");
-  assert.match(page.body, new RegExp(`<meta name="magpie-token" content="${server.writeToken}">`));
+  assert.match(page.body, new RegExp(escapeRegExp(`<meta name="magpie-token" content="${server.writeToken}">`)));
   const without = await http.get("/", { cookie: undefined });
   assert.equal(without.status, 401);
-  assert.doesNotMatch(without.body, new RegExp(server.writeToken));
+  assert.doesNotMatch(without.body, new RegExp(escapeRegExp(server.writeToken)));
 });
 
 test("GITHUB_TOKEN never reaches the browser: no response contains its value", async (t) => {
