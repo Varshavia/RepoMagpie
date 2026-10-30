@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.17] - 2026-10-30
+
+The eighteenth pre-release: security fixes, and the hook sees more ways of installing a package. Update, then run `repomagpie setup` again, so Claude Code's hook also covers its Monitor tool.
+
 ### Fixed
 
 - The hook now sees more ways of installing a package: npm's other install names (`npm in`, `npm isntall`, `npm it`, …), `pnpm i` and `pnpm install`, `bun i` and `bun install`, `yarn global add`, `python -mpip install`, a manager at a version run through `npx`, `bunx`, `corepack`, `pnpm dlx` or `yarn dlx` (`npx npm@latest install …`), and an npm alias, which is now looked up under both names.
@@ -354,7 +358,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.16...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.17...HEAD
+[0.2.0-beta.17]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.16...v0.2.0-beta.17
 [0.2.0-beta.16]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...v0.2.0-beta.16
 [0.2.0-beta.15]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.14...v0.2.0-beta.15
 [0.2.0-beta.14]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.13...v0.2.0-beta.14
