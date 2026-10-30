@@ -56,7 +56,7 @@ test("--json prints the spec's document", async () => {
   const r = await magpie(box, ["recall", "pdfkit", "--json"]);
   assert.equal(r.err, "");
   const json = JSON.parse(r.out);
-  assert.deepEqual(Object.keys(json), ["matches"]);
+  assert.deepEqual(Object.keys(json), ["matches", "skipped"]);
   assert.deepEqual(json.matches[1], {
     query: "pdfkit",
     id: "pkg:npm/pdfkit",
@@ -88,7 +88,7 @@ test("no match: nothing on stdout, a short message on stderr, exit 0; --json giv
   const box = sandbox(FILES);
   const r = await magpie(box, ["recall", "left-pad"]);
   assert.deepEqual([r.code, r.out, r.err], [0, "", "No note for left-pad.\n"]);
-  assert.deepEqual(JSON.parse((await magpie(box, ["recall", "left-pad", "--json"])).out), { matches: [] });
+  assert.deepEqual(JSON.parse((await magpie(box, ["recall", "left-pad", "--json"])).out), { matches: [], skipped: [] });
 });
 
 test("several packages: each query's matches in turn; a query without a note is reported on stderr", async () => {

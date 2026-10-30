@@ -102,7 +102,9 @@ export async function fetchRepository(purl: string, options: Options): Promise<R
     const listing = JSON.parse(tree.text) as { truncated?: boolean; tree?: { path: string; type: string }[] };
     const files = (listing.tree ?? []).filter((entry) => entry.type === "blob").map((entry) => entry.path);
     if (listing.truncated) warnings.push(`GitHub's file list for ${info.full_name} was cut short; some skills may be missing.`);
-    metadata.skills = skillNames(files, info.full_name).map(text).filter(Boolean);
+    const skills = skillNames(files, info.full_name).map(text).filter(Boolean);
+    if (skills.length > SKILL_CAP) warnings.push(`${metadata.name} has ${skills.length.toLocaleString("en-US")} skills; the note lists the first ${SKILL_CAP}.`);
+    metadata.skills = skills.slice(0, SKILL_CAP);
     metadata.skillFolders = countSkillFolders(files);
     metadata.plugin = files.includes(".claude-plugin/plugin.json") || files.includes(".claude-plugin/marketplace.json");
     metadata.action = files.includes("action.yml") || files.includes("action.yaml");
@@ -409,6 +411,11 @@ function validationDetail(body: string): string {
 }
 
 // One name per SKILL.md: the folder that holds it; a root SKILL.md takes the repository's name.
+// The most skill names a note lists: a repository's file list is its owner's, and a note
+// over 256 KB isn't read at all (decision 0032 rule 6), so its Verdict would be lost. 200 names of
+// GitHub's longest folder names (255 bytes) and their lines stay under 64 KB.
+export const SKILL_CAP = 200;
+
 function skillNames(files: string[], fullName: string): string[] {
   const names = files
     .filter((path) => path === "SKILL.md" || path.endsWith("/SKILL.md"))

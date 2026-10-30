@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { countSkillFolders, draftKind, fetchRepository, kindFromTopics, manifestKeywords, packageFromManifest, readmeOpening, readmeStart, rootFolders, type Fetch, type FetchProblem } from "./github.ts";
+import { countSkillFolders, draftKind, fetchRepository, kindFromTopics, manifestKeywords, packageFromManifest, readmeOpening, readmeStart, rootFolders, SKILL_CAP, type Fetch, type FetchProblem } from "./github.ts";
 
 // Recorded GET responses (src/core/fixtures/github/); no test touches the network.
 function recorded(name: string): Record<string, unknown> {
@@ -61,6 +61,21 @@ test("a hostile repository's control, bidi and zero-width characters reach a not
 });
 
 // --- metadata from recorded responses ---
+
+// A repository's file list is the owner's: a note keeps at most SKILL_CAP skill names, so
+// a note made or refreshed from GitHub stays far under the 256 KB the readers allow.
+test("a file list with thousands of SKILL.md folders gives at most SKILL_CAP skill names, and a warning", async () => {
+  const tree = Array.from({ length: 1100 }, (_, i) => ({ path: `skills/${String(i).padStart(5, "0")}-${"s".repeat(234)}/SKILL.md`, type: "blob" }));
+  const responses = {
+    "/repos/evil/thing": { full_name: "evil/thing", html_url: "https://github.com/evil/thing", description: "Agent skills", default_branch: "main", topics: [] },
+    "/repos/evil/thing/git/trees/main?recursive=1": { truncated: false, tree },
+  };
+  const r = await fetchRepository("pkg:github/evil/thing", { fetch: fakeFetch(responses) });
+  assert.ok(r.ok);
+  assert.equal(r.metadata.skills?.length, SKILL_CAP);
+  assert.equal(r.metadata.skillFolders, 1100); // the kind still sees them all
+  assert.ok(r.warnings.includes(`evil/thing has 1,100 skills; the note lists the first ${SKILL_CAP}.`), r.warnings.join("\n"));
+});
 
 test("playwright-cli: metadata, skills by folder name, package and bin from the root package.json", async () => {
   const r = await fetchRepository(PLAYWRIGHT, { fetch: fakeFetch(recorded("microsoft--playwright-cli")) });

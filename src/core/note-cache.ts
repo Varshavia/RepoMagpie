@@ -73,11 +73,12 @@ export function takeSkipped(): string[] {
 // is a link gives none; a note that is a link or over the size limit is left out. Both are skipped
 // for the report, and listed in `skipped` for the local app. `folderName` lists another flat folder of
 // the journal by the same rules: the trash (decision 0037).
-export function noteSignature(journal: string, folderName = "notes"): { files: string[]; signature: Signature; skipped: string[] } {
+export function noteSignature(journal: string, folderName = "notes"): { files: string[]; signature: Signature; skipped: string[]; tooBig: string[] } {
   const folder = join(journal, folderName);
   const files: string[] = [];
   const signature: Signature = {};
   const skipped: string[] = [];
+  const tooBig: string[] = []; // the paths of the notes over the size limit, for recall and the hook
   const left = (problem: PathProblem) => {
     skip(problem);
     skipped.push(problem.message);
@@ -85,7 +86,7 @@ export function noteSignature(journal: string, folderName = "notes"): { files: s
   const problem = journalPathProblem(journal, folder, false);
   if (problem) {
     left(problem);
-    return { files, signature, skipped };
+    return { files, signature, skipped, tooBig };
   }
   let names: string[];
   try {
@@ -102,13 +103,15 @@ export function noteSignature(journal: string, folderName = "notes"): { files: s
       continue; // gone since the folder was read
     }
     if (stats.isSymbolicLink()) left(linkProblem(path));
-    else if (stats.isFile() && stats.size > NOTE_SIZE_LIMIT) left(sizeProblem(path));
-    else if (stats.isFile()) {
+    else if (stats.isFile() && stats.size > NOTE_SIZE_LIMIT) {
+      left(sizeProblem(path));
+      tooBig.push(path);
+    } else if (stats.isFile()) {
       files.push(name);
       signature[name] = [stats.mtimeMs, stats.size];
     }
   }
-  return { files, signature, skipped };
+  return { files, signature, skipped, tooBig };
 }
 
 // A cache file's path, unless it or the cache folder is a link: then that cache is neither read nor
@@ -235,13 +238,19 @@ const RENAME_BUDGET = 50; // ms
 export function writeCache(journal: string, name: string, version: number, signature: Signature, data: unknown): void {
   const file = cacheFile(journal, name);
   if (!file) return;
-  const temporary = `${file}.${process.pid}.tmp`;
+  // A new file under a name nobody can guess: "wx" never writes into or through a file or
+  // link a teammate committed there; if it can't be created, the cache is skipped. node:crypto is
+  // loaded here, not imported: loading it costs every recall and hook run about 4 ms, and a warm
+  // run writes no cache.
+  const { randomBytes } = process.getBuiltinModule("node:crypto");
+  const temporary = `${file}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
   try {
     mkdirSync(join(journal, ".cache"), { recursive: true });
-    writeFileSync(temporary, JSON.stringify({ version, files: signature, data }));
+    writeFileSync(temporary, JSON.stringify({ version, files: signature, data }), { flag: "wx" });
     replaceFile(temporary, file);
-  } catch {
+  } catch (error) {
     // A cache that can't be written only costs time on the next run.
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return; // not ours: left alone
     try {
       removeFolder(temporary);
     } catch {

@@ -6,8 +6,8 @@ import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
 import { sectionItems, type Note } from "./note.ts";
-import { isRecord, isTextOrNull, isTexts, noteEntries } from "./note-cache.ts";
-import { CAPS, forAgent } from "./text.ts";
+import { isRecord, isTextOrNull, isTexts, noteEntries, noteSignature } from "./note-cache.ts";
+import { CAPS, clean, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
@@ -35,6 +35,7 @@ export interface RecallSource {
   scope: "project" | "personal";
   path: string;
   entries: RecallEntry[];
+  tooBig?: string[]; // note files over 256 KB, not read (decision 0032 rule 6): their Verdicts are unknown
 }
 
 export interface RecallMatch {
@@ -70,9 +71,13 @@ export interface Alternative {
 export function openRecallSources(options: { home: string; env: Env; cwd: string; homeFlag?: string; projectFlag?: string }): { sources: RecallSource[]; warnings: string[] } {
   const personal = resolvePersonalJournal({ home: options.home, env: options.env, cwd: options.cwd, flag: options.homeFlag });
   const project = findProjectJournal({ cwd: options.cwd, home: options.home, personalJournal: personal.path, flag: options.projectFlag });
-  const sources: RecallSource[] = [{ scope: "personal", path: personal.path, entries: loadRecallEntries(personal.path).entries }];
+  const source = (scope: RecallSource["scope"], path: string): RecallSource => {
+    const { entries, tooBig } = loadRecallEntries(path);
+    return { scope, path, entries, tooBig };
+  };
+  const sources: RecallSource[] = [source("personal", personal.path)];
   if (project && !samePath(project, personal.path) && !samePath(project, homeJournal(options.home))) {
-    sources.unshift({ scope: "project", path: project, entries: loadRecallEntries(project).entries });
+    sources.unshift(source("project", project));
   }
   return { sources, warnings: personal.warnings };
 }
@@ -80,12 +85,13 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
 // One journal's entries, in file order. Each is cached per note file (noteEntries): a note added or
 // changed since is read again, alone, and so is one whose cached entry hasn't the expected shape, so a
 // damaged cache can't silence recall or the hook. `rebuilt`: some entry was read again from its note.
-export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean; derived: string[] } {
+export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean; derived: string[]; tooBig: string[] } {
   // An entry must name the note file it is kept for: a cache a repository committed can't send recall
   // to a file elsewhere, nor to another note (decision 0032). A note without a readable id is null.
   const valid = (e: unknown, file: string) => e === null || (isRecallEntry(e) && (e as RecallEntry).file === file);
-  const { files, data, derived } = noteEntries(journal, RECALL_CACHE, CACHE_VERSION, (file, parse) => entryOf(parse(), file), valid);
-  return { entries: files.flatMap((file) => data[file] ?? []), rebuilt: derived.length > 0, derived };
+  const listed = noteSignature(journal);
+  const { files, data, derived } = noteEntries(journal, RECALL_CACHE, CACHE_VERSION, (file, parse) => entryOf(parse(), file), valid, listed);
+  return { entries: files.flatMap((file) => data[file] ?? []), rebuilt: derived.length > 0, derived, tooBig: listed.tooBig };
 }
 
 function isRecallEntry(e: unknown): boolean {
@@ -243,7 +249,7 @@ function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[]
 const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];
 
 export interface RecallRun {
-  document: { matches: Omit<RecallMatch, "name">[] }; // the --json document (spec §2), for an agent
+  document: { matches: Omit<RecallMatch, "name">[]; skipped: string[] }; // the --json document (spec §2), for an agent
   results: { query: string; matches: RecallMatch[] }[]; // as read, for people
   warnings: string[];
 }
@@ -269,7 +275,9 @@ export function runRecall(queries: string[], type: PackageType | undefined, plac
   const { sources, warnings } = openRecallSources(place);
   const results = queries.map((query) => ({ query, matches: recall(sources, query, types) }));
   const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => matchForAgent(match));
-  return { document: { matches }, results, warnings };
+  // Notes not read for their size: their Verdicts are unknown, so no match isn't the whole answer.
+  const skipped = sources.flatMap((s) => s.tooBig ?? []).map((path) => clean(`${path} is over 256 KB`));
+  return { document: { matches, skipped }, results, warnings };
 }
 
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
