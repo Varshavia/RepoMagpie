@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The hook now sees more ways of installing a package: npm's other install names (`npm in`, `npm isntall`, `npm it`, …), `pnpm i` and `pnpm install`, `bun i` and `bun install`, `yarn global add`, `python -mpip install`, a manager at a version run through `npx`, `bunx`, `corepack`, `pnpm dlx` or `yarn dlx` (`npx npm@latest install …`), and an npm alias, which is now looked up under both names.
+- The Claude Code hook also runs on Claude Code's Monitor tool, which runs shell commands in the background. `repomagpie setup` adds `Monitor` to an existing hook entry, and `repomagpie doctor` names an entry without it.
+- A skill link's name and a repository's description go into a note as one plain line: hidden characters show as markers, and neither can add a heading to the note.
+- `repomagpie note --use-when` and `--avoid-when` refuse an item that a code fence left open earlier in the note would hide, instead of writing it and saying RepoMagpie will ask.
+- Add's preview in the app shows hidden characters in a note's name, Verdict and other text as markers such as `<U+202E>`, with a warning, as the note view does.
+- Refreshing a repository's note from GitHub keeps a package the repository's manifests no longer name when the note has your Verdict or Avoid when, and warns, so your avoid note still covers that package.
+- The hook quotes the path of a project note, as it quotes the note's text, so a file name in a repository's journal can't read as the hook's own words.
+
+### Security
+
+- `repomagpie adopt` and Adopt in the app no longer print an install command for a package name its registry wouldn't accept. A repository's manifest could name its package so that the printed command ran something else in your shell. Now you get a warning that names the package instead.
+- A note made or refreshed from GitHub lists at most 200 of a repository's skills, with a warning when there are more. A repository with thousands of skill folders could grow a note past 256 KB, and RepoMagpie doesn't read a note that size, so the hook ignored what you wrote in it. When a note is still over 256 KB, the hook and `recall --json` now say a note couldn't be read, instead of saying nothing.
+- On Windows, `repomagpie doctor` and `repomagpie mcp` never look at a folder on another machine (`\\server\share`) that a project's settings or an agent's `project` argument names, as the hooks already did. Looking there could send that machine your Windows sign-in hash.
+- RepoMagpie's caches in a journal's `.cache` folder are written to a new file with an unguessable name. A file or link committed to a repository's `.magpie/.cache/` can no longer make RepoMagpie write to a file outside the journal.
+
 ## [0.2.0-beta.16] - 2026-10-29
 
 The seventeenth pre-release: the graph opens faster, the hook and recall answer faster right after you change a note, and the README is shorter, with screenshots of today's app.
