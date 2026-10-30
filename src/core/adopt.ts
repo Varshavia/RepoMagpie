@@ -82,9 +82,15 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
   const { frontmatter, verdict } = readNote(text);
   const avoid = verdictSaysAvoid(verdict);
   const root = dirname(project.path);
-  const commands = avoid ? [] : (resolved.purl.startsWith("pkg:github/") ? source.packages : [resolved.purl])
-    .map((purl) => installCommand(purl, root))
-    .filter((command): command is string => command !== null);
+  const purls = avoid ? [] : resolved.purl.startsWith("pkg:github/") ? source.packages : [resolved.purl];
+  const commands: string[] = [];
+  const refused: string[] = [];
+  for (const purl of purls) {
+    const command = installCommand(purl, root);
+    const p = PackageURL.fromString(purl);
+    if (command) commands.push(command);
+    else if (p.type in REGISTRY_NAME) refused.push(`${p.toString()} isn't a valid ${p.type} package name, so no install command is shown for it.`);
+  }
   const install = commands.length === 1 ? commands[0] : null;
   return {
     outcome: "ok",
@@ -93,15 +99,26 @@ export async function runAdopt(request: AdoptRequest, context: Context, ask?: (q
     url: resolved.purl.startsWith("pkg:github/") ? repositoryUrl(resolved.purl) : null,
     avoid,
     notices,
-    warnings: [...warnings, ...copy.warnings],
+    warnings: [...warnings, ...copy.warnings, ...refused],
   };
 }
+
+// A name its registry would accept, checked before it goes into a command: a manifest name
+// is the repository owner's text, and the command is pasted into shells we don't know, so quoting
+// wouldn't do. npm: validate-npm-package-name's characters for a new name (capitals kept for old
+// names), at most 214; PyPI: PEP 508's name; Cargo: crates.io's. None may start with "-" or ".".
+const REGISTRY_NAME: Record<string, RegExp> = {
+  npm: /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i,
+  pypi: /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/i,
+  cargo: /^[a-z][a-z0-9_-]{0,63}$/i,
+};
 
 // The install command for a package (spec §2 adopt, step 5), from its PURL type and the lockfile in
 // the project root. A GitHub repository has none.
 export function installCommand(purl: string, projectRoot: string): string | null {
   const p = PackageURL.fromString(purl);
   const name = p.namespace ? `${p.namespace}/${p.name}` : p.name;
+  if (p.type in REGISTRY_NAME && (!REGISTRY_NAME[p.type].test(name) || name.length > 214)) return null;
   const has = (file: string) => existsSync(join(projectRoot, file));
   if (p.type === "npm") {
     const tool = has("pnpm-lock.yaml") ? "pnpm add" : has("yarn.lock") ? "yarn add" : has("bun.lock") || has("bun.lockb") ? "bun add" : "npm install";

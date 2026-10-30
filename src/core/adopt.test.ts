@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
+import { PackageURL } from "packageurl-js";
 import { installCommand, runAdopt } from "./adopt.ts";
 import { fakeFetch } from "./fixtures/fake-fetch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
@@ -193,6 +194,39 @@ test("never installs anything: only .magpie/ appears in the project", async () =
   await runAdopt({ target: "pdfkit" }, p.context);
   assert.deepEqual(readdirSync(p.project).sort(), [...before, ".magpie"].sort());
   assert.equal(readFileSync(join(p.project, "package.json"), "utf8"), "{}");
+});
+
+// A manifest name is the repository owner's text. Only a name its registry would accept goes
+// into a command; quoting wouldn't do, since the command is pasted into shells we don't know.
+test("a package name its registry wouldn't accept gets no install command", () => {
+  const root = scratchBase("names");
+  const hostile = ["x;{echo,pwned}", "a b", "x;rm -rf ~", "$(id)", "`id`", "x`id`", "x'y", 'x"y', "x\nid", "x\r\nid", "x|sh", "a&&calc", "x>out", "x$env:PATH", "x@(1)", "x;Invoke-Expression", "%TEMP%", "x^&calc", "-g", "--global", ".hidden", "~user", "x".repeat(215)];
+  for (const name of hostile) {
+    for (const type of ["npm", "pypi", "cargo"]) {
+      const purl = new PackageURL(type, null, name, null, null, null).toString();
+      assert.equal(installCommand(purl, root), null, `${type} ${JSON.stringify(name)}`);
+    }
+  }
+  assert.equal(installCommand(new PackageURL("npm", "@x;id", "y", null, null, null).toString(), root), null, "a hostile npm scope");
+  for (const [purl, expected] of [
+    ["pkg:npm/left-pad", "npm install left-pad"],
+    ["pkg:npm/%40types/node", "npm install @types/node"],
+    ["pkg:npm/lodash.merge", "npm install lodash.merge"],
+    ["pkg:pypi/zope.interface", "pip install zope.interface"],
+    ["pkg:pypi/typing_extensions", "pip install typing-extensions"], // the PURL normalises the name
+    ["pkg:cargo/serde_json", "cargo add serde_json"],
+  ]) assert.equal(installCommand(purl, root), expected);
+});
+
+test("adopt of a repository whose package name is refused: no command, and a warning names the PURL", async () => {
+  const purl = new PackageURL("npm", null, "x;{echo,pwned}", null, null, null).toString();
+  const evil = note({ id: "pkg:github/evil/tool", name: "evil/tool", packages: [purl] });
+  const p = place({ "journal/notes/github--evil--tool.md": evil });
+  const run = await runAdopt({ target: "pkg:github/evil/tool" }, p.context);
+  assert.equal(run.outcome, "ok");
+  assert.equal(run.document.install, null);
+  assert.deepEqual(run.document.install_choices, []);
+  assert.deepEqual(run.warnings, [`${purl} isn't a valid npm package name, so no install command is shown for it.`]);
 });
 
 test("the install command follows the PURL type and the project's lockfile", () => {
