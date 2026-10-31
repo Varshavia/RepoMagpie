@@ -8,13 +8,13 @@ import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
 // The sandbox's today is 2026-10-04.
 const BASE = "archived:false fork:false stars:>=10 pushed:>=2024-10-04";
-const path = (q: string) => `/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=20&page=1`;
+const path = (q: string) => `/search/repositories?q=${encodeURIComponent(q)}&per_page=20&page=1`; // with words, Best match (decision 0054)
 const repo = (name: string, over: Record<string, unknown> = {}) => ({
   full_name: name, html_url: `https://github.com/${name}`, description: "A design system for React.", stargazers_count: 98_100, forks_count: 6512,
   open_issues_count: 3, pushed_at: "2026-07-04T00:00:00Z", license: { spdx_id: "MIT" }, archived: false, language: "TypeScript", topics: ["design-system", "react"], ...over,
 });
 const answer = (total: number, ...items: unknown[]) => ({ total_count: total, incomplete_results: false, items });
-const KEYS = ["query", "searches", "approximate", "total", "next_page", "incomplete", "cached", "results", "warnings", "partial_search", "problem"];
+const KEYS = ["query", "searches", "approximate", "total", "next_page", "incomplete", "cached", "results", "lists_hidden", "warnings", "partial_search", "problem"];
 
 test("discover --json: one document, the spec's keys, a result's fields", async () => {
   const box = sandbox();
@@ -23,8 +23,9 @@ test("discover --json: one document, the spec's keys, a result's fields", async 
   assert.equal(err, "");
   const doc = JSON.parse(out) as Record<string, unknown> & { results: Record<string, unknown>[]; query: Record<string, unknown> };
   assert.deepEqual(Object.keys(doc), KEYS);
-  assert.deepEqual(doc.query, { text: "design system", domain: null, kind: null, topics: [], language: null, min_stars: 10, updated_within: 24, include_archived: false, sort: "stars", limit: 20, page: 1 });
-  assert.deepEqual(Object.keys(doc.results[0]), ["name", "url", "description", "stars", "forks", "open_issues", "pushed_at", "license", "archived", "language", "topics", "updated", "estimated_kind", "suggested_domains", "in_journal"]);
+  assert.deepEqual(doc.query, { text: "design system", domain: null, kind: null, topics: [], language: null, min_stars: 10, updated_within: 24, include_archived: false, include_lists: false, sort: "best", limit: 20, page: 1 });
+  assert.deepEqual(Object.keys(doc.results[0]), ["name", "url", "description", "stars", "forks", "open_issues", "pushed_at", "license", "archived", "language", "topics", "updated", "estimated_kind", "suggested_domains", "matched_topics", "matched_words", "list_or_course", "in_journal"]);
+  assert.deepEqual([doc.results[0].matched_words, doc.lists_hidden], [["design", "system"], 0]);
   assert.equal(out.trim().split("\n").length, 1);
 });
 
@@ -33,10 +34,10 @@ test("discover for people: a block per result, the description on one line, what
   mkdirSync(join(box.journal, "notes"), { recursive: true });
   writeFileSync(box.note("github--acme--ui.md"), renderNote({ id: "pkg:github/acme/ui", name: "acme/ui", explored: "2026-10-01", kind: "library", tags: [], verdict: "our default UI kit" }));
   const fetch = fakeFetch({ [path(`ui in:name,description,topics ${BASE}`)]: answer(1234, repo("acme/ui"), repo("acme/old", { license: null, archived: true, topics: ["awesome-list"], description: `line one\nline two ${"x".repeat(200)}`, stargazers_count: 12 })) });
-  const { code, out, err } = await magpie(box, ["discover", "ui"], { fetch, columns: 80 });
+  const { code, out, err } = await magpie(box, ["discover", "ui", "--include-lists"], { fetch, columns: 80 });
   assert.equal(code, 0);
   assert.deepEqual(out.split("\n"), [
-    "acme/ui · ⭐ 98.1k · 6.5k forks · updated 3 months ago · MIT · styling",
+    "acme/ui · ⭐ 98.1k · 6.5k forks · updated 3 months ago · MIT · frontend",
     "  A design system for React.",
     "  in your personal journal, Verdict: our default UI kit",
     "acme/old · ⭐ 12 · 6.5k forks · updated 3 months ago · no licence · archived · awesome-list (estimated)",
@@ -44,6 +45,28 @@ test("discover for people: a block per result, the description on one line, what
     "",
   ]);
   assert.equal(err, "2 of 1.2k on GitHub. More: the same command with --page 2.\nAdd one to your inbox: repomagpie note https://github.com/acme/ui\n");
+});
+
+test("lists and courses are hidden by default: one line counts them and names --include-lists", async () => {
+  const box = sandbox();
+  const fetch = fakeFetch({ [path(`ui in:name,description,topics ${BASE}`)]: answer(3, repo("acme/ui"), repo("acme/awesome-ui"), repo("acme/ui-course")) });
+  const some = await magpie(box, ["discover", "ui"], { fetch });
+  assert.equal(some.code, 0);
+  assert.match(some.out, /^acme\/ui · /);
+  assert.doesNotMatch(some.out, /awesome-ui|ui-course/);
+  assert.equal(some.err.split("\n")[1], "2 lists and courses hidden; --include-lists shows them.");
+  const only = fakeFetch({ [path(`ui in:name,description,topics ${BASE}`)]: answer(1, repo("acme/awesome-ui")) });
+  const none = await magpie(box, ["discover", "ui"], { fetch: only });
+  assert.deepEqual([none.code, none.out, none.err], [0, "", "1 list or course hidden; --include-lists shows them.\n"]);
+});
+
+test("--sort: Best match by default with words, Stars without", async () => {
+  const box = sandbox();
+  const calls: Call[] = [];
+  await magpie(box, ["discover", "--domain", "testing", "--json"], { fetch: fakeFetch({}, calls, () => new Response(JSON.stringify(answer(0)))) });
+  assert.match(calls[0].url, /&sort=stars&order=desc&/);
+  await magpie(box, ["discover", "ui", "--json"], { fetch: fakeFetch({}, calls, () => new Response(JSON.stringify(answer(0)))) });
+  assert.doesNotMatch(calls[2].url, /&sort=/);
 });
 
 test("what a journal has is one line of at most about 100 characters, cut at a word, and named: the Verdict, else What it does", async () => {
@@ -89,7 +112,7 @@ test("--domain and --kind take their fixed lists, and the error names them", asy
   const box = sandbox();
   const domain = await magpie(box, ["discover", "--domain", "web"]);
   assert.equal(domain.code, 2);
-  assert.match(domain.err, /Allowed choices are architecture, security, performance, styling, database, testing, auth, api, devops, observability, ai, tooling/);
+  assert.match(domain.err, /Allowed choices are architecture, security, performance, frontend, database, testing, auth, api, devops, observability, ai, tooling, mobile, data, docs, payments, styling/);
   const kind = await magpie(box, ["discover", "--kind", "tool"]);
   assert.equal(kind.code, 2);
   assert.match(kind.err, /Allowed choices are .*skill-pack/);
@@ -115,7 +138,7 @@ test("a reset time already past is never printed, on the search limit's own path
   const box = sandbox();
   const past = String(Math.floor(Date.now() / 1000) - 7 * 60);
   const limited = fakeFetch({}, [], () => new Response("{}", { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": past, "x-ratelimit-resource": "search" } }));
-  const human = await magpie(box, ["discover", "design system", "--domain", "styling"], { fetch: limited });
+  const human = await magpie(box, ["discover", "design system", "--domain", "styling"], { fetch: limited }); // the old name still works (decision 0055)
   assert.equal(human.code, 1);
   assert.match(human.err, /^repomagpie discover: GitHub's search limit is used up; try again in a minute\. Without a token/m);
   assert.doesNotMatch(human.err, /UTC/);

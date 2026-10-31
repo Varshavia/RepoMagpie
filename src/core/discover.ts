@@ -5,7 +5,7 @@
 // prints the document as --json and the app's GET /api/discover returns it (decision 0023).
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { DOMAIN_IDS, isDomain, suggestDomains, type Domain } from "./domains.ts";
+import { canonicalDomain, DOMAIN_IDS, isDomain, suggestDomains, type Domain } from "./domains.ts";
 import { ageText } from "./discover-format.ts";
 import { noteDocument, noteListDocument } from "./documents.ts";
 import { get, kindFromTopics, PLATFORM, RATE_LIMITS, SKILL_TOPICS, TEMPLATE, type FetchProblem } from "./github.ts";
@@ -30,7 +30,8 @@ export interface DiscoverInput {
   minStars?: number; // default 10
   updatedWithin?: number; // months; default 24; 0 means any time
   includeArchived?: boolean;
-  sort?: Sort; // default stars
+  includeLists?: boolean; // show lists, courses and cheatsheets (decision 0054); default hidden
+  sort?: Sort; // default best with words, stars without
   limit?: number; // default 20, at most 50
   page?: number; // default 1
 }
@@ -50,6 +51,9 @@ export interface DiscoverResult {
   topics: string[];
   estimated_kind: string | null; // decision 0030's rules on topics and the name; null when only files could say
   suggested_domains: Domain[];
+  matched_topics: string[]; // the domain's or kind's topics whose request found it; empty without one
+  matched_words: string[]; // the search's words its name, description or topics hold
+  list_or_course: boolean; // a list, course, book or cheatsheet by decision 0054's rule
   // what_it_does: the note's "What it does", read only when it has no Verdict; null otherwise
   in_journal: { journal: "personal" | "project"; id: string; verdict: string | null; what_it_does: string | null }[];
   truncated?: string[];
@@ -58,7 +62,7 @@ export interface DiscoverResult {
 export interface DiscoverJson {
   query: {
     text: string; domain: string | null; kind: string | null; topics: string[]; language: string | null;
-    min_stars: number; updated_within: number; include_archived: boolean; sort: Sort; limit: number; page: number;
+    min_stars: number; updated_within: number; include_archived: boolean; include_lists: boolean; sort: Sort; limit: number; page: number;
   };
   searches: string[]; // the queries GitHub answered, one per request
   approximate: string | null; // why the kind filter is approximate, when it is
@@ -67,6 +71,7 @@ export interface DiscoverJson {
   incomplete: boolean; // GitHub stopped a query early (its timeout)
   cached: boolean;
   results: DiscoverResult[];
+  lists_hidden: number; // lists and courses on this page left out of results (decision 0054)
   warnings: string[];
   partial_search: { searched: string[]; left_out: string[] } | null; // a domain's or kind's topics, when some weren't searched without a token; a warning says so too
   problem: FetchProblem | null;
@@ -80,7 +85,7 @@ export interface DiscoverOptions {
   onWait?: (seconds: number, problem: FetchProblem) => void; // told before that wait, so the CLI can say so
 }
 
-const DEFAULTS = { minStars: 10, updatedWithin: 24, sort: "stars" as Sort, limit: 20, page: 1 };
+const DEFAULTS = { minStars: 10, updatedWithin: 24, limit: 20, page: 1 };
 export const DISCOVER_LIMIT = 50;
 const GITHUB_RESULTS = 1000; // GitHub's search returns at most 1,000 results a query
 const TEXT_LIMIT = 256; // GitHub refuses longer query text ("Limitations on query length")
@@ -89,21 +94,26 @@ const LANGUAGE = /^[A-Za-z0-9+#. -]{1,40}$/;
 
 // A domain's GitHub topics: the 3 most common of those DOMAIN_MAP maps to it on their own (not the
 // generic "ai", nor "playwright", which needs no automation topic beside it), by the number of
-// repositories with 10 stars or more on GitHub, counted on 2026-10-26 (decision 0045). GitHub's
-// search can't OR topics, so each is its own request; without a token, only the first 2.
+// repositories with 10 stars or more on GitHub, counted on 2026-10-26 (decision 0045); frontend,
+// devops and the four new domains counted again on 2026-10-31 (decision 0055). GitHub's search
+// can't OR topics, so each is its own request; without a token, only the first 2.
 export const DOMAIN_TOPICS: Readonly<Record<Domain, readonly string[]>> = {
   architecture: ["microservices", "clean-architecture", "architecture"],
   security: ["security", "cybersecurity", "cryptography"],
   performance: ["performance", "optimization", "benchmark"],
-  styling: ["css", "tailwindcss", "design"],
+  frontend: ["react", "vue", "css"],
   database: ["database", "mysql", "postgresql"],
   testing: ["testing", "jest", "test"],
   auth: ["authentication", "jwt", "oauth2"],
   api: ["api", "graphql", "rest-api"],
-  devops: ["kubernetes", "devops", "github-actions"],
+  devops: ["docker", "kubernetes", "devops"],
   observability: ["monitoring", "logging", "metrics"],
   ai: ["machine-learning", "deep-learning", "llm"],
   tooling: ["cli", "developer-tools", "vscode"],
+  mobile: ["android", "ios", "flutter"],
+  data: ["data-science", "data-visualization", "data-analysis"],
+  docs: ["documentation", "docs", "documentation-tool"],
+  payments: ["stripe", "payment", "payments"],
 };
 
 // The kinds GitHub topics name (decision 0030's topic rules): searched by those topics. The others
@@ -140,6 +150,7 @@ export function emptyDiscover(input: DiscoverInput = {}, error?: string): Discov
     incomplete: false,
     cached: false,
     results: [],
+    lists_hidden: 0,
     warnings: [],
     partial_search: null,
     problem: null,
@@ -147,17 +158,20 @@ export function emptyDiscover(input: DiscoverInput = {}, error?: string): Discov
   };
 }
 
+// An old domain name becomes its new one (decision 0055); an unknown one is kept for the error.
 function normalise(input: DiscoverInput): DiscoverJson["query"] {
+  const text = (input.text ?? "").trim().replace(/\s+/g, " ");
   return {
-    text: (input.text ?? "").trim().replace(/\s+/g, " "),
-    domain: input.domain ?? null,
+    text,
+    domain: input.domain === undefined ? null : (canonicalDomain(input.domain) ?? input.domain),
     kind: input.kind ?? null,
     topics: [...new Set((input.topics ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean))],
     language: input.language?.trim() || null,
     min_stars: input.minStars ?? DEFAULTS.minStars,
     updated_within: input.updatedWithin ?? DEFAULTS.updatedWithin,
     include_archived: input.includeArchived === true,
-    sort: input.sort ?? DEFAULTS.sort,
+    include_lists: input.includeLists === true,
+    sort: input.sort ?? (text ? "best" : "stars"),
     limit: input.limit ?? DEFAULTS.limit,
     page: input.page ?? DEFAULTS.page,
   };
@@ -187,8 +201,9 @@ export function discoverProblem(input: DiscoverInput): string | null {
 // The queries for GitHub, one per request (decision 0045). Each holds the words, where to look for
 // them, the filters, and at most one topic of the domain's and the kind's; GitHub's search ANDs
 // qualifiers and can't OR them, so a domain's topics are sent one per request and merged. At most
-// `maxRequests` of them; `leftOut` names the topics that didn't fit.
-export function buildQueries(input: DiscoverInput, today: string, maxRequests = MAX_REQUESTS): { queries: string[]; postKind: string | null; leftOut: string[] } {
+// `maxRequests` of them; `leftOut` names the topics that didn't fit. `topics[i]` holds the domain's
+// or kind's topics of `queries[i]`, which say what found each result.
+export function buildQueries(input: DiscoverInput, today: string, maxRequests = MAX_REQUESTS): { queries: string[]; topics: string[][]; postKind: string | null; leftOut: string[] } {
   const q = normalise(input);
   const domainTopics = q.domain ? [...DOMAIN_TOPICS[q.domain as Domain]] : [];
   const kindTopics = q.kind ? [...(KIND_TOPICS[q.kind] ?? [])] : [];
@@ -210,8 +225,15 @@ export function buildQueries(input: DiscoverInput, today: string, maxRequests = 
   base.push("fork:false", `stars:>=${q.min_stars}`);
   if (q.updated_within > 0) base.push(`pushed:>=${monthsBefore(today, q.updated_within)}`);
   if (q.language) base.push(`language:${/\s/.test(q.language) ? `"${q.language}"` : q.language}`);
-  const queries = variants.map((topics) => [...base, ...[...new Set([...q.topics, ...topics])].map((t) => `topic:${t}`)].join(" "));
-  return { queries: [...new Set(queries)], postKind, leftOut };
+  const queries: string[] = [];
+  const topics: string[][] = [];
+  for (const variant of variants) {
+    const query = [...base, ...[...new Set([...q.topics, ...variant])].map((t) => `topic:${t}`)].join(" ");
+    if (queries.includes(query)) continue;
+    queries.push(query);
+    topics.push(variant);
+  }
+  return { queries, topics, postKind, leftOut };
 }
 
 // The date `months` before today, YYYY-MM-DD; the day is kept, or the month's last when it has fewer.
@@ -229,7 +251,10 @@ function searchPath(query: string, sort: Sort, limit: number, page: number): str
 }
 
 // What a search keeps of each result: GitHub's text cleaned (decision 0032, rule 8), the rest checked.
-type Found = Omit<DiscoverResult, "updated" | "estimated_kind" | "suggested_domains" | "in_journal" | "truncated"> & { template: boolean; updated_at: string; score: number };
+// `found_by`: the domain's or kind's topics of the requests that returned it.
+type Found = Omit<DiscoverResult, "updated" | "estimated_kind" | "suggested_domains" | "in_journal" | "truncated" | "matched_topics" | "matched_words" | "list_or_course"> & {
+  template: boolean; updated_at: string; score: number; found_by: string[];
+};
 const FULL_NAME = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
 
 function found(item: Record<string, unknown>): Found | null {
@@ -255,6 +280,7 @@ function found(item: Record<string, unknown>): Found | null {
     template: item.is_template === true,
     updated_at: date(item.updated_at) ?? date(item.pushed_at) ?? "",
     score: typeof item.score === "number" ? item.score : 0,
+    found_by: [],
   };
 }
 
@@ -265,7 +291,7 @@ interface Searched { items: Found[]; total: number; nextPage: number | null; inc
 // another version starts empty; an entry not of this exact shape is dropped, and goes at the next
 // write.
 const CACHE = "discover.json";
-const CACHE_VERSION = 2; // 2: entries checked field by field; a file from the builds before starts empty
+const CACHE_VERSION = 3; // 2: entries checked field by field; a file from the builds before starts empty; 3: found_by
 const CACHE_AGE = 10 * 60 * 1000;
 const CACHE_ENTRIES = 50;
 type CacheEntry = { key: string; at: number; data: Searched };
@@ -279,14 +305,15 @@ const exactly = (value: unknown, keys: string): value is Record<string, unknown>
   typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).sort().join(",") === keys;
 const isCount = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 0;
 const isTextOrNull = (v: unknown) => v === null || typeof v === "string";
-const FOUND_KEYS = "archived,description,forks,language,license,name,open_issues,pushed_at,score,stars,template,topics,updated_at,url";
+const FOUND_KEYS = "archived,description,forks,found_by,language,license,name,open_issues,pushed_at,score,stars,template,topics,updated_at,url";
 
 function isFound(v: unknown): v is Found {
   return exactly(v, FOUND_KEYS) && typeof v.name === "string" && FULL_NAME.test(v.name) && v.url === `https://github.com/${v.name}` &&
     isTextOrNull(v.description) && isCount(v.stars) && isCount(v.forks) && isCount(v.open_issues) && isTextOrNull(v.pushed_at) &&
     typeof v.license === "string" && typeof v.archived === "boolean" && isTextOrNull(v.language) &&
     Array.isArray(v.topics) && v.topics.every((t) => typeof t === "string") && typeof v.template === "boolean" &&
-    typeof v.updated_at === "string" && typeof v.score === "number" && Number.isFinite(v.score);
+    typeof v.updated_at === "string" && typeof v.score === "number" && Number.isFinite(v.score) &&
+    Array.isArray(v.found_by) && v.found_by.every((t) => typeof t === "string" && TOPIC.test(t));
 }
 
 export function isCacheEntry(e: unknown): e is CacheEntry {
@@ -310,7 +337,7 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
   if (usage) return { outcome: "usage", document: emptyDiscover(input, usage) };
   const query = normalise(input);
   const token = Boolean(githubAuth(context).token);
-  const { queries, postKind, leftOut } = buildQueries(input, context.today(), token ? MAX_REQUESTS : MAX_REQUESTS_WITHOUT_TOKEN);
+  const { queries, topics, postKind, leftOut } = buildQueries(input, context.today(), token ? MAX_REQUESTS : MAX_REQUESTS_WITHOUT_TOKEN);
   const now = (options.now ?? Date.now)();
   const personal = locateJournal("personal", context);
   const key = cacheKey(queries, query.sort, query.limit, query.page);
@@ -333,7 +360,7 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
     searched = hit.data;
     document.cached = true;
   } else {
-    const got = await search(queries, query, context, options);
+    const got = await search(queries, topics, query, context, options);
     if (!got.ok) {
       document.problem = got.problem;
       document.error = got.problem.message;
@@ -354,15 +381,19 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
 
   const journals = journalNotes(context);
   const aliases = journalAliases(personal.path);
+  const words = searchWords(query.text);
   const results = searched.items
     .map((item): DiscoverResult => {
-      const { template, updated_at: _updated, score: _score, ...shown } = item;
+      const { template, updated_at: _updated, score: _score, found_by: foundBy, ...shown } = item;
       const key = `pkg:github/${item.name.toLowerCase()}`;
       return {
         ...shown,
         updated: item.pushed_at ? ageText(item.pushed_at, context.today()) : null,
         estimated_kind: kindFromTopics({ name: item.name, topics: item.topics, template }),
         suggested_domains: suggestDomains({ topics: item.topics }, aliases),
+        matched_topics: foundBy,
+        matched_words: matchedWords(words, item),
+        list_or_course: listOrCourse(item),
         in_journal: journals.flatMap(({ journal, notes }) => {
           const note = notes.get(key);
           return note ? [{ journal, id: note.id, verdict: note.verdict, what_it_does: note.verdict ? null : whatItDoes(journal, note.id, context) }] : [];
@@ -370,7 +401,10 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
       };
     })
     .filter((r) => !postKind || kindMatches(postKind, r.estimated_kind));
-  document.results = results.map(resultForAgent);
+  // Lists and courses are hidden unless asked for, or unless the search is for awesome-lists.
+  const showLists = query.include_lists || query.kind === "awesome-list";
+  document.lists_hidden = showLists ? 0 : results.filter((r) => r.list_or_course).length;
+  document.results = results.filter((r) => showLists || !r.list_or_course).map(resultForAgent);
   document.total = searched.total;
   document.next_page = searched.nextPage;
   document.incomplete = searched.incomplete;
@@ -392,7 +426,7 @@ type Searching = { ok: true; searched: Searched; answered: number; stopped: Fetc
 // its secondary limit). The first rate limit over within RETRY_WITHIN is waited out and its request
 // sent again; a rate limit after that, with some answers, stops there and keeps them (`stopped`);
 // any other failure, or a rate limit with no answers, fails the search.
-async function search(queries: string[], q: DiscoverJson["query"], context: Context, options: DiscoverOptions): Promise<Searching> {
+async function search(queries: string[], topics: string[][], q: DiscoverJson["query"], context: Context, options: DiscoverOptions): Promise<Searching> {
   const token = githubAuth(context).token;
   const now = options.now ?? Date.now;
   const request = (query: string) => get(searchPath(query, q.sort, q.limit, q.page), "search", { fetch: context.fetch, token, timeoutMs: options.timeoutMs, now });
@@ -419,13 +453,11 @@ async function search(queries: string[], q: DiscoverJson["query"], context: Cont
     } catch {
       return { ok: false, problem: { kind: "http", message: "GitHub's answer wasn't JSON." } };
     }
-    const items = (Array.isArray(body.items) ? body.items : []).filter((i): i is Record<string, unknown> => typeof i === "object" && i !== null).map(found).filter((i): i is Found => i !== null);
+    const by = topics[answers.length] ?? [];
+    const items = (Array.isArray(body.items) ? body.items : []).filter((i): i is Record<string, unknown> => typeof i === "object" && i !== null).map(found).filter((i): i is Found => i !== null).map((i) => ({ ...i, found_by: [...by] }));
     answers.push({ total: typeof body.total_count === "number" ? body.total_count : items.length, incomplete: body.incomplete_results === true, items });
   }
-  // Merged: each repository once (by its name, ignoring case), in the sort's order, cut to the limit.
-  const seen = new Set<string>();
-  const merged = answers.flatMap((a) => a.items).filter((item) => !seen.has(item.name.toLowerCase()) && Boolean(seen.add(item.name.toLowerCase())));
-  if (answers.length > 1) merged.sort(compareBy(q.sort));
+  const merged = merge(answers.map((a) => a.items), q.sort);
   const more = answers.some((a) => a.total > q.page * q.limit) && (q.page + 1) * q.limit <= GITHUB_RESULTS;
   return {
     ok: true,
@@ -447,9 +479,59 @@ function shortWait(problem: FetchProblem, now: number): number | null {
   return left >= 0 && left <= RETRY_WITHIN ? left + 1000 : null;
 }
 
-function compareBy(sort: Sort): (a: Found, b: Found) => number {
-  const value = (f: Found) => (sort === "stars" ? f.stars : sort === "forks" ? f.forks : sort === "best" ? f.score : Date.parse(f.updated_at) || 0);
+// Several requests' answers as one list: each repository once (by its name, ignoring case), with the
+// topics of every request that found it. Stars, forks and updated are sorted again. Best match
+// takes each request's first, then each one's second, and so on: GitHub gives every result the same
+// score (1, checked on 2026-10-31), so sorting by it would order them by name (decision 0054).
+function merge(lists: Found[][], sort: Sort): Found[] {
+  const byName = new Map<string, Found>();
+  const order = sort === "best"
+    ? Array.from({ length: Math.max(0, ...lists.map((l) => l.length)) }, (_, rank) => lists.flatMap((l) => (rank < l.length ? [l[rank]] : []))).flat()
+    : lists.flat();
+  for (const item of order) {
+    const name = item.name.toLowerCase();
+    const seen = byName.get(name);
+    if (seen) seen.found_by = [...new Set([...seen.found_by, ...item.found_by])];
+    else byName.set(name, { ...item, found_by: [...item.found_by] });
+  }
+  const merged = [...byName.values()];
+  if (lists.length > 1 && sort !== "best") merged.sort(compareBy(sort));
+  return merged;
+}
+
+function compareBy(sort: Exclude<Sort, "best">): (a: Found, b: Found) => number {
+  const value = (f: Found) => (sort === "stars" ? f.stars : sort === "forks" ? f.forks : Date.parse(f.updated_at) || 0);
   return (a, b) => value(b) - value(a) || a.name.localeCompare(b.name);
+}
+
+// The search's words, as they could appear in a result: lowercased, once each, without GitHub's
+// qualifiers (`language:go`), its operators and quotes.
+function searchWords(text: string): string[] {
+  const words = text.toLowerCase().replace(/"/g, " ").split(/\s+/).filter((w) => w && !w.includes(":") && !["and", "or", "not"].includes(w));
+  return [...new Set(words)];
+}
+
+// The words a result's name, description or topics hold, in the search's order: a word that starts
+// one of theirs ("mock" in "mocking", not "ui" in "guide"), or, for a word with a hyphen or a dot,
+// anywhere. GitHub also matches other forms of a word, so a result can match none here.
+function matchedWords(words: string[], item: Found): string[] {
+  const text = [item.name, item.description ?? "", ...item.topics].join(" ").toLowerCase();
+  const tokens = text.split(/[^\p{L}\p{N}]+/u);
+  return words.filter((w) => (/^[\p{L}\p{N}]+$/u.test(w) ? tokens.some((t) => t.startsWith(w)) : text.includes(w)));
+}
+
+// Lists, courses, books and cheatsheets (decision 0054): a topic that says so, or a name that does.
+// Measured on the 159 labelled repositories of the classification and retrieval fixtures (it hides
+// their 4 awesome-lists and nothing else) and on 80 Discover results labelled by hand (10 of 13 such
+// repositories hidden, no other).
+export const LIST_TOPICS: readonly string[] = [
+  "awesome", "awesome-list", "awesome-lists", "lists", "cheatsheet", "cheatsheets", "cheat-sheet", "courses", "books",
+  "tutorials", "learning-resources", "interview-questions", "education",
+];
+const LIST_NAME = /^(awesome|learn)[-_]|[-_](courses?|tutorials?|cheatsheets?|cheat-sheet|books?)$|^(courses?|tutorials?|cheatsheets?|books?)$/i;
+
+export function listOrCourse(repository: { name: string; topics: readonly string[] }): boolean {
+  return repository.topics.some((t) => LIST_TOPICS.includes(t)) || LIST_NAME.test(repository.name.split("/")[1] ?? "");
 }
 
 // Each journal's notes by id, with their Verdicts: a GitHub note's id is its lowercased PURL

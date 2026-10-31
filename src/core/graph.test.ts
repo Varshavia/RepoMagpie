@@ -247,7 +247,7 @@ test("graph cache: written whole to a temporary file, then renamed into place; n
   assert.match(written[0], /graph\.json\.\d+\.[0-9a-f]{12}\.tmp$/); // the pid and random bytes
   assert.deepEqual(renames.mock.calls.filter((call) => String(call.arguments[1]) === cacheFile).map((call) => String(call.arguments[0])), written);
   assert.ok(readdirSync(join(root, ".cache")).every((name) => !name.endsWith(".tmp")));
-  assert.equal((JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number }).version, 3);
+  assert.equal((JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number }).version, 4);
 });
 
 test("graph cache: a corrupt, truncated or mismatched graph.json is ignored and rebuilt, without an error", () => {

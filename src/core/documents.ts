@@ -147,7 +147,7 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
 // and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
 const NOTE_LIST_CACHE = "note-list.json";
-const NOTE_LIST_VERSION = 3; // 2: nested and unterminated comments stripped from the Verdict; 3: domains
+const NOTE_LIST_VERSION = 4; // 2: nested and unterminated comments stripped from the Verdict; 3: domains; 4: frontend replaces styling (decision 0055)
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
   const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, parse) => summary(file, parse()), isSummary);

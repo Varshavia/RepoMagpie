@@ -1,6 +1,26 @@
 /* The graph page's styles, loaded with its chunk (decision 0028); the --graph-* tokens are in
    styles.css with the others. */
 
+/* The domain colours (DESIGN.md): only the graph shows them, so they load with it (decision 0055). */
+:root {
+  --domain-architecture: light-dark(#2368C7, #7DAAE8);
+  --domain-security: light-dark(#C72323, #E36363);
+  --domain-performance: light-dark(#7E7516, #E3D963);
+  --domain-frontend: light-dark(#C72375, #E363A3);
+  --domain-database: light-dark(#197B8F, #63CEE3);
+  --domain-testing: light-dark(#188618, #63E363);
+  --domain-auth: light-dark(#8323C7, #BB7DE8);
+  --domain-api: light-dark(#A5611D, #E3A363);
+  --domain-devops: light-dark(#178255, #63E3AE);
+  --domain-observability: light-dark(#537E16, #AEE363);
+  --domain-ai: light-dark(#C322C3, #E363E3);
+  --domain-tooling: light-dark(#3123C7, #867DE8);
+  --domain-mobile: light-dark(#264AD9, #A8B7F0);
+  --domain-data: light-dark(#9A46B9, #D7B5E3);
+  --domain-docs: light-dark(#B95246, #CD827A);
+  --domain-payments: light-dark(#D92656, #F0A8BB);
+}
+
 .graph-page { position: relative; }
 .graph-page .pane-header .graph-status { overflow: hidden; padding: 0; text-overflow: ellipsis; white-space: nowrap; }
 .graph-actions { display: flex; gap: var(--xs); margin-left: auto; }

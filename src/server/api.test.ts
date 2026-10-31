@@ -103,7 +103,8 @@ test("GET /api/discover returns exactly repomagpie discover --json; the CLI's fl
   const fresh = () => existsSync(cache) && unlinkSync(cache); // each side searches, so neither reads the other's answer
   const cases: [string, string[]][] = [
     ["q=design+system", ["discover", "design system"]],
-    ["q=ui&domain=styling&kind=library&topic=react&topic=css&language=TypeScript&min_stars=100&updated_within=6&include_archived=true&sort=forks&limit=5&page=2", ["discover", "ui", "--domain", "styling", "--kind", "library", "--topic", "react", "--topic", "css", "--language", "TypeScript", "--min-stars", "100", "--updated-within", "6", "--include-archived", "--sort", "forks", "--limit", "5", "--page", "2"]],
+    ["q=ui&domain=frontend&kind=library&topic=react&topic=css&language=TypeScript&min_stars=100&updated_within=6&include_archived=true&include_lists=true&sort=forks&limit=5&page=2", ["discover", "ui", "--domain", "frontend", "--kind", "library", "--topic", "react", "--topic", "css", "--language", "TypeScript", "--min-stars", "100", "--updated-within", "6", "--include-archived", "--include-lists", "--sort", "forks", "--limit", "5", "--page", "2"]],
+    ["q=x&domain=styling", ["discover", "x", "--domain", "styling"]], // the old name (decision 0055)
     ["q=", ["discover"]],
     ["q=x&page=100", ["discover", "x", "--page", "100"]],
   ];
@@ -113,7 +114,7 @@ test("GET /api/discover returns exactly repomagpie discover --json; the CLI's fl
     fresh();
     assert.deepEqual(parsed(await http.get(`/api/discover?${query}`)), { status: STATUS_FOR_EXIT[expected.code], document: expected.document }, query);
   }
-  for (const query of ["q=x&domain=web", "q=x&kind=tool", "q=x&limit=x", "q=x&min_stars=-1", "q=x&sort=name", "q=x&include_archived=yes", "q=x&limit=51"]) {
+  for (const query of ["q=x&domain=web", "q=x&kind=tool", "q=x&limit=x", "q=x&min_stars=-1", "q=x&sort=name", "q=x&include_archived=yes", "q=x&include_lists=1", "q=x&limit=51"]) {
     assert.equal((await http.get(`/api/discover?${query}`)).status, 400, query);
   }
 });
@@ -328,6 +329,8 @@ test("GET /api/settings, /api/tags, /api/notes and /api/note return core's share
   assert.deepEqual(parsed(await http.get("/api/notes?journal=project&kind=library")), { status: 200, document: noteListDocument("project", { kind: "library" }, context).document });
   assert.deepEqual(parsed(await http.get("/api/notes?journal=personal&domain=api")), { status: 200, document: noteListDocument("personal", { domain: "api" }, context).document });
   assert.equal((await http.get("/api/notes?journal=personal&domain=pdfs")).status, 400);
+  // A link with the old name keeps working (decision 0055).
+  assert.deepEqual(parsed(await http.get("/api/notes?journal=personal&domain=styling")), { status: 200, document: noteListDocument("personal", { domain: "frontend" }, context).document });
   assert.deepEqual(parsed(await http.get("/api/note?journal=personal&id=pkg%3Anpm%2Fpdfkit")), { status: 200, document: noteDocument("personal", { id: "pkg:npm/pdfkit" }, context).document });
   const broken = parsed(await http.get("/api/note?journal=personal&file=npm--broken.md"));
   assert.deepEqual(broken, { status: 200, document: noteDocument("personal", { file: "npm--broken.md" }, context).document });

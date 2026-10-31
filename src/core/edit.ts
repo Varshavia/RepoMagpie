@@ -2,7 +2,7 @@
 // edits, checked and applied through the round-trip-safe functions in write.ts. All or nothing:
 // one bad edit and nothing is applied. Pure: text in, text out; never prints.
 import { createHash } from "node:crypto";
-import { domainsProblem, isDomain } from "./domains.ts";
+import { canonicalDomain, domainsProblem } from "./domains.ts";
 import { readNote, SECTION_NAMES, type SectionName } from "./note.ts";
 import { acceptDraft, addSectionItems, itemsProblem, setDomains, setHumanFields, setSection, setVerdict, type EditResult, type HumanFields } from "./write.ts";
 
@@ -84,7 +84,7 @@ export function editNote(text: string, edits: NoteEdits): EditOutcome {
       if (list !== undefined && !(Array.isArray(list) && list.every((d) => typeof d === "string"))) return fail(`domains.${key} takes a list of domains.`);
     }
     const { restore } = domains;
-    if (restore !== undefined && !(isObject(restore) && Object.keys(restore).every((key) => key === "domain" || key === "at") && isDomain(restore.domain) && Number.isInteger(restore.at) && (restore.at as number) >= 0)) {
+    if (restore !== undefined && !(isObject(restore) && Object.keys(restore).every((key) => key === "domain" || key === "at") && canonicalDomain(restore.domain) && Number.isInteger(restore.at) && (restore.at as number) >= 0)) {
       return fail("domains.restore must be a domain and its position, such as {\"domain\": \"security\", \"at\": 0}.");
     }
     steps.push((t) =>

@@ -722,12 +722,12 @@ test("--domain on an existing note confirms a suggestion: it moves from domains_
   assert.deepEqual(JSON.parse(again.out).domains_added, []);
 });
 
-test("--domain takes one of the 12 domains, at most 3: otherwise a usage error and nothing written", async () => {
+test("--domain takes one of the 16 domains, at most 3: otherwise a usage error and nothing written", async () => {
   const box = sandbox({ "project/package.json": "{}" });
   const unknown = await magpie(box, ["note", "pdfkit", "--domain", "pdfs"]);
   assert.equal(unknown.code, 2);
   assert.match(unknown.err, /--domain takes one of: .*security.* Not a domain: "pdfs"\./);
-  const many = await magpie(box, ["note", "pdfkit", "--domain", "styling", "--domain", "api", "--domain", "tooling", "--domain", "testing"]);
+  const many = await magpie(box, ["note", "pdfkit", "--domain", "frontend", "--domain", "api", "--domain", "tooling", "--domain", "testing"]);
   assert.equal(many.code, 2);
   assert.match(many.err, /at most 3 domains/);
   assert.equal(existsSync(box.note("npm--pdfkit.md")), false);
@@ -735,10 +735,27 @@ test("--domain takes one of the 12 domains, at most 3: otherwise a usage error a
 
 test("--domain on a note that already has 3 domains: refused with a warning, exit 1, the file unchanged", async () => {
   const box = sandbox({ "project/package.json": "{}" });
-  await magpie(box, ["note", "pdfkit", "fine", "--domain", "styling", "--domain", "api", "--domain", "tooling"]);
+  await magpie(box, ["note", "pdfkit", "fine", "--domain", "frontend", "--domain", "api", "--domain", "tooling"]);
   const before = readFileSync(box.note("npm--pdfkit.md"), "utf8");
   const r = await magpie(box, ["note", "pdfkit", "--domain", "testing"]);
   assert.equal(r.code, 1);
   assert.match(r.err, /at most 3 domains/);
   assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), before);
+});
+
+test("styling, the old name of frontend (decision 0055): --domain takes it and writes frontend; a note that has it keeps working", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  const r = await magpie(box, ["note", "pdfkit", "fine", "--domain", "styling", "--json"]);
+  assert.equal(r.code, 0);
+  assert.match(readFileSync(box.note("npm--pdfkit.md"), "utf8"), /^domains: \[frontend\]$/m);
+  // A note written before the rename: confirming frontend again changes nothing; removing it by
+  // either name takes styling out.
+  const old = readFileSync(box.note("npm--pdfkit.md"), "utf8").replace("domains: [frontend]", "domains: [styling, api]");
+  writeFileSync(box.note("npm--pdfkit.md"), old);
+  const same = await magpie(box, ["note", "pdfkit", "--domain", "frontend", "--json"]);
+  assert.equal(same.code, 0);
+  assert.deepEqual(JSON.parse(same.out).domains_added, []);
+  assert.equal(readFileSync(box.note("npm--pdfkit.md"), "utf8"), old);
+  const search = await magpie(box, ["search", "pdfkit", "--domain", "styling", "--json"]);
+  assert.deepEqual((JSON.parse(search.out) as { results: { domains: string[] }[] }).results[0].domains, ["frontend", "api"]);
 });

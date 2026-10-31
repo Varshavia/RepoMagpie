@@ -6,7 +6,7 @@ import type { CatalogOptions } from "./catalog.ts";
 import type { GlobalOptions } from "./context.ts";
 import type { DeleteOptions } from "./delete.ts";
 import type { DiscoverOptions } from "./discover.ts";
-import { DOMAIN_IDS } from "../core/domains.ts";
+import { DOMAIN_ALIASES, DOMAIN_IDS } from "../core/domains.ts";
 import type { DomainsOptions } from "./domains.ts";
 import type { Env } from "../core/journals.ts";
 import { KINDS } from "../core/note.ts";
@@ -142,14 +142,15 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .command("discover")
     .description("search GitHub for repositories: stars, activity, licence, and whether a journal has them")
     .argument("[words]", "words to look for in names, descriptions and topics")
-    .addOption(new Option("--domain <domain>", "repositories for this concern, by its GitHub topics").choices(DOMAIN_IDS))
+    .addOption(new Option("--domain <domain>", "repositories for this concern, by its GitHub topics").choices([...DOMAIN_IDS, ...Object.keys(DOMAIN_ALIASES)]))
     .addOption(new Option("--kind <kind>", "repositories of this kind (library, cli, plugin, app and other are estimated)").choices(KINDS))
     .option("--topic <topic>", "a GitHub topic the repository must have (repeatable)", (topic: string, topics: string[]) => [...topics, topic], [])
     .option("--language <language>", "the repository's main language, as GitHub names it")
     .option("--min-stars <n>", "at least n stars", wholeNumber, 10)
     .option("--updated-within <months>", "pushed to in the last n months; 0 for any time", wholeNumber, 24)
     .option("--include-archived", "also show archived repositories")
-    .addOption(new Option("--sort <order>", "stars, forks, updated (recently pushed) or best (GitHub's best match)").choices(["stars", "forks", "updated", "best"]).default("stars"))
+    .option("--include-lists", "also show lists, courses, books and cheatsheets")
+    .addOption(new Option("--sort <order>", "stars, forks, updated (recently pushed) or best (GitHub's best match); default best with words, stars without").choices(["stars", "forks", "updated", "best"]))
     .option("--limit <n>", "results a page, from 1 to 50", discoverLimit, 20)
     .option("--page <n>", "the page of results", positiveInteger, 1)
     .action(async (words: string | undefined, _options: unknown, command: Command) => {

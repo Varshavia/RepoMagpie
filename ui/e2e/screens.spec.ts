@@ -233,6 +233,7 @@ test.describe("discover", () => {
     await shoot(page, "20-discover-first-visit");
     await page.getByRole("searchbox", { name: "Words" }).fill("design system");
     await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+    await page.getByRole("button", { name: "Show", exact: true }).click(); // the lists and courses, with the note's awesome-list
     await expect(page.getByText("In your personal journal")).toBeVisible();
     await page.getByRole("button", { name: "Add google-labs-code/design.md to your inbox" }).click();
     await expect(page.getByRole("link", { name: "Added" })).toBeFocused();

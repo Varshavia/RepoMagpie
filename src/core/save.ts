@@ -28,7 +28,7 @@ import {
   type NoteEntry,
   type Place,
 } from "./journals.ts";
-import { domainsProblem } from "./domains.ts";
+import { canonicalDomains, domainsProblem } from "./domains.ts";
 import { linkEntries } from "./links.ts";
 import { readNote } from "./note.ts";
 import { assertWritable, journalPathProblem, linkProblem } from "./note-cache.ts";
@@ -337,7 +337,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
   const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
   if (!resolved.ok) return stop(resolved.error, "usage");
 
-  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags, domains: request.domains };
+  const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags, domains: request.domains && canonicalDomains(request.domains) };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
     id: saved.id,

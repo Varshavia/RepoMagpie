@@ -437,7 +437,7 @@ test("domains: the review shows the suggested ones outlined; one picked is saved
   await magpie.open(page);
   await page.keyboard.press("Enter");
   const domains = page.getByRole("group", { name: "Domains" });
-  await expect(domains.getByRole("button")).toHaveCount(12);
+  await expect(domains.getByRole("button")).toHaveCount(16);
   await expect(domains.getByRole("button", { name: "ai (suggested)" })).toHaveAttribute("aria-pressed", "false");
   await domains.getByRole("button", { name: "ai (suggested)" }).click();
   await expect(domains.getByRole("button", { name: "ai", exact: true })).toHaveAttribute("aria-pressed", "true");

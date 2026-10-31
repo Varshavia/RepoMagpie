@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DOMAIN_IDS, DOMAIN_MAP } from "./domains.ts";
-import { APPROXIMATE_KINDS, buildQueries, discoverProblem, DOMAIN_TOPICS, runDiscover, type DiscoverInput } from "./discover.ts";
+import { APPROXIMATE_KINDS, buildQueries, discoverProblem, DOMAIN_TOPICS, emptyDiscover, LIST_TOPICS, listOrCourse, runDiscover, type DiscoverInput } from "./discover.ts";
 import { fakeFetch, recorded, type Call } from "./fixtures/fake-fetch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import type { Fetch, FetchProblem } from "./github.ts";
@@ -11,7 +11,8 @@ import type { Context } from "./save.ts";
 import { renderNote } from "./write.ts";
 
 const TODAY = "2026-10-26";
-const path = (q: string, rest = "&sort=stars&order=desc&per_page=20&page=1") => `/search/repositories?q=${encodeURIComponent(q)}${rest}`;
+// With words, Best match is the default sort, and Stars without (decision 0054).
+const path = (q: string, rest = q.includes(" in:name,") ? "&per_page=20&page=1" : "&sort=stars&order=desc&per_page=20&page=1") => `/search/repositories?q=${encodeURIComponent(q)}${rest}`;
 const BASE = "archived:false fork:false stars:>=10 pushed:>=2024-10-26";
 
 // A scratch journal (and a project journal beside it), and a context whose fetch answers `responses`.
@@ -47,7 +48,7 @@ const answer = (...items: unknown[]) => ({ total_count: items.length, incomplete
 // --- Building the query (decision 0045) ---
 
 test("the words, where to look, the archived and fork filters, stars and the push date make the default query", () => {
-  assert.deepEqual(buildQueries({ text: "  design   system " }, TODAY), { queries: [`design system in:name,description,topics ${BASE}`], postKind: null, leftOut: [] });
+  assert.deepEqual(buildQueries({ text: "  design   system " }, TODAY), { queries: [`design system in:name,description,topics ${BASE}`], topics: [[]], postKind: null, leftOut: [] });
 });
 
 test("every flag has its qualifier; a language with a space is quoted; topics are ANDed, each once", () => {
@@ -62,13 +63,13 @@ test("updated within keeps the day, or takes the month's last day when it has fe
 });
 
 test("a domain is one request per topic, since GitHub's search can't OR qualifiers", () => {
-  assert.deepEqual(buildQueries({ domain: "styling" }, TODAY).queries, DOMAIN_TOPICS.styling.map((t) => `${BASE} topic:${t}`));
-  assert.deepEqual(buildQueries({ text: "ui", domain: "styling", topics: ["css"] }, TODAY).queries.length, 3); // "css" once in its own query
+  assert.deepEqual(buildQueries({ domain: "frontend" }, TODAY).queries, DOMAIN_TOPICS.frontend.map((t) => `${BASE} topic:${t}`));
+  assert.deepEqual(buildQueries({ text: "ui", domain: "frontend", topics: ["css"] }, TODAY).queries.length, 3); // "css" once in its own query
 });
 
 test("at most maxRequests requests: the first topics, and leftOut names the rest", () => {
-  assert.deepEqual(buildQueries({ domain: "styling" }, TODAY, 2), { queries: ["css", "tailwindcss"].map((t) => `${BASE} topic:${t}`), postKind: null, leftOut: ["design"] });
-  assert.deepEqual(buildQueries({ kind: "template" }, TODAY, 2), { queries: ["template", "starter"].map((t) => `${BASE} topic:${t}`), postKind: null, leftOut: ["boilerplate"] });
+  assert.deepEqual(buildQueries({ domain: "frontend" }, TODAY, 2), { queries: ["react", "vue"].map((t) => `${BASE} topic:${t}`), topics: [["react"], ["vue"]], postKind: null, leftOut: ["css"] });
+  assert.deepEqual(buildQueries({ kind: "template" }, TODAY, 2), { queries: ["template", "starter"].map((t) => `${BASE} topic:${t}`), topics: [["template"], ["starter"]], postKind: null, leftOut: ["boilerplate"] });
   assert.deepEqual(buildQueries({ kind: "awesome-list", domain: "testing" }, TODAY, 2).queries, ["testing", "jest"].map((t) => `${BASE} topic:${t} topic:awesome-list`));
   assert.deepEqual(buildQueries({ text: "x" }, TODAY, 2).leftOut, []);
 });
@@ -91,8 +92,8 @@ test("a kind topics name is searched by them; beside a domain, a kind with one t
 });
 
 test("a kind with several topics beside a domain, and the kinds topics can't name, are chosen from the results", () => {
-  assert.deepEqual(buildQueries({ kind: "template", domain: "testing" }, TODAY), { queries: DOMAIN_TOPICS.testing.map((t) => `${BASE} topic:${t}`), postKind: "template", leftOut: [] });
-  for (const kind of APPROXIMATE_KINDS) assert.deepEqual(buildQueries({ text: "pdf", kind }, TODAY), { queries: [`pdf in:name,description,topics ${BASE}`], postKind: kind, leftOut: [] });
+  assert.deepEqual(buildQueries({ kind: "template", domain: "testing" }, TODAY), { queries: DOMAIN_TOPICS.testing.map((t) => `${BASE} topic:${t}`), topics: DOMAIN_TOPICS.testing.map((t) => [t]), postKind: "template", leftOut: [] });
+  for (const kind of APPROXIMATE_KINDS) assert.deepEqual(buildQueries({ text: "pdf", kind }, TODAY), { queries: [`pdf in:name,description,topics ${BASE}`], topics: [[]], postKind: kind, leftOut: [] });
   assert.deepEqual([...APPROXIMATE_KINDS].sort(), ["app", "cli", "library", "other", "plugin"]);
 });
 
@@ -125,14 +126,15 @@ test("a result: GitHub's numbers, the age, the licence, the estimated kind and d
       item("acme/other", { license: { spdx_id: "NOASSERTION" }, pushed_at: null }),
     ),
   });
-  const { outcome, document } = await runDiscover({ text: "charts" }, context);
+  const { outcome, document } = await runDiscover({ text: "charts", includeLists: true }, context);
   assert.equal(outcome, "ok");
   assert.equal(calls.length, 1);
   assert.deepEqual(document.searches, [`charts in:name,description,topics ${BASE}`]);
   assert.deepEqual(document.results[0], {
     name: "acme/charts", url: "https://github.com/acme/charts", description: "acme/charts does things", stars: 100, forks: 10, open_issues: 1,
     pushed_at: "2026-07-26T10:00:00Z", license: "Apache-2.0", archived: false, language: "TypeScript", topics: ["charts", "react", "css"],
-    updated: "3 months ago", estimated_kind: null, suggested_domains: ["styling"], in_journal: [],
+    updated: "3 months ago", estimated_kind: null, suggested_domains: ["frontend"], in_journal: [],
+    matched_topics: [], matched_words: ["charts"], list_or_course: false,
   });
   assert.deepEqual([document.results[1].license, document.results[1].estimated_kind, document.results[1].archived], ["none", "awesome-list", true]);
   assert.deepEqual([document.results[2].license, document.results[2].pushed_at, document.results[2].updated], ["unknown", null, null]);
@@ -148,28 +150,97 @@ test("the GitHub request is a GET with the search's path, the token in the Autho
 });
 
 test("several requests are merged: each repository once, in the sort's order, cut to the limit; totals add up", async () => {
-  const [a, b, c] = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`, "&sort=stars&order=desc&per_page=3&page=1"));
+  const [a, b, c] = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`, "&sort=stars&order=desc&per_page=3&page=1"));
   const { context, calls } = setup({
     [a]: { total_count: 40, incomplete_results: false, items: [item("x/one", { stargazers_count: 50 }), item("x/two", { stargazers_count: 10 })] },
     [b]: { total_count: 2, incomplete_results: true, items: [item("X/One", { stargazers_count: 50 }), item("x/three", { stargazers_count: 90 })] },
     [c]: { total_count: 1, incomplete_results: false, items: [item("x/four", { stargazers_count: 30 })] },
   }, { env: { GITHUB_TOKEN: "t" } });
-  const { document } = await runDiscover({ domain: "styling", limit: 3 }, context);
+  const { document } = await runDiscover({ domain: "frontend", limit: 3 }, context);
   assert.equal(calls.length, 3);
   assert.deepEqual(document.results.map((r) => r.name), ["x/three", "x/one", "x/four"]);
   assert.deepEqual([document.total, document.next_page, document.incomplete], [43, 2, true]);
   assert.deepEqual(document.warnings, []);
+  assert.deepEqual(document.results.map((r) => r.matched_topics), [["vue"], ["react", "vue"], ["css"]]);
+});
+
+test("Best match merges by rank: each request's first, then each one's second; GitHub's equal scores never order them by name", async () => {
+  const [a, b, c] = DOMAIN_TOPICS.frontend.map((t) => path(`ui in:name,description,topics ${BASE} topic:${t}`, "&per_page=20&page=1"));
+  const { context } = setup({
+    [a]: answer(item("z/react-first"), item("b/react-second"), item("a/react-third")),
+    [b]: answer(item("y/vue-first"), item("Z/React-First")),
+    [c]: answer(item("x/css-first")),
+  }, { env: { GITHUB_TOKEN: "t" } });
+  const { document } = await runDiscover({ text: "ui", domain: "frontend" }, context);
+  assert.equal(document.query.sort, "best");
+  assert.deepEqual(document.results.map((r) => r.name), ["z/react-first", "y/vue-first", "x/css-first", "b/react-second", "a/react-third"]);
+  assert.deepEqual(document.results[0].matched_topics, ["react", "vue"]);
+});
+
+test("the sort: Best match by default with words, Stars without; a sort given is kept", () => {
+  assert.equal(emptyDiscover({ text: "pdf" }).query.sort, "best");
+  assert.equal(emptyDiscover({ domain: "testing" }).query.sort, "stars");
+  assert.equal(emptyDiscover({ text: "  " , minStars: 100 }).query.sort, "stars");
+  assert.equal(emptyDiscover({ text: "pdf", sort: "updated" }).query.sort, "updated");
+});
+
+test("matched words: a word that starts a word of the name, description or topics; one with a hyphen or a dot anywhere", async () => {
+  const { context } = setup({
+    [path(`"mock" ui server.js -x language:go OR AND in:name,description,topics ${BASE}`)]: answer(
+      item("a/mocking-kit", { description: "A guide to tests", topics: ["node"] }),
+      item("a/web", { description: "Serves ui from my-server.js files", topics: [] }),
+    ),
+  });
+  const { document } = await runDiscover({ text: `"mock" ui server.js -x language:go OR AND` }, context);
+  assert.deepEqual(document.results.map((r) => r.matched_words), [["mock"], ["ui", "server.js"]]);
+  assert.deepEqual(document.results.map((r) => r.matched_topics), [[], []]);
+});
+
+test("lists, courses, books and cheatsheets are hidden by default and counted; include_lists, or the awesome-list kind, shows them", async () => {
+  const items = [
+    item("a/lib"), item("a/awesome-pdf"), item("a/pdf-course"), item("a/notes", { topics: ["cheatsheet"] }),
+    item("a/learn-pdf"), item("a/pdf-books"), item("a/handbook"), item("a/booking"),
+  ];
+  const { context } = setup({ [path(`pdf in:name,description,topics ${BASE}`)]: answer(...items) });
+  const hidden = (await runDiscover({ text: "pdf" }, context)).document;
+  assert.deepEqual(hidden.results.map((r) => r.name), ["a/lib", "a/handbook", "a/booking"]);
+  assert.equal(hidden.lists_hidden, 5);
+  assert.equal(hidden.query.include_lists, false);
+  const shown = (await runDiscover({ text: "pdf", includeLists: true }, context)).document;
+  assert.equal(shown.results.length, 8);
+  assert.equal(shown.lists_hidden, 0);
+  assert.deepEqual(shown.results.map((r) => r.list_or_course), [false, true, true, true, true, true, false, false]);
+  const lists = setup({ [path(`${BASE} topic:awesome-list`)]: answer(item("a/awesome-pdf", { topics: ["awesome-list"] })) });
+  const byKind = (await runDiscover({ kind: "awesome-list" }, lists.context)).document;
+  assert.deepEqual([byKind.results.length, byKind.lists_hidden], [1, 0]);
+});
+
+test("the list rule: its topics, and a name that starts with awesome- or learn- or ends with -course, -tutorial, -cheatsheet or -book", () => {
+  for (const topic of LIST_TOPICS) assert.ok(listOrCourse({ name: "a/b", topics: [topic] }), topic);
+  for (const name of ["awesome-go", "learn_rust", "react-courses", "go-tutorial", "git-cheatsheets", "rust-book", "tutorials"]) assert.ok(listOrCourse({ name: `a/${name}`, topics: [] }), name);
+  for (const name of ["awesomeness", "learning", "handbook", "booking", "coursera-dl", "book-api", "tutorial-maker"]) assert.ok(!listOrCourse({ name: `a/${name}`, topics: [] }), name);
+  assert.ok(!listOrCourse({ name: "a/b", topics: ["learning", "book", "awesome-css"] }));
+});
+
+test("a domain's old name searches as its new one (decision 0055)", async () => {
+  const urls = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`));
+  const { context, calls } = setup(Object.fromEntries(urls.map((u) => [u, answer()])), { env: { GITHUB_TOKEN: "t" } });
+  const { outcome, document } = await runDiscover({ domain: "styling" }, context);
+  assert.equal(outcome, "ok");
+  assert.equal(document.query.domain, "frontend");
+  assert.equal(calls.length, 3);
+  assert.equal(discoverProblem({ domain: "styling" }), null);
 });
 
 test("without a token a domain search sends 2 requests, says so in one sentence, and partial_search names the topics", async () => {
-  const [a, b] = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
+  const [a, b] = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`));
   const { context, calls } = setup({ [a]: answer(item("x/one")), [b]: answer(item("x/two")) });
-  const { outcome, document } = await runDiscover({ domain: "styling" }, context);
+  const { outcome, document } = await runDiscover({ domain: "frontend" }, context);
   assert.equal(outcome, "ok");
   assert.equal(calls.length, 2);
   assert.deepEqual(document.results.map((r) => r.name), ["x/one", "x/two"]);
-  assert.deepEqual(document.warnings, ["Searched 2 of 3 styling topics to stay within GitHub's limit. Connect GitHub to search all."]);
-  assert.deepEqual(document.partial_search, { searched: ["css", "tailwindcss"], left_out: ["design"] });
+  assert.deepEqual(document.warnings, ["Searched 2 of 3 frontend topics to stay within GitHub's limit. Connect GitHub to search all."]);
+  assert.deepEqual(document.partial_search, { searched: ["react", "vue"], left_out: ["css"] });
   const kind = setup({}, { fetch: fakeFetch({}, [], () => new Response(JSON.stringify(answer()))) });
   const byKind = (await runDiscover({ kind: "template" }, kind.context)).document;
   assert.equal(byKind.warnings[0], "Searched 2 of 3 template topics to stay within GitHub's limit. Connect GitHub to search all.");
@@ -177,9 +248,9 @@ test("without a token a domain search sends 2 requests, says so in one sentence,
 });
 
 test("with a token every topic is searched, and partial_search is null", async () => {
-  const urls = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
+  const urls = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`));
   const { context, calls } = setup(Object.fromEntries(urls.map((u) => [u, answer()])), { env: { GH_TOKEN: "t" } });
-  const { document } = await runDiscover({ domain: "styling" }, context);
+  const { document } = await runDiscover({ domain: "frontend" }, context);
   assert.equal(calls.length, 3);
   assert.deepEqual([document.warnings, document.partial_search], [[], null]);
 });
@@ -292,7 +363,7 @@ test("the live 403 on a search's first request: the wait in seconds from x-ratel
   const calls: Call[] = [];
   const { context, journal } = setup({}, { fetch: fakeFetch({}, calls, LIVE_403) });
   const again = clock(live);
-  const run = await runDiscover({ text: "design system", domain: "styling", limit: 5 }, context, again.options);
+  const run = await runDiscover({ text: "design system", domain: "frontend", limit: 5 }, context, again.options);
   assert.equal(run.outcome, "failed");
   assert.deepEqual(again.waits, [33_605]); // to 15:34:08, and a second more
   assert.deepEqual(again.told, [[34, "search-rate-limit"]]);
@@ -301,7 +372,7 @@ test("the live 403 on a search's first request: the wait in seconds from x-ratel
   assert.ok(!existsSync(CACHE(journal)));
 
   // Without the wait (a fixed clock that never passes the reset), the first answer's message.
-  const first = await runDiscover({ text: "design system", domain: "styling", limit: 5 }, context, { now: () => Date.parse(live), wait: async () => {} });
+  const first = await runDiscover({ text: "design system", domain: "frontend", limit: 5 }, context, { now: () => Date.parse(live), wait: async () => {} });
   assert.equal(first.document.problem?.message, `GitHub's search limit is used up; try again in 33 seconds.${SHARED}`);
   assert.equal(first.document.problem?.reset, "2026-10-27T15:34:08.000Z");
 
@@ -309,14 +380,14 @@ test("the live 403 on a search's first request: the wait in seconds from x-ratel
   let n = 0;
   const later = setup({}, { fetch: fakeFetch({}, [], () => (++n === 1 ? LIVE_403() : new Response(JSON.stringify(answer(item(n === 2 ? "x/one" : "x/two")))))) });
   const waited = clock(live);
-  const ok = await runDiscover({ text: "design system", domain: "styling", limit: 5 }, later.context, waited.options);
+  const ok = await runDiscover({ text: "design system", domain: "frontend", limit: 5 }, later.context, waited.options);
   assert.equal(ok.outcome, "ok");
   assert.deepEqual(waited.waits, [33_605]);
   assert.deepEqual(ok.document.results.map((r) => r.name).sort(), ["x/one", "x/two"]);
   assert.ok(existsSync(CACHE(later.journal)));
 
   // A reset further away than 2 minutes is a clock time, and isn't waited for.
-  const far = await runDiscover({ text: "design system", domain: "styling", limit: 5 }, context, { now: () => Date.parse("2026-10-27T15:30:00Z"), wait: async () => assert.fail("no wait") });
+  const far = await runDiscover({ text: "design system", domain: "frontend", limit: 5 }, context, { now: () => Date.parse("2026-10-27T15:30:00Z"), wait: async () => assert.fail("no wait") });
   assert.match(far.document.error ?? "", /^GitHub's search limit is used up until 15:34 UTC\./);
 });
 
@@ -348,7 +419,7 @@ test("waiting out a rate limit: only when it ends within 60 seconds, and once a 
   let n = 0;
   const once = clock(start);
   const twice = fakeFetch({}, calls, () => (++n === 2 ? new Response(JSON.stringify(answer(item("x/one")))) : limitAt(once.options.now() + 10_000)));
-  const partial = await runDiscover({ domain: "styling" }, setup({}, { fetch: twice }).context, once.options);
+  const partial = await runDiscover({ domain: "frontend" }, setup({}, { fetch: twice }).context, once.options);
   assert.deepEqual(once.waits, [11_000]);
   assert.equal(calls.length, 3);
   assert.deepEqual(partial.document.results.map((r) => r.name), ["x/one"]);
@@ -378,20 +449,20 @@ test("GitHub's search limit: its reset time, and without a token that connecting
 
 test("a rate limit after some requests answered: their results, with a warning, outcome ok, and nothing cached", async () => {
   const now = () => Date.UTC(2026, 9, 26, 14, 1);
-  const [a, b] = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
+  const [a, b] = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`));
   const calls: Call[] = [];
   const fetch = fakeFetch({ [a]: answer(item("x/one")) }, calls, (p) => (p === b ? searchLimit(false)() : undefined));
   const { context, journal } = setup({}, { fetch });
-  const run = await runDiscover({ domain: "styling" }, context, { now });
+  const run = await runDiscover({ domain: "frontend" }, context, { now });
   assert.equal(run.outcome, "ok");
   assert.deepEqual(run.document.results.map((r) => r.name), ["x/one"]);
   assert.deepEqual([run.document.problem, run.document.error], [null, undefined]);
-  assert.deepEqual(run.document.searches, [`${BASE} topic:css`]);
+  assert.deepEqual(run.document.searches, [`${BASE} topic:react`]);
   assert.equal(run.document.warnings.length, 2); // the topic left out without a token, then this
   assert.equal(run.document.warnings[1], `Only 1 of 2 searches ran: GitHub's search limit is used up until 14:05 UTC.${SHARED} The results are from the first; search again later for the rest.`);
   assert.ok(!existsSync(CACHE(journal)));
   // Asked again, it goes to GitHub again.
-  await runDiscover({ domain: "styling" }, context, { now });
+  await runDiscover({ domain: "frontend" }, context, { now });
   assert.equal(calls.length, 4);
 });
 
@@ -399,14 +470,14 @@ test("a rate limit on the first request, or any other failure, fails the search;
   const now = () => Date.UTC(2026, 9, 26, 14, 1);
   const secondary = () => new Response(JSON.stringify({ message: "You have exceeded a secondary rate limit." }), { status: 403, headers: { "retry-after": "60" } });
   const first = setup({}, { fetch: fakeFetch({}, [], secondary) });
-  const run = await runDiscover({ domain: "styling" }, first.context, { now, wait: async () => {} }); // waited once, limited again
+  const run = await runDiscover({ domain: "frontend" }, first.context, { now, wait: async () => {} }); // waited once, limited again
   assert.equal(run.outcome, "failed");
   assert.deepEqual(run.document.problem, { kind: "secondary-rate-limit", message: "GitHub's secondary rate limit stopped the request (too many requests too fast); try again in 60 seconds.", reset: "2026-10-26T14:02:00.000Z" });
   assert.ok(!existsSync(CACHE(first.journal)));
 
-  const [a, b] = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
+  const [a, b] = DOMAIN_TOPICS.frontend.map((t) => path(`${BASE} topic:${t}`));
   const broken = setup({}, { fetch: fakeFetch({ [a]: answer(item("x/one")) }, [], (p) => (p === b ? new Response("{}", { status: 502 }) : undefined)) });
-  const failed = await runDiscover({ domain: "styling" }, broken.context, { now });
+  const failed = await runDiscover({ domain: "frontend" }, broken.context, { now });
   assert.equal(failed.outcome, "failed");
   assert.equal(failed.document.problem?.kind, "http");
 });
@@ -429,7 +500,7 @@ test("the Windows report, on a fake GitHub that allows 10 searches a minute with
   // 30 seconds before the minute's end: the 11th request waits 31 seconds, and the next minute answers it.
   const soon = searchAt(minute - 30_000);
   assert.equal((await runDiscover({ text: "browser automation" }, soon.context, soon.time.options)).outcome, "ok"); // 1
-  for (const domain of ["styling", "testing", "api", "database"]) assert.equal((await runDiscover({ domain }, soon.context, soon.time.options)).document.searches.length, 2); // 9
+  for (const domain of ["frontend", "testing", "api", "database"]) assert.equal((await runDiscover({ domain }, soon.context, soon.time.options)).document.searches.length, 2); // 9
   const fifth = await runDiscover({ domain: "auth" }, soon.context, soon.time.options); // the 10th, then the limit
   assert.deepEqual([fifth.outcome, fifth.document.warnings.length, soon.time.waits], ["ok", 1, [31_000]]); // only the topic left out
   assert.deepEqual(fifth.document.results.map((r) => r.name), ["x/r10", "x/r12"]);
@@ -515,12 +586,12 @@ test("a cache that can't be read is ignored and replaced; a search never creates
 type CacheFile = { version: number; files: Record<string, never>; data: { entries: { key: string; at: number; data: Record<string, unknown> }[] } };
 const readCacheFile = (journal: string) => JSON.parse(readFileSync(CACHE(journal), "utf8")) as CacheFile;
 
-test("a cache file from the builds before (version 1, the Windows file's shape) starts empty: GitHub is asked, and the file is rewritten as version 2", async () => {
+test("a cache file from the builds before (version 1, the Windows file's shape) starts empty: GitHub is asked, and the file is rewritten as version 3", async () => {
   const { context, calls, journal } = setup({ [path(`x in:name,description,topics ${BASE}`)]: answer(item("a/b")) });
   let now = Date.UTC(2026, 9, 27, 14, 31, 22);
   await runDiscover({ text: "x" }, context, { now: () => now });
   const file = readCacheFile(journal);
-  assert.equal(file.version, 2);
+  assert.equal(file.version, 3);
   const [entry] = file.data.entries;
   const old: CacheFile = { version: 1, files: {}, data: { entries: [
     { ...entry, data: { ...entry.data, items: Array(5).fill((entry.data.items as unknown[])[0]), total: 257, nextPage: 2, incomplete: true } },
@@ -530,7 +601,7 @@ test("a cache file from the builds before (version 1, the Windows file's shape) 
   now += 60_000; // fresh by age, and its key matches: only the version keeps it out
   const run = await runDiscover({ text: "x" }, context, { now: () => now });
   assert.deepEqual([run.outcome, run.document.cached, run.document.problem, calls.length], ["ok", false, null, 2]);
-  assert.equal(readCacheFile(journal).version, 2);
+  assert.equal(readCacheFile(journal).version, 3);
 });
 
 test("an entry not of the current shape is dropped, never used and never a failure: GitHub is asked instead, and the file keeps only good entries", async () => {
@@ -576,7 +647,7 @@ test("the cache keeps successful answers only: a rate-limited search writes noth
 test("recorded answers from GitHub's search (src/core/fixtures/github/search.json) read as results", async () => {
   const responses = recorded("search");
   const { context } = setup(responses);
-  const { outcome, document } = await runDiscover({ text: "design system" }, context);
+  const { outcome, document } = await runDiscover({ text: "design system", sort: "stars" }, context);
   assert.equal(outcome, "ok");
   assert.ok(document.results.length >= 5);
   for (const r of document.results) {

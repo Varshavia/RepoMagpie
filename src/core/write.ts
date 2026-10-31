@@ -3,7 +3,7 @@
 // the intended change stays as the person wrote it (note schema, rules 2 and 8).
 // Pure functions on text; no file system, no printing.
 import { isMap, isScalar, isSeq, parseDocument, stringify, type Pair, type Scalar } from "yaml";
-import { DOMAIN_LIMIT, isDomain } from "./domains.ts";
+import { canonicalDomain, DOMAIN_LIMIT, isDomain } from "./domains.ts";
 import { alternativeLinks, findLinks } from "./links.ts";
 import { DRAFT_MARKER, KINDS, readNote, SECTION_NAMES, sectionItems, stripComments, YAML_LIMITS, type SectionName } from "./note.ts";
 import { CAPS, cut } from "./text.ts";
@@ -232,11 +232,13 @@ export function setDomains(text: string, change: DomainChange): DomainResult {
   for (const key of ["domains", "domains_suggested"]) {
     if (!isList(fm[key])) return none(untouched(text, `The note's ${key} field isn't a list, so it was left unchanged; edit the file to fix it.`));
   }
-  const confirmedNow = ((fm.domains ?? []) as string[]).slice();
-  const suggestedNow = ((fm.domains_suggested ?? []) as string[]).slice();
-  const remove = new Set(change.remove ?? []);
-  const dismiss = new Set(change.dismiss ?? []);
-  const confirm = [...new Set(change.confirm ?? [])].filter((d) => !remove.has(d));
+  // An old name is read and written as its new one (decision 0055); a list kept as text keeps its own.
+  const canon = (d: string) => canonicalDomain(d) ?? d;
+  const confirmedNow = [...new Set(((fm.domains ?? []) as string[]).map(canon))];
+  const suggestedNow = ((fm.domains_suggested ?? []) as string[]).map(canon);
+  const remove = new Set((change.remove ?? []).map(canon));
+  const dismiss = new Set((change.dismiss ?? []).map(canon));
+  const confirm = [...new Set((change.confirm ?? []).map(canon))].filter((d) => !remove.has(d));
   const confirmed = confirm.filter((d) => !confirmedNow.includes(d));
   const removed = [...new Set([...remove, ...dismiss])].filter((d) => (remove.has(d) && confirmedNow.includes(d)) || suggestedNow.includes(d));
   const nextDomains = [...confirmedNow.filter((d) => !remove.has(d)), ...confirmed];
@@ -245,7 +247,7 @@ export function setDomains(text: string, change: DomainChange): DomainResult {
   }
   const kept = suggestedNow.map((d) => !remove.has(d) && !dismiss.has(d) && !nextDomains.includes(d));
   let nextSuggested = suggestedNow.filter((_, k) => kept[k]);
-  const back = change.restore;
+  const back = change.restore && { ...change.restore, domain: canon(change.restore.domain) };
   const restoreAt = back && !nextDomains.includes(back.domain) && !nextSuggested.includes(back.domain) ? Math.min(back.at, nextSuggested.length) : -1;
   if (back && restoreAt !== -1) nextSuggested.splice(restoreAt, 0, back.domain);
   const fresh = fm.domains === undefined && fm.domains_suggested === undefined;
