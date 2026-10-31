@@ -36,7 +36,7 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 | `adopted` | no | date | tool | Project journal only: the date `repomagpie adopt` copied this note from the personal journal ([spec](spec.md)) |
 | `kind` | yes | enum | human (tool drafts at creation) | See below |
 | `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the journal's tag list. Drafted from a repository's GitHub topics (rule 5) |
-| `domains` | no | list | human | The concerns the subject addresses, that you confirmed: at most 3 of the 12 domains below ([decision 0040](decisions/0040-domains-a-second-axis.md)). Written after `tags`, only when not empty |
+| `domains` | no | list | human | The concerns the subject addresses, that you confirmed: at most 3 of the 16 domains below ([decision 0040](decisions/0040-domains-a-second-axis.md)). Written after `tags`, only when not empty |
 | `domains_suggested` | no | list | tool (at creation; `repomagpie domains --suggest`) | Domains RepoMagpie suggested from the topics and tags, at most 3; never written by an agent. Confirming one moves it to `domains`. Search counts it at half weight |
 | `tried` | yes | bool | human (default `false`) | Have you actually run it? |
 | `rating` | no | 1–5 | human | Leave empty until tried |
@@ -73,14 +73,14 @@ When two fit, the first rule below that applies decides:
 
 ### `domains` values
 
-`kind` says what a thing is; a domain says what concern it addresses. The list is fixed, the same in every journal, and shown to agents with these definitions ([decision 0040](decisions/0040-domains-a-second-axis.md)):
+`kind` says what a thing is; a domain says what concern it addresses. The list is fixed, the same in every journal, and shown to agents with these definitions ([decision 0040](decisions/0040-domains-a-second-axis.md); the last four, and `frontend` for `styling`, from [decision 0055](decisions/0055-four-domains-and-frontend.md)):
 
 | Domain | Covers |
 |---|---|
 | `architecture` | Structure, patterns, state management and application frameworks |
 | `security` | Vulnerabilities, secrets, hardening and input validation |
 | `performance` | Speed, caching, bundle size and profiling |
-| `styling` | CSS, design systems and UI components |
+| `frontend` | UI frameworks, components, CSS and design systems |
 | `database` | Databases, ORMs, migrations and storage |
 | `testing` | Unit tests, end-to-end tests and mocking |
 | `auth` | Sign-in, sessions and permissions |
@@ -88,7 +88,11 @@ When two fit, the first rule below that applies decides:
 | `devops` | Build, deploy, CI and containers |
 | `observability` | Logging, metrics, tracing and error tracking |
 | `ai` | LLMs, agents, embeddings and MCP |
-| `tooling` | Developer tools, CLIs, linters, formatters, docs and editors |
+| `tooling` | Developer tools, CLIs, linters, formatters and editors |
+| `mobile` | Android, iOS and cross-platform mobile apps |
+| `data` | Analytics, data visualization and ETL pipelines (databases are `database`) |
+| `docs` | Documentation sites, generators and API references |
+| `payments` | Payments, checkout and billing |
 
 ```yaml
 tags: [supabase, postgresql]
@@ -98,6 +102,7 @@ domains_suggested: [security]
 
 - A note may have none. More than 3 means the subject is a platform: pick the 3 that matter to you.
 - A value outside the list (a typo, a domain from a later release) is kept in the file. Search and the app ignore it; `repomagpie doctor` reports it as an unknown domain.
+- `styling`, the name `frontend` had before [decision 0055](decisions/0055-four-domains-and-frontend.md), still counts as `frontend`: in a note, a flag, a search and a link. RepoMagpie writes `frontend` when it rewrites the list `styling` is in; until then the file keeps `styling`, and `doctor` doesn't report it.
 - A domain is in one field only. Removing one deletes it from whichever field holds it; a field left empty stays as `[]`, so `domains --suggest` doesn't fill it again.
 
 ## Body sections (in this order)

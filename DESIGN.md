@@ -33,7 +33,7 @@ colors:
   domain-architecture: "#7DAAE8"
   domain-security: "#E36363"
   domain-performance: "#E3D963"
-  domain-styling: "#E363A3"
+  domain-frontend: "#E363A3"
   domain-database: "#63CEE3"
   domain-testing: "#63E363"
   domain-auth: "#BB7DE8"
@@ -42,6 +42,10 @@ colors:
   domain-observability: "#AEE363"
   domain-ai: "#E363E3"
   domain-tooling: "#867DE8"
+  domain-mobile: "#A8B7F0"
+  domain-data: "#D7B5E3"
+  domain-docs: "#CD827A"
+  domain-payments: "#F0A8BB"
   # Light theme
   light-canvas: "#FAFAF9"
   light-surface-1: "#F2F3F4"
@@ -73,7 +77,7 @@ colors:
   light-domain-architecture: "#2368C7"
   light-domain-security: "#C72323"
   light-domain-performance: "#7E7516"
-  light-domain-styling: "#C72375"
+  light-domain-frontend: "#C72375"
   light-domain-database: "#197B8F"
   light-domain-testing: "#188618"
   light-domain-auth: "#8323C7"
@@ -82,6 +86,10 @@ colors:
   light-domain-observability: "#537E16"
   light-domain-ai: "#C322C3"
   light-domain-tooling: "#3123C7"
+  light-domain-mobile: "#264AD9"
+  light-domain-data: "#9A46B9"
+  light-domain-docs: "#B95246"
+  light-domain-payments: "#D92656"
 typography:
   headline-md:
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -376,7 +384,7 @@ The graph page ([decision 0028](docs/decisions/0028-the-graph-page.md)) draws on
 - **Labels** never overlap: one that would waits until zooming in makes room. Note names are 12 px at weight 500 in `ink`; tag labels are quieter, 11 px at weight 400 in `ink-muted`, so note names lead.
 - **Edges:** `graph-edge-tagged` and `graph-edge-similar` are quiet greys, drawn thin, so tag hubs and similarity stay in the background; `graph-edge-link` is a stronger grey, drawn thicker; `graph-edge-alternative` is the accent, drawn thickest, as the product's graph specification asks for the one typed relation. A thin line is antialiased, so it shows lighter than its token: `graph-edge-tagged` is set at about 4.4:1, so that a tag edge, 1.5 px wide, still shows at 3:1 or more at the default zoom (measured on screenshots, 2026-10-08: 3.52 dark, 3.22 light).
 - **Inbox notes** are faded: their kind colour mixed 55% toward `canvas`. That is the one graph colour under 3:1, on purpose; the legend says "Faded: in the inbox", and the note itself says its status in words.
-- **Colour by domain** (a Draw option): a note takes its first confirmed domain's `domain-*` token, otherwise its first suggested domain's mixed 40% toward `canvas` (dimmer), otherwise `graph-other`. Twelve hues about 30° apart, each at least 4.5:1 on `canvas` in both themes; the dimmer ones are under 3:1 for some domains, on purpose, as the inbox fade is, and the legend says "Dimmer: a suggested domain". The inbox fade isn't applied in this mode, so one fade means one thing. With twelve hues, some sit near the semantic colours (security near danger, performance near warning, testing near success); the legend names each domain in words, and only the domains present are listed.
+- **Colour by domain** (a Draw option): a note takes its first confirmed domain's `domain-*` token, otherwise its first suggested domain's mixed 40% toward `canvas` (dimmer), otherwise `graph-other`. Twelve hues about 30° apart, then four of [decision 0055](docs/decisions/0055-four-domains-and-frontend.md), paler in dark and deeper in light so they stay apart from the twelve; each at least 4.5:1 on `canvas` in both themes; the dimmer ones are under 3:1 for some domains, on purpose, as the inbox fade is, and the legend says "Dimmer: a suggested domain". The inbox fade isn't applied in this mode, so one fade means one thing. With sixteen colours, some sit near the semantic colours (security near danger, performance near warning, testing near success); the legend names each domain in words, and only the domains present are listed.
 - **Missing notes** (a link or alternative to a subject without a note, off until "Missing notes" is on) are `graph-other` faded the same way; the legend says "Faded grey: no note yet".
 - **Around a hovered or selected node**, everything else is mixed 70% toward `canvas` and loses its label; the node gets a ring in `ink` and its label on a `surface-2` plate. Labels have a halo in `canvas`, so they stay readable over nodes and edges.
 - **Notices** lie over the top of the graph as a strip of `surface-1` (92%, so the graph shows faintly through) with a `hairline` under it, in `ink-muted`, so they never resize the canvas. Only their buttons take the pointer.
@@ -410,14 +418,14 @@ Checked with the WCAG 2 relative-luminance formula on 2026-10-04. Text needs 4.5
 
 The graph rows were checked on 2026-10-08, with the same formula.
 
-The domain tokens, checked on 2026-10-25 with the same formula, each against `canvas` (3:1; "dimmer" is the colour mixed 40% toward `canvas`, for a suggested domain):
+The domain tokens, checked on 2026-10-25 with the same formula, each against `canvas` (3:1; "dimmer" is the colour mixed 40% toward `canvas`, for a suggested domain). `domain-frontend` is the former `domain-styling`, unchanged; the last four were added and checked on 2026-10-31 ([decision 0055](docs/decisions/0055-four-domains-and-frontend.md)), each at least as far from every other domain colour as the closest pair before. Only the graph shows these colours, so they live in its lazily loaded `GraphPage.css`, not in `styles.css`:
 
 | Token | Dark | Dimmer, dark | Light | Dimmer, light |
 |---|---|---|---|---|
 | `domain-architecture` | 7.98 | 3.55 | 5.19 | 2.51 |
 | `domain-security` | 5.66 | 2.73 | 5.44 | 2.86 |
 | `domain-performance` | 13.05 | 5.27 | 4.53 | 2.28 |
-| `domain-styling` | 5.97 | 2.84 | 5.12 | 2.74 |
+| `domain-frontend` | 5.97 | 2.84 | 5.12 | 2.74 |
 | `domain-database` | 10.41 | 4.37 | 4.71 | 2.37 |
 | `domain-testing` | 11.53 | 4.75 | 4.51 | 2.37 |
 | `domain-auth` | 6.55 | 3.05 | 6.64 | 3.01 |
@@ -426,6 +434,10 @@ The domain tokens, checked on 2026-10-25 with the same formula, each against `ca
 | `domain-observability` | 12.68 | 5.15 | 4.61 | 2.30 |
 | `domain-ai` | 6.50 | 3.02 | 4.64 | 2.63 |
 | `domain-tooling` | 5.55 | 2.71 | 9.16 | 3.53 |
+| `domain-mobile` | 9.71 | 4.14 | 6.56 | 2.88 |
+| `domain-data` | 10.54 | 4.43 | 5.09 | 2.50 |
+| `domain-docs` | 6.42 | 3.01 | 4.61 | 2.38 |
+| `domain-payments` | 10.01 | 4.24 | 4.61 | 2.63 |
 
 ## Typography
 
