@@ -123,7 +123,7 @@ $ repomagpie note pdf-lib "fine for invoices" --use-when "filling in an existing
 
 ### `repomagpie import <file>`
 
-The bulk form of `note`. Each line that starts with `- ` is one item:
+The bulk form of `note`. Each line that names a repository or a package is one item:
 
 ```
 - <url-or-name> — verdict: ... | use: ... | avoid: ...
@@ -131,17 +131,18 @@ The bulk form of `note`. Each line that starts with `- ` is one item:
 
 - The separator after the target is ` — ` (em dash) or ` -- `. Labels are case-insensitive; parts are separated by ` | `.
 - `verdict:` counts as human-written; `use:` and `avoid:` become drafts; text without a label goes to "My notes" (schema rule 7).
-- A line may hold the target alone (`- pkg:npm/pdfkit`). Each `use:` or `avoid:` part becomes one bullet; unlabelled parts become one line each in "My notes". A label with no text is ignored. Two `verdict:` parts make the line `failed`. Only lines that start with `- ` at the left margin are items.
-- Lenient read, for a list copied out of a chat or another editor: an item may also start with `* `, `+ ` or an escaped `\- `; a non-breaking space after the marker counts as a space; a UTF-8 BOM is ignored.
-- A file without items is not an error (exit 0). The hint on stderr names what the first line with text starts with instead: `No items found in list.md. Each item is a line that starts with "- ". Line 1 starts with "1.".`
-- Output: one result line per item on stdout (`line 3: created pkg:npm/pdfkit`); errors and warnings on stderr, prefixed with the line number; then a summary on stderr (`2 created, 1 updated, 0 unchanged, 1 failed.`). Later lines see the notes earlier lines wrote, also in a dry run. A dry run still fetches GitHub metadata (read-only) to report what would happen.
-- Other lines are ignored. A line that can't be parsed or resolved is reported as `failed` and skipped; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts).
+- A line may hold the target alone (`- pkg:npm/pdfkit`). Each `use:` or `avoid:` part becomes one bullet; unlabelled parts become one line each in "My notes". A label with no text is ignored. Two `verdict:` parts make the line `failed`.
+- Lenient read, for a list pasted from a chat, a README or a browser: the marker is optional, and may be `- `, `* `, `+ `, `• `, `1. `, `1) ` or an escaped `\- `, after spaces too; a non-breaking space counts as a space; a UTF-8 BOM is ignored. The target is a URL or a PURL, a Markdown link's URL (`[zod](https://github.com/colinhacks/zod)`), or a package name that is the whole text before the separator. A name in backticks counts as that name (`` `pdfkit` ``). Text after a URL or a link that doesn't follow the separator is left out: a description copied from somewhere isn't the user's words. GitHub URLs are read as in section 4, so `https://github.com/thedotmack/claude-mem.git` is `pkg:github/thedotmack/claude-mem`.
+- A heading (a line starting with `#`, or a line of 60 characters or fewer ending with `:`, bold or not, such as `**Security tools:**`) is skipped without a word. Any other line with text (prose, a code fence) is skipped, listed with why: `line 1: skipped: Not a URL or a package name.` on stderr. Blank lines are not listed. A package a line names again with nothing more is skipped too (`line 6: skipped: Line 3 names the same package.`); a later line with text adds it to the note the earlier line made, as for a note already in the journal.
+- A file without items is not an error (exit 0). The hint on stderr names what the first line with text starts with: `No items found in list.md. Put one repo URL or package name on each line. Line 1 starts with "Here".`
+- Output: one result line per item on stdout (`line 3: created pkg:npm/pdfkit`); errors, warnings and skipped lines on stderr, prefixed with the line number; then a summary on stderr (`2 created, 1 updated, 0 unchanged, 1 failed.`, then `, 2 skipped` when lines were skipped). Later lines see the notes earlier lines wrote, also in a dry run. A dry run still fetches GitHub metadata (read-only) to report what would happen.
+- A line that can't be parsed or resolved is reported as `failed`; the other lines continue. A bare name that the manifests don't settle fails with a hint to write a PURL (`import` never prompts). A skipped line is no failure.
 - Flags: `--to personal|project`, `--dry-run` (report what would happen, write nothing).
 - An item whose note already exists is handled as in `note`, step 2. A `verdict:` for a note that already has a Verdict makes that line `failed`. `use:`, `avoid:` and unlabelled text for an existing note are ignored with a warning on that line, because those sections are human-owned (schema rule 2).
 - A new repository note's tags come from its topics as in `note`, step 3, and new tags are appended to `tags.md` the same way. A later item ranks against the tags and notes that earlier items added, also in a dry run, so each tag is appended once. Before the summary, stderr says `Added 3 tags to tags.md: llm, rag, pdf` (`Would add` in a dry run).
 - Exit 0 if every item succeeded or was skipped as unchanged; 1 if any item failed.
 
-`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null, "warnings": []}], "created": 4, "updated": 1, "failed": 0, "tags_md_added": []}`
+`--json`: `{"items": [{"line": 3, "id": "...", "result": "created|updated|unchanged|failed", "error": null, "warnings": []}], "created": 4, "updated": 1, "failed": 0, "tags_md_added": [], "skipped": [{"line": 1, "reason": "Not a URL or a package name."}]}`. `skipped` lists the skipped lines in order. Added in 0.2; an addition.
 
 - `tags_md_added`: the tags appended to `tags.md`, in order (in a dry run, those that would be). Added in 0.2; an addition.
 
@@ -623,7 +624,7 @@ Every note's `id` is a Package URL ([decision 0017](decisions/0017-package-ident
 
 | Input | PURL |
 |---|---|
-| `https://github.com/<owner>/<repo>` | `pkg:github/<owner>/<repo>` (lowercase) |
+| `https://github.com/<owner>/<repo>` | `pkg:github/<owner>/<repo>` (lowercase). A `.git` ending, a trailing `/`, `#readme`, `?tab=…`, `/tree/<ref>` and `/blob/<ref>/<file>` (any file but a `SKILL.md`) are the repository too |
 | A skill URL inside a repository (`.../tree/<ref>/<path>/SKILL.md` or its folder) | the parent repository, plus a skill line ([decision 0006](decisions/0006-skills-as-searchable-lines.md)) |
 | `https://www.npmjs.com/package/<name>` | `pkg:npm/<name>` (scope `@x` encoded as `%40x`) |
 | `https://pypi.org/project/<name>` | `pkg:pypi/<name>`, lowercased with `_` replaced by `-` ([purl-spec PyPI type](https://github.com/package-url/purl-spec/blob/main/types/pypi-definition.json)) |
