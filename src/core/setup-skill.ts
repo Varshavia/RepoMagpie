@@ -22,6 +22,9 @@ export interface SkillRequest {
   stamp: string;
   platform: Platform;
   project: boolean; // --project: the folders are committed, so no junction on Windows
+  // With remove: the agents found that this run leaves set up and that read the shared folder
+  // (decision 0052). The shared folder stays while there is one.
+  readers?: string[];
 }
 
 export interface SkillItem {
@@ -47,6 +50,15 @@ function files(source: string): string[] {
 
 const isLink = (path: string) => lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink() ?? false;
 const exists = (path: string) => lstatSync(path, { throwIfNoEntry: false }) !== undefined;
+
+// `path` is a link to `folder`: Claude Code's or Antigravity CLI's link to the shared folder.
+export function linksTo(path: string, folder: string): boolean {
+  try {
+    return isLink(path) && realpathSync(path) === realpathSync(folder);
+  } catch {
+    return false;
+  }
+}
 
 // A folder holding RepoMagpie's skill: its SKILL.md is named repomagpie.
 function holdsOurs(folder: string): boolean {
@@ -81,6 +93,10 @@ function planShared(r: SkillRequest): SkillItem {
   if (!exists(r.shared)) return item(r.remove ? "keep" : "add");
   if (isLink(r.shared)) return item("leave", `${r.shared} is a link (yours); setup leaves it.`);
   if (!holdsOurs(r.shared)) return item("leave", `${r.shared} holds another skill; setup leaves it.`);
+  if (r.remove && r.readers?.length) {
+    const names = r.readers.length > 1 ? `${r.readers.slice(0, -1).join(", ")} and ${r.readers.at(-1)}` : r.readers[0];
+    return item("leave", `${names} still ${r.readers.length > 1 ? "read" : "reads"} it; setup removes it with the last agent that does.`);
+  }
   if (r.remove) return item("remove");
   if (sameFiles(r.shared, r.source)) return item("keep");
   const lock = join(dirname(dirname(r.shared)), ".skill-lock.json");

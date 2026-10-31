@@ -16,7 +16,7 @@ import { redactArgs, redactText } from "./redact.ts";
 import { ALLOW_WRITE, noteTool, type Launch } from "./launch.ts";
 import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookPlan, type AgentHookTarget } from "./setup-agent-hooks.ts";
 import { applyHook, planHook, STOP, type HookPlan, type HookTarget } from "./setup-hook.ts";
-import { applySkill, planSkill, type SkillPlan, type SkillRequest } from "./setup-skill.ts";
+import { applySkill, linksTo, planSkill, type SkillPlan, type SkillRequest } from "./setup-skill.ts";
 
 // The package's skill: beside dist/ in the package, beside src/ in the repository.
 export const SKILL_SOURCE = fileURLToPath(new URL("../../skills/repomagpie/", import.meta.url));
@@ -144,7 +144,28 @@ function skillRequest(request: SetupRequest, plan: Pick<SetupPlan, "agents">): S
     source: request.skillSource ?? SKILL_SOURCE, shared: join(root, ".agents", "skills", NAME), claude: chosen("claude-code") ? join(root, ".claude", "skills", NAME) : null,
     antigravity: chosen("antigravity") && request.project === undefined ? join(root, ".gemini", "skills", NAME) : null,
     root, remove: request.remove, stamp: request.stamp, platform: request.where.platform, project: request.project !== undefined,
+    readers: request.remove ? sharedReaders(request, chosen) : [],
   };
+}
+
+// With --remove: the agents found that this run doesn't remove and that still use the shared skill
+// folder: through their own folder's link to it (Claude Code's, and Antigravity CLI's outside a
+// project), or, for the agents that read it themselves, while RepoMagpie's MCP entry is in their
+// settings. `--remove --agents codex` once deleted the folder under the others (decision 0052).
+function sharedReaders(request: SetupRequest, chosen: (id: Agent["id"]) => boolean): string[] {
+  const root = ROOT(request);
+  const shared = join(root, ".agents", "skills", NAME);
+  const links: Partial<Record<Agent["id"], string>> = { "claude-code": join(root, ".claude", "skills", NAME) };
+  if (request.project === undefined) links.antigravity = join(root, ".gemini", "skills", NAME);
+  const hasEntry = (agent: Agent) => {
+    const config = readConfig(agent.mcpFile(request.where));
+    if ("error" in config) return true; // can't tell: keep the folder
+    const read = config.text === null ? { entry: null } : mcpEntry(config.text, agent.format, NAME);
+    return "error" in read || read.entry !== null;
+  };
+  return AGENTS.filter((agent) => !chosen(agent.id) && foundBy(agent, request.where) !== null)
+    .filter((agent) => { const link = links[agent.id]; return link === undefined ? hasEntry(agent) : linksTo(link, shared); })
+    .map((agent) => agent.name);
 }
 
 // The other agents' hook entries start what the MCP entry starts: its node and entry file.

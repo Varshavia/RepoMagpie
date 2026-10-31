@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AGENTS, foundBy, type Platform, type Where } from "./agents.ts";
+import { AGENTS, foundBy, type Agent, type Platform, type Where } from "./agents.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { applySetup, mcpByHand, planSetup, type SetupRequest } from "./setup.ts";
@@ -255,6 +255,36 @@ test("with Claude Code: its MCP entry, the skill linked, and the old magpie hook
   assert.deepEqual([removed.agents[0].result, removed.skill?.result, removed.hook?.result], ["done", "done", "done"]);
   assert.equal(readFileSync(settings, "utf8"), '{\n  "hooks": {\n    "PreToolUse": []\n  }\n}\n');
   assert.ok(!existsSync(join(s.home, ".agents", "skills", "repomagpie")) && !existsSync(join(s.home, ".claude", "skills", "repomagpie")));
+});
+
+// `--remove --agents codex` deleted ~/.agents/skills/repomagpie under the agents still set up (decision 0052).
+test("--remove for one agent keeps the shared skill while another still uses it; removing the last one takes it out", () => {
+  const s = scratch(["claude-code", "codex", "gemini"]);
+  applySetup(planSetup(s.request()), s.request());
+  const shared = join(s.home, ".agents", "skills", "repomagpie");
+  const claude = join(s.home, ".claude", "skills", "repomagpie");
+  const remove = (id: Agent["id"], stamp: string) => {
+    const request = s.request({ remove: true, only: [id], stamp });
+    const plan = planSetup(request);
+    return { plan, done: applySetup(plan, request) };
+  };
+
+  // Claude Code through its link, Gemini CLI through its MCP entry.
+  const codex = remove("codex", "20261014-140000");
+  assert.deepEqual(codex.plan.skill?.shared, { path: shared, action: "leave", reason: "Claude Code and Gemini CLI still read it; setup removes it with the last agent that does.", backup: null });
+  assert.equal(codex.done.agents[0].result, "done");
+  assert.ok(existsSync(join(shared, "SKILL.md")) && existsSync(join(claude, "SKILL.md")));
+
+  const claudeCode = remove("claude-code", "20261014-150000");
+  assert.deepEqual([claudeCode.plan.skill?.shared.action, claudeCode.plan.skill?.shared.reason, claudeCode.plan.skill?.claude?.action], ["leave", "Gemini CLI still reads it; setup removes it with the last agent that does.", "remove"]);
+  assert.equal(claudeCode.done.skill?.result, "done");
+  assert.ok(existsSync(join(shared, "SKILL.md")) && !existsSync(claude));
+
+  // Codex CLI and Claude Code are still installed, but nothing of RepoMagpie's is left in them.
+  const last = remove("gemini", "20261014-160000");
+  assert.equal(last.plan.skill?.shared.action, "remove");
+  assert.equal(last.done.skill?.result, "done");
+  assert.ok(!existsSync(shared));
 });
 
 test("a launch that can't work refuses every agent and writes nothing; --agents limits the plan", () => {
