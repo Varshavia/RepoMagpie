@@ -1,59 +1,51 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { noItemsHint as coreNoItemsHint, parseImport } from "../../../src/core/import.ts";
-import { countItems, lineTarget, noItemsHint, resultWord, summary } from "./importing.ts";
+import type { ImportJson } from "../../../src/core/save.ts";
+import { countItems, rows, summary, writes } from "./importing.ts";
 
-// Import (docs/ui.md §7): the dry-run table and the summary, from magpie import --json.
+// Import (docs/ui.md §7): the check's table and the summary, from magpie import --json.
 
-const TEXT = "# my list\n- pkg:npm/pdfkit — verdict: avoid | use: one-page PDFs\n- https://github.com/a/b -- verdict: fine\n  - not an item\n- left-pad\n";
+const TEXT = "# my list\nhttps://github.com/a/b\n- pkg:npm/pdfkit — verdict: avoid\nleft-pad\nhttps://github.com/a/b.git\n";
+const DOC: ImportJson = {
+  items: [
+    { line: 2, id: "pkg:github/a/b", result: "created", error: null, warnings: ["GitHub didn't answer; the note has no metadata."] },
+    { line: 3, id: "pkg:npm/pdfkit", result: "unchanged", error: null, warnings: [] },
+    { line: 4, id: null, result: "failed", error: "left-pad could be npm, pypi, cargo; write a PURL instead, such as pkg:npm/left-pad.", warnings: [] },
+  ],
+  created: 1,
+  updated: 0,
+  failed: 1,
+  tags_md_added: [],
+  skipped: [{ line: 1, reason: "Not a URL or a package name." }, { line: 5, reason: "Line 2 names the same package." }],
+};
 
-test("countItems: lines that start with '- ' at the left margin", () => {
-  assert.equal(countItems(TEXT), 3);
-  assert.equal(countItems(""), 0);
+test("countItems: the lines core's parser reads as items", () => {
+  assert.equal(countItems(TEXT), 4);
+  assert.equal(countItems("Some prose.\n\n"), 0);
 });
 
-test("lineTarget: the target on that line, without the dash and the parts", () => {
-  assert.equal(lineTarget(TEXT, 2), "pkg:npm/pdfkit");
-  assert.equal(lineTarget(TEXT, 3), "https://github.com/a/b");
-  assert.equal(lineTarget(TEXT, 5), "left-pad");
-  assert.equal(lineTarget(TEXT, 9), "");
+test("rows: every line in order, as pasted, with what it becomes and its status", () => {
+  assert.deepEqual(
+    rows(DOC, TEXT, true).map((r) => [r.line, r.text, r.becomes, r.status, r.why]),
+    [
+      [1, "# my list", null, "skipped", "Not a URL or a package name."],
+      [2, "https://github.com/a/b", "pkg:github/a/b", "new", "GitHub didn't answer; the note has no metadata."],
+      [3, "- pkg:npm/pdfkit — verdict: avoid", "pkg:npm/pdfkit", "already in your journal", ""],
+      [4, "left-pad", null, "can't import", DOC.items[2].error],
+      [5, "https://github.com/a/b.git", null, "skipped", "Line 2 names the same package."],
+    ],
+  );
+  assert.deepEqual(rows(DOC, TEXT, false).map((r) => r.status), ["skipped", "created", "already in your journal", "failed", "skipped"]);
 });
 
-// The app can't bundle core, so it mirrors core's item rule; these keep the two equal.
-const LENIENT = [
-  TEXT,
-  String.fromCharCode(0xfeff) + "* pdfkit — verdict: ok\r\n+ chalk\r\n\\- pkg:npm/left-pad — use: padding\r\n\\* no\r\n- left-pad — verdict: x\r\n1. no\r\n-no\r\n",
-  "",
-  " \n\t\n",
-  "\n\n1. pdfkit — verdict: ok",
-  "  - indented\n• bullet",
-  "-pdfkit — verdict: ok",
-  "https://github.com/microsoft/playwright-cli",
-];
-
-test("countItems and lineTarget agree with core's parseImport (lenient read)", () => {
-  for (const text of LENIENT) {
-    const items = parseImport(text);
-    assert.equal(countItems(text), items.length, JSON.stringify(text));
-    for (const item of items) assert.equal(lineTarget(text, item.line), item.target, `${JSON.stringify(text)} line ${item.line}`);
-  }
+test("writes: Import is offered only for lines that create or add to a note", () => {
+  assert.equal(writes(DOC), 1);
+  assert.equal(writes({ ...DOC, created: 0 }), 0);
+  assert.equal(writes({ ...DOC, created: 0, updated: 2 }), 2);
 });
 
-test("noItemsHint equals core's", () => {
-  for (const text of LENIENT) assert.equal(noItemsHint(text), coreNoItemsHint(text), JSON.stringify(text));
-});
-
-test("resultWord: what will happen in a dry run, what happened otherwise", () => {
-  assert.equal(resultWord("created", true), "will create");
-  assert.equal(resultWord("updated", true), "will update");
-  assert.equal(resultWord("unchanged", true), "no change");
-  assert.equal(resultWord("failed", true), "will fail");
-  assert.equal(resultWord("created", false), "created");
-  assert.equal(resultWord("failed", false), "failed");
-});
-
-test("summary counts every result, unchanged included", () => {
-  const items = [{ result: "created" }, { result: "created" }, { result: "unchanged" }, { result: "failed" }] as const;
-  assert.equal(summary([...items], true), "RepoMagpie wrote nothing yet: 2 to create, 0 to update, 1 unchanged, 1 failing.");
-  assert.equal(summary([...items], false), "2 created, 0 updated, 1 unchanged, 1 failed.");
+test("summary: the counts that aren't 0", () => {
+  assert.equal(summary(DOC, true), "Nothing written yet: 1 new, 1 already in your journal, 1 can't import, 2 skipped.");
+  assert.equal(summary(DOC, false), "1 created, 1 already in your journal, 1 failed, 2 skipped.");
+  assert.equal(summary({ ...DOC, items: [], skipped: [] }, true), "No lines to import.");
 });

@@ -856,6 +856,7 @@ button.chip.domain:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 .empty-state.center { margin: auto; align-items: center; text-align: center; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: var(--sm); }
 
 /* ---------- Dialogs: the palette and the key map ---------- */
 

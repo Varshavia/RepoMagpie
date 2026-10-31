@@ -103,9 +103,7 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
       }}
     >
       <h1 className="page-title">Add a note</h1>
-      <p className="page-lede">
-        Works like <code>repomagpie note</code>. For a GitHub URL, RepoMagpie fetches the repository's description, licence and skills as drafts. RepoMagpie writes nothing until you choose Save note.
-      </p>
+      <p className="page-lede">Add one repo or package to your journal, with your Verdict now or later from the Inbox.</p>
 
       <form
         className="page-section"
@@ -136,8 +134,14 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
             </button>
           </div>
           <p className="field-help">
-            For example <code>pdfkit</code>, the package URL (PURL) <code>pkg:pypi/requests</code>, or a repository URL. Only a GitHub URL makes RepoMagpie contact GitHub.
+            For example <code>pdfkit</code>, <code>pkg:pypi/requests</code> or a GitHub URL.
           </p>
+          <details className="disclosure">
+            <summary>How this works</summary>
+            <p>
+              Preview shows the note first; RepoMagpie writes nothing until you choose Save note. For a GitHub URL, it fetches the repository's description, licence and skills as drafts; only a GitHub URL makes it contact GitHub. The command line does the same: <code>repomagpie note</code>.
+            </p>
+          </details>
         </div>
         <div className="review-fields">
           <JournalChoice value={to} onChange={(j) => change(() => setTo(j))} project={project} />

@@ -20,37 +20,42 @@ export function SettingsPage({ settings, error, theme, scheme, onTheme, onKeys }
   return (
     <div className="page">
       <h1 className="page-title">Settings</h1>
-      <p className="page-lede">
-        The journals and settings this <code>repomagpie ui</code> uses. To change a journal, start <code>repomagpie ui</code> with <code>--home</code> or <code>--project</code>, or set <code>MAGPIE_HOME</code>.
-      </p>
+      <p className="page-lede">The journals this app reads and writes, and how it looks.</p>
 
       <section className="page-section" aria-labelledby="settings-journals">
         <h2 className="section-label" id="settings-journals">
           Journals
         </h2>
         {settings ? (
-          <dl className="facts">
-            <dt>Personal</dt>
-            <dd>
-              <span className="mono">{homePath(settings.journals.personal.path, settings.home)}</span>
-              {settings.journals.personal.exists ? null : <span className="field-help"> (created by the first note)</span>}
-            </dd>
-            <dt>Project</dt>
-            <dd>
-              {settings.journals.project ? (
-                <>
-                  <span className="mono">{homePath(settings.journals.project.path, settings.home)}</span>
-                  {settings.journals.project.exists ? null : <span className="field-help"> (created by the first note saved to it)</span>}
-                </>
-              ) : (
-                "None: repomagpie ui was not started inside a project."
-              )}
-            </dd>
-            <dt>GitHub token</dt>
-            <dd>{settings.github_token_set ? "Set (GITHUB_TOKEN)" : "Not set. Without GITHUB_TOKEN, GitHub allows 60 requests an hour."}</dd>
-            <dt>Version</dt>
-            <dd className="mono">{settings.version}</dd>
-          </dl>
+          <>
+            <dl className="facts">
+              <dt>Personal</dt>
+              <dd>
+                <span className="mono">{homePath(settings.journals.personal.path, settings.home)}</span>
+                {settings.journals.personal.exists ? null : <span className="field-help"> (created by the first note)</span>}
+              </dd>
+              <dt>Project</dt>
+              <dd>
+                {settings.journals.project ? (
+                  <>
+                    <span className="mono">{homePath(settings.journals.project.path, settings.home)}</span>
+                    {settings.journals.project.exists ? null : <span className="field-help"> (created by the first note saved to it)</span>}
+                  </>
+                ) : (
+                  <>
+                    None. Start <code>repomagpie ui</code> inside a git project to use its journal.
+                  </>
+                )}
+              </dd>
+              <dt>GitHub token</dt>
+              <dd>{settings.github_token_set ? "Set (GITHUB_TOKEN)" : "Not set. Without GITHUB_TOKEN, GitHub allows 60 requests an hour."}</dd>
+              <dt>Version</dt>
+              <dd className="mono">{settings.version}</dd>
+            </dl>
+            <p className="field-help">
+              To use other journals, start <code>repomagpie ui</code> with <code>--home</code> or <code>--project</code>, or set <code>MAGPIE_HOME</code>.
+            </p>
+          </>
         ) : error ? (
           <EmptyState>{`Couldn't load the settings. ${error}`}</EmptyState>
         ) : (

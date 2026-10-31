@@ -305,7 +305,9 @@ test("no path from a request reaches the file system: traversal in every paramet
     assert.ok(suggested.status === 200 || suggested.status === 400, `suggest description ${p}: ${suggested.status}`);
     noSecret(suggested, `suggest description ${p}`);
     const imported = await http.write("POST", "/api/import", { text: `- ${p} — verdict: x`, to: "personal", dry_run: true });
-    assert.ok(imported.status === 422 || imported.status === 400, `import ${p}`);
+    // A path is no target: skipped as prose (200) or failed (422), never a note.
+    assert.ok([200, 400, 422].includes(imported.status), `import ${p}: ${imported.status}`);
+    if (imported.status !== 400) assert.equal(JSON.parse(imported.body).created + JSON.parse(imported.body).updated, 0, `import ${p}`);
     noSecret(imported, `import ${p}`);
   }
   assert.deepEqual(opened, []);

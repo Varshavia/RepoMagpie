@@ -2,13 +2,13 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type ImportJson, type Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
-import { countItems, lineTarget, noItemsHint, resultWord, summary } from "../logic/importing.ts";
+import { countItems, noItemsHint, rows, summary, writes } from "../logic/importing.ts";
 import { readablePurl } from "../logic/schema.ts";
 import { Banner, FieldError } from "./common.tsx";
 import { JournalChoice, type ProjectState } from "./fields.tsx";
 
-const EXAMPLE = "- https://github.com/microsoft/playwright-cli — verdict: default for agent browser checks\n- pkg:npm/pdfkit — verdict: avoid | avoid: streamed output for large PDFs";
-const ICONS: Record<string, IconName> = { created: "check", updated: "check", unchanged: "check", failed: "warning" };
+const EXAMPLE = "https://github.com/microsoft/playwright-cli\nhttps://www.npmjs.com/package/pdfkit\n- [zod](https://github.com/colinhacks/zod)";
+const ICONS: Record<string, IconName> = { created: "check", updated: "check", unchanged: "check", failed: "warning", skipped: "warning" };
 
 export function ImportPage({ project, defaultJournal, onImported }: { project: ProjectState; defaultJournal: Scope; onImported: (journal: Scope) => void }) {
   const id = useId();
@@ -19,10 +19,10 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
   const [error, setError] = useState<string | null>(null);
   const items = countItems(text);
   // Import only what was checked: any change to the lines or the journal needs a new check.
-  const checked = result?.dryRun && result.text === text && result.doc.items.length > 0;
+  const checked = result?.dryRun && result.text === text ? writes(result.doc) : 0;
 
   async function run(dryRun: boolean) {
-    if (!items) return setError("Add at least one line that starts with “- ”.");
+    if (!items) return setError("Paste at least one repo URL or package name.");
     setBusy(dryRun ? "check" : "import");
     setError(null);
     try {
@@ -45,9 +45,7 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
   return (
     <div className="page">
       <h1 className="page-title">Import</h1>
-      <p className="page-lede">
-        Works like <code>repomagpie import</code>: one note per line that starts with a dash. Check the lines first; RepoMagpie writes nothing until you import them.
-      </p>
+      <p className="page-lede">Have a list of repos or packages? Paste it here, and each line becomes an inbox note you can review later.</p>
 
       <div className="page-section">
         <div className="field">
@@ -66,11 +64,18 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
             aria-describedby={`${id}-help`}
             autoFocus
           />
-          <p className="field-help" id={`${id}-help`}>
-
-            One item per line: <code>{"- <url-or-name> — verdict: … | use: … | avoid: …"}</code>. The Verdict stays your own words; use and avoid become drafts.{" "}
-            {items ? `${items} ${items === 1 ? "item" : "items"}.` : text.trim() ? `No items yet. ${noItemsHint(text)}` : "No items yet."}
+          <p className="field-help">
+            <span id={`${id}-help`}>{items ? `One repo URL or package name per line. ${items} ${items === 1 ? "item" : "items"}.` : text.trim() ? noItemsHint(text) : "One repo URL or package name per line."}</span>{" "}
+            <button type="button" className="link-button" onClick={() => setText(EXAMPLE)}>
+              Paste an example
+            </button>
           </p>
+          <details className="disclosure">
+            <summary>Add your own Verdict on the same line</summary>
+            <p>
+              After the name, write a dash and your words: <code>{"pkg:npm/pdfkit — verdict: fine for one-page PDFs | use: invoices | avoid: large reports"}</code>. The Verdict stays as you wrote it; use and avoid become drafts you review.
+            </p>
+          </details>
         </div>
         <JournalChoice value={to} onChange={(j) => { setTo(j); setResult(null); }} project={project} />
         {error ? <FieldError>{error}</FieldError> : null}
@@ -79,9 +84,9 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
             {busy === "check" ? "Checking…" : "Check lines"}
           </button>
           <button type="button" className={checked ? "button primary" : "button secondary"} onClick={() => void run(false)} disabled={busy !== "" || !checked}>
-            {busy === "import" ? "Importing…" : checked && result ? `Import ${result.doc.items.length} ${result.doc.items.length === 1 ? "line" : "lines"}` : "Import"}
+            {busy === "import" ? "Importing…" : checked ? `Import ${checked} ${checked === 1 ? "line" : "lines"}` : "Import"}
           </button>
-          {!checked && items ? <span className="hint">Check the lines before you import them.</span> : null}
+          {!checked && items ? <span className="hint">{result?.dryRun && result.text === text ? "No line here is new." : "Check the lines before you import them."}</span> : null}
         </div>
       </div>
 
@@ -90,30 +95,29 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
           <h2 className="section-label" id={`${id}-result`}>
             {result.dryRun ? "Check" : "Imported"}
           </h2>
-          <p role="status">{summary(result.doc.items, result.dryRun)}</p>
-          <table className="result-table">
+          <p role="status">{summary(result.doc, result.dryRun)}</p>
+          <table className="result-table import-table">
             <thead>
               <tr>
                 <th scope="col">Line</th>
-                <th scope="col">Item</th>
-                <th scope="col">{result.dryRun ? "What happens" : "Result"}</th>
-                <th scope="col">Notes</th>
+                <th scope="col">Becomes</th>
+                <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
-              {result.doc.items.map((item) => (
-                <tr key={item.line}>
-                  <td className="tabular">{item.line}</td>
-                  <td className="nowrap">
-                    <span className="mono">{item.id ? readablePurl(item.id) : lineTarget(result.text, item.line)}</span>
+              {rows(result.doc, result.text, result.dryRun).map((row) => (
+                <tr key={row.line}>
+                  <td>
+                    <span className="mono">{row.text}</span>
                   </td>
-                  <td className="nowrap">
-                    <span className={`result ${item.result}`}>
-                      <Icon name={ICONS[item.result]} size={14} />
-                      {resultWord(item.result, result.dryRun)}
+                  <td>{row.becomes ? <span className="mono">{readablePurl(row.becomes)}</span> : "–"}</td>
+                  <td>
+                    <span className={`result ${row.result}`}>
+                      <Icon name={ICONS[row.result]} size={14} />
+                      {row.status}
                     </span>
+                    {row.why ? <span className="result-why">{row.why}</span> : null}
                   </td>
-                  <td>{[item.error, ...item.warnings].filter(Boolean).join(" ")}</td>
                 </tr>
               ))}
             </tbody>

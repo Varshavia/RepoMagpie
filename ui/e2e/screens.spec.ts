@@ -144,6 +144,34 @@ test.describe("an empty journal", () => {
     await expect(page.getByText("Your inbox is empty.")).toBeVisible();
     await shoot(page, "11-empty-inbox");
   });
+  test("search, nothing to list", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.keyboard.press("/");
+    await expect(page.getByText("No notes in your journals yet.", { exact: false })).toBeVisible();
+    await shoot(page, "22-search-empty-journal");
+  });
+});
+
+test("search: an empty query lists the notes; a filter that hides the match says so", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option").first()).toBeVisible();
+  await shoot(page, "23-search-browse");
+  await page.keyboard.type("understand");
+  await page.getByRole("radio", { name: "Reviewed" }).click();
+  await expect(page.getByRole("button", { name: "Show inbox notes" })).toBeVisible();
+  await shoot(page, "24-search-status-hides");
+});
+
+test.describe("no project", () => {
+  test.use({ noProject: true });
+  test("search: nothing matches, and no project is named", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.keyboard.press("/");
+    await page.keyboard.type("nothing-matches-this");
+    await expect(page.getByText("No notes match “nothing-matches-this”. Try other words.")).toBeVisible();
+    await shoot(page, "25-search-no-match-no-project");
+  });
 });
 
 test("connection lost", async ({ page, magpie }) => {
@@ -210,6 +238,14 @@ test.describe("discover", () => {
     await expect(page.getByRole("link", { name: "Added" })).toBeFocused();
     await page.getByRole("checkbox", { name: "Select radix-ui/primitives" }).check();
     await shoot(page, "21-discover-results");
+  });
+  test("import: a bare URL checked", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await page.getByLabel("Lines").fill("https://github.com/donnemartin/system-design-primer.git");
+    await page.getByRole("button", { name: "Check lines" }).click();
+    await expect(page.getByText("Nothing written yet: 1 new.")).toBeVisible();
+    await shoot(page, "26-import-bare-url");
   });
 });
 

@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
+import { PASTE } from "../core/fixtures/import-paste.ts";
 import { readNote, validate } from "../core/note.ts";
 import { magpie, sandbox, type Box } from "./fixtures/sandbox.ts";
 
@@ -19,7 +20,7 @@ function importFile(box: Box, lines: string[]): string {
 }
 
 const LIST = [
-  "# Repositories I looked at", // 1: ignored
+  "# Repositories I looked at", // 1: a heading, skipped without a word
   "", // 2
   "- https://github.com/microsoft/playwright-cli — verdict: default for browser checks | use: agent-driven UI tests", // 3
   "- pdfkit -- avoid: large streamed reports | tried it in 2025", // 4
@@ -42,6 +43,7 @@ test("every item becomes a note; --json reports each line and the counts exactly
     updated: 0,
     failed: 0,
     tags_md_added: ["playwright"],
+    skipped: [{ line: 5, reason: "Not a URL or a package name." }], // line 1 is a heading
   });
   for (const file of ["github--microsoft--playwright-cli.md", "npm--pdfkit.md", "cargo--ripgrep.md"]) valid(box.note(file));
 });
@@ -209,7 +211,7 @@ test("a file that can't be read: exit 1; --json gives empty items, zero counts a
   const r = await magpie(box, ["import", "missing.md", "--json"]);
   assert.equal(r.code, 1);
   const json = JSON.parse(r.out);
-  assert.deepEqual({ ...json, error: typeof json.error }, { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], error: "string" });
+  assert.deepEqual({ ...json, error: typeof json.error }, { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], skipped: [], error: "string" });
   assert.match(json.error, /missing\.md/);
   const human = await magpie(box, ["import", "missing.md"]);
   assert.match(human.err, /^repomagpie import: Can't read /m);
@@ -227,5 +229,34 @@ test("a file without items: a hint on stderr, exit 0", async () => {
   const r = await magpie(box, ["import", importFile(box, ["", "\\* not an item", "1. nor this"])]);
   assert.equal(r.code, 0);
   assert.equal(r.out, "");
-  assert.match(r.err, /^No items found in .*\. Each item is a line that starts with "- "\. Line 2 starts with "\\\*"\.$/m);
+  assert.match(r.err, /^No items found in .*\. Put one repo URL or package name on each line\. Line 2 starts with "\\\*"\.$/m);
+});
+
+// Lenient read: a list pasted from a chat or a browser (src/core/fixtures/import-paste.ts).
+test("a pasted list: bare URLs, numbered lines, links, bullets and names in backticks are items; prose and a repeat are listed as skipped, headings not", async () => {
+  const box = sandbox({ "project/package.json": "{}" }); // `chalk` is an npm package
+  const offline: Fetch = (() => Promise.reject(new TypeError("fetch failed"))) as Fetch;
+  const file = importFile(box, PASTE.split("\n"));
+  const json = await magpie(box, ["import", file, "--dry-run", "--json"], { fetch: offline });
+  assert.equal(json.code, 0, json.err);
+  const doc = JSON.parse(json.out);
+  assert.deepEqual(doc.items.map((i: { line: number; id: string; result: string }) => [i.line, i.id, i.result]), [
+    [3, "pkg:github/thedotmack/claude-mem", "created"],
+    [4, "pkg:github/microsoft/playwright-cli", "created"],
+    [5, "pkg:npm/pdfkit", "created"],
+    [7, "pkg:cargo/ripgrep", "created"],
+    [10, "pkg:npm/chalk", "created"],
+  ]);
+  assert.deepEqual(doc.skipped, [
+    { line: 6, reason: "Line 3 names the same package." },
+    { line: 8, reason: "Not a URL or a package name." },
+    { line: 11, reason: "Not a URL or a package name." },
+  ]);
+  const r = await magpie(box, ["import", file], { fetch: offline });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out, "line 3: created pkg:github/thedotmack/claude-mem\nline 4: created pkg:github/microsoft/playwright-cli\nline 5: created pkg:npm/pdfkit\nline 7: created pkg:cargo/ripgrep\nline 10: created pkg:npm/chalk\n");
+  assert.match(r.err, /^line 6: skipped: Line 3 names the same package\.$/m);
+  assert.doesNotMatch(r.err, /^line (1|9): /m);
+  assert.match(r.err, /^5 created, 0 updated, 0 unchanged, 0 failed, 3 skipped\.$/m);
+  assert.equal(readNote(readFileSync(box.note("npm--pdfkit.md"), "utf8")).verdict, "avoid for large reports");
 });

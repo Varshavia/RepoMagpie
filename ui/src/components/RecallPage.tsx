@@ -39,10 +39,7 @@ export function RecallPage({ home, onOpenNote, onAdd, onSearch }: { home: string
   return (
     <div className="page">
       <h1 className="page-title">Check a package</h1>
-      <p className="page-lede">
-        What your journals say before an install: the same lookup as <code>repomagpie recall</code>, and what the hook does in each agent.
-      </p>
-      <p className="field-help">VS Code gets no hook; there, the MCP server and the skill check installs.</p>
+      <p className="page-lede">About to install something? Type its name to see what your journals say before you add it.</p>
 
       <form
         className="page-section"
@@ -73,8 +70,14 @@ export function RecallPage({ home, onOpenNote, onAdd, onSearch }: { home: string
             </button>
           </div>
           <p className="field-help" id={`${id}-help`}>
-            Names as you would install them, separated by spaces. A version or a PURL works too.
+            For example <code>moment</code>; separate several names with spaces.
           </p>
+          <details className="disclosure">
+            <summary>How this works</summary>
+            <p>
+              Write names as you would install them; a version or a PURL works too. Each card shows the note's Verdict, when to use and avoid it, and what the hook does before an install in each agent. VS Code gets no hook; there, the MCP server and the skill check installs. The command line does the same: <code>repomagpie recall</code>.
+            </p>
+          </details>
         </div>
         <TypeChoice value={type} onChange={setType} />
         {error ? <FieldError>{error}</FieldError> : null}

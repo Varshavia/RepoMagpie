@@ -58,6 +58,16 @@
 .result.created, .result.updated { color: var(--success); }
 .result.unchanged { color: var(--ink-muted); }
 .result.failed { color: var(--danger); }
+.result.skipped { color: var(--ink-muted); }
+.result-table .result-why { display: block; margin-top: var(--xxs); color: var(--ink-muted); }
+.import-table { table-layout: fixed; }
+.import-table th:first-child { width: 40%; }
+
+/* A collapsed "How this works": the summary reads as a link. */
+.disclosure { margin-top: var(--xs); font-size: 13px; color: var(--ink-muted); }
+.disclosure summary { width: fit-content; list-style-position: inside; cursor: pointer; text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; }
+.disclosure summary:hover { text-decoration-color: currentColor; }
+.disclosure p { margin: var(--xs) 0 0; line-height: 1.5; }
 
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sm) var(--xl); }
 .facts dt { color: var(--ink-muted); }
@@ -77,3 +87,4 @@
 
 .suggest-form { display: flex; flex-direction: column; gap: var(--xs); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); }
 .suggest-form .field-help { overflow-wrap: anywhere; }
+.suggest-form .page-lede { margin: 0 0 var(--xs); }
