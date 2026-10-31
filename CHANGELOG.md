@@ -6,11 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- RepoMagpie uses your GitHub CLI login: signed in with `gh auth login`, you get GitHub's higher limits (30 searches a minute, 5,000 requests an hour) with nothing to set. It looks for a token in `GITHUB_TOKEN`, then `GH_TOKEN`, then asks `gh auth token`, once, when it first needs one. The token stays in memory and is never printed, logged or saved.
+- Discover, Import and Settings in the app, and `repomagpie doctor`, say how RepoMagpie connects to GitHub: "GitHub: using your GitHub CLI login", or "GitHub: not connected, limited to 10 searches a minute." with how to connect.
+
 ### Changed
 
 - Search in the app lists your notes before you type, Verdicts first, then the most recently explored. When a filter hides what matches, the empty list says so and offers the fix: "No reviewed notes match “pdf”. 2 inbox notes do." with **Show inbox notes**. An empty journal points to Discover and Import. Without a project, Search no longer shows a Journal switch or mentions a project.
 - `repomagpie import` and the app's Import read a list as people paste it: one URL or package name per line, with or without a marker, numbered lines (`1.`, `1)`), `•` bullets and Markdown links (`[zod](https://github.com/colinhacks/zod)`). Headings are skipped; other lines that name nothing, such as a sentence, are listed with why, instead of being ignored silently or failing. A name in backticks counts as that name; a package named twice is imported once. `--json` lists them in `skipped`.
 - The app's Import says what it is for, keeps its help to one line with a "Paste an example" link, and shows a table of each line, the note it becomes and its status. Import is enabled only when a line is new or adds to a note.
+- A domain search without a token says so in one sentence: "Searched 2 of 3 security topics to stay within GitHub's limit. Connect GitHub to search all." In the app you can dismiss it until you close the tab. `repomagpie discover --json` names the topics in `partial_search`.
 
 ### Fixed
 

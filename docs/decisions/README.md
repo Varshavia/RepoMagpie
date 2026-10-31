@@ -53,7 +53,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0042 | [The Stop reminder: an opt-in nudge to offer a note](0042-the-stop-reminder.md) | accepted (adds to 0035) |
 | 0043 | [The graph colours by domain on request, and fetches its data while its code loads](0043-the-graph-colours-by-domain.md) | accepted (adds to 0028) |
 | 0044 | [Graph labels never overlap, and tags on one note are hidden by default](0044-graph-labels-never-overlap.md) | accepted (supersedes parts of 0028) |
-| 0045 | [Discover: search GitHub from RepoMagpie](0045-discover.md) | accepted (adds to 0034, which it leaves offline) |
+| 0045 | [Discover: search GitHub from RepoMagpie](0045-discover.md) | accepted (adds to 0034, which it leaves offline; rules 2 and 6 refined by 0053) |
 | 0046 | [Classification signals beyond topics](0046-classification-signals.md) | accepted (adds to 0030 and 0040) |
 | 0047 | [Kind rules, measured](0047-kind-rules-measured.md) | accepted (changes 0030's kind rules) |
 | 0048 | [The first files' line, measured](0048-the-first-load-line-measured.md) | accepted (supersedes 0028's first-files line) |

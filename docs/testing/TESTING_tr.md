@@ -35,7 +35,7 @@ repomagpie doctor
 - **Komutu olmayan Codex CLI: kaydı elle yapıştır.** `setup`, Codex'in MCP kaydını `codex mcp add` ile ekler. `PATH`'te `codex` yoksa kaydı yazdırır: onu `~/.codex/config.toml` dosyasına kendin yapıştır. `repomagpie setup --dry-run --agents codex` kaydı yeniden yazdırır.
 - **Codex CLI yeni bir hook'u ancak ona güvendiğinde çalıştırır.** Codex'te `/hooks` açıp RepoMagpie'nin hook'una güven. `repomagpie doctor` komutunu yeniden çalıştır: Codex satırında `trusted` yazar.
 - **Node.js sürümünü değiştiriyorsun** (nvm, fnm, Volta). `setup`, çalıştığı Node.js'in yolunu yazar. Sürüm değiştirdikten sonra `repomagpie doctor`, ardından yeniden `repomagpie setup` çalıştır.
-- **GitHub sınırı.** Token olmadan GitHub saatte 60 isteğe izin verir ve bir GitHub URL'sinden not birkaç istek yapar. Sınıra takılırsan bir saat bekle ya da o anki kabuk için RepoMagpie'ye GitHub CLI'nin token'ını ver: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de `$env:GITHUB_TOKEN = gh auth token`.
+- **GitHub sınırı.** Token olmadan GitHub saatte 60 isteğe izin verir ve bir GitHub URL'sinden not birkaç istek yapar. Sınıra takılırsan bir saat bekle ya da GitHub CLI ile giriş yap (`gh auth login`): RepoMagpie onun girişini kullanır, ayarlanacak bir değişken yok. Bulup bulmadığını `repomagpie doctor` söyler.
 
 ### 3. Kendi deneyiminden üç not yaz
 
