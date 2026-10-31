@@ -48,12 +48,12 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |
 | 0038 | [`setup` chooses agents found by command or app, and deletes its backups on request](0038-setup-chooses-found-agents-and-deletes-backups-on-request.md) | accepted (refines 0035) |
 | 0039 | [A note on a registry package starts as `library`](0039-a-registry-package-note-starts-as-library.md) | accepted (adds to 0030) |
-| 0040 | [Domains: a second axis on a note](0040-domains-a-second-axis.md) | accepted (adds to 0030) |
+| 0040 | [Domains: a second axis on a note](0040-domains-a-second-axis.md) | accepted (adds to 0030; vocabulary and mapping changed by 0055) |
 | 0041 | [Structured search: domains, tags, aliases and `why`](0041-structured-search.md) | accepted (changes `search --tag`; adds a tool to 0034) |
 | 0042 | [The Stop reminder: an opt-in nudge to offer a note](0042-the-stop-reminder.md) | accepted (adds to 0035) |
-| 0043 | [The graph colours by domain on request, and fetches its data while its code loads](0043-the-graph-colours-by-domain.md) | accepted (adds to 0028) |
+| 0043 | [The graph colours by domain on request, and fetches its data while its code loads](0043-the-graph-colours-by-domain.md) | accepted (adds to 0028; tokens changed by 0055) |
 | 0044 | [Graph labels never overlap, and tags on one note are hidden by default](0044-graph-labels-never-overlap.md) | accepted (supersedes parts of 0028) |
-| 0045 | [Discover: search GitHub from RepoMagpie](0045-discover.md) | accepted (adds to 0034, which it leaves offline; rules 2 and 6 refined by 0053) |
+| 0045 | [Discover: search GitHub from RepoMagpie](0045-discover.md) | accepted (adds to 0034, which it leaves offline; rules 2 and 6 refined by 0053; rules 3 and 7 by 0054; `DOMAIN_TOPICS` changed by 0055) |
 | 0046 | [Classification signals beyond topics](0046-classification-signals.md) | accepted (adds to 0030 and 0040) |
 | 0047 | [Kind rules, measured](0047-kind-rules-measured.md) | accepted (changes 0030's kind rules) |
 | 0048 | [The first files' line, measured](0048-the-first-load-line-measured.md) | accepted (supersedes 0028's first-files line) |
@@ -61,3 +61,6 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0050 | [The agent's path](0050-the-agents-path.md) | accepted |
 | 0051 | [No project journal outside a git repository](0051-no-project-journal-outside-git.md) | accepted (supersedes 0016's walk outside git) |
 | 0052 | [`setup --remove` keeps the shared skill while another agent uses it](0052-remove-keeps-the-shared-skill-while-an-agent-uses-it.md) | accepted (refines 0035) |
+| 0053 | [The GitHub token from the GitHub CLI's login](0053-the-github-token-from-the-github-cli.md) | accepted (refines 0045) |
+| 0054 | [Discover: results that fit](0054-discover-results-that-fit.md) | accepted (refines 0045) |
+| 0055 | [Four domains, and `styling` becomes `frontend`](0055-four-domains-and-frontend.md) | accepted (changes 0040, 0043 and 0045) |
