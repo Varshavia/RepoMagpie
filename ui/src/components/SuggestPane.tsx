@@ -93,8 +93,9 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
           setDescription(words ? words : undefined);
         }}
       >
+        <p className="page-lede">Describe what you need, and RepoMagpie suggests packages from your own notes.</p>
         <label className="field-label" htmlFor={`${id}-description`}>
-          Describe the project instead
+          Describe what you need
         </label>
         <div className="input-row">
           <input
@@ -104,7 +105,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
             className="input"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="a TypeScript CLI with tests…"
+            placeholder="parse dates in the browser…"
             autoComplete="off"
             aria-describedby={`${id}-source`}
           />
@@ -139,7 +140,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
       {state === "loading" ? (
         <SkeletonRows label="Looking for candidates" />
       ) : state === "nothing" ? (
-        <EmptyState>Nothing to go on here: no package.json, pyproject.toml, Cargo.toml or README. Describe the project above instead.</EmptyState>
+        <EmptyState>Nothing to go on here: no package.json, pyproject.toml, Cargo.toml or README. Describe what you need above.</EmptyState>
       ) : state === "error" ? (
         <EmptyState
           action={
@@ -165,7 +166,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
           rowHeight={TALL_ROW}
         />
       ) : (
-        <EmptyState>No notes match these words. Describe the project in other words, or add notes for the tools you use.</EmptyState>
+        <EmptyState>No notes match these words. Try other words, or add notes for the tools you use.</EmptyState>
       )}
     </section>
   );

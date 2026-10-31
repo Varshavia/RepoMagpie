@@ -171,11 +171,12 @@ export interface Running {
 
 // magpie ui --no-open --json, from the source, on the journal; resolves once it prints its URL.
 // fakeGithub: GitHub answers from fake-github.ts instead of the network (the Discover tests).
-export function startMagpie(j: Journal, options: { fakeGithub?: boolean } = {}): Promise<Running> {
+// noProject: it starts in the home folder, outside any project.
+export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProject?: boolean } = {}): Promise<Running> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: j.home, USERPROFILE: j.home, MAGPIE_HOME: j.journal };
   delete env.GITHUB_TOKEN;
   const preload = options.fakeGithub ? ["--import", pathToFileURL(join(REPO, "ui", "e2e", "fake-github.ts")).href] : [];
-  const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: j.project, env, stdio: ["ignore", "pipe", "pipe"] });
+  const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: options.noProject ? j.home : j.project, env, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   let err = "";
   child.stderr?.on("data", (chunk) => (err += chunk));

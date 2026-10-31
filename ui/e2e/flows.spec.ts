@@ -209,7 +209,7 @@ test("links: an ambiguous link opens Search with its name; a missing file stem o
   await expect(ambiguous).toHaveAttribute("title", "Several notes are named “zod”");
   await expect(ambiguous).toHaveAccessibleName("zod (Several notes are named “zod”. Search for it.)");
   await ambiguous.click();
-  const search = page.getByRole("searchbox", { name: "Search both journals" });
+  const search = page.getByRole("searchbox", { name: "Search notes" });
   await expect(search).toHaveValue("zod");
   const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
   await expect(results.filter({ hasText: /the (npm|pypi) one/ })).toHaveCount(2);
@@ -572,6 +572,60 @@ test("search: / focuses the box, Verdicts first, Enter opens the note; the statu
   for (const row of await results.getByRole("option").all()) await expect(row).toContainText("no verdict yet");
 });
 
+test("search: an empty query lists every note, Verdicts first; the right pane says how to search from anywhere", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+  await expect(results).toHaveCount(10); // the 9 readable personal notes and the project's one
+  await expect(results.first()).not.toContainText("no verdict yet");
+  await expect(results.last()).toContainText("no verdict yet");
+  await expect(page.getByRole("region", { name: "Note" })).toHaveText(/^Pick a note on the left\. Press (⌘|Ctrl)\+K to search from anywhere\.$/);
+  await page.getByRole("group", { name: "Filters" }).getByRole("radio", { name: "Project" }).click();
+  await expect(results).toHaveCount(1);
+  await expect(results.first()).toContainText("puppeteer");
+});
+
+test("search: a match the Reviewed filter hides is named, and Show inbox notes shows it", async ({ page, magpie }) => {
+  writeFileSync(magpie.note("npm--qrcode.md"), renderNote({ id: "pkg:npm/qrcode", name: "qrcode", explored: "2026-10-04", kind: "library", tags: [] }));
+  await magpie.open(page);
+  await page.keyboard.press("/");
+  await page.keyboard.type("qrcode");
+  const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+  await expect(results).toHaveCount(1);
+  await page.getByRole("radio", { name: "Reviewed" }).click();
+  await expect(page.getByText("No reviewed notes match “qrcode”. 1 inbox note does.")).toBeVisible();
+  await page.getByRole("button", { name: "Show inbox notes" }).click();
+  await expect(page.getByRole("radio", { name: "Inbox" })).toBeChecked();
+  await expect(results.first()).toContainText("qrcode");
+});
+
+test.describe("no project", () => {
+  test.use({ noProject: true });
+
+  test("search: one journal, so no Journal switch; no empty state or hint mentions a project", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.keyboard.press("/");
+    const pane = page.getByRole("main");
+    await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option")).toHaveCount(9);
+    await expect(page.getByRole("group", { name: "Filters" }).getByRole("radiogroup", { name: "Journal" })).toHaveCount(0);
+    await page.getByRole("searchbox", { name: "Search notes" }).fill("nothing-matches-this");
+    await expect(page.getByText("No notes match “nothing-matches-this”. Try other words.")).toBeVisible();
+    await expect(pane).not.toContainText(/project|both journals/i);
+  });
+});
+
+test.describe("an empty journal", () => {
+  test.use({ empty: true, noProject: true });
+
+  test("search: says the journal has no notes yet, and Discover and Import are a click away", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.keyboard.press("/");
+    await expect(page.getByText("No notes in this journal yet. Add one from Discover or Import, or ask your agent to note a package.")).toBeVisible();
+    await page.getByRole("main").getByRole("button", { name: "Import" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: /Import/ })).toBeVisible();
+  });
+});
+
 test("add: preview a package, write the Verdict, save; the note is on disk", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -625,28 +679,67 @@ test("import: check the lines (nothing written), then import them", async ({ pag
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await page.getByLabel("Lines").fill("- pkg:npm/left-pad — verdict: avoid; use padStart\n- pkg:pypi/requests — use: HTTP in scripts\n- not a package!");
   await page.getByRole("button", { name: "Check lines" }).click();
-  await expect(page.getByText("RepoMagpie wrote nothing yet: 2 to create, 0 to update, 0 unchanged, 1 failing.")).toBeVisible();
+  await expect(page.getByText("Nothing written yet: 2 new, 1 skipped.")).toBeVisible();
+  await expect(page.getByRole("row", { name: /not a package!.*skipped Not a URL or a package name\./ })).toBeVisible();
   expect(existsSync(magpie.note("npm--left-pad.md"))).toBe(false);
-  await page.getByRole("button", { name: "Import 3 lines" }).click();
-  await expect(page.getByText("2 created, 0 updated, 0 unchanged, 1 failed.")).toBeVisible();
+  await page.getByRole("button", { name: "Import 2 lines" }).click();
+  await expect(page.getByText("2 created, 1 skipped.")).toBeVisible();
   expect(readFileSync(magpie.note("npm--left-pad.md"), "utf8")).toContain("avoid; use padStart");
   expect(existsSync(magpie.note("pypi--requests.md"))).toBe(true);
   // A change to the lines needs a new check.
   await page.getByLabel("Lines").fill("- pkg:npm/chalk");
   await expect(page.getByRole("main").getByRole("button", { name: "Import", exact: true })).toBeDisabled();
+  // Lines already in the journal: nothing new, so nothing to import.
+  await page.getByLabel("Lines").fill("pkg:npm/left-pad");
+  await page.getByRole("button", { name: "Check lines" }).click();
+  await expect(page.getByText("Nothing written yet: 1 already in your journal.")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("button", { name: "Import", exact: true })).toBeDisabled();
+  await expect(page.getByText("No line here is new.")).toBeVisible();
 });
 
 test("import: a list copied out of a chat is read leniently; without items, the hint names the first line", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Import", exact: true }).click();
   const lines = page.getByLabel("Lines");
-  await lines.fill("1. pkg:npm/left-pad — verdict: fine");
-  await expect(page.getByText('No items yet. Each item is a line that starts with "- ". Line 1 starts with "1.".')).toBeVisible();
+  await lines.fill("Here are my tools:");
+  await expect(page.getByText('Put one repo URL or package name on each line. Line 1 starts with "Here".')).toBeVisible();
   await lines.fill("\\- pkg:npm/left-pad — verdict: fine\n* pkg:npm/chalk\n+ pkg:pypi/requests");
   await expect(page.getByText("3 items.")).toBeVisible();
   await page.getByRole("button", { name: "Check lines" }).click();
-  await expect(page.getByText("RepoMagpie wrote nothing yet: 3 to create, 0 to update, 0 unchanged, 0 failing.")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "pkg:npm/left-pad" })).toBeVisible();
+  await expect(page.getByText("Nothing written yet: 3 new.")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "pkg:npm/left-pad", exact: true })).toBeVisible();
+});
+
+test("import: numbered lines, links and repeats; Paste an example fills the box; the Verdict syntax is one click away", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  const lines = page.getByLabel("Lines");
+  await lines.fill("Here are my tools:\n1. pkg:npm/chalk\n2) pkg:pypi/requests\n• [chalk](https://www.npmjs.com/package/chalk)");
+  await expect(page.getByText("3 items.")).toBeVisible();
+  await page.getByRole("button", { name: "Check lines" }).click();
+  await expect(page.getByText("Nothing written yet: 2 new, 1 skipped.")).toBeVisible(); // the heading isn't listed
+  await expect(page.getByRole("row", { name: /\[chalk\].*skipped Line 2 names the same package\./ })).toBeVisible();
+  await page.getByRole("button", { name: "Paste an example" }).click();
+  await expect(lines).toHaveValue(/^https:\/\/github\.com\/microsoft\/playwright-cli\n/);
+  await expect(page.getByText("3 items.")).toBeVisible();
+  await page.getByText("Add your own Verdict on the same line").click();
+  await expect(page.getByText(/verdict: fine for one-page PDFs/)).toBeVisible();
+});
+
+test.describe("import from a fake GitHub", () => {
+  test.use({ fakeGithub: true });
+
+  test("import: a bare URL with .git: Check shows 1 new; Import makes one inbox note", async ({ page, magpie }) => {
+    await magpie.open(page);
+    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await page.getByLabel("Lines").fill("https://github.com/donnemartin/system-design-primer.git");
+    await page.getByRole("button", { name: "Check lines" }).click();
+    await expect(page.getByText("Nothing written yet: 1 new.")).toBeVisible();
+    await expect(page.getByRole("row", { name: /system-design-primer\.git pkg:github\/donnemartin\/system-design-primer new/ })).toBeVisible();
+    await page.getByRole("button", { name: "Import 1 line" }).click();
+    await expect(page.getByText("1 created.")).toBeVisible();
+    expect(readFileSync(magpie.note("github--donnemartin--system-design-primer.md"), "utf8")).toContain("status: inbox");
+  });
 });
 
 test("conflict: a save against an old version gets 409; the banner reloads; nothing was overwritten", async ({ page, magpie }) => {
@@ -936,7 +1029,7 @@ test("suggest: what magpie suggest finds for this project, in its order; the in-
   await expect(rows).toHaveCount(expected.candidates.length + 1);
 
   const described = runSuggest({ description: "design system", limit: 20 }, place).document;
-  await page.getByLabel("Describe the project instead").fill("design system");
+  await page.getByLabel("Describe what you need").fill("design system");
   await page.getByRole("main").getByRole("button", { name: "Suggest", exact: true }).click();
   await expect(page.getByText(`Looked for: ${described.keywords.join(", ")}`)).toBeVisible();
   await expect(rows).toHaveCount(described.candidates.length + described.in_use_avoid.length);
@@ -950,7 +1043,7 @@ test("alternatives before an install: Check a package and Suggest name them; a r
   }
   writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ description: "Let an agent test a web UI in the browser", dependencies: { pdfkit: "*" } }));
   await magpie.open(page);
-  const search = page.getByRole("searchbox", { name: "Search both journals" });
+  const search = page.getByRole("searchbox", { name: "Search notes" });
 
   // Check a package: an Alternatives row on the card.
   const check = async () => {
@@ -994,7 +1087,7 @@ test("suggest: a project with nothing to go on asks for a description", async ({
   await magpie.open(page);
   await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
   await expect(page.getByText("Nothing to go on here: no package.json, pyproject.toml, Cargo.toml or README.")).toBeVisible();
-  await expect(page.getByLabel("Describe the project instead")).toBeFocused();
+  await expect(page.getByLabel("Describe what you need")).toBeFocused();
 });
 
 test("adopt: the note reaches the project journal only after the confirm; the install command shows; nothing is installed", async ({ page, magpie }) => {
@@ -1234,7 +1327,7 @@ test("delete: the note is gone from search, the graph and Check a package", asyn
   await expect(page.getByRole("status").getByText("Moved pdfkit to the trash")).toBeVisible();
 
   await page.keyboard.press("/");
-  await page.getByRole("searchbox", { name: "Search both journals" }).fill("pdfkit");
+  await page.getByRole("searchbox", { name: "Search notes" }).fill("pdfkit");
   await expect(page.getByText("No notes match")).toBeVisible();
   await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option", { name: /^pdfkit/ })).toHaveCount(0);
 

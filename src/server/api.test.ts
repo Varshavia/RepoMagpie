@@ -10,7 +10,8 @@ import { noteVersion } from "../core/edit.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
-import type { Context } from "../core/save.ts";
+import type { Context, ImportJson } from "../core/save.ts";
+import { PASTE } from "../core/fixtures/import-paste.ts";
 import { addSectionItems } from "../core/write.ts";
 import { client } from "./fixtures/http.ts";
 import { startServer } from "./server.ts";
@@ -283,8 +284,19 @@ test("POST /api/import returns exactly magpie import --json", async (t) => {
   removeFolder(box.note("npm--chalk.md"));
   assert.deepEqual(parsed(await http.write("POST", "/api/import", { text, to: "personal" })), { status: 422, document: real.document });
   assert.equal(readFileSync(box.note("npm--chalk.md"), "utf8"), written);
-  assert.deepEqual(parsed(await http.write("POST", "/api/import", { text: "nothing here", to: "project" })), { status: 200, document: { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [] } });
+  assert.deepEqual(parsed(await http.write("POST", "/api/import", { text: "nothing here", to: "project" })), { status: 200, document: { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], skipped: [{ line: 1, reason: "Not a URL or a package name." }] } });
   for (const body of [{ to: "personal" }, { text: "", to: "x" }, { text: "", dry_run: "yes" }]) assert.equal((await http.write("POST", "/api/import", body)).status, 400);
+});
+
+test("POST /api/import reads a pasted list as magpie import does: the same items and skipped lines", async (t) => {
+  const { box, fetch, http } = await start(t);
+  writeFileSync(join(box.root, "paste.md"), PASTE);
+  const dry = await cli(box, ["import", join(box.root, "paste.md"), "--dry-run"], fetch);
+  const api = parsed(await http.write("POST", "/api/import", { text: PASTE, to: "personal", dry_run: true }));
+  assert.deepEqual(api, { status: STATUS_FOR_EXIT[dry.code], document: dry.document });
+  const doc = dry.document as ImportJson;
+  assert.deepEqual(doc.items.map((i) => i.line), [3, 4, 5, 7, 10]);
+  assert.deepEqual(doc.skipped.map((s) => s.line), [6, 8, 11]);
 });
 
 test("POST /api/note/preview returns the Note preview document and writes nothing", async (t) => {

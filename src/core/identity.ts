@@ -107,9 +107,11 @@ function fromUrl(text: string): Resolution {
   if (host === "github.com" && parts.length >= 2) {
     const purl = new PackageURL("github", parts[0], parts[1].replace(/\.git$/, ""), undefined, undefined, undefined).toString();
     if (parts.length === 2) return { kind: "ok", purl };
-    // A skill: .../tree/<ref>/<path> (a folder) or .../blob/<ref>/<path>/SKILL.md (the file).
+    // A skill: .../tree/<ref>/<path> (a folder) or .../blob/<ref>/<path>/SKILL.md (the file). Any
+    // other file (.../blob/<ref>/README.md) is the repository.
     if ((parts[2] === "tree" || parts[2] === "blob") && parts.length >= 4) {
       const path = parts.slice(4);
+      if (parts[2] === "blob" && path.at(-1) !== "SKILL.md") return { kind: "ok", purl };
       if (path.at(-1) === "SKILL.md") path.pop();
       return path.length ? { kind: "ok", purl, skillPath: path.join("/") } : { kind: "ok", purl };
     }

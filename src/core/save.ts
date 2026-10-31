@@ -6,7 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { captureNote, type Capture, type Items } from "./capture.ts";
 import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
-import { parseImport } from "./import.ts";
+import { parseImport, type SkippedLine } from "./import.ts";
 import {
   appendTags,
   carried,
@@ -388,6 +388,7 @@ export interface ImportJson {
   updated: number;
   failed: number;
   tags_md_added: string[]; // the new notes' tags appended to tags.md, in order
+  skipped: SkippedLine[]; // prose, and a package an earlier line already names; in line order
   error?: string;
 }
 
@@ -400,10 +401,12 @@ export interface ImportRun {
 }
 
 export function importFailure(error: string): ImportJson {
-  return { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], error };
+  return { items: [], created: 0, updated: 0, failed: 0, tags_md_added: [], skipped: [], error };
 }
 
-// magpie import: one item per "- " line. One bad line never stops the rest; import never prompts.
+// magpie import: one item per line that names a package. One bad line never stops the rest; import
+// never prompts. A package named again with nothing more is skipped; a later line with text adds it
+// to the note the earlier line made, as for a note already in the journal.
 export async function runImport(request: ImportRequest, context: Context): Promise<ImportRun> {
   const journal = locateJournal(request.to, context);
   if (journal.error) return { outcome: "failed", document: importFailure(journal.error), journal, results: [], notices: [] };
@@ -414,7 +417,9 @@ export async function runImport(request: ImportRequest, context: Context): Promi
   const manifests = findManifests(context.cwd);
   const notices = new Set<string>();
   const results: LineResult[] = [];
-  for (const item of parseImport(request.text)) {
+  const { items, skipped } = parseImport(request.text);
+  const seen = new Map<string, number>(); // PURL and skill → the first line that names it
+  for (const item of items) {
     const failed = (error: string, id: string | null = null): LineResult => ({ line: item.line, target: item.target, id, result: "failed", error, warnings: [] });
     if (item.error) {
       results.push(failed(item.error));
@@ -431,6 +436,14 @@ export async function runImport(request: ImportRequest, context: Context): Promi
       continue;
     }
     const { useWhen, avoidWhen, verdict, myNotes } = item;
+    const key = `${resolution.purl} ${resolution.skillPath ?? ""}`;
+    const first = seen.get(key);
+    const bare = verdict === undefined && !useWhen.length && !avoidWhen.length && !myNotes;
+    if (first !== undefined && bare) {
+      skipped.push({ line: item.line, reason: `Line ${first} names the same package.` });
+      continue;
+    }
+    if (first === undefined) seen.set(key, item.line);
     const saved = await saveItem(journal, notes, { purl: resolution.purl, skillPath: resolution.skillPath, source: item.target, verdict, useWhen, avoidWhen, myNotes }, context, request.dryRun, tagList);
     tagsMdAdded.push(...saved.tagsMdAdded);
     for (const notice of saved.notices) notices.add(notice);
@@ -444,6 +457,7 @@ export async function runImport(request: ImportRequest, context: Context): Promi
     updated: count("updated"),
     failed: count("failed"),
     tags_md_added: tagsMdAdded,
+    skipped: skipped.sort((a, b) => a.line - b.line),
   };
   return { outcome: count("failed") ? "failed" : "ok", document, journal, results, notices: [...notices] };
 }

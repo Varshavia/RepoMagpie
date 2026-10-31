@@ -1,46 +1,53 @@
-// Import (docs/ui.md §7): words for the dry-run table and the summary, from magpie import --json.
-// Which lines are items, and what each does, is core's; this labels the results and mirrors the
-// item rule for the count while you type.
+// Import (docs/ui.md §7): the words of the check's table and the summary, from magpie import --json.
+// Which lines are items is core's parser, which the app runs too (pure, no imports).
+import { importLines, parseImport } from "../../../src/core/import.ts";
+import type { ImportJson } from "../../../src/core/save.ts";
 
-type Result = "created" | "updated" | "unchanged" | "failed";
+export { noItemsHint } from "../../../src/core/import.ts";
 
-// Core's item rule (core/import.ts, lenient read), mirrored because the app can't bundle core;
-// importing.test.ts keeps the two equal. An item starts with "- ", "* ", "+ " or "\- " at the left
-// margin; a non-breaking space counts as the space; a UTF-8 BOM is ignored.
-const ITEM_MARKER = /^(?:\\?-|\*|\+)[  ]/;
-const lines = (text: string) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).split(/\r?\n/); // without a byte-order mark
+type Result = ImportJson["items"][number]["result"] | "skipped";
 
 export function countItems(text: string): number {
-  return lines(text).filter((line) => ITEM_MARKER.test(line)).length;
+  return parseImport(text).items.length;
 }
 
-// The target written on a line (1-based): the text after the marker, up to the separator.
-export function lineTarget(text: string, line: number): string {
-  const rest = (lines(text)[line - 1] ?? "").replace(ITEM_MARKER, "");
-  const split = rest.match(/^(.*?)(?:^|\s)(?:—|--)(?:\s|$)(.*)$/);
-  return (split ? split[1] : rest).trim();
+// A row of the table: the line as pasted, the note it becomes, and its status, with why.
+export interface Row {
+  line: number;
+  text: string;
+  becomes: string | null; // the note's id
+  result: Result;
+  status: string;
+  why: string; // the error or the reason it was skipped, then any warnings
 }
 
-// For a text without items: the rule, and what the first line with text starts with instead.
-export function noItemsHint(text: string): string {
-  const rule = 'Each item is a line that starts with "- ".';
-  const all = lines(text);
-  const index = all.findIndex((line) => line.trim());
-  if (index === -1) return `${rule} The text is empty.`;
-  const first = all[index].trim().split(/\s/)[0];
-  const start = first.length > 20 ? `${first.slice(0, 20)}…` : first;
-  return `${rule} Line ${index + 1} starts with ${/^\s/.test(all[index]) ? "spaces, then " : ""}"${start}".`;
+const STATUS: Record<Result, [check: string, done: string]> = {
+  created: ["new", "created"],
+  updated: ["in your journal; adds to it", "updated"],
+  unchanged: ["already in your journal", "already in your journal"],
+  failed: ["can't import", "failed"],
+  skipped: ["skipped", "skipped"],
+};
+
+export function rows(doc: ImportJson, text: string, dryRun: boolean): Row[] {
+  const lines = importLines(text);
+  const row = (line: number, becomes: string | null, result: Result, why: string): Row => ({ line, text: (lines[line - 1] ?? "").trim(), becomes, result, status: STATUS[result][dryRun ? 0 : 1], why });
+  return [
+    ...doc.items.map((i) => row(i.line, i.id, i.result, [i.error, ...i.warnings].filter(Boolean).join(" "))),
+    ...doc.skipped.map((s) => row(s.line, null, "skipped", s.reason)),
+  ].sort((a, b) => a.line - b.line);
 }
 
-const WILL: Record<Result, string> = { created: "will create", updated: "will update", unchanged: "no change", failed: "will fail" };
-
-export function resultWord(result: Result, dryRun: boolean): string {
-  return dryRun ? WILL[result] : result;
+// The lines an import would write: new notes and notes it adds to.
+export function writes(doc: ImportJson): number {
+  return doc.created + doc.updated;
 }
 
-export function summary(items: { result: Result }[], dryRun: boolean): string {
-  const n = (r: Result) => items.filter((i) => i.result === r).length;
-  return dryRun
-    ? `RepoMagpie wrote nothing yet: ${n("created")} to create, ${n("updated")} to update, ${n("unchanged")} unchanged, ${n("failed")} failing.`
-    : `${n("created")} created, ${n("updated")} updated, ${n("unchanged")} unchanged, ${n("failed")} failed.`;
+// "Nothing written yet: 2 new, 1 already in your journal, 1 skipped."; the counts that aren't 0.
+export function summary(doc: ImportJson, dryRun: boolean): string {
+  const n = (r: Result) => (r === "skipped" ? doc.skipped.length : doc.items.filter((i) => i.result === r).length);
+  const word = (r: Result) => (dryRun && r === "updated" ? "to update" : STATUS[r][dryRun ? 0 : 1]);
+  const parts = (["created", "updated", "unchanged", "failed", "skipped"] as const).filter((r) => n(r)).map((r) => `${n(r)} ${word(r)}`);
+  if (!parts.length) return "No lines to import.";
+  return dryRun ? `Nothing written yet: ${parts.join(", ")}.` : `${parts.join(", ")}.`;
 }

@@ -215,6 +215,11 @@ export function App() {
   const home = settings?.home ?? null;
   const projectRoot = settings?.journals.project ? homePath(settings.journals.project.path.replace(/[\\/]\.magpie$/, ""), home) : null;
   const allTags = useMemo(() => [...new Set([...tagLists.personal, ...tagLists.project])].sort(), [tagLists]);
+  // Search with an empty query lists these; personal is null while it loads.
+  const searchNotes = useMemo(() => {
+    const ready = (s: ListState) => (s.status === "ready" ? s.notes : null);
+    return { personal: ready(lists.personal), project: hasProject ? ready(lists.project) ?? [] : [] };
+  }, [lists, hasProject]);
 
   const select = useCallback((key: string | null, opts: { focus?: boolean; pane?: boolean } = {}) => {
     setSelected(key);
@@ -619,12 +624,14 @@ export function App() {
           inputRef={searchInput}
           listRef={listRef}
           refresh={live.personal.tick + live.project.tick}
+          notes={searchNotes}
+          onAdd={(page) => go({ page })}
         />
         <section className="pane" aria-label="Note">
           {currentHit?.id ? (
             notePane(currentHit.journal, { id: currentHit.id }, resultKey(currentHit))
           ) : (
-            <EmptyState center>{shown.length ? "Select a result to read the note." : "Results open here."}</EmptyState>
+            <EmptyState center>{`${shown.length ? "Pick a note on the left. " : ""}Press ${MOD}+K to search from anywhere.`}</EmptyState>
           )}
         </section>
       </>

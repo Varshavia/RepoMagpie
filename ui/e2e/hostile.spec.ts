@@ -162,7 +162,7 @@ test("hidden characters: search results and Check a package show the markers too
   writeFileSync(magpie.note("npm--hidden.md"), HIDDEN_NOTE);
   await magpie.open(page);
   await page.keyboard.press("/");
-  await page.getByRole("searchbox", { name: "Search both journals" }).fill("hidden");
+  await page.getByRole("searchbox", { name: "Search notes" }).fill("hidden");
   const results = page.getByRole("listbox", { name: "Search results" });
   await expect(results).toContainText(SHOWN_VERDICT);
   expect(await results.evaluate((el) => el.textContent ?? "")).not.toMatch(RAW);

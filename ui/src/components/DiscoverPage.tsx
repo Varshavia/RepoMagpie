@@ -187,10 +187,8 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
   return (
     <div className="page discover-page">
       <h1 className="page-title">Discover</h1>
-      <p className="page-lede">
-        Search GitHub for repositories by words, concern and kind, and add the ones you choose to your inbox. When you search, Discover sends your words and filters to GitHub's search API, nothing from
-        your journals.
-      </p>
+      <p className="page-lede">Find repositories on GitHub by words, concern and kind, and add the ones you pick to your inbox.</p>
+      <p className="field-help">Discover sends your words and filters to GitHub's search API, nothing from your journals.</p>
 
       <form
         className="page-section"

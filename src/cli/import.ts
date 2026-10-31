@@ -48,14 +48,16 @@ export async function importCommand(file: string, options: ImportOptions, termin
   const count = (result: string) => results.filter((r) => r.result === result).length;
   for (const warning of run.journal.warnings) io.err(`warning: ${warning}\n`);
   for (const notice of run.notices) io.err(`${notice}\n`);
+  const { skipped } = run.document;
   for (const r of results) {
     io.out(`line ${r.line}: ${r.result} ${r.id ? readablePurl(r.id) : r.target}\n`);
     for (const warning of r.warnings) io.err(`line ${r.line}: warning: ${warning}\n`);
     if (r.error) io.err(`line ${r.line}: ${r.error}\n`);
   }
+  for (const s of skipped) io.err(`line ${s.line}: skipped: ${s.reason}\n`);
   const added = run.document.tags_md_added;
   if (added.length) io.err(`${options.dryRun ? "Would add" : "Added"} ${added.length} ${added.length === 1 ? "tag" : "tags"} to tags.md: ${added.join(", ")}\n`);
   if (options.dryRun) io.err("Dry run: nothing was written.\n");
-  io.err(`${count("created")} created, ${count("updated")} updated, ${count("unchanged")} unchanged, ${count("failed")} failed.\n`);
+  io.err(`${count("created")} created, ${count("updated")} updated, ${count("unchanged")} unchanged, ${count("failed")} failed${skipped.length ? `, ${skipped.length} skipped` : ""}.\n`);
   return exitCode(run.outcome);
 }

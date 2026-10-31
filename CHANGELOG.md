@@ -6,10 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Search in the app lists your notes before you type, Verdicts first, then the most recently explored. When a filter hides what matches, the empty list says so and offers the fix: "No reviewed notes match “pdf”. 2 inbox notes do." with **Show inbox notes**. An empty journal points to Discover and Import. Without a project, Search no longer shows a Journal switch or mentions a project.
+- `repomagpie import` and the app's Import read a list as people paste it: one URL or package name per line, with or without a marker, numbered lines (`1.`, `1)`), `•` bullets and Markdown links (`[zod](https://github.com/colinhacks/zod)`). Headings are skipped; other lines that name nothing, such as a sentence, are listed with why, instead of being ignored silently or failing. A name in backticks counts as that name; a package named twice is imported once. `--json` lists them in `skipped`.
+- The app's Import says what it is for, keeps its help to one line with a "Paste an example" link, and shows a table of each line, the note it becomes and its status. Import is enabled only when a line is new or adds to a note.
+
 ### Fixed
 
 - `repomagpie setup --remove --agents codex` no longer deletes the skill in `~/.agents/skills/repomagpie/` while another agent still uses it. That folder is shared: Cursor, Gemini CLI, VS Code and Copilot CLI read it, and Claude Code and Antigravity CLI link to it. The plan now says which agents still read it, and the folder goes with the last of them. If an earlier `--remove --agents` deleted it, run `repomagpie setup` again.
 - `repomagpie doctor`'s to-do for a Codex CLI hook you haven't trusted yet, when only the `~/.codex` folder is there, now says what to do if you don't use Codex CLI: `run repomagpie setup --remove --agents codex`. It ended in "If you don't: ." before.
+- A GitHub link to a file, such as `.../blob/main/README.md`, now makes a note for the repository; it made a skill line named after the file.
 
 ## [0.2.0-beta.18] - 2026-10-30
 

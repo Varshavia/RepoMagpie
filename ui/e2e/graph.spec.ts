@@ -281,7 +281,7 @@ test("graph: an ambiguous missing note offers Search with its name; a file stem'
   await matches.filter({ hasText: "No note yet" }).click();
   await expect(page.getByRole("button", { name: "Add a note" })).toHaveCount(0);
   await page.getByRole("button", { name: "Search notes" }).click();
-  await expect(page.getByRole("searchbox", { name: "Search both journals" })).toHaveValue("zod");
+  await expect(page.getByRole("searchbox", { name: "Search notes" })).toHaveValue("zod");
 
   await page.getByRole("button", { name: "Graph", exact: true }).click();
   await page.getByRole("group", { name: "Draw" }).getByRole("checkbox", { name: "Missing notes" }).check();

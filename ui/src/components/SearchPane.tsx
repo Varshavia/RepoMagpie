@@ -1,11 +1,14 @@
 // Search (docs/ui.md §7): the same ranking as magpie search, across both journals; Verdict first.
 // Filters for journal, kind, domain and tag go to the API; status is filtered here, from the results.
-// Each row says why it matched (decision 0041).
+// Each row says why it matched (decision 0041). An empty query lists the notes the filters keep, and
+// an empty list says why, with the click that fixes it.
 import { useEffect, useRef, useState, type Ref } from "react";
+import type { NoteSummary } from "../../../src/core/documents.ts";
 import { DOMAINS } from "../../../src/core/domains.ts";
 import { api, type ApiError, type Scope, type SearchResult } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { KINDS } from "../logic/schema.ts";
+import { browseRows, emptyText } from "../logic/search.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
 import { SearchRow } from "./rows.tsx";
 import { TALL_ROW, VirtualList } from "./VirtualList.tsx";
@@ -35,22 +38,33 @@ interface Props {
   inputRef: Ref<HTMLInputElement>;
   listRef: Ref<HTMLDivElement>;
   refresh: number; // grows on live updates: search again
+  notes: Partial<Record<Scope, NoteSummary[] | null>>; // each journal's notes, for an empty query; null while loading
+  onAdd: (page: "discover" | "import") => void; // an empty journal's way to add notes
 }
 
 const LIMIT = 100;
+const NO_FILTERS = { journal: "", kind: "", tag: "", domain: "" } as const;
 
-export function SearchPane({ search, onSearch, results, onResults, selected, onSelect, hasProject, tags, inputRef, listRef, refresh }: Props) {
-  const [state, setState] = useState<"idle" | "loading" | "ready" | "error">(search.query.trim() ? "loading" : "idle");
+export function SearchPane({ search, onSearch, results, onResults, selected, onSelect, hasProject, tags, inputRef, listRef, refresh, notes, onAdd }: Props) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [unfiltered, setUnfiltered] = useState<number | null>(null); // matches without the filters, once known
   const attempt = useRef(0);
   const set = <K extends keyof SearchState>(key: K, value: SearchState[K]) => onSearch({ ...search, [key]: value });
+  const q = search.query.trim();
+  const filters = { journal: search.journal, kind: search.kind, tag: search.tag, domain: search.domain };
+  const filtered = Boolean(search.journal || search.kind || search.tag || search.domain);
 
   useEffect(() => {
-    const q = search.query.trim();
+    setUnfiltered(null);
+    // An empty query lists the notes the filters keep, from the lists the app already has.
     if (!q) {
-      setState("idle");
-      onResults([]);
+      attempt.current++;
+      if (!notes.personal) return setState("loading");
+      onResults(browseRows(notes, filters));
+      setUnfiltered(browseRows(notes, NO_FILTERS).length);
+      setState("ready");
       return;
     }
     const n = ++attempt.current;
@@ -63,6 +77,8 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
           if (n !== attempt.current) return;
           onResults(doc.results);
           setState("ready");
+          // Nothing with the filters: does anything match without them? The empty list says so.
+          if (!doc.results.length && filtered) api.search({ q, limit: LIMIT }).then((all) => n === attempt.current && setUnfiltered(all.results.length), () => {});
         },
         (e: ApiError) => {
           if (n !== attempt.current) return;
@@ -72,11 +88,13 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
       );
     }, 150);
     return () => clearTimeout(timer);
-    // results is read only to keep old results on screen while the next ones load
-  }, [search.query, search.journal, search.kind, search.tag, search.domain, refresh, retry]);
+    // results is read only to keep old results on screen while the next ones load; notes only matter without a query
+  }, [search.query, search.journal, search.kind, search.tag, search.domain, refresh, retry, q ? null : notes]);
 
   const shown = search.status ? results.filter((r) => r.status === search.status) : results;
-  const filtered = Boolean(search.journal || search.kind || search.tag || search.domain || search.status);
+  const empty = state === "ready" && !shown.length
+    ? emptyText({ query: q, status: search.status, rows: results, filtered, unfiltered, total: browseRows(notes, { ...NO_FILTERS, journal: search.journal }).length, journals: search.journal || !hasProject ? 1 : 2 })
+    : null;
 
   return (
     <section className="pane" aria-labelledby="search-title">
@@ -86,7 +104,7 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
         </h1>
         <label className="search-box">
           <Icon name="search" />
-          <span className="visually-hidden">Search both journals</span>
+          <span className="visually-hidden">Search notes</span>
           <input
             ref={inputRef}
             type="search"
@@ -107,13 +125,16 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
         </label>
       </header>
       <div className="filters" role="group" aria-label="Filters">
-        <div className="segmented" role="radiogroup" aria-label="Journal">
-          {(["", "personal", "project"] as const).map((j) => (
-            <button key={j || "all"} type="button" role="radio" aria-checked={search.journal === j} disabled={j === "project" && !hasProject} onClick={() => set("journal", j)}>
-              {j === "" ? "Both" : j === "personal" ? "Personal" : "Project"}
-            </button>
-          ))}
-        </div>
+        {/* Without a project there is one journal to search: no switch names the other. */}
+        {hasProject && (
+          <div className="segmented" role="radiogroup" aria-label="Journal">
+            {(["", "personal", "project"] as const).map((j) => (
+              <button key={j || "all"} type="button" role="radio" aria-checked={search.journal === j} onClick={() => set("journal", j)}>
+                {j === "" ? "Both" : j === "personal" ? "Personal" : "Project"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="segmented" role="radiogroup" aria-label="Status">
           {(["", "reviewed", "inbox"] as const).map((s) => (
             <button key={s || "any"} type="button" role="radio" aria-checked={search.status === s} onClick={() => set("status", s)}>
@@ -149,9 +170,7 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
       <div className="visually-hidden" role="status" aria-live="polite">
         {state === "ready" ? `${shown.length} ${shown.length === 1 ? "result" : "results"}` : ""}
       </div>
-      {state === "idle" ? (
-        <EmptyState>Type to search both journals. Notes with a Verdict come first.</EmptyState>
-      ) : state === "loading" ? (
+      {state === "loading" ? (
         <SkeletonRows label="Searching" />
       ) : state === "error" ? (
         <EmptyState
@@ -177,19 +196,34 @@ export function SearchPane({ search, onSearch, results, onResults, selected, onS
           listRef={listRef}
           rowHeight={TALL_ROW}
         />
-      ) : (
+      ) : empty ? (
         <EmptyState
           action={
-            filtered ? (
+            empty.fix?.kind === "status" ? (
+              <button type="button" className="button secondary" onClick={() => set("status", (empty.fix as { status: SearchState["status"] }).status)}>
+                {empty.fix.label}
+              </button>
+            ) : empty.fix?.kind === "clear" ? (
               <button type="button" className="button secondary" onClick={() => onSearch({ ...NO_SEARCH, query: search.query })}>
                 Clear the filters
               </button>
+            ) : empty.fix?.kind === "add" ? (
+              <span className="empty-actions">
+                <button type="button" className="button secondary" onClick={() => onAdd("discover")}>
+                  <Icon name="external" />
+                  Discover
+                </button>
+                <button type="button" className="button secondary" onClick={() => onAdd("import")}>
+                  <Icon name="import" />
+                  Import
+                </button>
+              </span>
             ) : undefined
           }
         >
-          {`No notes match “${search.query.trim()}”. Try fewer words${filtered ? ", or clear the filters" : ""}.`}
+          {empty.text}
         </EmptyState>
-      )}
+      ) : null}
     </section>
   );
 }
