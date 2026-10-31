@@ -1,6 +1,9 @@
 // The global flags, and the context core needs from a command's I/O. Kept apart from the commands
 // so a quick command loads nothing else (spec §7 budgets).
+import type { Platform } from "../core/agents.ts";
 import type { Fetch } from "../core/github.ts";
+import { onceGitHubAuth } from "../core/github-auth.ts";
+import { ghLogin } from "../core/github-cli.ts";
 import { takeSkipped } from "../core/note-cache.ts";
 import type { Context } from "../core/save.ts";
 import { clean } from "../core/text.ts";
@@ -14,7 +17,10 @@ export interface GlobalOptions {
 
 export function contextOf(io: Io, options: GlobalOptions): Context {
   const fetch = io.env.REPOMAGPIE_DEBUG_HTTP === "1" ? debugFetch(io.fetch, io.err) : io.fetch;
-  return { home: io.home, env: io.env, cwd: io.cwd, homeFlag: options.home, projectFlag: options.project, fetch, today: io.today };
+  // The GitHub token is read on the first request that needs it, once (decision 0053). Tests pass
+  // io.gh; without one, gh is looked up on io.env's PATH.
+  const gh = io.gh ?? ghLogin({ home: io.home, env: io.env, platform: process.platform as Platform });
+  return { home: io.home, env: io.env, cwd: io.cwd, homeFlag: options.home, projectFlag: options.project, fetch, today: io.today, github: onceGitHubAuth(io.env, gh) };
 }
 
 // REPOMAGPIE_DEBUG_HTTP=1 (spec §1): one stderr line for each GitHub request, for a diagnosis: this

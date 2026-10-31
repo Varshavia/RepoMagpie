@@ -109,14 +109,18 @@ test("Settings: the home directory, both journals with their paths, and whether 
     home: s.context.home,
     journals: { personal: { path: s.journal, exists: true }, project: { path: join(s.project, ".magpie"), exists: true } },
     github_token_set: false,
+    github_source: null,
   });
 });
 
-test("Settings never contains the token's value", () => {
+test("Settings never contains the token's value, only where it came from", () => {
   const s = setup();
-  const document = settingsDocument({ ...s.context, env: { ...s.context.env, GITHUB_TOKEN: "ghp_never_shown_123" } });
-  assert.equal(document.github_token_set, true);
-  assert.doesNotMatch(JSON.stringify(document), /ghp_never_shown_123/);
+  const fromEnv = settingsDocument({ ...s.context, env: { ...s.context.env, GITHUB_TOKEN: "ghp_never_shown_123" } });
+  assert.deepEqual([fromEnv.github_token_set, fromEnv.github_source], [true, "GITHUB_TOKEN"]);
+  assert.doesNotMatch(JSON.stringify(fromEnv), /ghp_never_shown_123/);
+  const fromGh = settingsDocument({ ...s.context, github: () => ({ token: "gho_never_shown_456", source: "gh" }) });
+  assert.deepEqual([fromGh.github_token_set, fromGh.github_source], [true, "gh"]);
+  assert.doesNotMatch(JSON.stringify(fromGh), /gho_never_shown_456/);
 });
 
 test("Settings: a project journal not created yet is where it would be; none when there is no project root", () => {

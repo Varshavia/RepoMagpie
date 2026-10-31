@@ -161,18 +161,27 @@ test("several requests are merged: each repository once, in the sort's order, cu
   assert.deepEqual(document.warnings, []);
 });
 
-test("without a token a domain search sends 2 requests, and a warning names the topic left out", async () => {
+test("without a token a domain search sends 2 requests, says so in one sentence, and partial_search names the topics", async () => {
   const [a, b] = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
   const { context, calls } = setup({ [a]: answer(item("x/one")), [b]: answer(item("x/two")) });
   const { outcome, document } = await runDiscover({ domain: "styling" }, context);
   assert.equal(outcome, "ok");
   assert.equal(calls.length, 2);
   assert.deepEqual(document.results.map((r) => r.name), ["x/one", "x/two"]);
-  assert.deepEqual(document.warnings, [
-    "Without GITHUB_TOKEN, only 2 of the domain styling's 3 topics were searched (css, tailwindcss; not design), to stay within GitHub's 10 searches a minute. Set GITHUB_TOKEN to search them all.",
-  ]);
+  assert.deepEqual(document.warnings, ["Searched 2 of 3 styling topics to stay within GitHub's limit. Connect GitHub to search all."]);
+  assert.deepEqual(document.partial_search, { searched: ["css", "tailwindcss"], left_out: ["design"] });
   const kind = setup({}, { fetch: fakeFetch({}, [], () => new Response(JSON.stringify(answer()))) });
-  assert.match((await runDiscover({ kind: "template" }, kind.context)).document.warnings[0], /only 2 of the kind template's 3 topics were searched \(template, starter; not boilerplate\)/);
+  const byKind = (await runDiscover({ kind: "template" }, kind.context)).document;
+  assert.equal(byKind.warnings[0], "Searched 2 of 3 template topics to stay within GitHub's limit. Connect GitHub to search all.");
+  assert.deepEqual(byKind.partial_search, { searched: ["template", "starter"], left_out: ["boilerplate"] });
+});
+
+test("with a token every topic is searched, and partial_search is null", async () => {
+  const urls = DOMAIN_TOPICS.styling.map((t) => path(`${BASE} topic:${t}`));
+  const { context, calls } = setup(Object.fromEntries(urls.map((u) => [u, answer()])), { env: { GH_TOKEN: "t" } });
+  const { document } = await runDiscover({ domain: "styling" }, context);
+  assert.equal(calls.length, 3);
+  assert.deepEqual([document.warnings, document.partial_search], [[], null]);
 });
 
 test("a search's requests go one after another, never at once", async () => {
@@ -254,7 +263,7 @@ const searchLimit = (token: boolean) => () =>
     headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Date.UTC(2026, 9, 26, 14, 5) / 1000), "x-ratelimit-resource": "search", ...(token ? {} : {}) },
   });
 
-const SHARED = " Without a token, GitHub counts 10 searches a minute for your public IP address, shared with every other program and device that uses it, so other searches can use them up. Set GITHUB_TOKEN for 30 a minute of your own.";
+const SHARED = " Without a token, GitHub counts 10 searches a minute for your public IP address, shared with every other program and device that uses it, so other searches can use them up. Connect GitHub (gh auth login, or GITHUB_TOKEN) for 30 a minute of your own.";
 
 // GitHub's real answer to the first search of a minute, recorded with REPOMAGPIE_DEBUG_HTTP=1 on
 // 2026-10-27 (Windows, no token), while /rate_limit showed the search limit with none used: the
@@ -346,7 +355,7 @@ test("waiting out a rate limit: only when it ends within 60 seconds, and once a 
   assert.match(partial.document.warnings.at(-1) ?? "", /^Only 1 of 2 searches ran/);
 });
 
-test("GitHub's search limit: its reset time, and without a token that GITHUB_TOKEN raises it; nothing is cached", async () => {
+test("GitHub's search limit: its reset time, and without a token that connecting GitHub raises it; nothing is cached", async () => {
   const now = () => Date.UTC(2026, 9, 26, 14, 1);
   const without = setup({}, { fetch: fakeFetch({}, [], searchLimit(false)) });
   const run = await runDiscover({ text: "x" }, without.context, { now });

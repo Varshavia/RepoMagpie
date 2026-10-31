@@ -385,14 +385,14 @@ function statusProblem(response: Response, slug: string, hasToken: boolean, body
     // (x-ratelimit-used 10) while /rate_limit showed none used (decision 0045). The message can't say
     // the user used them up.
     if (headers.get("x-ratelimit-resource") === "search") {
-      const raise = hasToken ? "" : " Without a token, GitHub counts 10 searches a minute for your public IP address, shared with every other program and device that uses it, so other searches can use them up. Set GITHUB_TOKEN for 30 a minute of your own.";
+      const raise = hasToken ? "" : " Without a token, GitHub counts 10 searches a minute for your public IP address, shared with every other program and device that uses it, so other searches can use them up. Connect GitHub (gh auth login, or GITHUB_TOKEN) for 30 a minute of your own.";
       return { kind: "search-rate-limit", message: `${used("GitHub's search limit")}${raise}`, ...reset };
     }
-    return { kind: "rate-limit", message: `${used("GitHub's rate limit")}${hasToken ? "" : " Set GITHUB_TOKEN to raise the limit."}`, ...reset };
+    return { kind: "rate-limit", message: `${used("GitHub's rate limit")}${hasToken ? "" : " Connect GitHub (gh auth login, or GITHUB_TOKEN) to raise the limit."}`, ...reset };
   }
-  if (status === 401) return { kind: "auth", message: "GitHub rejected the request (401): GITHUB_TOKEN may be invalid or expired. Check it, or unset it to use GitHub without a token." };
+  if (status === 401) return { kind: "auth", message: "GitHub rejected the request (401): the GitHub token may be invalid or expired. Run gh auth login again, or check GITHUB_TOKEN and GH_TOKEN." };
   if (status === 404) {
-    return { kind: "not-found", message: `GitHub has no repository ${slug}, or it is private${hasToken ? " and GITHUB_TOKEN can't see it" : ""}.` };
+    return { kind: "not-found", message: `GitHub has no repository ${slug}, or it is private${hasToken ? " and your GitHub token can't see it" : ""}.` };
   }
   if (status === 422) return { kind: "invalid-query", message: `GitHub refused the query (422)${validationDetail(body)}.` };
   return { kind: "http", message: `GitHub answered ${status}.` };

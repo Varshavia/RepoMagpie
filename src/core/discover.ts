@@ -9,6 +9,8 @@ import { DOMAIN_IDS, isDomain, suggestDomains, type Domain } from "./domains.ts"
 import { ageText } from "./discover-format.ts";
 import { noteDocument, noteListDocument } from "./documents.ts";
 import { get, kindFromTopics, PLATFORM, RATE_LIMITS, SKILL_TOPICS, TEMPLATE, type FetchProblem } from "./github.ts";
+import { githubAuth } from "./github-auth.ts";
+import { partialSearchWarning } from "./github-connection.ts";
 import { journalAliases } from "./journals.ts";
 import { KINDS, stripComments } from "./note.ts";
 import { readCache, writeCache } from "./note-cache.ts";
@@ -66,6 +68,7 @@ export interface DiscoverJson {
   cached: boolean;
   results: DiscoverResult[];
   warnings: string[];
+  partial_search: { searched: string[]; left_out: string[] } | null; // a domain's or kind's topics, when some weren't searched without a token; a warning says so too
   problem: FetchProblem | null;
   error?: string;
 }
@@ -138,6 +141,7 @@ export function emptyDiscover(input: DiscoverInput = {}, error?: string): Discov
     cached: false,
     results: [],
     warnings: [],
+    partial_search: null,
     problem: null,
     ...(error === undefined ? {} : { error }),
   };
@@ -305,7 +309,7 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
   const usage = discoverProblem(input);
   if (usage) return { outcome: "usage", document: emptyDiscover(input, usage) };
   const query = normalise(input);
-  const token = Boolean(context.env.GITHUB_TOKEN);
+  const token = Boolean(githubAuth(context).token);
   const { queries, postKind, leftOut } = buildQueries(input, context.today(), token ? MAX_REQUESTS : MAX_REQUESTS_WITHOUT_TOKEN);
   const now = (options.now ?? Date.now)();
   const personal = locateJournal("personal", context);
@@ -319,10 +323,9 @@ export async function runDiscover(input: DiscoverInput, context: Context, option
     ? `GitHub can't search by the kind ${postKind}, so the results are filtered by their estimated kind, from topics and the name: some ${postKind}s are left out, and a page can hold fewer results.`
     : null;
   if (leftOut.length) {
-    const what = query.domain ? `the domain ${query.domain}` : `the kind ${query.kind}`;
     const all = query.domain ? DOMAIN_TOPICS[query.domain as Domain] : (KIND_TOPICS[query.kind as string] ?? []);
-    const done = all.filter((t) => !leftOut.includes(t));
-    document.warnings.push(`Without GITHUB_TOKEN, only ${done.length} of ${what}'s ${all.length} topics were searched (${done.join(", ")}; not ${leftOut.join(", ")}), to stay within GitHub's 10 searches a minute. Set GITHUB_TOKEN to search them all.`);
+    document.partial_search = { searched: all.filter((t) => !leftOut.includes(t)), left_out: leftOut };
+    document.warnings.push(partialSearchWarning(document.query, document.partial_search));
   }
 
   let searched: Searched;
@@ -390,7 +393,7 @@ type Searching = { ok: true; searched: Searched; answered: number; stopped: Fetc
 // sent again; a rate limit after that, with some answers, stops there and keeps them (`stopped`);
 // any other failure, or a rate limit with no answers, fails the search.
 async function search(queries: string[], q: DiscoverJson["query"], context: Context, options: DiscoverOptions): Promise<Searching> {
-  const token = context.env.GITHUB_TOKEN || undefined;
+  const token = githubAuth(context).token;
   const now = options.now ?? Date.now;
   const request = (query: string) => get(searchPath(query, q.sort, q.limit, q.page), "search", { fetch: context.fetch, token, timeoutMs: options.timeoutMs, now });
   const answers: { total: number; incomplete: boolean; items: Found[] }[] = [];

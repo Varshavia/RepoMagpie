@@ -4,13 +4,15 @@ import { api, type ApiError, type ImportJson, type Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { countItems, noItemsHint, rows, summary, writes } from "../logic/importing.ts";
 import { readablePurl } from "../logic/schema.ts";
+import type { GitHubSource } from "../../../src/core/github-connection.ts";
 import { Banner, FieldError } from "./common.tsx";
 import { JournalChoice, type ProjectState } from "./fields.tsx";
+import { GitHubLine } from "./GitHubLine.tsx";
 
 const EXAMPLE = "https://github.com/microsoft/playwright-cli\nhttps://www.npmjs.com/package/pdfkit\n- [zod](https://github.com/colinhacks/zod)";
 const ICONS: Record<string, IconName> = { created: "check", updated: "check", unchanged: "check", failed: "warning", skipped: "warning" };
 
-export function ImportPage({ project, defaultJournal, onImported }: { project: ProjectState; defaultJournal: Scope; onImported: (journal: Scope) => void }) {
+export function ImportPage({ project, defaultJournal, github, onImported }: { project: ProjectState; defaultJournal: Scope; github: GitHubSource | null | undefined; onImported: (journal: Scope) => void }) {
   const id = useId();
   const [text, setText] = useState("");
   const [to, setTo] = useState<Scope>(defaultJournal);
@@ -46,6 +48,7 @@ export function ImportPage({ project, defaultJournal, onImported }: { project: P
     <div className="page">
       <h1 className="page-title">Import</h1>
       <p className="page-lede">Have a list of repos or packages? Paste it here, and each line becomes an inbox note you can review later.</p>
+      <GitHubLine source={github} />
 
       <div className="page-section">
         <div className="field">

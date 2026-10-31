@@ -1,5 +1,6 @@
-// Settings (docs/ui.md §7; read-only in v0.1): the journals, whether GITHUB_TOKEN is set (never its
-// value), the version, links to the docs. The theme is this browser's choice, not a journal setting.
+// Settings (docs/ui.md §7; read-only in v0.1): the journals, where the GitHub token comes from (never
+// its value), the version, links to the docs. The theme is this browser's choice, not a journal setting.
+import { connectionText } from "../../../src/core/github-connection.ts";
 import type { SettingsJson } from "../api.ts";
 import { homePath } from "../logic/text.ts";
 import type { Scheme, Theme } from "../platform.ts";
@@ -47,8 +48,8 @@ export function SettingsPage({ settings, error, theme, scheme, onTheme, onKeys }
                   </>
                 )}
               </dd>
-              <dt>GitHub token</dt>
-              <dd>{settings.github_token_set ? "Set (GITHUB_TOKEN)" : "Not set. Without GITHUB_TOKEN, GitHub allows 60 requests an hour."}</dd>
+              <dt>GitHub</dt>
+              <dd>{connectionText(settings.github_source).replace(/^GitHub: /, "")}</dd>
               <dt>Version</dt>
               <dd className="mono">{settings.version}</dd>
             </dl>

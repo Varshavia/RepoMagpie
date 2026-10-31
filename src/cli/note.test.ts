@@ -214,7 +214,7 @@ test("a rejected token: exit 1, nothing written, says it may be invalid or expir
   for (const json of [[], ["--json"]]) {
     const r = await magpie(box, ["note", PLAYWRIGHT_URL, ...json], { fetch: reject, env: { MAGPIE_HOME: box.journal, GITHUB_TOKEN: "t0k3n-secret" } });
     assert.equal(r.code, 1);
-    assert.match(r.err + r.out, /GITHUB_TOKEN may be invalid or expired/);
+    assert.match(r.err + r.out, /GitHub token may be invalid or expired/);
     assert.ok(!(r.err + r.out).includes("t0k3n-secret"));
   }
   assert.equal(calls[0].headers.Authorization, "Bearer t0k3n-secret");

@@ -1,5 +1,6 @@
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import type { Fetch } from "../core/github.ts";
+import type { GhLogin } from "../core/github-auth.ts";
 import type { AdoptOptions } from "./adopt.ts";
 import type { CatalogOptions } from "./catalog.ts";
 import type { GlobalOptions } from "./context.ts";
@@ -45,6 +46,7 @@ export interface Io {
   untilStopped?: () => Promise<void>; // resolves when magpie ui should stop; default: Ctrl+C (SIGINT) or SIGTERM
   terminal?: Terminal; // setup's prompts read keys here; default: stdin, drawn on stderr
   self?: { execPath: string; entry: string }; // the node and the entry file running this; default: this process's
+  gh?: GhLogin; // `gh auth token` for the GitHub token (decision 0053); default: gh on env's PATH
 }
 
 const JOURNAL_COMMANDS = new Set(["note", "import", "tags", "domains", "search", "catalog", "recall", "suggest", "init", "adopt", "delete", "discover"]);

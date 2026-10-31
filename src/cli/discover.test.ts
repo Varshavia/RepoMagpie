@@ -14,7 +14,7 @@ const repo = (name: string, over: Record<string, unknown> = {}) => ({
   open_issues_count: 3, pushed_at: "2026-07-04T00:00:00Z", license: { spdx_id: "MIT" }, archived: false, language: "TypeScript", topics: ["design-system", "react"], ...over,
 });
 const answer = (total: number, ...items: unknown[]) => ({ total_count: total, incomplete_results: false, items });
-const KEYS = ["query", "searches", "approximate", "total", "next_page", "incomplete", "cached", "results", "warnings", "problem"];
+const KEYS = ["query", "searches", "approximate", "total", "next_page", "incomplete", "cached", "results", "warnings", "partial_search", "problem"];
 
 test("discover --json: one document, the spec's keys, a result's fields", async () => {
   const box = sandbox();
@@ -104,7 +104,7 @@ test("GitHub's search limit or no connection is exit 1, with problem in --json",
   const doc = JSON.parse(json.out) as { problem: { kind: string; reset: string }; error: string; results: unknown[] };
   assert.equal(doc.problem.kind, "search-rate-limit");
   assert.match(doc.problem.reset, /^\d{4}-\d{2}-\d{2}T/);
-  assert.match(doc.error, /shared with every other program and device that uses it.*Set GITHUB_TOKEN for 30 a minute of your own\.$/);
+  assert.match(doc.error, /shared with every other program and device that uses it.*Connect GitHub \(gh auth login, or GITHUB_TOKEN\) for 30 a minute of your own\.$/);
   assert.deepEqual(doc.results, []);
   const offline = await magpie(box, ["discover", "x"], { fetch: (async () => { throw new TypeError("fetch failed"); }) as typeof fetch });
   assert.equal(offline.code, 1);

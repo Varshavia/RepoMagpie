@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { captureNote, type Capture, type Items } from "./capture.ts";
 import { fetchRepository, type Fetch, type RepoMetadata } from "./github.ts";
+import { githubAuth, type GitHubAuth } from "./github-auth.ts";
 import { fileNameClash, fileNameFor, resolveTarget, type PackageType } from "./identity.ts";
 import { parseImport, type SkippedLine } from "./import.ts";
 import {
@@ -41,6 +42,7 @@ import { addAlternatives, itemsProblem } from "./write.ts";
 export interface Context extends Place {
   fetch: Fetch;
   today: () => string; // YYYY-MM-DD, local time
+  github?: () => GitHubAuth; // the GitHub token and where it came from (decision 0053); without it, the environment alone
 }
 
 export interface Journal {
@@ -136,7 +138,7 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   let metadata: RepoMetadata | null = null;
   const verdictTaken = existing !== null && Boolean(item.verdict?.trim()) && readNote(existing).verdict !== "";
   if (item.purl.startsWith("pkg:github/") && !verdictTaken) {
-    const fetched = await fetchRepository(item.purl, { fetch: context.fetch, token: context.env.GITHUB_TOKEN || undefined });
+    const fetched = await fetchRepository(item.purl, { fetch: context.fetch, token: githubAuth(context).token });
     if (fetched.ok) {
       metadata = fetched.metadata;
       warnings.push(...fetched.warnings);

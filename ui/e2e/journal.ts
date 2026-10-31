@@ -4,8 +4,8 @@
 // read, and a project journal with one note. No network: nothing here fetches from GitHub, and the
 // Discover tests get a fake one (fake-github.ts).
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderNote } from "../../src/core/write.ts";
 import { SHOWCASE_PROJECT, SHOWCASE_SUGGESTED, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
@@ -174,7 +174,13 @@ export interface Running {
 // noProject: it starts in the home folder, outside any project.
 export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProject?: boolean } = {}): Promise<Running> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: j.home, USERPROFILE: j.home, MAGPIE_HOME: j.journal };
+  // Never the maintainer's GitHub login (decision 0053): no token variables, and no folder on PATH
+  // that holds gh, so the app shows "not connected" here as on a fresh machine.
   delete env.GITHUB_TOKEN;
+  delete env.GH_TOKEN;
+  for (const name of ["PATH", "Path"]) {
+    if (env[name]) env[name] = env[name].split(delimiter).filter((folder) => !["gh", "gh.exe", "gh.cmd"].some((file) => existsSync(join(folder, file)))).join(delimiter);
+  }
   const preload = options.fakeGithub ? ["--import", pathToFileURL(join(REPO, "ui", "e2e", "fake-github.ts")).href] : [];
   const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: options.noProject ? j.home : j.project, env, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";

@@ -146,10 +146,49 @@ test("a domain search that meets the limit on its second request shows the first
   await page.getByRole("searchbox", { name: "Words" }).fill("halfway");
   await page.getByRole("searchbox", { name: "Words" }).press("Enter");
   await expect(card(page, "VoltAgent/awesome-design-md")).toBeVisible();
-  await expect(page.getByText(/^Without GITHUB_TOKEN, only 2 of the domain styling's 3 topics were searched/)).toBeVisible();
+  await expect(page.getByText("Searched 2 of 3 styling topics to stay within GitHub's limit. Connect GitHub to search all.")).toBeVisible();
   await expect(page.getByText(/^Only 1 of 2 searches ran: GitHub's search limit is used up until \d\d:\d\d UTC\./)).toBeVisible();
-  // Warnings, not the failure banner (which links to how to set a token).
-  await expect(page.getByRole("link", { name: "How to set a GitHub token" })).toHaveCount(0);
+  // The two warnings, not a failure banner as well.
+  await expect(page.getByRole("alert")).toHaveCount(2);
+});
+
+test("not connected: the GitHub line and its steps; the partial-search warning shows once and stays dismissed for the session", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Discover", exact: true }).click();
+  await expect(page.getByText("GitHub: not connected, limited to 10 searches a minute.")).toBeVisible();
+  const how = page.getByRole("button", { name: "How to connect" });
+  await expect(how).toHaveAttribute("aria-expanded", "false");
+  await how.click();
+  await expect(how).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Install the GitHub CLI (cli.github.com) and run gh auth login.")).toBeVisible();
+
+  const warning = page.getByText("Searched 2 of 3 security topics to stay within GitHub's limit. Connect GitHub to search all.");
+  await page.getByLabel("Domain").selectOption("security");
+  await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(cards(page).first()).toBeVisible();
+  await expect(warning).toHaveCount(1);
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect(warning).toHaveCount(0);
+
+  // Another partial search, and a reload of the page: still dismissed.
+  await page.getByRole("searchbox", { name: "Words" }).fill("design");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(page.getByText(/^Searched 2 of 3 security topics/)).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Discover", exact: true }).click();
+  await page.getByLabel("Domain").selectOption("security");
+  await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(cards(page).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+});
+
+test("Import shows the same GitHub line", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("GitHub: not connected, limited to 10 searches a minute.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "How to connect" })).toBeVisible();
 });
 
 test("a secondary rate limit says so and when to try again; a reset already past is never shown", async ({ page, magpie }) => {
@@ -173,13 +212,13 @@ test("a limit over within a minute is waited out: the page stays loading, then s
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
-test("rate limited: GitHub's message, the reset in local time, and where to set a token", async ({ page, magpie }) => {
+test("rate limited: GitHub's message, the reset in local time, and how to connect GitHub", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "ratelimit");
   const alert = page.getByRole("alert");
   await expect(alert).toContainText("GitHub's search limit is used up until");
   await expect(alert).toContainText(/That is \d\d:\d\d.* your time\./);
-  await expect(alert.getByRole("link", { name: "How to set a GitHub token" })).toHaveAttribute("href", /^https:\/\/github\.com\/Varshavia\/RepoMagpie#/);
+  await expect(alert).toContainText("Connect GitHub (gh auth login, or GITHUB_TOKEN) for 30 a minute of your own.");
 });
 
 test("offline: can't reach GitHub, with Try again", async ({ page, magpie }) => {

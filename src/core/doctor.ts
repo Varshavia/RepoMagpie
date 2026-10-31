@@ -14,10 +14,13 @@ import { findHooks, lacksMonitor, PRE_TOOL_USE, STOP, type HookKind } from "./se
 import { findAgentHooks, HOOK_SPECS, type HookSpec } from "./setup-agent-hooks.ts";
 import { codexHookHash, codexHooksOff, codexTrust } from "./codex-hooks.ts";
 import { DOMAIN_IDS, noteDomains } from "./domains.ts";
+import { githubAuth, type GitHubAuth } from "./github-auth.ts";
+import type { GitHubSource } from "./github-connection.ts";
 import { readNote } from "./note.ts";
 import { noteSignature } from "./note-cache.ts";
 
 export interface DoctorRequest extends Place {
+  github?: () => GitHubAuth; // the GitHub token's lookup (decision 0053); without it, the environment alone
   platform: Platform;
   version: string; // this CLI's version
   node: { path: string; version: string }; // the Node.js running it
@@ -107,6 +110,7 @@ export interface DoctorJson {
   backups: { path: string; date: string }[]; // setup's backups, which setup --delete-backups deletes; never a problem
   journals: JournalReport[];
   git_repository: boolean; // the working directory is in a git repository (not one at home), where a project journal could start
+  github: { connected: boolean; source: GitHubSource | null }; // where the GitHub token comes from; never the token
   problems: string[]; // what to do, one sentence each
 }
 
@@ -349,7 +353,9 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
 
   const gitRepository = gitRoot(request.cwd, request.home) !== null; // as the project journal's walk decides
 
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, problems };
+  // Information, not a to-do: RepoMagpie works without GitHub, only more slowly.
+  const { source } = githubAuth(request);
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked

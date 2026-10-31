@@ -705,7 +705,7 @@ export function App() {
             </p>
           }
         >
-          <DiscoverPage journal={journal} tokenSet={settings?.github_token_set ?? false} memory={discovered} onOpenNote={openNote} onSaved={afterWrite} />
+          <DiscoverPage journal={journal} github={settings?.github_source} memory={discovered} onOpenNote={openNote} onSaved={afterWrite} />
         </Suspense>
       </section>
     );
@@ -723,7 +723,7 @@ export function App() {
               onSaved={afterWrite}
             />
           ) : view.page === "import" ? (
-            <Import.Part project={projectState} defaultJournal={journal} onImported={afterWrite} />
+            <Import.Part project={projectState} defaultJournal={journal} github={settings?.github_source} onImported={afterWrite} />
           ) : view.page === "recall" ? (
             <Recall.Part home={home} onOpenNote={openNote} onAdd={addInJournal} onSearch={searchName} />
           ) : (
