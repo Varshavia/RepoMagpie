@@ -315,9 +315,12 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
       const hand = hookByHand(hook);
       printed ||= hand !== null;
       use.push(hand ? `change the hook in ${tilde(hook.file)} by hand (${hand})${trusting}` : `run repomagpie setup --agents ${id}${trusting}`);
+    } else if (l.trust) use.push("open /hooks in Codex and trust it");
+    // A hook that only needs trusting goes the same way as a broken one.
+    if ((l.hook || l.trust) && hook) {
       const keeps = pathProblem(hook.file, request.home) !== null || plainAgentHook.get(id) === false;
       drop.push(keeps ? `delete the hook entry in ${tilde(hook.file)} by hand` : `run repomagpie setup --remove --agents ${id}`);
-    } else if (l.trust) use.push("open /hooks in Codex and trust it");
+    }
     if (l.mcp) {
       const text = texts.get(id) ?? null;
       const hand = mcpByHand(agent, where, text, true);
