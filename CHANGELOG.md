@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- `repomagpie setup --remove --agents codex` no longer deletes the skill in `~/.agents/skills/repomagpie/` while another agent still uses it. That folder is shared: Cursor, Gemini CLI, VS Code and Copilot CLI read it, and Claude Code and Antigravity CLI link to it. The plan now says which agents still read it, and the folder goes with the last of them. If an earlier `--remove --agents` deleted it, run `repomagpie setup` again.
+- `repomagpie doctor`'s to-do for a Codex CLI hook you haven't trusted yet, when only the `~/.codex` folder is there, now says what to do if you don't use Codex CLI: `run repomagpie setup --remove --agents codex`. It ended in "If you don't: ." before.
+
 ## [0.2.0-beta.18] - 2026-10-30
 
 The nineteenth pre-release: security fixes. The link `repomagpie ui` prints works once, and outside a git repository a project journal needs `--project`.

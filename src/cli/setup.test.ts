@@ -244,6 +244,20 @@ test("--remove takes out only our entry, after a backup", async () => {
   assert.ok(Math.abs(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s) - Date.now()) < 60_000, r.err);
 });
 
+test("--remove for one agent says the shared skill stays while another agent still uses it", async () => {
+  const b = box();
+  await magpie(b, ["setup", "--yes"], b.over);
+  // Gemini CLI, set up by an earlier setup: found by its settings.json, which holds RepoMagpie's entry.
+  const gemini = join(b.home, ".gemini", "settings.json");
+  mkdirSync(join(b.home, ".gemini"));
+  writeFileSync(gemini, JSON.stringify({ mcpServers: { repomagpie: b.entry() } }));
+  const r = await magpie(b, ["setup", "--remove", "--yes", "--agents", "cursor"], b.over);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /^ {2}Skill {9}leave: ~[\\/]\.agents[\\/]skills[\\/]repomagpie: Gemini CLI still reads it; setup removes it with the last agent that does\.$/m);
+  assert.ok(existsSync(join(b.home, ".agents", "skills", "repomagpie", "SKILL.md")));
+  assert.match(r.err, /^Done: Cursor, removed/m);
+});
+
 test("--project: the skill and the Claude Code hook go into the project; the MCP entries stay in the user's settings", async () => {
   const b = box();
   mkdirSync(join(b.home, ".claude"));

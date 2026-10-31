@@ -399,6 +399,49 @@ test("a folder-only agent's MCP entry, and both entries: one to-do, setup's way 
   ]);
 });
 
+// A step with nothing after it: "If you don't: ." (Codex's trust alone, in an agent found by its
+// folder only), a colon at the end, or empty brackets.
+const EMPTY_STEP = /:\s*(?:[.,;]|$)|\(\s*\)|\b[Rr]un\s*[.,;]/;
+
+test("no to-do leaves a step without its command: Codex's trust alone, and every agent's entries by folder, by hand and by command", () => {
+  const box = scratchHome();
+  const entry = join(box.bin, "main.js");
+  box.write(entry, "");
+  const handler = { type: "command", command: hookLaunch(hookShell("codex", platform), process.execPath, entry, "codex", []) as string, timeout: 10 };
+  box.write(join(box.home, ".codex", "hooks.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [handler] }] } }));
+  assert.deepEqual(runDoctor(box.request).problems.filter((p) => p.includes("Codex")), [
+    "Codex CLI skips RepoMagpie's hook until you trust it. If you use Codex CLI: open /hooks in Codex and trust it. If you don't: run repomagpie setup --remove --agents codex.",
+  ]);
+
+  const seen = new Set<string>();
+  const collect = () => { for (const p of runDoctor(box.request).problems) seen.add(p); };
+  collect();
+  const gone = { command: join(box.root, "gone", "node"), args: ["x.js", "mcp"] };
+  const vscode = windows ? join(box.home, "AppData", "Roaming", "Code", "User") : platform === "darwin" ? join(box.home, "Library", "Application Support", "Code", "User") : join(box.home, ".config", "Code", "User");
+  box.write(join(box.home, ".claude.json"), JSON.stringify({ mcpServers: { repomagpie: gone } }));
+  box.write(join(box.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "magpie hook claude-code" }] }] } }));
+  box.write(join(box.home, ".codex", "config.toml"), `[mcp_servers.repomagpie]\ncommand = ${JSON.stringify(gone.command)}\nargs = ["x.js", "mcp"]\n`);
+  box.write(join(box.home, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { repomagpie: gone } }));
+  box.write(join(box.home, ".cursor", "hooks.json"), JSON.stringify({ version: 1, hooks: { beforeShellExecution: [{ command: "repomagpie hook cursor" }] } }));
+  box.write(join(box.home, ".gemini", "settings.json"), JSON.stringify({ mcpServers: { repomagpie: gone }, hooks: { BeforeTool: [{ matcher: "run_shell_command", hooks: [{ type: "command", name: "repomagpie", command: "repomagpie hook gemini-cli" }] }] } }));
+  box.write(join(vscode, "mcp.json"), JSON.stringify({ servers: { repomagpie: gone } }));
+  box.write(join(box.home, ".gemini", "config", "mcp_config.json"), JSON.stringify({ mcpServers: { repomagpie: gone } }));
+  box.write(join(box.home, ".gemini", "config", "hooks.json"), JSON.stringify({ repomagpie: { PreToolUse: [{ matcher: "run_command", hooks: [{ type: "command", command: "repomagpie hook antigravity", timeout: 10 }] }] } }));
+  box.write(join(box.home, ".copilot", "mcp-config.json"), JSON.stringify({ mcpServers: { repomagpie: { type: "local", ...gone, tools: ["*"] } } }));
+  box.write(join(box.home, ".copilot", "hooks", "repomagpie.json"), JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: "command", bash: "repomagpie hook copilot", powershell: "repomagpie hook copilot" }] } }));
+  collect(); // Antigravity CLI and Copilot CLI not installed: the by-hand to-dos
+  mkdirSync(join(box.home, ".gemini", "antigravity-cli"));
+  box.write(join(box.home, ".copilot", "config.json"), "{}");
+  collect(); // every agent found by its folder only
+  box.write(join(box.home, ".cursor", "mcp.json"), `{\n  // mine\n  "mcpServers": { "repomagpie": ${JSON.stringify(gone)} }\n}\n`);
+  box.write(join(box.home, ".cursor", "hooks.json"), '{\n  // mine\n  "version": 1, "hooks": { "beforeShellExecution": [{ "command": "repomagpie hook cursor" }] }\n}\n');
+  collect(); // files setup doesn't edit
+  for (const name of ["claude", "codex", "cursor", "gemini", "code", "agy", "copilot"]) command(box, name, null);
+  collect(); // every agent found by its command
+  assert.ok(seen.size >= 20, `only ${seen.size} to-dos`);
+  assert.deepEqual([...seen].filter((p) => EMPTY_STEP.test(p)), []);
+});
+
 test("an agent that isn't installed keeps the by-hand to-do, naming the file; one found by its command keeps setup's", () => {
   const box = scratchHome();
   const s = windows ? "\\" : "/";

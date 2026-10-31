@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { fakeFetch, recorded, type Call } from "../core/fixtures/fake-fetch.ts";
 import type { Fetch } from "../core/github.ts";
@@ -383,6 +383,27 @@ test("the home directory's own .magpie is never the project journal, even with a
   assert.equal(below.code, 1, below.err);
   assert.match(below.err, /outside a git repository, use --project <path>/);
   assert.equal(existsSync(join(box.home, "code", ".magpie")), false);
+});
+
+// A regression guard: the walk for the git root stops at the home folder, so a home folder under git
+// (dotfiles) is no project (decision 0051), for every command that looks for a project journal.
+test("a home folder that is a git repository is no project: doctor, recall and note --to project find no project journal there", async () => {
+  const pdfkit = renderNote({ id: "pkg:npm/pdfkit", name: "pdfkit", explored: "2026-10-31", kind: "library", tags: [], verdict: "avoid: async streams painful" });
+  const box = sandbox({ "home/.git/": null, "home/.magpie/notes/npm--pdfkit.md": pdfkit, "home/code/app/": null, "home/code/repo/.git/": null, "home/code/repo/.magpie/notes/npm--pdfkit.md": pdfkit });
+  for (const cwd of [box.home, join(box.home, "code", "app")]) {
+    const doctor = JSON.parse((await magpie(box, ["doctor", "--json"], { cwd })).out);
+    assert.deepEqual([doctor.git_repository, doctor.journals.map((j: { scope: string }) => j.scope)], [false, ["personal"]], cwd);
+    assert.deepEqual(JSON.parse((await magpie(box, ["recall", "pdfkit", "--json"], { cwd })).out).matches, [], cwd);
+    const note = await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project"], { cwd });
+    assert.equal(note.code, 1, `${cwd}: ${note.err}`);
+    assert.match(note.err, cwd === box.home ? HOME_GUARD : /outside a git repository, use --project <path>/);
+  }
+  assert.deepEqual(readdirSync(join(box.home, ".magpie", "notes")), ["npm--pdfkit.md"]);
+  assert.equal(existsSync(join(box.home, "code", "app", ".magpie")), false);
+  // A repository below the home folder is still a project.
+  const repo = join(box.home, "code", "repo");
+  assert.deepEqual(JSON.parse((await magpie(box, ["recall", "pdfkit", "--json"], { cwd: repo })).out).matches.map((m: { journal: string }) => m.journal), ["project"]);
+  assert.equal((await magpie(box, ["note", "pkg:npm/chalk", "ok", "--to", "project"], { cwd: repo })).code, 0);
 });
 
 test("search never reads the home directory's own .magpie as the project journal", async () => {
