@@ -24,8 +24,8 @@ test("each repository is listed once, with a known kind and at most 3 known doma
 });
 
 // The held-out set: 30 repositories none of the first set has, chosen for spread (brief O2, A2), each
-// with a kind and its reason, and no domains (they are scored on the first set only).
-test("the held-out set: 30 new repositories, a known kind and a reason each, the spread it was chosen for", () => {
+// with a kind and its reason, and at most 3 known domains (decision 0056).
+test("the held-out set: 30 new repositories, a known kind, a reason and known domains each, the spread it was chosen for", () => {
   const names = holdout.map((c) => c.full_name.toLowerCase());
   assert.equal(names.length, 30);
   assert.equal(new Set(names).size, 30);
@@ -33,7 +33,9 @@ test("the held-out set: 30 new repositories, a known kind and a reason each, the
   assert.deepEqual(names.filter((name) => first.has(name)), []);
   for (const { full_name, expected } of holdout) {
     assert.ok(KINDS.includes(expected.kind), full_name);
-    assert.ok(expected.reason && !expected.domains, full_name);
+    assert.ok(expected.reason && expected.domains, full_name);
+    assert.ok(expected.domains.length <= 3 && expected.domains.every(isDomain), full_name);
+    assert.equal(new Set(expected.domains).size, expected.domains.length, full_name);
   }
   const count = (kind: string) => holdout.filter((c) => c.expected.kind === kind).length;
   for (const kind of ["library", "framework", "app", "cli"]) assert.ok(count(kind) >= 4, kind);
@@ -44,7 +46,7 @@ test("the held-out set: 30 new repositories, a known kind and a reason each, the
 });
 
 test("score: domains count only where a case has expected domains", () => {
-  const s = score(holdout, true);
+  const s = score(holdout.map((c) => ({ ...c, expected: { kind: c.expected.kind } })), true);
   assert.deepEqual([s.suggested, s.expected, s.exact], [0, 0, 0]);
 });
 

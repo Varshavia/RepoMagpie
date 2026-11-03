@@ -74,12 +74,16 @@ test("at most maxRequests requests: the first topics, and leftOut names the rest
   assert.deepEqual(buildQueries({ text: "x" }, TODAY, 2).leftOut, []);
 });
 
-test("each domain's search topics map to that domain on their own: never the generic ai, nor playwright", () => {
+// Topics decision 0056 took out of DOMAIN_MAP for suggestions only: Discover still searches them.
+const SEARCH_ONLY: Record<string, string> = { react: "frontend", vue: "frontend", flutter: "mobile" };
+
+test("each domain's search topics map to that domain on their own, or are search-only: never the generic ai, nor playwright", () => {
+  for (const [topic, domain] of Object.entries(SEARCH_ONLY)) assert.equal(DOMAIN_MAP[topic], undefined, `${topic} → ${domain}`);
   for (const domain of DOMAIN_IDS) {
     const topics = DOMAIN_TOPICS[domain];
     assert.ok(topics.length >= 2 && topics.length <= 4, domain);
     for (const topic of topics) {
-      assert.equal(DOMAIN_MAP[topic], domain, `${topic} → ${domain}`);
+      assert.equal(DOMAIN_MAP[topic] ?? SEARCH_ONLY[topic], domain, `${topic} → ${domain}`);
       assert.ok(!["ai", "artificial-intelligence", "playwright"].includes(topic), topic);
     }
   }

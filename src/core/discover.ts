@@ -95,8 +95,10 @@ const LANGUAGE = /^[A-Za-z0-9+#. -]{1,40}$/;
 // A domain's GitHub topics: the 3 most common of those DOMAIN_MAP maps to it on their own (not the
 // generic "ai", nor "playwright", which needs no automation topic beside it), by the number of
 // repositories with 10 stars or more on GitHub, counted on 2026-10-26 (decision 0045); frontend,
-// devops and the four new domains counted again on 2026-10-31 (decision 0055). GitHub's search
-// can't OR topics, so each is its own request; without a token, only the first 2.
+// devops and the four new domains counted again on 2026-10-31 (decision 0055). react, vue and flutter
+// stay, by the maintainer's choice, although DOMAIN_MAP no longer has them (decision 0056): only
+// suggestions leave them out. GitHub's search can't OR topics, so each is its own request; without a
+// token, only the first 2.
 export const DOMAIN_TOPICS: Readonly<Record<Domain, readonly string[]>> = {
   architecture: ["microservices", "clean-architecture", "architecture"],
   security: ["security", "cybersecurity", "cryptography"],
