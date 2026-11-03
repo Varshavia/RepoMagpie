@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sandbox } from "../cli/fixtures/sandbox.ts";
 import { noteVersion } from "../core/edit.ts";
+import type { Context } from "../core/save.ts";
 import { escapeRegExp } from "../core/text.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
 import { client, send, type Reply } from "./fixtures/http.ts";
@@ -21,7 +22,7 @@ const PDFKIT = "---\nid: pkg:npm/pdfkit\nname: pdfkit\nexplored: 2026-10-03\nkin
 // A note "Add GitHub topics as tags" would change (decision 0030).
 const WIDGET = "---\nid: pkg:github/acme/widget\nname: acme/widget\ntopics: [charts, cli]\nkind: other\ntags: []\ntried: false\nstatus: inbox\n---\n\n## Verdict\n";
 
-async function start(t: TestContext, env: Record<string, string> = {}, today = () => "2026-10-04") {
+async function start(t: TestContext, env: Record<string, string> = {}, today = () => "2026-10-04", github?: Context["github"]) {
   const box = sandbox({
     "journal/notes/npm--pdfkit.md": PDFKIT,
     "journal/notes/npm--broken.md": "---\nid: [broken\n---\n",
@@ -33,7 +34,7 @@ async function start(t: TestContext, env: Record<string, string> = {}, today = (
   const opened: string[] = [];
   const logged: string[] = [];
   const server = await startServer({
-    context: { home: box.home, env: { MAGPIE_HOME: box.journal, ...env }, cwd: box.project, fetch: fakeFetch(recorded("microsoft--playwright-cli")), today },
+    context: { home: box.home, env: { MAGPIE_HOME: box.journal, ...env }, cwd: box.project, fetch: fakeFetch(recorded("microsoft--playwright-cli")), today, github },
     open: async (target) => { opened.push(target); },
     log: (line) => { logged.push(line); },
     assets: APP,
@@ -355,8 +356,12 @@ test("the page carries the token in a meta tag only for a request with the sessi
   assert.doesNotMatch(without.body, new RegExp(escapeRegExp(server.writeToken)));
 });
 
-test("GITHUB_TOKEN never reaches the browser: no response contains its value", async (t) => {
-  const { http, server } = await start(t, { GITHUB_TOKEN });
+// From the environment or from gh's login (decision 0053): the same rule.
+for (const [source, env, github] of [
+  ["GITHUB_TOKEN", { GITHUB_TOKEN }, undefined],
+  ["gh", {}, () => ({ token: GITHUB_TOKEN, source: "gh" as const })],
+] as const) test(`a GitHub token from ${source} never reaches the browser or the log: no response or log line contains its value`, async (t) => {
+  const { http, server, logged } = await start(t, env, undefined, github);
   const replies = [
     await http.get("/"),
     await http.get("/assets/app.js"),
@@ -369,6 +374,7 @@ test("GITHUB_TOKEN never reaches the browser: no response contains its value", a
     await http.get("/api/recall?package=pdfkit"),
     await http.get("/api/suggest?description=pdf"),
     await http.get("/api/graph?journal=personal&ghosts=1"),
+    await http.get("/api/discover?q=pdf&domain=security"),
     await http.write("POST", "/api/adopt", { target: "pkg:npm/pdfkit" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/microsoft/playwright-cli", to: "personal" }),
     await http.write("POST", "/api/note/preview", { target: "https://github.com/nobody/nothing", to: "personal" }),
@@ -380,10 +386,12 @@ test("GITHUB_TOKEN never reaches the browser: no response contains its value", a
     await send(server.port, { path: "/api/settings", headers: { host: "evil.example" } }),
   ];
   assert.equal(JSON.parse(replies[2].body).github_token_set, true);
+  assert.equal(JSON.parse(replies[2].body).github_source, source);
   for (const r of replies) {
     assert.doesNotMatch(r.body, new RegExp(GITHUB_TOKEN));
     assert.doesNotMatch(JSON.stringify(r.headers), new RegExp(GITHUB_TOKEN));
   }
+  assert.doesNotMatch(logged.join("\n"), new RegExp(GITHUB_TOKEN));
 });
 
 test("an unknown path gets 404, a wrong method 405, and a bug 500 without internals", async (t) => {

@@ -1,7 +1,7 @@
 // The app's edit of one note (spec, "Editing a note"): only what the person changed, with the version
 // the note was read with. Core checks and applies it; these helpers only shape the request.
 import type { NoteJson } from "../../../src/core/documents.ts";
-import { isDomain } from "../../../src/core/domains.ts";
+import { canonicalDomains } from "../../../src/core/domains.ts";
 import type { TagsFromTopicsJson } from "../../../src/core/tags-from-topics.ts";
 import { isStopTopic, TAG_PATTERN } from "./schema.ts";
 
@@ -85,10 +85,10 @@ export function patchFor(note: NoteJson, form: Form): Patch | null {
   return patch.verdict === undefined && !patch.fields && !patch.add_items && !patch.domains ? null : patch;
 }
 
-// A note's known domains as written (an unknown value is kept in the file; doctor reports it);
-// the suggested ones without those already confirmed.
+// A note's known domains as written, an old name as its new one (an unknown value is kept in the
+// file; doctor reports it); the suggested ones without those already confirmed.
 export function noteDomainList(note: NoteJson, key: "domains" | "domains_suggested"): string[] {
-  const list = (value: unknown) => (Array.isArray(value) ? [...new Set(value.filter(isDomain))] : []);
+  const list = (value: unknown) => (Array.isArray(value) ? canonicalDomains(value) : []);
   const confirmed = list(note.frontmatter.domains);
   return key === "domains" ? confirmed : list(note.frontmatter.domains_suggested).filter((d) => !confirmed.includes(d));
 }

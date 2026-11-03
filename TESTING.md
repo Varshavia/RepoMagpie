@@ -35,7 +35,7 @@ repomagpie doctor
 - **Codex CLI without its command: paste the entry.** `setup` adds Codex's MCP entry through `codex mcp add`. Without `codex` on `PATH`, it prints the entry instead: paste it into `~/.codex/config.toml` yourself. `repomagpie setup --dry-run --agents codex` prints it again.
 - **Codex CLI runs a new hook only after you trust it.** Open `/hooks` in Codex and trust RepoMagpie's hook. Run `repomagpie doctor` again: the Codex line says `trusted`.
 - **You switch Node.js versions** (nvm, fnm, Volta). `setup` writes the path of the Node.js it ran with. After a switch, run `repomagpie doctor`, then `repomagpie setup` again.
-- **GitHub's limit.** Without a token, GitHub allows 60 requests an hour, and a note from a GitHub URL makes a few. If you hit the limit, wait an hour, or give RepoMagpie your GitHub CLI's token for the current shell: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+- **GitHub's limit.** Without a token, GitHub allows 60 requests an hour, and a note from a GitHub URL makes a few. If you hit the limit, wait an hour, or sign in with the GitHub CLI (`gh auth login`): RepoMagpie uses its login, with no variable to set. `repomagpie doctor` says whether it found one.
 
 ### 3. Write three notes from your own experience
 

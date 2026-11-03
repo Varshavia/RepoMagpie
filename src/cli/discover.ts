@@ -15,7 +15,8 @@ export interface DiscoverOptions extends GlobalOptions {
   minStars: number;
   updatedWithin: number;
   includeArchived?: boolean;
-  sort: Sort;
+  includeLists?: boolean;
+  sort?: Sort;
   limit: number;
   page: number;
 }
@@ -35,6 +36,7 @@ export async function discoverCommand(text: string | undefined, options: Discove
     minStars: options.minStars,
     updatedWithin: options.updatedWithin,
     includeArchived: options.includeArchived,
+    includeLists: options.includeLists,
     sort: options.sort,
     limit: options.limit,
     page: options.page,
@@ -56,13 +58,19 @@ export async function discoverCommand(text: string | undefined, options: Discove
   }
   if (document.approximate) io.err(`${document.approximate}\n`);
   if (document.cached) io.err("From the cache: GitHub answered this search in the last 10 minutes.\n");
+  const hidden = document.lists_hidden ? `${document.lists_hidden} ${document.lists_hidden === 1 ? "list or course" : "lists and courses"} hidden; --include-lists shows them.\n` : "";
   if (!document.results.length) {
+    if (hidden) {
+      io.err(hidden);
+      return 0;
+    }
     io.err("GitHub found no repositories for this search. Loosen it: fewer words, a lower --min-stars, --updated-within 0, or no --kind.\n");
     return 0;
   }
   for (const r of document.results) io.out(block(r, io.columns));
   const more = document.next_page ? ` More: the same command with --page ${document.next_page}.` : "";
   io.err(`${document.results.length} of ${compactCount(document.total)} on GitHub.${more}\n`);
+  io.err(hidden);
   io.err(`Add one to your inbox: repomagpie note ${document.results[0].url}\n`);
   return 0;
 }

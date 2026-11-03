@@ -30,7 +30,7 @@ test("domains --suggest fills domains_suggested on notes that have neither field
     "notes/github--a--orm.md": note("pkg:github/a/orm", "[orm, testing]", "[]"),
     "notes/github--a--mine.md": note("pkg:github/a/mine", "[orm]", "[]", "domains: [security]\n"),
     "notes/github--a--cleared.md": note("pkg:github/a/cleared", "[orm]", "[]", "domains_suggested: []\n"),
-    "notes/github--a--none.md": note("pkg:github/a/none", "[react]", "[]"),
+    "notes/github--a--none.md": note("pkg:github/a/none", "[rust]", "[]"),
     "notes/npm--broken.md": "---\nid: [\n---\n",
   });
   const before = box.snapshot();

@@ -71,7 +71,7 @@ Do you want to proceed?
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   GitHub allows 60 requests an hour without a token. To raise the limit: `export GITHUB_TOKEN=$(gh auth token)`, or in PowerShell `$env:GITHUB_TOKEN = gh auth token`.
+   GitHub allows 60 requests an hour without a token. To raise the limit, sign in with the GitHub CLI (`gh auth login`): RepoMagpie uses its login. Or set `GITHUB_TOKEN`. `repomagpie doctor` says which one it uses.
 
 > [!IMPORTANT]
 > RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
@@ -151,7 +151,7 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 <details>
 <summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
 
-No. Your journals are Markdown files on your machine, and there is no telemetry. The only network requests are read-only calls to GitHub's API, when you add a note from a GitHub repository or search with `discover`: they send that repository's name or your search, and `GITHUB_TOKEN` if you set it, never your notes. `repomagpie ui` listens on `127.0.0.1` only. Your agent's model provider sees the notes your agent reads. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+No. Your journals are Markdown files on your machine, and there is no telemetry. The only network requests are read-only calls to GitHub's API, when you add a note from a GitHub repository or search with `discover`: they send that repository's name or your search, and your GitHub token if there is one (`GITHUB_TOKEN`, or the GitHub CLI's login), never your notes. `repomagpie ui` listens on `127.0.0.1` only. Your agent's model provider sees the notes your agent reads. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
 
 </details>
 

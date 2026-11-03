@@ -11,11 +11,16 @@ export interface Filters {
   language: string;
   minStars: number;
   updatedWithin: number; // months, 0 for any time
-  sort: Sort;
+  sort: Sort | null; // null until chosen: Best match with words, Stars without (decision 0054)
   archived: boolean;
+  lists: boolean; // show lists, courses, books and cheatsheets
+  hideOwned: boolean; // the app's own: hide the results a journal has a note on; never sent
 }
 
-export const DEFAULT_FILTERS: Filters = { domain: "", kind: "", language: "", minStars: 10, updatedWithin: 24, sort: "stars", archived: false };
+export const DEFAULT_FILTERS: Filters = { domain: "", kind: "", language: "", minStars: 10, updatedWithin: 24, sort: null, archived: false, lists: false, hideOwned: false };
+
+// The sort a search uses when none was chosen (core's default).
+export const sortFor = (text: string, sort: Sort | null): Sort => sort ?? (text.trim() ? "best" : "stars");
 export const STAR_STEPS = [10, 100, 1000, 10000];
 export const UPDATED_STEPS: { months: number; label: string }[] = [
   { months: 0, label: "Any time" },
@@ -39,9 +44,30 @@ export function discoverParams(text: string, filters: Filters, page = 1): Record
     min_stars: String(filters.minStars),
     updated_within: String(filters.updatedWithin),
     include_archived: filters.archived ? "true" : undefined,
-    sort: filters.sort,
+    include_lists: filters.lists ? "true" : undefined,
+    sort: filters.sort ?? undefined,
     page: page === 1 ? undefined : String(page),
   };
+}
+
+// The results shown: without the ones a journal has a note on, when the person asked.
+export function shownResults(results: DiscoverResult[], hideOwned: boolean): DiscoverResult[] {
+  return hideOwned ? results.filter((r) => !r.in_journal.length) : results;
+}
+
+// "N lists and courses hidden."
+export function listsHiddenText(n: number): string {
+  return `${n.toLocaleString("en-US")} ${n === 1 ? "list or course" : "lists and courses"} hidden.`;
+}
+
+// Why a card is in the results: the domain's or kind's topics whose search found it, and the
+// search's words its name, description or topics hold; null when neither says anything.
+export function matchedLine(result: Pick<DiscoverResult, "matched_topics" | "matched_words">): string | null {
+  const parts: string[] = [];
+  const { matched_topics: topics, matched_words: words } = result;
+  if (topics.length) parts.push(`Matched ${topics.length === 1 ? "topic" : "topics"}: ${topics.join(", ")}`);
+  if (words.length) parts.push(`${parts.length ? "matched" : "Matched"} ${words.length === 1 ? "word" : "words"}: ${visible(words.join(", "))}`);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 // Counts read aloud in full: "12,345 stars".

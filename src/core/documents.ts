@@ -6,6 +6,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { noteDomains } from "./domains.ts";
 import { editNote, noteVersion } from "./edit.ts";
+import { githubAuth, type GitHubAuth } from "./github-auth.ts";
+import type { GitHubSource } from "./github-connection.ts";
 import { graphData, type GraphData } from "./graph.ts";
 import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
@@ -27,11 +29,13 @@ export interface SettingsJson {
   version: string;
   home: string; // the home directory, so the app can show paths under it with ~
   journals: { personal: { path: string; exists: boolean }; project: { path: string; exists: boolean } | null };
-  github_token_set: boolean;
+  github_token_set: boolean; // a token from any source (decision 0053)
+  github_source: GitHubSource | null; // where it came from; never the token
 }
 
-export function settingsDocument(place: Place): SettingsJson {
+export function settingsDocument(place: Place & { github?: () => GitHubAuth }): SettingsJson {
   const personal = locateJournal("personal", place);
+  const github = githubAuth(place);
   const project = locateJournal("project", place);
   return {
     version: packageVersion(),
@@ -40,7 +44,8 @@ export function settingsDocument(place: Place): SettingsJson {
       personal: { path: personal.path, exists: existsSync(personal.path) },
       project: project.error ? null : { path: project.path, exists: existsSync(project.path) },
     },
-    github_token_set: Boolean(place.env.GITHUB_TOKEN),
+    github_token_set: Boolean(github.token),
+    github_source: github.source,
   };
 }
 
@@ -142,7 +147,7 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
 // and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
 const NOTE_LIST_CACHE = "note-list.json";
-const NOTE_LIST_VERSION = 3; // 2: nested and unterminated comments stripped from the Verdict; 3: domains
+const NOTE_LIST_VERSION = 4; // 2: nested and unterminated comments stripped from the Verdict; 3: domains; 4: frontend replaces styling (decision 0055)
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
   const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, parse) => summary(file, parse()), isSummary);

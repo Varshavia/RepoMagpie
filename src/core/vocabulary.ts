@@ -1,4 +1,4 @@
-// The vocabulary an agent maps a question onto (decision 0041): the 12 domains with their
+// The vocabulary an agent maps a question onto (decision 0041): the domains with their
 // definitions, and the tags the journals use, each with its note count and its aliases. Read-only;
 // MCP's vocabulary tool returns it. Reads the search index search reads; never prints.
 import MiniSearch from "minisearch";

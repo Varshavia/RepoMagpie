@@ -18,6 +18,8 @@ async function discover(page: Page, words: string) {
 const results = (page: Page) => page.getByRole("list", { name: "Results" });
 const card = (page: Page, name: string) => results(page).getByRole("listitem", { name, exact: true });
 const cards = (page: Page) => results(page).locator(":scope > li"); // not the topics' chips
+// The recorded page's 20 results less its 7 lists and courses (decision 0054).
+const SHOWN = 13;
 
 test("first visit: what Discover sends; a search on Enter shows cards with stars, age, licence and a GitHub link", async ({ page, magpie }) => {
   await magpie.open(page);
@@ -26,7 +28,7 @@ test("first visit: what Discover sends; a search on Enter shows cards with stars
   await expect(page.getByRole("button", { name: "Try “design system”" })).toBeVisible();
 
   await discover(page, "design system");
-  await expect(cards(page)).toHaveCount(20);
+  await expect(cards(page)).toHaveCount(SHOWN);
   const blueprint = card(page, "palantir/blueprint");
   const link = blueprint.getByRole("link", { name: "palantir/blueprint" });
   await expect(link).toHaveAttribute("href", "https://github.com/palantir/blueprint");
@@ -38,32 +40,77 @@ test("first visit: what Discover sends; a search on Enter shows cards with stars
   await expect(blueprint.getByText("Apache-2.0")).toBeVisible();
   await expect(card(page, FAILING).getByText("No licence")).toBeVisible(); // GitHub found none
   await expect(results(page).getByText("estimated").first()).toBeVisible();
-  await expect(page.getByRole("status").getByText("20 shown of 23 on GitHub.")).toBeVisible();
+  await expect(blueprint.getByText("Matched words: design, system")).toBeVisible();
+  await expect(page.getByRole("status").getByText(`${SHOWN} shown of 23 on GitHub.`)).toBeVisible();
+  await expect(page.getByLabel("Sort")).toHaveValue("best"); // words typed: Best match
+});
+
+test("lists and courses: hidden by default and counted; Show searches again with them", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await discover(page, "design system");
+  await expect(page.getByText("7 lists and courses hidden.")).toBeVisible();
+  await expect(card(page, "alexpate/awesome-design-systems")).toHaveCount(0);
+  await expect(page.getByLabel("Show lists and courses")).not.toBeChecked();
+  await page.getByRole("button", { name: "Show", exact: true }).click();
+  await expect(cards(page)).toHaveCount(20);
+  await expect(card(page, "alexpate/awesome-design-systems")).toBeVisible();
+  await expect(page.getByText(/lists and courses hidden/)).toHaveCount(0);
+  await expect(page.getByLabel("Show lists and courses")).toBeChecked();
+});
+
+test("hide the ones I already have: at once, without a search; the count says how many", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await discover(page, "design system");
+  await page.getByRole("button", { name: "Show", exact: true }).click();
+  await expect(card(page, "VoltAgent/awesome-design-md")).toBeVisible();
+  const asked: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/api/discover")) asked.push(r.url());
+  });
+  await page.getByLabel("Hide ones I already have").check();
+  await expect(card(page, "VoltAgent/awesome-design-md")).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(19);
+  await expect(page.getByRole("status").getByText("19 shown of 23 on GitHub. 1 you already have is hidden.")).toBeVisible();
+  await page.getByLabel("Hide ones I already have").uncheck();
+  await expect(cards(page)).toHaveCount(20);
+  expect(asked).toEqual([]);
+});
+
+test("the sort: Stars without words, Best match with them, until one is chosen", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Discover", exact: true }).click();
+  await expect(page.getByLabel("Sort")).toHaveValue("stars");
+  await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+  await expect(page.getByLabel("Sort")).toHaveValue("best");
+  await page.getByLabel("Sort").selectOption("forks");
+  await page.getByRole("searchbox", { name: "Words" }).fill("");
+  await expect(page.getByLabel("Sort")).toHaveValue("forks");
 });
 
 test("filters: a change sends nothing; Search sends them all", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "design system");
-  await expect(cards(page)).toHaveCount(20);
+  await expect(cards(page)).toHaveCount(SHOWN);
   const asked: string[] = [];
   page.on("request", (r) => {
     if (r.url().includes("/api/discover")) asked.push(r.url());
   });
-  await page.getByLabel("Domain").selectOption("styling");
-  await expect(page.getByText("styling: CSS, design systems and UI components.")).toBeVisible();
+  await page.getByLabel("Domain").selectOption("frontend");
+  await expect(page.getByText("frontend: UI frameworks, components, CSS and design systems.")).toBeVisible();
   await page.getByLabel("Kind").selectOption("library");
   await page.getByLabel("Language").fill("TypeScript");
   await page.getByLabel("Min stars").selectOption("1000");
   await page.getByLabel("Updated within").selectOption("6");
   await page.getByLabel("Sort").selectOption("updated");
   await page.getByLabel("Show archived").check();
+  await page.getByLabel("Show lists and courses").check();
   expect(asked).toEqual([]);
   await expect(page.getByRole("option", { name: "library (approximate)" })).toHaveCount(1);
 
   await page.getByRole("search", { name: "Search GitHub" }).getByRole("button", { name: "Search", exact: true }).click();
   await expect.poll(() => asked.length).toBe(1);
   const params = new URL(asked[0]).searchParams;
-  expect(Object.fromEntries(params)).toMatchObject({ q: "design system", domain: "styling", kind: "library", language: "TypeScript", min_stars: "1000", updated_within: "6", sort: "updated", include_archived: "true" });
+  expect(Object.fromEntries(params)).toMatchObject({ q: "design system", domain: "frontend", kind: "library", language: "TypeScript", min_stars: "1000", updated_within: "6", sort: "updated", include_archived: "true", include_lists: "true" });
 });
 
 test("add one: Add to inbox becomes Added, focused, and opens the new inbox note", async ({ page, magpie }) => {
@@ -99,7 +146,7 @@ test("add several: one by one with progress, then what was added, what was there
   await discover(page, "design system");
   await page.getByRole("button", { name: "Add radix-ui/primitives to your inbox" }).click();
   await expect(card(page, "radix-ui/primitives").getByRole("link", { name: "Added" })).toBeVisible();
-  for (const name of ["palantir/blueprint", FAILING, "cheat/cheat"]) await page.getByRole("checkbox", { name: `Select ${name}` }).check();
+  for (const name of ["palantir/blueprint", FAILING, "nim-lang/Nim"]) await page.getByRole("checkbox", { name: `Select ${name}` }).check();
   await expect(page.getByRole("checkbox", { name: "Select radix-ui/primitives" })).toBeDisabled(); // added already
   await page.getByRole("button", { name: "Add 3 to inbox" }).click();
   const summary = page.locator(".discover-summary");
@@ -107,7 +154,7 @@ test("add several: one by one with progress, then what was added, what was there
   await expect(summary).toContainText("Added 2, 1 failed.");
   await expect(summary).toContainText(new RegExp(`${FAILING}: GitHub has no repository ${FAILING}`, "i"));
   await expect(card(page, FAILING).getByRole("alert")).toContainText("GitHub has no repository");
-  await expect(card(page, "cheat/cheat").getByRole("link", { name: "Added" })).toBeVisible();
+  await expect(card(page, "nim-lang/Nim").getByRole("link", { name: "Added" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Inbox, 6 notes" })).toBeVisible();
 });
 
@@ -126,6 +173,7 @@ test("without a token, more than 5 adds ask first; Cancel adds nothing", async (
 test("a repository in this journal: a badge linking to the note, and no Add", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "design system");
+  await page.getByRole("button", { name: "Show", exact: true }).click(); // an awesome-list: shown with the lists
   const there = card(page, "VoltAgent/awesome-design-md");
   await expect(there.getByText("In your personal journal")).toBeVisible();
   await expect(there.getByRole("button", { name: /to your inbox/ })).toHaveCount(0);
@@ -142,14 +190,54 @@ test("a repository in this journal: a badge linking to the note, and no Add", as
 test("a domain search that meets the limit on its second request shows the first one's results, with a warning", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: "Discover", exact: true }).click();
-  await page.getByLabel("Domain").selectOption("styling");
+  await page.getByLabel("Domain").selectOption("frontend");
   await page.getByRole("searchbox", { name: "Words" }).fill("halfway");
   await page.getByRole("searchbox", { name: "Words" }).press("Enter");
-  await expect(card(page, "VoltAgent/awesome-design-md")).toBeVisible();
-  await expect(page.getByText(/^Without GITHUB_TOKEN, only 2 of the domain styling's 3 topics were searched/)).toBeVisible();
+  await expect(card(page, "palantir/blueprint")).toBeVisible();
+  await expect(card(page, "palantir/blueprint").getByText("Matched topic: react")).toBeVisible();
+  await expect(page.getByText("Searched 2 of 3 frontend topics to stay within GitHub's limit. Connect GitHub to search all.")).toBeVisible();
   await expect(page.getByText(/^Only 1 of 2 searches ran: GitHub's search limit is used up until \d\d:\d\d UTC\./)).toBeVisible();
-  // Warnings, not the failure banner (which links to how to set a token).
-  await expect(page.getByRole("link", { name: "How to set a GitHub token" })).toHaveCount(0);
+  // The two warnings, not a failure banner as well.
+  await expect(page.getByRole("alert")).toHaveCount(2);
+});
+
+test("not connected: the GitHub line and its steps; the partial-search warning shows once and stays dismissed for the session", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Discover", exact: true }).click();
+  await expect(page.getByText("GitHub: not connected, limited to 10 searches a minute.")).toBeVisible();
+  const how = page.getByRole("button", { name: "How to connect" });
+  await expect(how).toHaveAttribute("aria-expanded", "false");
+  await how.click();
+  await expect(how).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Install the GitHub CLI (cli.github.com) and run gh auth login.")).toBeVisible();
+
+  const warning = page.getByText("Searched 2 of 3 security topics to stay within GitHub's limit. Connect GitHub to search all.");
+  await page.getByLabel("Domain").selectOption("security");
+  await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(cards(page).first()).toBeVisible();
+  await expect(warning).toHaveCount(1);
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect(warning).toHaveCount(0);
+
+  // Another partial search, and a reload of the page: still dismissed.
+  await page.getByRole("searchbox", { name: "Words" }).fill("design");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(page.getByText(/^Searched 2 of 3 security topics/)).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Discover", exact: true }).click();
+  await page.getByLabel("Domain").selectOption("security");
+  await page.getByRole("searchbox", { name: "Words" }).fill("design system");
+  await page.getByRole("searchbox", { name: "Words" }).press("Enter");
+  await expect(cards(page).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+});
+
+test("Import shows the same GitHub line", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("GitHub: not connected, limited to 10 searches a minute.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "How to connect" })).toBeVisible();
 });
 
 test("a secondary rate limit says so and when to try again; a reset already past is never shown", async ({ page, magpie }) => {
@@ -169,17 +257,17 @@ test("a limit over within a minute is waited out: the page stays loading, then s
   await magpie.open(page);
   await discover(page, "shortwait");
   await expect(page.getByRole("button", { name: "Searching…" })).toBeVisible();
-  await expect(cards(page)).toHaveCount(20, { timeout: 10_000 });
+  await expect(cards(page)).toHaveCount(SHOWN, { timeout: 10_000 });
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
-test("rate limited: GitHub's message, the reset in local time, and where to set a token", async ({ page, magpie }) => {
+test("rate limited: GitHub's message, the reset in local time, and how to connect GitHub", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "ratelimit");
   const alert = page.getByRole("alert");
   await expect(alert).toContainText("GitHub's search limit is used up until");
   await expect(alert).toContainText(/That is \d\d:\d\d.* your time\./);
-  await expect(alert.getByRole("link", { name: "How to set a GitHub token" })).toHaveAttribute("href", /^https:\/\/github\.com\/Varshavia\/RepoMagpie#/);
+  await expect(alert).toContainText("Connect GitHub (gh auth login, or GITHUB_TOKEN) for 30 a minute of your own.");
 });
 
 test("offline: can't reach GitHub, with Try again", async ({ page, magpie }) => {
@@ -200,9 +288,9 @@ test("no results: says so and names the filters to loosen", async ({ page, magpi
 test("More results: the next page after the shown one, then no button", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "design system");
-  await expect(cards(page)).toHaveCount(20);
+  await expect(cards(page)).toHaveCount(SHOWN);
   await page.getByRole("button", { name: "More results" }).click();
-  await expect(cards(page)).toHaveCount(23);
+  await expect(cards(page)).toHaveCount(SHOWN + 3);
   await expect(card(page, "example-org/more-results-3")).toBeVisible();
   await expect(page.getByRole("button", { name: "More results" })).toHaveCount(0);
 });
@@ -210,9 +298,10 @@ test("More results: the next page after the shown one, then no button", async ({
 test("the page keeps its search while another screen is open", async ({ page, magpie }) => {
   await magpie.open(page);
   await discover(page, "design system");
-  await expect(cards(page)).toHaveCount(20);
+  await expect(cards(page)).toHaveCount(SHOWN);
   await page.getByRole("button", { name: /^Inbox/ }).click();
   await page.getByRole("button", { name: "Discover", exact: true }).click();
   await expect(page.getByRole("searchbox", { name: "Words" })).toHaveValue("design system");
-  await expect(cards(page)).toHaveCount(20);
+  await expect(cards(page)).toHaveCount(SHOWN);
+  await expect(page.getByText("7 lists and courses hidden.")).toBeVisible();
 });

@@ -437,7 +437,7 @@ test("domains: the review shows the suggested ones outlined; one picked is saved
   await magpie.open(page);
   await page.keyboard.press("Enter");
   const domains = page.getByRole("group", { name: "Domains" });
-  await expect(domains.getByRole("button")).toHaveCount(12);
+  await expect(domains.getByRole("button")).toHaveCount(16);
   await expect(domains.getByRole("button", { name: "ai (suggested)" })).toHaveAttribute("aria-pressed", "false");
   await domains.getByRole("button", { name: "ai (suggested)" }).click();
   await expect(domains.getByRole("button", { name: "ai", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -568,8 +568,10 @@ test("search: / focuses the box, Verdicts first, Enter opens the note; the statu
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
   await page.getByRole("searchbox").fill("skills");
+  await expect(results.getByRole("option")).toHaveCount(6); // 4 reviewed notes and 2 in the inbox
   await page.getByRole("radio", { name: "Inbox" }).click();
-  for (const row of await results.getByRole("option").all()) await expect(row).toContainText("no verdict yet");
+  await expect(results.getByRole("option")).toHaveCount(2);
+  await expect(results.getByRole("option")).toContainText(["no verdict yet", "no verdict yet"]);
 });
 
 test("search: an empty query lists every note, Verdicts first; the right pane says how to search from anywhere", async ({ page, magpie }) => {

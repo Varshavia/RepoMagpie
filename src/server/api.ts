@@ -21,7 +21,7 @@ import {
   type NoteAddress,
 } from "../core/documents.ts";
 import { emptyDiscover, runDiscover, SORTS, type DiscoverInput, type Sort } from "../core/discover.ts";
-import { DOMAIN_IDS, domainsProblem, isDomain } from "../core/domains.ts";
+import { canonicalDomain, DOMAIN_IDS, domainsProblem } from "../core/domains.ts";
 import type { PackageType } from "../core/identity.ts";
 import { KINDS } from "../core/note.ts";
 import type { Outcome } from "../core/outcome.ts";
@@ -102,8 +102,10 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (status !== undefined && status !== "inbox" && status !== "reviewed") return bad(empty, "status must be inbox or reviewed.");
         const kind = query.get("kind") ?? undefined;
         if (kind !== undefined && !KINDS.includes(kind)) return bad(empty, `kind must be one of: ${KINDS.join(", ")}.`);
-        const domain = query.get("domain") ?? undefined;
-        if (domain !== undefined && !isDomain(domain)) return bad(empty, `domain must be one of: ${DOMAIN_IDS.join(", ")}.`);
+        // An old domain name (a saved link) reads as its new one (decision 0055).
+        const asked = query.get("domain") ?? undefined;
+        const domain = asked === undefined ? undefined : canonicalDomain(asked);
+        if (domain === null) return bad(empty, `domain must be one of: ${DOMAIN_IDS.join(", ")}.`);
         return reply(noteListDocument(journal, { status, kind, tags: query.getAll("tag"), domain }, context));
       },
     },
@@ -270,6 +272,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         };
         const sort = flag("sort") ?? undefined;
         const archived = flag("include_archived");
+        const lists = flag("include_lists");
         const input: DiscoverInput = {
           text: query.get("q") ?? "",
           domain: flag("domain") ?? undefined,
@@ -279,6 +282,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
           minStars: whole("min_stars"),
           updatedWithin: whole("updated_within"),
           includeArchived: archived === "true",
+          includeLists: lists === "true",
           sort: sort as Sort | undefined,
           limit: whole("limit"),
           page: whole("page"),
@@ -287,6 +291,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
           if (Number.isNaN(whole(name))) return bad(emptyDiscover(), `${name} must be a whole number.`);
         }
         if (archived !== null && archived !== "true" && archived !== "false") return bad(emptyDiscover(), "include_archived must be true or false.");
+        if (lists !== null && lists !== "true" && lists !== "false") return bad(emptyDiscover(), "include_lists must be true or false.");
         if (sort !== undefined && !SORTS.includes(sort as Sort)) return bad(emptyDiscover(), `sort must be one of: ${SORTS.join(", ")}.`);
         const run = searching.then(() => runDiscover(input, context));
         searching = run.catch(() => undefined);

@@ -2,6 +2,7 @@
 // whatever it finds, so its output can always go into a bug report.
 import { runDoctor, type AgentHookEntry, type AgentReport, type DoctorJson } from "../core/doctor.ts";
 import type { Platform } from "../core/agents.ts";
+import { CONNECT_STEPS, connectionText } from "../core/github-connection.ts";
 import { clean, cleanAll } from "../core/text.ts";
 import { packageVersion } from "../core/version.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
@@ -79,6 +80,10 @@ export function render(r: DoctorJson, home: string): string {
   }
   // Information, not a to-do: a project journal is a choice to share notes through git.
   if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here; ${r.git_repository ? "repomagpie note <x> --to project starts one, shared through git" : "outside a git repository, use --project <path>"}`);
+
+  // Information, not a to-do: the same line as on Discover and Import.
+  lines.push("", connectionText(r.github.source));
+  if (!r.github.connected) lines.push(...CONNECT_STEPS.slice(0, 2).map((step) => `  ${step}`));
 
   lines.push("");
   if (r.problems.length) lines.push("To do", ...r.problems.map((p) => `  - ${p}`));

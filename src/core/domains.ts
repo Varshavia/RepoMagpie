@@ -3,13 +3,13 @@
 // `domains_suggested` the ones RepoMagpie suggested from topics and tags. Pure; no imports, so the
 // hook could load it, though it never does.
 
-// The vocabulary, in RFC order, each with the one line shown to users and agents. Versioned: a later
-// release may add a domain, never rename or remove one without a migration.
+// The vocabulary, in RFC order, then the ones added later, each with the one line shown to users and
+// agents. Versioned: a later release may add a domain, never rename or remove one without a migration.
 export const DOMAINS = [
   { id: "architecture", definition: "Structure, patterns, state management and application frameworks." },
   { id: "security", definition: "Vulnerabilities, secrets, hardening and input validation." },
   { id: "performance", definition: "Speed, caching, bundle size and profiling." },
-  { id: "styling", definition: "CSS, design systems and UI components." },
+  { id: "frontend", definition: "UI frameworks, components, CSS and design systems." },
   { id: "database", definition: "Databases, ORMs, migrations and storage." },
   { id: "testing", definition: "Unit tests, end-to-end tests and mocking." },
   { id: "auth", definition: "Sign-in, sessions and permissions." },
@@ -17,19 +17,33 @@ export const DOMAINS = [
   { id: "devops", definition: "Build, deploy, CI and containers." },
   { id: "observability", definition: "Logging, metrics, tracing and error tracking." },
   { id: "ai", definition: "LLMs, agents, embeddings and MCP." },
-  { id: "tooling", definition: "Developer tools, CLIs, linters, formatters, docs and editors." },
+  { id: "tooling", definition: "Developer tools, CLIs, linters, formatters and editors." },
+  { id: "mobile", definition: "Android, iOS and cross-platform mobile apps." },
+  { id: "data", definition: "Analytics, data visualization and ETL pipelines." },
+  { id: "docs", definition: "Documentation sites, generators and API references." },
+  { id: "payments", definition: "Payments, checkout and billing." },
 ] as const;
 
 export type Domain = (typeof DOMAINS)[number]["id"];
 export const DOMAIN_IDS: readonly Domain[] = DOMAINS.map((d) => d.id);
 export const DOMAIN_LIMIT = 3; // more than 3 means the note is a platform (RFC §4.1)
 
+// Old names (decision 0055): read as the domain they became, in notes, flags, API requests and
+// links, and written as the new name whenever RepoMagpie writes a note's domains.
+export const DOMAIN_ALIASES: Readonly<Record<string, Domain>> = { styling: "frontend" };
+
 export function isDomain(value: unknown): value is Domain {
   return typeof value === "string" && (DOMAIN_IDS as readonly string[]).includes(value);
 }
 
+// A domain or an old name for one, as the domain; null for anything else.
+export function canonicalDomain(value: unknown): Domain | null {
+  if (isDomain(value)) return value;
+  return typeof value === "string" && Object.hasOwn(DOMAIN_ALIASES, value) ? DOMAIN_ALIASES[value] : null;
+}
+
 // Topics and tags that clearly name a concern, and the domain each names. Conservative: a word that
-// names a technology without naming what it is for (react, supabase, rust) maps to nothing; one that
+// names a technology without naming what it is for (supabase, rust) maps to nothing; one that
 // could mean two concerns (validation, session, node, profiling) maps to nothing. Each row has a test.
 export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   // architecture
@@ -45,12 +59,14 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "performance": "performance", "web-performance": "performance", "caching": "performance", "cache": "performance",
   "profiler": "performance", "optimization": "performance", "benchmark": "performance",
   "benchmarks": "performance", "bundle-size": "performance", "image-optimization": "performance", "lighthouse": "performance",
-  // styling
-  "css": "styling", "css-framework": "styling", "tailwind": "styling", "tailwindcss": "styling", "sass": "styling",
-  "scss": "styling", "css-in-js": "styling", "styled-components": "styling", "design-system": "styling",
-  "design-systems": "styling", "ui-components": "styling", "component-library": "styling", "ui-library": "styling",
-  "shadcn": "styling", "shadcn-ui": "styling", "design": "styling", "ui-design": "styling", "web-design": "styling",
-  "frontend-design": "styling", "ui-ux": "styling",
+  // frontend (styling before decision 0055); react and vue name what a project is for here, unlike
+  // most technology names
+  "frontend": "frontend", "react": "frontend", "vue": "frontend", "ui": "frontend",
+  "css": "frontend", "css-framework": "frontend", "tailwind": "frontend", "tailwindcss": "frontend", "sass": "frontend",
+  "scss": "frontend", "css-in-js": "frontend", "styled-components": "frontend", "design-system": "frontend",
+  "design-systems": "frontend", "ui-components": "frontend", "component-library": "frontend", "ui-library": "frontend",
+  "shadcn": "frontend", "shadcn-ui": "frontend", "design": "frontend", "ui-design": "frontend", "web-design": "frontend",
+  "frontend-design": "frontend", "ui-ux": "frontend",
   // database
   "database": "database", "databases": "database", "db": "database", "orm": "database", "sql": "database",
   "nosql": "database", "postgres": "database", "postgresql": "database", "mysql": "database", "sqlite": "database",
@@ -74,7 +90,7 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "ci": "devops", "ci-cd": "devops", "cicd": "devops", "continuous-integration": "devops", "continuous-delivery": "devops",
   "continuous-deployment": "devops", "deployment": "devops", "infrastructure": "devops",
   "github-actions": "devops", "terraform": "devops", "ansible": "devops", "infrastructure-as-code": "devops",
-  "iac": "devops", "paas": "devops", "heroku": "devops", "build-tool": "devops",
+  "iac": "devops", "paas": "devops", "heroku": "devops", "build-tool": "devops", "docker": "devops",
   // observability
   "observability": "observability", "logging": "observability", "logger": "observability", "logs": "observability",
   "monitoring": "observability", "metrics": "observability", "tracing": "observability",
@@ -89,13 +105,26 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "cli": "tooling", "command-line": "tooling", "command-line-tool": "tooling", "developer-tools": "tooling",
   "devtools": "tooling", "dev-tools": "tooling", "linter": "tooling", "linting": "tooling", "eslint": "tooling",
   "formatter": "tooling", "code-formatter": "tooling", "prettier": "tooling", "vscode": "tooling",
-  "vscode-extension": "tooling", "documentation-tool": "tooling",
+  "vscode-extension": "tooling",
+  // mobile
+  "mobile": "mobile", "mobile-app": "mobile", "mobile-development": "mobile", "android": "mobile", "ios": "mobile",
+  "react-native": "mobile", "flutter": "mobile", "swiftui": "mobile", "jetpack-compose": "mobile",
+  // data: analytics, visualization and ETL; databases stay in database
+  "data-science": "data", "data-engineering": "data", "data-analysis": "data", "data-visualization": "data",
+  "dataviz": "data", "analytics": "data", "etl": "data", "data-pipeline": "data", "pandas": "data",
+  "dataframe": "data", "business-intelligence": "data",
+  // docs
+  "documentation": "docs", "docs": "docs", "documentation-tool": "docs", "documentation-generator": "docs",
+  "api-documentation": "docs", "technical-writing": "docs",
+  // payments
+  "payments": "payments", "payment": "payments", "payment-gateway": "payments", "payment-processing": "payments",
+  "stripe": "payments", "billing": "payments",
 };
 
 // The word alone says a project touches AI, not that AI is what it's for: supabase has the topic "ai".
 const GENERIC = new Set(["ai", "artificial-intelligence"]);
 // Playwright drives browsers for tests and for automation: on a note about automation or scraping,
-// it doesn't name testing. Scraping itself names no domain: none of the 12 is that concern.
+// it doesn't name testing. Scraping itself names no domain: none of the domains is that concern.
 const AUTOMATION = new Set([
   "browser-automation", "web-automation", "rpa", "robotic-process-automation", "crawler", "crawling", "web-crawler",
   "web-crawling", "scraper", "scraping", "web-scraper", "web-scraping", "webscraping", "data-extraction",
@@ -112,7 +141,7 @@ export const README_TERMS: Readonly<Record<Domain, readonly string[]>> = {
   architecture: ["clean architecture", "hexagonal architecture", "domain-driven design", "event sourcing", "state management"],
   security: ["vulnerability scanner", "security scanner", "penetration testing", "secret scanning", "leaked credentials", "supply chain security"],
   performance: ["web performance", "core web vitals", "performance profiler"],
-  styling: ["design system", "design systems", "design tokens", "component library", "ui components", "css framework", "utility-first css"],
+  frontend: ["design system", "design systems", "design tokens", "component library", "ui components", "css framework", "utility-first css"],
   database: ["row level security", "relational database", "vector database", "query builder", "database migrations", "sql database", "ORM"],
   testing: ["end-to-end tests", "end-to-end testing", "e2e tests", "e2e testing", "test runner", "testing framework", "unit testing", "api mocking"],
   auth: ["single sign-on", "openid connect", "multi-factor authentication", "passkeys", "identity and access management", "role-based access control"],
@@ -121,6 +150,12 @@ export const README_TERMS: Readonly<Record<Domain, readonly string[]>> = {
   observability: ["distributed tracing", "error tracking", "log management", "opentelemetry", "uptime monitoring", "performance monitoring"],
   ai: ["large language model", "large language models", "llm", "llms", "retrieval-augmented generation"],
   tooling: ["command-line tool", "linter", "code formatter"],
+  // None yet for the domains of decision 0055: a phrase is added only once npm run eval:classification
+  // shows it helps.
+  mobile: [],
+  data: [],
+  docs: [],
+  payments: [],
 };
 
 const TERM_PATTERNS: [Domain, RegExp][] = Object.entries(README_TERMS).flatMap(([domain, terms]) =>
@@ -152,7 +187,7 @@ export function suggestDomains(
   aliases?: ReadonlyMap<string, string>,
 ): Domain[] {
   const texts = (value: unknown) => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
-  const confirmed = texts(note.domains);
+  const confirmed: readonly string[] = canonicalDomains(texts(note.domains));
   const words = new Set<string>();
   for (const raw of [...texts(note.tags), ...texts(note.topics), ...texts(note.keywords)]) {
     const value = raw.toLowerCase();
@@ -176,18 +211,25 @@ export function suggestDomains(
 }
 
 // Why a list of domains given by the user (repomagpie note --domain, the MCP note tool, the app) can't
-// be written, or null: each must be in the vocabulary, and there are at most DOMAIN_LIMIT.
+// be written, or null: each must be in the vocabulary (an old name counts), and there are at most
+// DOMAIN_LIMIT.
 export function domainsProblem(label: string, value: unknown): string | null {
   if (value === undefined) return null;
   if (!Array.isArray(value) || !value.every((d) => typeof d === "string")) return `${label} takes a list of domains.`;
-  const bad = value.find((d) => !isDomain(d));
+  const bad = value.find((d) => !canonicalDomain(d));
   if (bad !== undefined) return `${label} takes one of: ${DOMAIN_IDS.join(", ")}. Not a domain: ${JSON.stringify(bad.slice(0, 64))}.`;
-  if (new Set(value).size > DOMAIN_LIMIT) return `${label} takes at most ${DOMAIN_LIMIT} domains; a note with more is a platform.`;
+  if (canonicalDomains(value).length > DOMAIN_LIMIT) return `${label} takes at most ${DOMAIN_LIMIT} domains; a note with more is a platform.`;
   return null;
 }
 
+// The known domains of a list, old names as their new ones, each once, in order.
+export function canonicalDomains(values: readonly unknown[]): Domain[] {
+  return [...new Set(values.map(canonicalDomain).filter((d): d is Domain => d !== null))];
+}
+
 // A note's two domain fields as written, each a list of text (anything else reads as empty), split
-// into the known values and the unknown ones (kept in the file, reported by doctor).
+// into the known values (an old name read as its new one) and the unknown ones (kept in the file,
+// reported by doctor).
 export interface NoteDomains {
   domains: Domain[];
   suggested: Domain[]; // without the confirmed ones
@@ -196,8 +238,8 @@ export interface NoteDomains {
 
 export function noteDomains(frontmatter: Record<string, unknown>): NoteDomains {
   const texts = (value: unknown) => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
-  const domains = [...new Set(texts(frontmatter.domains).filter(isDomain))];
-  const suggested = [...new Set(texts(frontmatter.domains_suggested).filter(isDomain))].filter((d) => !domains.includes(d));
-  const unknown = [...new Set([...texts(frontmatter.domains), ...texts(frontmatter.domains_suggested)].filter((d) => !isDomain(d)))];
+  const domains = canonicalDomains(texts(frontmatter.domains));
+  const suggested = canonicalDomains(texts(frontmatter.domains_suggested)).filter((d) => !domains.includes(d));
+  const unknown = [...new Set([...texts(frontmatter.domains), ...texts(frontmatter.domains_suggested)].filter((d) => !canonicalDomain(d)))];
   return { domains, suggested, unknown };
 }

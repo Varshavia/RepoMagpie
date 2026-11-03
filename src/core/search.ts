@@ -2,7 +2,7 @@
 // searchJournals is pure over the loaded indexes; runSearch opens them. Never prints.
 import { join } from "node:path";
 import MiniSearch from "minisearch";
-import { DOMAIN_IDS, isDomain } from "./domains.ts";
+import { canonicalDomain, canonicalDomains, DOMAIN_IDS } from "./domains.ts";
 import { findProjectJournal, homeJournal, journalAliases, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import type { Outcome } from "./outcome.ts";
 import { loadIndex, type JournalIndex, type SearchDoc } from "./search-index.ts";
@@ -212,10 +212,11 @@ export function runSearch(request: SearchRequest, place: Place): SearchRun {
   if (!query.trim()) {
     return { outcome: "usage", document: { query, results: [], error: "Give a search query, for example: repomagpie search pdf" }, total: 0, warnings: [] };
   }
-  const bad = request.domains?.find((d) => !isDomain(d));
+  const bad = request.domains?.find((d) => !canonicalDomain(d));
   if (bad !== undefined) return { outcome: "usage", document: { query, results: [], error: `--domain takes one of: ${DOMAIN_IDS.join(", ")}. Not a domain: ${bad}.` }, total: 0, warnings: [] };
   const { sources, warnings } = searchSources(request.journal, place);
-  const all = searchJournals(sources, query, { limit: Infinity, tags: request.tags, domains: request.domains, match: request.match, kind: request.kind });
+  const domains = request.domains && canonicalDomains(request.domains); // an old name as its new one (decision 0055)
+  const all = searchJournals(sources, query, { limit: Infinity, tags: request.tags, domains, match: request.match, kind: request.kind });
   return { outcome: "ok", document: { query, results: all.slice(0, request.limit) }, total: all.length, warnings };
 }
 

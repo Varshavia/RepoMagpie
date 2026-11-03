@@ -10,7 +10,7 @@ import { readNote, stripComments } from "./note.ts";
 import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const CACHE_FILE = "search-index.json";
-const CACHE_VERSION = 4; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped; 4: domains
+const CACHE_VERSION = 5; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped; 4: domains; 5: frontend replaces styling (decision 0055)
 
 // One searchable document: a note, or one completed skill line of a note (decision 0006).
 export interface SearchDoc {

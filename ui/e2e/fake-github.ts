@@ -6,7 +6,7 @@
 //                than the minute magpie ui waits out);
 //   "shortwait": the search limit, over in a second, on the query's first request; then the
 //                recorded page (magpie ui waits it out and asks again);
-//   "halfway":   the request with topic:css answers; any other is rate limited (a domain search
+//   "halfway":   the request with topic:react answers; any other is rate limited (a domain search
 //                that meets the limit on its second request);
 //   "offline":   the network fails, as with no connection;
 //   "nothing":   no results;
@@ -62,7 +62,7 @@ globalThis.fetch = (async (input: string | URL | Request) => {
       waited.add(q);
       return limited(1);
     }
-    if (q.includes("halfway")) return q.includes("topic:css") ? json({ ...first, total_count: first.items.length }) : limited(600);
+    if (q.includes("halfway")) return q.includes("topic:react") ? json({ ...first, total_count: first.items.length }) : limited(600);
     if (q.includes("nothing")) return json({ total_count: 0, incomplete_results: false, items: [] });
     if (q.includes("hostile")) return json({ total_count: 1, incomplete_results: false, items: [hostile] });
     if (url.searchParams.get("page") === "2") return json({ total_count: first.items.length + more.length, incomplete_results: false, items: more });

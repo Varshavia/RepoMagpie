@@ -75,7 +75,7 @@
         },
         "domains": {
           "type": "array",
-          "maxItems": 12,
+          "maxItems": 16,
           "uniqueItems": true,
           "items": {
             "type": "string",
@@ -83,7 +83,7 @@
               "architecture",
               "security",
               "performance",
-              "styling",
+              "frontend",
               "database",
               "testing",
               "auth",
@@ -91,10 +91,14 @@
               "devops",
               "observability",
               "ai",
-              "tooling"
+              "tooling",
+              "mobile",
+              "data",
+              "docs",
+              "payments"
             ]
           },
-          "description": "The concerns the question is about; each raises the notes that have it. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); styling (CSS, design systems and UI components); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters, docs and editors)."
+          "description": "The concerns the question is about; each raises the notes that have it. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); frontend (UI frameworks, components, CSS and design systems); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters and editors); mobile (Android, iOS and cross-platform mobile apps); data (Analytics, data visualization and ETL pipelines); docs (Documentation sites, generators and API references); payments (Payments, checkout and billing)."
         },
         "tags": {
           "type": "array",
@@ -195,7 +199,7 @@
   {
     "name": "vocabulary",
     "title": "The domains and tags to search with",
-    "description": "The 12 domains, each with its definition, and the tags the user's journals use, each with its note count and aliases. Call it to map a question onto domains and tags before search.",
+    "description": "The 16 domains, each with its definition, and the tags the user's journals use, each with its note count and aliases. Call it to map a question onto domains and tags before search.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -494,7 +498,7 @@
               "architecture",
               "security",
               "performance",
-              "styling",
+              "frontend",
               "database",
               "testing",
               "auth",
@@ -502,10 +506,14 @@
               "devops",
               "observability",
               "ai",
-              "tooling"
+              "tooling",
+              "mobile",
+              "data",
+              "docs",
+              "payments"
             ]
           },
-          "description": "Only domains the user confirmed for this package, never your guess; RepoMagpie suggests its own. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); styling (CSS, design systems and UI components); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters, docs and editors)."
+          "description": "Only domains the user confirmed for this package, never your guess; RepoMagpie suggests its own. The domains: architecture (Structure, patterns, state management and application frameworks); security (Vulnerabilities, secrets, hardening and input validation); performance (Speed, caching, bundle size and profiling); frontend (UI frameworks, components, CSS and design systems); database (Databases, ORMs, migrations and storage); testing (Unit tests, end-to-end tests and mocking); auth (Sign-in, sessions and permissions); api (HTTP, RPC, API clients and servers); devops (Build, deploy, CI and containers); observability (Logging, metrics, tracing and error tracking); ai (LLMs, agents, embeddings and MCP); tooling (Developer tools, CLIs, linters, formatters and editors); mobile (Android, iOS and cross-platform mobile apps); data (Analytics, data visualization and ETL pipelines); docs (Documentation sites, generators and API references); payments (Payments, checkout and billing)."
         },
         "type": {
           "type": "string",

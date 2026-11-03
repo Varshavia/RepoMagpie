@@ -785,6 +785,25 @@ test("setDomains: confirming moves a domain from the suggestions to domains; rem
   assert.equal(setDomains(confirmed.text, { confirm: ["database"] }).changed, false);
 });
 
+test("setDomains: styling, the old name, is frontend (decision 0055): matched by either name, written as frontend", () => {
+  const old = HAND_WRITTEN.replace("tried: true", "domains: [styling]\ndomains_suggested: [api, testing]\ntried: true");
+  assert.equal(setDomains(old, { confirm: ["frontend"] }).changed, false);
+  assert.equal(setDomains(old, { confirm: ["styling"] }).changed, false);
+  const more = setDomains(old, { confirm: ["database"] });
+  assert.deepEqual(more.confirmed, ["database"]);
+  assert.match(more.text, /\ndomains: \[frontend, database\]\n/);
+  const removed = setDomains(old, { remove: ["frontend"] });
+  assert.match(removed.text, /\ndomains: \[\]\n/);
+  assert.match(removed.text, /\ndomains_suggested: \[api, testing\]\n/);
+  assert.equal(setDomains(old, { remove: ["styling"] }).text, removed.text);
+  const suggested = HAND_WRITTEN.replace("tried: true", "domains_suggested: [styling, api]\ntried: true");
+  assert.match(setDomains(suggested, { dismiss: ["frontend"] }).text, /\ndomains_suggested: \[api\]\n/);
+  assert.match(setDomains(suggested, { dismiss: ["api"] }).text, /\ndomains_suggested: \[styling\]\n/); // a list edited as text keeps its own
+  const confirmed = setDomains(suggested, { confirm: ["styling"] }).text;
+  assert.match(confirmed, /\ndomains: \[frontend\]\n/);
+  assert.match(confirmed, /\ndomains_suggested: \[api\]\n/);
+});
+
 test("setDomains dismiss: one suggestion leaves domains_suggested, the rest of the file byte for byte; the last leaves [] (decision 0040)", () => {
   const start = HAND_WRITTEN.replace("tags:\n  - pdf\n", "tags:\n  - pdf\ndomains: [security]   # mine\n").replace("tried: true", "domains_suggested: [database, \"Odd value\", testing]  # RepoMagpie's\ntried: true");
   const one = setDomains(start, { dismiss: ["database"] });

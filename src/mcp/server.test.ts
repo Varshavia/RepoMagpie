@@ -191,7 +191,7 @@ test("note's use_when and avoid_when: the user's items as the CLI writes them; a
 
 // Domains, tags and the vocabulary (decisions 0040, 0041).
 
-test("search's schema: domains is the enum of the 12, each definition in its description; it tells the agent how to map a question", async () => {
+test("search's schema: domains is the enum of the 16, each definition in its description; it tells the agent how to map a question", async () => {
   const box = sandbox(FILES);
   await withClient(box, {}, async (client) => {
     const tools = (await client.request("tools/list")).result?.tools as { name: string; description: string; inputSchema: { properties: Record<string, { description: string; items?: { enum: string[] } }> } }[];
@@ -203,7 +203,7 @@ test("search's schema: domains is the enum of the 12, each definition in its des
   });
 });
 
-test("vocabulary: the 12 domains with their definitions; the tags in use, most used first, with counts and aliases", async () => {
+test("vocabulary: the 16 domains with their definitions; the tags in use, most used first, with counts and aliases", async () => {
   const box = sandbox(FILES);
   await withClient(box, {}, async (client) => {
     const result = await client.call("vocabulary", {});

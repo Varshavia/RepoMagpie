@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { APPROXIMATE_KINDS as CORE_APPROXIMATE, emptyDiscover, type DiscoverResult } from "../../../src/core/discover.ts";
-import { appendResults, APPROXIMATE_KINDS, bulkPlan, bulkSummary, cardMeta, DEFAULT_FILTERS, discoverParams, inJournal, looserFilters, needsTokenWarning, resetSentence, toggle, badgeText, type AddState } from "./discover.ts";
+import { appendResults, APPROXIMATE_KINDS, bulkPlan, bulkSummary, cardMeta, DEFAULT_FILTERS, discoverParams, inJournal, listsHiddenText, looserFilters, matchedLine, needsTokenWarning, resetSentence, shownResults, sortFor, toggle, badgeText, type AddState } from "./discover.ts";
 
 // The Discover page (docs/ui.md §7, decision 0045): what a card shows, the query it sends, and what
 // "Add N to inbox" adds.
@@ -21,6 +21,9 @@ const result = (name: string, over: Partial<DiscoverResult> = {}): DiscoverResul
   topics: [],
   estimated_kind: null,
   suggested_domains: [],
+  matched_topics: [],
+  matched_words: [],
+  list_or_course: false,
   in_journal: [],
   ...over,
 });
@@ -46,18 +49,42 @@ test("a card's numbers: compact counts, read aloud in full; the age with the pus
   assert.equal(cardMeta(result("a/b", { pushed_at: null, updated: null })).date, null);
 });
 
-test("the query: the filters as the API's parameters; defaults sent, empty ones left out; page 1 implied", () => {
+test("the query: the filters as the API's parameters; defaults sent, empty ones left out; page 1 implied; hiding owned ones never sent", () => {
   assert.deepEqual(discoverParams(" design system ", DEFAULT_FILTERS), {
-    q: "design system", domain: undefined, kind: undefined, language: undefined, min_stars: "10", updated_within: "24", include_archived: undefined, sort: "stars", page: undefined,
+    q: "design system", domain: undefined, kind: undefined, language: undefined, min_stars: "10", updated_within: "24", include_archived: undefined, include_lists: undefined, sort: undefined, page: undefined,
   });
-  const params = discoverParams("", { domain: "styling", kind: "library", language: " TypeScript ", minStars: 1000, updatedWithin: 0, sort: "best", archived: true }, 3);
-  assert.deepEqual(params, { q: undefined, domain: "styling", kind: "library", language: "TypeScript", min_stars: "1000", updated_within: "0", include_archived: "true", sort: "best", page: "3" });
+  const params = discoverParams("", { domain: "frontend", kind: "library", language: " TypeScript ", minStars: 1000, updatedWithin: 0, sort: "best", archived: true, lists: true, hideOwned: true }, 3);
+  assert.deepEqual(params, { q: undefined, domain: "frontend", kind: "library", language: "TypeScript", min_stars: "1000", updated_within: "0", include_archived: "true", include_lists: "true", sort: "best", page: "3" });
+});
+
+test("the sort: Best match with words and Stars without, until one is chosen (decision 0054)", () => {
+  assert.equal(sortFor("pdf", null), "best");
+  assert.equal(sortFor("  ", null), "stars");
+  assert.equal(sortFor("pdf", "forks"), "forks");
+  assert.equal(DEFAULT_FILTERS.sort, null);
+  assert.deepEqual([DEFAULT_FILTERS.lists, DEFAULT_FILTERS.hideOwned], [false, false]);
+});
+
+test("hiding the ones I already have: a note in either journal hides the result; off, every result shows", () => {
+  const results = [result("a/b"), result("c/d", { in_journal: [{ journal: "project", id: "pkg:github/c/d", verdict: null, what_it_does: null }] })];
+  assert.deepEqual(shownResults(results, true).map((r) => r.name), ["a/b"]);
+  assert.equal(shownResults(results, false), results);
+});
+
+test("the lists line and the matched line", () => {
+  assert.equal(listsHiddenText(1), "1 list or course hidden.");
+  assert.equal(listsHiddenText(1200), "1,200 lists and courses hidden.");
+  assert.equal(matchedLine(result("a/b")), null);
+  assert.equal(matchedLine(result("a/b", { matched_topics: ["react"] })), "Matched topic: react");
+  assert.equal(matchedLine(result("a/b", { matched_words: ["pdf"] })), "Matched word: pdf");
+  assert.equal(matchedLine(result("a/b", { matched_topics: ["react", "vue"], matched_words: ["design", "system"] })), "Matched topics: react, vue · matched words: design, system");
+  assert.equal(matchedLine(result("a/b", { matched_words: [`a${String.fromCharCode(0x202e)}b`] })), "Matched word: a<U+202E>b");
 });
 
 test("no results: the filters to loosen are named; the defaults aren't", () => {
   assert.deepEqual(looserFilters(emptyDiscover({ text: "x" }).query), []);
-  const query = emptyDiscover({ text: "x", domain: "styling", kind: "cli", language: "Go", minStars: 10_000, updatedWithin: 6, topics: ["react"] }).query;
-  assert.deepEqual(looserFilters(query), ["domain styling", "kind cli", "language Go", "at least 10k stars", "updated within 6 months", "topics react"]);
+  const query = emptyDiscover({ text: "x", domain: "frontend", kind: "cli", language: "Go", minStars: 10_000, updatedWithin: 6, topics: ["react"] }).query;
+  assert.deepEqual(looserFilters(query), ["domain frontend", "kind cli", "language Go", "at least 10k stars", "updated within 6 months", "topics react"]);
   assert.deepEqual(looserFilters(emptyDiscover({ text: "x", updatedWithin: 0 }).query), [], "any time is already loose");
 });
 

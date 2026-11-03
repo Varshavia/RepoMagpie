@@ -265,7 +265,7 @@ test("a rejected token is auth", async () => {
   const r = await fetchRepository(PLAYWRIGHT, { fetch: failWith(() => new Response("{}", { status: 401 })), token: TOKEN });
   assert.ok(!r.ok);
   assert.equal(r.problem.kind, "auth");
-  assert.match(r.problem.message, /GITHUB_TOKEN may be invalid or expired/);
+  assert.match(r.problem.message, /GitHub token may be invalid or expired\. Run gh auth login again, or check GITHUB_TOKEN and GH_TOKEN\.$/);
 });
 
 test("no answer within the timeout is timeout", async () => {

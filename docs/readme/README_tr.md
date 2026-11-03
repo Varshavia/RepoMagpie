@@ -73,7 +73,7 @@ Do you want to proceed?
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   Token olmadan GitHub saatte 60 isteğe izin verir. Sınırı yükseltmek için: `export GITHUB_TOKEN=$(gh auth token)`, PowerShell'de ise `$env:GITHUB_TOKEN = gh auth token`.
+   Token olmadan GitHub saatte 60 isteğe izin verir. Sınırı yükseltmek için GitHub CLI ile giriş yap (`gh auth login`): RepoMagpie onun girişini kullanır. Ya da `GITHUB_TOKEN` ayarla. Hangisini kullandığını `repomagpie doctor` söyler.
 
 > [!IMPORTANT]
 > RepoMagpie yalnızca üç yerden gelir: [bu depo](https://github.com/Varshavia/RepoMagpie), [`repomagpie`](https://www.npmjs.com/package/repomagpie) npm paketi ve [skills.sh](https://skills.sh/varshavia/repomagpie) üzerindeki ajan skill'i. Kurulum programı, `.exe` ya da başka bir indirme, başka bir paket ve başka bir web sitesi yoktur: kendine RepoMagpie diyen başka her şey bizim değildir ([SECURITY.md](../../SECURITY.md#official-channels)).
@@ -153,7 +153,7 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <details>
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
-Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde ya da `discover` ile aradığında. Bunlar o deponun adını ya da aramanı, ayarladıysan `GITHUB_TOKEN`'ı gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde ya da `discover` ile aradığında. Bunlar o deponun adını ya da aramanı, varsa GitHub token'ını (`GITHUB_TOKEN` ya da GitHub CLI girişi) gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
 
 </details>
 

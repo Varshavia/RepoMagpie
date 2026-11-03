@@ -1,8 +1,9 @@
 // The coding agents that repomagpie setup and doctor know (decision 0035; facts, sources and dates
 // in docs/agents.md): where each keeps its MCP entry, and reading those files without changing them.
 // Never prints, never writes.
-import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, posix, resolve, win32 } from "node:path";
+import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { onPath } from "./agent-cli.ts";
 import type { Env } from "./journals.ts";
 import { hasDuplicateKey } from "./json-edit.ts";
 
@@ -91,29 +92,9 @@ export const skillFolders = (w: Where) => [
   join(codexHome(w), "skills", "repomagpie"),
 ];
 
-// Every file on PATH that `name` may run, in the order the shell looks: the first one runs. On
-// Windows, each PATHEXT extension in each folder (npm installs name.cmd and name.ps1 there).
-export function onPath(name: string, w: Where): string[] {
-  const path = w.env.PATH ?? w.env.Path ?? "";
-  const separator = w.platform === "win32" ? ";" : ":";
-  const extensions = w.platform === "win32" ? (w.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((e) => e.toLowerCase()) : [""];
-  const found: string[] = [];
-  // Only absolute folders: a relative entry (".", "bin") means the current folder, which may be a
-  // repository someone else wrote, and setup would run its claude.cmd.
-  const absolute = w.platform === "win32" ? win32.isAbsolute : posix.isAbsolute;
-  for (const folder of path.split(separator).filter((entry) => entry && absolute(entry))) {
-    for (const extension of extensions) {
-      const file = join(folder, name + extension);
-      try {
-        const stat = statSync(file);
-        if (stat.isFile() && (w.platform === "win32" || (stat.mode & 0o111) !== 0) && !found.includes(file)) found.push(file);
-      } catch {
-        // not there
-      }
-    }
-  }
-  return found;
-}
+// In agent-cli.ts beside runCli, so the GitHub token's lookup (github-cli.ts) loads neither this
+// file nor its imports on every command (spec §7 startup budgets).
+export { onPath };
 
 // The package a command file runs: the folder above node_modules/<package>/ that npm's shims (a
 // symlink, a .cmd or a .ps1 file) point to, read from the shim, and that package's name and

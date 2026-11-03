@@ -6,6 +6,7 @@
 import { useEffect, useId, useRef, useState, type MutableRefObject } from "react";
 import type { DiscoverResult } from "../../../src/core/discover.ts";
 import { DOMAINS } from "../../../src/core/domains.ts";
+import { partialSearchWarning, type GitHubSource } from "../../../src/core/github-connection.ts";
 import { api, type ApiError, type DiscoverJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import {
@@ -19,10 +20,14 @@ import {
   discoverParams,
   inJournal,
   LANGUAGES,
+  listsHiddenText,
   looserFilters,
+  matchedLine,
   needsTokenWarning,
   resetSentence,
+  shownResults,
   SORT_LABELS,
+  sortFor,
   STAR_STEPS,
   toggle,
   UPDATED_STEPS,
@@ -36,10 +41,29 @@ import { KINDS } from "../logic/schema.ts";
 import { externalHref, visible } from "../logic/text.ts";
 import { Banner, EmptyState, FieldError, plainClick, SkeletonRows } from "./common.tsx";
 import { ItemsField } from "./fields.tsx";
+import { GitHubLine } from "./GitHubLine.tsx";
 import "./DiscoverPage.css";
 
-const TOKEN_HELP = "https://github.com/Varshavia/RepoMagpie#quick-start";
 const EXAMPLE = "design system";
+// The partial-search warning, once dismissed, stays hidden until the tab closes (decision 0053).
+const PARTIAL_DISMISSED = "magpie-partial-search-dismissed";
+
+// Storage can be missing or blocked; the warning then shows again on the next search.
+function dismissedBefore(): boolean {
+  try {
+    return sessionStorage.getItem(PARTIAL_DISMISSED) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberDismissed(): void {
+  try {
+    sessionStorage.setItem(PARTIAL_DISMISSED, "1");
+  } catch {
+    // Hidden on this page only.
+  }
+}
 
 type Failure = { kind: "rate-limit" | "offline" | "error"; message: string; reset: string | null };
 type Searched = { text: string; filters: Filters };
@@ -52,13 +76,14 @@ export interface DiscoverMemory {
   searched: Searched | null;
   doc: DiscoverJson | null;
   results: DiscoverResult[];
+  listsHidden: number; // over every page shown
   adds: Map<string, AddState>;
   selected: Set<string>;
 }
 
 interface Props {
   journal: Scope;
-  tokenSet: boolean;
+  github: GitHubSource | null | undefined; // undefined until the settings arrive
   memory: MutableRefObject<DiscoverMemory | null>;
   onOpenNote: (journal: Scope, id: string) => void;
   onSaved: (journal: Scope) => void;
@@ -72,14 +97,16 @@ function failureOf(e: unknown): Failure {
   return { kind: "error", message: error.message, reset: null };
 }
 
-export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, onSaved }: Props) {
+export default function DiscoverPage({ journal, github, memory, onOpenNote, onSaved }: Props) {
   const id = useId();
+  const tokenSet = Boolean(github);
   const kept = memory.current;
   const [text, setText] = useState(kept?.text ?? "");
   const [filters, setFilters] = useState<Filters>(kept?.filters ?? DEFAULT_FILTERS);
   const [searched, setSearched] = useState<Searched | null>(kept?.searched ?? null);
   const [doc, setDoc] = useState<DiscoverJson | null>(kept?.doc ?? null);
   const [results, setResults] = useState<DiscoverResult[]>(kept?.results ?? []);
+  const [listsHidden, setListsHidden] = useState(kept?.listsHidden ?? 0);
   const [adds, setAdds] = useState<Map<string, AddState>>(() => new Map([...(kept?.adds ?? [])].filter(([, s]) => s.status !== "adding")));
   const [selected, setSelected] = useState<Set<string>>(kept?.selected ?? new Set());
   const [loading, setLoading] = useState<"" | "search" | "more">("");
@@ -89,13 +116,14 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null); // adds waiting for the token warning's answer
+  const [partialDismissed, setPartialDismissed] = useState(dismissedBefore);
   const latest = useRef(0); // the last search asked for; older replies are dropped
   const focusAdded = useRef<string | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    memory.current = { text, filters, searched, doc, results, adds, selected };
-  }, [memory, text, filters, searched, doc, results, adds, selected]);
+    memory.current = { text, filters, searched, doc, results, listsHidden, adds, selected };
+  }, [memory, text, filters, searched, doc, results, listsHidden, adds, selected]);
 
   useEffect(() => {
     if (outcome) summaryRef.current?.focus();
@@ -120,6 +148,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
       setDoc(answer);
       setSearched(next);
       setResults((shown) => (page === 1 ? answer.results : appendResults(shown, answer.results)));
+      setListsHidden((n) => (page === 1 ? answer.lists_hidden : n + answer.lists_hidden));
       if (page === 1) setSelected(new Set());
     } catch (e) {
       if (ask !== latest.current) return;
@@ -127,6 +156,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
         setFailure(failureOf(e));
         setDoc(null);
         setResults([]);
+        setListsHidden(0);
         setSearched(next);
       } else setMoreFailure(failureOf(e));
     } finally {
@@ -183,12 +213,32 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((f) => ({ ...f, [key]: value }));
   const domain = DOMAINS.find((d) => d.id === filters.domain);
   const chosen = bulkPlan(results, selected, addsHere, journal);
+  const partial = doc?.partial_search ? partialSearchWarning(doc.query, doc.partial_search) : null;
+  // Hiding the ones a journal has applies at once: it filters what is shown, not GitHub's search.
+  const shown = shownResults(results, filters.hideOwned);
+  const owned = results.length - shown.length;
+  // Show: the same search with lists; its requests are the same, so the cache answers.
+  const showLists = () => {
+    if (!searched) return;
+    set("lists", true);
+    void search({ ...searched, filters: { ...searched.filters, lists: true } });
+  };
+  const listsLine =
+    listsHidden && searched && !searched.filters.lists ? (
+      <p className="field-help">
+        {`${listsHiddenText(listsHidden)} `}
+        <button type="button" className="link-button" onClick={showLists}>
+          Show
+        </button>
+      </p>
+    ) : null;
 
   return (
     <div className="page discover-page">
       <h1 className="page-title">Discover</h1>
       <p className="page-lede">Find repositories on GitHub by words, concern and kind, and add the ones you pick to your inbox.</p>
       <p className="field-help">Discover sends your words and filters to GitHub's search API, nothing from your journals.</p>
+      <GitHubLine source={github} />
 
       <form
         className="page-section"
@@ -287,7 +337,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
             <label className="field-label" htmlFor={`${id}-sort`}>
               Sort
             </label>
-            <select id={`${id}-sort`} className="select" value={filters.sort} onChange={(e) => set("sort", e.target.value as Filters["sort"])}>
+            <select id={`${id}-sort`} className="select" value={sortFor(text, filters.sort)} onChange={(e) => set("sort", e.target.value as Filters["sort"])}>
               {Object.entries(SORT_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -299,9 +349,13 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
             <input type="checkbox" checked={filters.archived} onChange={(e) => set("archived", e.target.checked)} />
             Show archived
           </label>
+          <label className="check">
+            <input type="checkbox" checked={filters.lists} onChange={(e) => set("lists", e.target.checked)} />
+            Show lists and courses
+          </label>
         </div>
         <p className="field-help" id={`${id}-domain-help`}>
-          {domain ? `${domain.id}: ${domain.definition}` : "Domain: the concern a repository addresses, such as testing or styling."} Filters apply when you search.
+          {domain ? `${domain.id}: ${domain.definition}` : "Domain: the concern a repository addresses, such as testing or frontend."} Filters apply when you search.
         </p>
       </form>
 
@@ -311,7 +365,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
         </div>
       ) : failure ? (
         <div className="page-section">
-          <FailureBanner failure={failure} tokenSet={tokenSet} onRetry={() => searched && void search(searched)} />
+          <FailureBanner failure={failure} onRetry={() => searched && void search(searched)} />
         </div>
       ) : !doc ? (
         <div className="page-section">
@@ -336,20 +390,49 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
         <div className="page-section">
           {doc.approximate ? <Banner tone="muted">{visible(doc.approximate)}</Banner> : null}
           {doc.incomplete ? <Banner tone="warning">GitHub stopped this search early, so some matches may be missing.</Banner> : null}
-          {doc.warnings.map((w) => (
-            <Banner tone="warning" key={w}>
-              {visible(w)}
-            </Banner>
-          ))}
+          {doc.warnings.map((w) =>
+            w !== partial ? (
+              <Banner tone="warning" key={w}>
+                {visible(w)}
+              </Banner>
+            ) : partialDismissed ? null : (
+              <Banner
+                tone="warning"
+                key={w}
+                action={
+                  <button
+                    type="button"
+                    className="button ghost"
+                    onClick={() => {
+                      rememberDismissed();
+                      setPartialDismissed(true);
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                }
+              >
+                {visible(w)}
+              </Banner>
+            ),
+          )}
 
           {results.length === 0 ? (
-            <EmptyState>
-              {looserFilters(doc.query).length ? `No repositories match. Try loosening: ${looserFilters(doc.query).join("; ")}.` : "No repositories match. Try other words."}
-            </EmptyState>
+            listsLine ?? (
+              <EmptyState>
+                {looserFilters(doc.query).length ? `No repositories match. Try loosening: ${looserFilters(doc.query).join("; ")}.` : "No repositories match. Try other words."}
+              </EmptyState>
+            )
           ) : (
             <>
               <div className="discover-bar">
-                <p className="field-help" role="status">{`${results.length} shown of ${doc.total.toLocaleString("en-US")} on GitHub.`}</p>
+                <p className="field-help" role="status">
+                  {`${shown.length} shown of ${doc.total.toLocaleString("en-US")} on GitHub.${owned ? ` ${owned} you already have ${owned === 1 ? "is" : "are"} hidden.` : ""}`}
+                </p>
+                <label className="check">
+                  <input type="checkbox" checked={filters.hideOwned} onChange={(e) => set("hideOwned", e.target.checked)} />
+                  Hide ones I already have
+                </label>
                 {selected.size ? (
                   <div className="form-actions">
                     <span className="field-help">{`${selected.size} selected`}</span>
@@ -362,6 +445,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
                   </div>
                 ) : null}
               </div>
+              {listsLine}
 
               {confirm !== null ? (
                 <Banner
@@ -401,7 +485,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
               ) : null}
 
               <ul className="discover-results" aria-label="Results">
-                {results.map((r) => (
+                {shown.map((r) => (
                   <Card
                     key={r.name}
                     result={r}
@@ -419,7 +503,7 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
                 ))}
               </ul>
 
-              {moreFailure ? <FailureBanner failure={moreFailure} tokenSet={tokenSet} onRetry={() => searched && doc.next_page && void search(searched, doc.next_page)} /> : null}
+              {moreFailure ? <FailureBanner failure={moreFailure} onRetry={() => searched && doc.next_page && void search(searched, doc.next_page)} /> : null}
               {doc.next_page && searched ? (
                 <div className="form-actions">
                   <button type="button" className="button secondary" onClick={() => void search(searched, doc.next_page as number)} disabled={loading !== ""}>
@@ -435,20 +519,13 @@ export default function DiscoverPage({ journal, tokenSet, memory, onOpenNote, on
   );
 }
 
-function FailureBanner({ failure, tokenSet, onRetry }: { failure: Failure; tokenSet: boolean; onRetry: () => void }) {
+// A rate limit's message says how to connect GitHub; the line at the top of the page has the steps.
+function FailureBanner({ failure, onRetry }: { failure: Failure; onRetry: () => void }) {
   if (failure.kind === "rate-limit") {
     return (
       <Banner tone="warning">
         {visible(failure.message)}
         {failure.reset ? ` ${failure.reset}` : ""}
-        {tokenSet ? null : (
-          <>
-            {" "}
-            <a href={TOKEN_HELP} target="_blank" rel="noreferrer">
-              How to set a GitHub token
-            </a>
-          </>
-        )}
       </Banner>
     );
   }
@@ -482,6 +559,7 @@ function Card(props: {
 }) {
   const { result: r, journal, state, selected, onSelect, busy, verdictOpen, onVerdict, onAdd, focusAdded, onOpenNote } = props;
   const meta = cardMeta(r);
+  const matched = matchedLine(r);
   const name = visible(r.name);
   const here = inJournal(r, journal);
   const href = externalHref(r.url);
@@ -540,6 +618,8 @@ function Card(props: {
           ))}
         </ul>
       ) : null}
+
+      {matched ? <p className="discover-matched">{matched}</p> : null}
 
       {r.estimated_kind || r.suggested_domains.length ? (
         <p className="discover-estimated">

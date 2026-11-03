@@ -57,6 +57,7 @@ const output = (properties: Record<string, unknown>, required: string[]) =>
 const list = { type: "array", items: { type: "object" } };
 const nullable = (type: string) => ({ type: [type, "null"] });
 // The domains (decision 0040): an enum, so a value that isn't one, instructions included, is refused.
+// Current names only: an agent reads them each session, so an old name (decision 0055) isn't offered.
 const domainList = { type: "array", maxItems: DOMAIN_IDS.length, uniqueItems: true, items: { type: "string", enum: [...DOMAIN_IDS] } };
 const DOMAIN_HELP = `The domains: ${DOMAINS.map((d) => `${d.id} (${d.definition.replace(/\.$/, "")})`).join("; ")}.`;
 
@@ -120,7 +121,7 @@ export function buildServer(options: McpOptions): McpServer {
 
   server.registerTool("vocabulary", {
     title: "The domains and tags to search with",
-    description: "The 12 domains, each with its definition, and the tags the user's journals use, each with its note count and aliases. Call it to map a question onto domains and tags before search.",
+    description: "The 16 domains, each with its definition, and the tags the user's journals use, each with its note count and aliases. Call it to map a question onto domains and tags before search.",
     inputSchema: input({ journal }),
     outputSchema: output({ domains: list, tags: list }, ["domains", "tags"]),
     annotations: READ,
