@@ -1,6 +1,6 @@
 <div align="center">
 
-**English** · [Türkçe](docs/readme/README_tr.md)
+English · [Türkçe](docs/readme/README_tr.md) · [Deutsch](docs/readme/README_de.md) · [Español](docs/readme/README_es.md) · [简体中文](docs/readme/README_zh-CN.md) · [日本語](docs/readme/README_ja.md)
 
 <img src="docs/assets/logo.svg" width="96" height="96" alt="RepoMagpie logo: a magpie in profile">
 
@@ -40,10 +40,10 @@ Do you want to proceed?
 - **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
 - **Find by concern:** ask about security, databases, testing… in any language, and your agent finds the notes that fit, even ones with no word in common.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
-- **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app.
+- **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app. Lists and courses stay hidden unless you ask, and each result says why it is there.
 - **Start from a project:** `repomagpie init --auto` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
 
-**Status:** pre-release `0.2.0-beta.19`, for early testers. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
+**Status:** beta, for early testers. The [changelog](CHANGELOG.md) lists every version; the [roadmap](docs/roadmap.md) shows what comes next.
 
 ## Quick start
 
@@ -67,11 +67,11 @@ Do you want to proceed?
 3. Write your first note. A GitHub URL also fetches the repository's licence, topics and agent skills, and `--use-when` lets you find the note later by what you need:
 
    ```bash
-   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
+   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm --alternative puppeteer
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   GitHub allows 60 requests an hour without a token. To raise the limit, sign in with the GitHub CLI (`gh auth login`): RepoMagpie uses its login. Or set `GITHUB_TOKEN`. `repomagpie doctor` says which one it uses.
+   GitHub allows 60 requests an hour without a token. To raise the limit, sign in with the GitHub CLI (`gh auth login`): RepoMagpie uses its login. Or set `GITHUB_TOKEN` or `GH_TOKEN`. `repomagpie doctor` says which one it uses.
 
 > [!IMPORTANT]
 > RepoMagpie comes only from [this repository](https://github.com/Varshavia/RepoMagpie), the npm package [`repomagpie`](https://www.npmjs.com/package/repomagpie) and the agent skill on [skills.sh](https://skills.sh/varshavia/repomagpie). There are no installers, no `.exe` or other downloads, no other packages and no other website: anything else that calls itself RepoMagpie is not ours ([SECURITY.md](SECURITY.md#official-channels)).
@@ -120,7 +120,7 @@ Or copy one of your own notes there: `repomagpie adopt pdfkit`. When a teammate'
 
 ## The local app
 
-`repomagpie ui` opens your journals in the browser. Review an inbox note: write the Verdict, set kind, domains, tags and rating, and press Ctrl+Enter.
+`repomagpie ui` opens your journals in the browser. Search lists your notes before you type, and Import takes a list you paste. Review an inbox note: write the Verdict, set kind, domains, tags and rating, and press Ctrl+Enter.
 
 ![The inbox review in repomagpie ui: the Verdict being typed for Understand-Anything, with ai and tooling outlined as suggested domains, and tags to pick below](docs/assets/screen-inbox-review.png)
 
@@ -151,7 +151,7 @@ A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note 
 <details>
 <summary><strong>Does RepoMagpie send my notes anywhere?</strong></summary>
 
-No. Your journals are Markdown files on your machine, and there is no telemetry. The only network requests are read-only calls to GitHub's API, when you add a note from a GitHub repository or search with `discover`: they send that repository's name or your search, and your GitHub token if there is one (`GITHUB_TOKEN`, or the GitHub CLI's login), never your notes. `repomagpie ui` listens on `127.0.0.1` only. Your agent's model provider sees the notes your agent reads. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
+No. Your journals are Markdown files on your machine, and there is no telemetry. The only network requests are read-only calls to GitHub's API, when you add a note from a GitHub repository or search with `discover`: they send that repository's name or your search, and your GitHub token if there is one (`GITHUB_TOKEN`, `GH_TOKEN` or the GitHub CLI's login), never your notes. `repomagpie ui` listens on `127.0.0.1` only. Your agent's model provider sees the notes your agent reads. See [SECURITY.md](SECURITY.md#what-repomagpie-reads-writes-and-sends).
 
 </details>
 
@@ -172,7 +172,7 @@ Never for good, and it never approves one. When a note says to avoid the package
 <details>
 <summary><strong>How do I remove it?</strong></summary>
 
-Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, never restores a backup over your later changes, and leaves your journals and `setup`'s backups. Then `repomagpie setup --delete-backups` deletes the backups after asking, and `npm uninstall -g repomagpie` removes the command.
+Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, never restores a backup over your later changes, and leaves your journals and `setup`'s backups. With `--agents`, the shared skill folder stays while another agent still reads it. Then `repomagpie setup --delete-backups` deletes the backups after asking, and `npm uninstall -g repomagpie` removes the command.
 
 </details>
 
