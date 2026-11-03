@@ -5,7 +5,7 @@
 // Also the file rules of decision 0032 (rules 5 and 6), here because every read of a journal's notes
 // lists them through noteSignature: a link inside a journal is never followed nor written through,
 // and a note file over 256 KB is skipped. What was skipped is kept for the command to report once.
-import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { removeFolder } from "./copy-folder.ts";
 import { readNote, type Note } from "./note.ts";
@@ -172,25 +172,69 @@ export function readCacheEntries(journal: string, name: string, version: number)
 // cached entry's shape, given the file it is kept for; one that fails is derived again, so a damaged
 // cache can't break the caller. `listed`: the journal's noteSignature, when the caller has it already
 // (one listing for two caches). `derived`: the files derived again in this call.
+//
+// The cache is updated, not rewritten (decision 0057): the entries derived since it was last written
+// whole go to a small delta file beside it (deltaName), read first. Each entry, in either file, is
+// used only while its note has the modification time and size recorded with it, so a delta that is
+// stale, damaged or gone only costs a read again. The cache is written whole, and the delta removed,
+// when there is no usable cache (none, unreadable, another version), when a note it lists is gone
+// (removed or renamed), when an entry for a note as it is now is missing or of the wrong shape (a
+// damaged cache), or when the delta would hold more than DELTA_LIMIT entries.
 export function noteEntries<T>(journal: string, name: string, version: number, derive: (file: string, parse: () => Note) => T, valid?: (entry: unknown, file: string) => boolean, listed = noteSignature(journal)): { files: string[]; data: Record<string, T>; skipped: string[]; derived: string[] } {
   const { files, signature, skipped } = listed;
   const cached = readCacheEntries(journal, name, version);
+  const delta = cached && readCacheEntries(journal, deltaName(name), version);
   const data: Record<string, T> = {};
   const derived: string[] = [];
-  let changed = !cached || Object.keys(cached.files).length !== files.length;
+  const inDelta: string[] = []; // files whose entry came from the delta
+  let damaged = false; // an entry recorded for the note as it is now, but missing or of the wrong shape
+  const current = (entries: { files: Signature; data: Record<string, unknown> } | undefined, file: string) => {
+    const at: unknown = entries && Object.hasOwn(entries.files, file) ? entries.files[file] : undefined;
+    if (!entries || !Array.isArray(at) || at[0] !== signature[file][0] || at[1] !== signature[file][1]) return undefined;
+    const hit = entries.data[file];
+    if (hit !== undefined && (!valid || valid(hit, file))) return hit;
+    damaged = true;
+    return undefined;
+  };
   for (const file of files) {
-    const before = cached?.files[file];
-    const hit = before && before[0] === signature[file][0] && before[1] === signature[file][1] ? cached?.data[file] : undefined;
-    if (hit !== undefined && (!valid || valid(hit, file))) data[file] = hit as T;
+    const fromDelta = current(delta, file);
+    const hit = fromDelta ?? current(cached, file);
+    if (fromDelta !== undefined) inDelta.push(file);
+    if (hit !== undefined) data[file] = hit as T;
     else {
       data[file] = derive(file, () => parsedNote(journal, file, signature[file]));
       derived.push(file);
-      changed = true;
     }
   }
-  if (changed && files.length) writeCache(journal, name, version, signature, data);
+  const listedFiles = new Set(files);
+  const gone = !cached || Object.keys(cached.files).some((file) => !listedFiles.has(file));
+  if (files.length && (gone || damaged || derived.length)) {
+    const kept = [...inDelta, ...derived];
+    if (gone || damaged || kept.length > DELTA_LIMIT) {
+      writeCache(journal, name, version, signature, data);
+      removeCache(journal, deltaName(name));
+    } else {
+      const pick = <V>(all: Record<string, V>) => Object.fromEntries(kept.map((file) => [file, all[file]]));
+      writeCache(journal, deltaName(name), version, pick(signature), pick(data));
+    }
+  }
   forgetGone(journal, files);
   return { files, data, skipped, derived };
+}
+
+// The delta of a cache file (decision 0057): recall-index.json → recall-index.delta.json.
+export const deltaName = (name: string): string => `${name.replace(/\.json$/, "")}.delta.json`;
+const DELTA_LIMIT = 100;
+
+// Removes a cache file, unless it or the cache folder is a link; a file that can't be removed is left.
+function removeCache(journal: string, name: string): void {
+  const file = cacheFile(journal, name);
+  if (!file) return;
+  try {
+    unlinkSync(file);
+  } catch {
+    // Not there, or held: a stale delta only costs a read again.
+  }
 }
 
 // The notes parsed in this process, by journal and file, with the modification time and size they

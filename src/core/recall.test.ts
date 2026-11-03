@@ -7,7 +7,7 @@ import { withJournal } from "../../scripts/bench-journal.ts";
 import { copyFolder, removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { linkIndex } from "./links.ts";
-import { forgetParsed } from "./note-cache.ts";
+import { deltaName, forgetParsed } from "./note-cache.ts";
 import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, runRecall, type RecallSource } from "./recall.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
@@ -252,6 +252,144 @@ test("the recall cache, per note: on the example vault and the bench journal, en
       assert.deepEqual(edited.entries, coldEntries(path));
     }
   }, false);
+});
+
+// --- The delta (decision 0057): entries derived since the cache was written whole ---
+
+const cachePath = (path: string) => join(path, ".cache", RECALL_CACHE);
+const deltaPath = (path: string) => join(path, ".cache", deltaName(RECALL_CACHE));
+const deltaFiles = (path: string) => Object.keys((JSON.parse(readFileSync(deltaPath(path), "utf8")) as { files: object }).files);
+const verdictOf = (path: string, query: string) => recall(sources(["personal", path]), query, ["npm"]).map((m) => m.verdict);
+
+test("the recall cache's delta: an edit and an added note go to the delta, the cache file stays as it was, and the next recall sees each", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  loadRecallEntries(path);
+  const whole = readFileSync(cachePath(path), "utf8");
+  assert.equal(existsSync(deltaPath(path)), false);
+
+  writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict: "avoid: too big" }));
+  assert.deepEqual(verdictOf(path, "zod"), ["avoid: too big"]);
+  assert.deepEqual(deltaFiles(path), ["npm--zod.md"]);
+  writeFileSync(join(path, "notes", "npm--puppeteer.md"), PUPPETEER);
+  assert.deepEqual(verdictOf(path, "puppeteer"), ["default for PDF rendering in new projects"]);
+  assert.deepEqual(deltaFiles(path), ["npm--zod.md", "npm--puppeteer.md"]);
+  writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict: "fine again, since 4.0" }));
+  assert.deepEqual(verdictOf(path, "zod"), ["fine again, since 4.0"]);
+  assert.equal(readFileSync(cachePath(path), "utf8"), whole, "the cache file isn't rewritten for an edit or an addition");
+
+  const warm = loadRecallEntries(path);
+  assert.deepEqual([warm.derived, warm.rebuilt], [[], false]);
+  assert.deepEqual(warm.entries, coldEntries(path));
+});
+
+test("the recall cache's delta: a note deleted or renamed writes the cache whole, with the delta's entries, and removes the delta", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }), "npm--puppeteer.md": PUPPETEER });
+  loadRecallEntries(path);
+  writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict: "avoid: too big" }));
+  loadRecallEntries(path);
+  assert.ok(existsSync(deltaPath(path)));
+
+  unlinkSync(join(path, "notes", "npm--puppeteer.md"));
+  assert.deepEqual(verdictOf(path, "puppeteer"), []);
+  assert.equal(existsSync(deltaPath(path)), false);
+  const data = (JSON.parse(readFileSync(cachePath(path), "utf8")) as { data: Record<string, { verdict: string }> }).data;
+  assert.deepEqual([Object.keys(data), data["npm--zod.md"].verdict], [["npm--pdfkit.md", "npm--zod.md"], "avoid: too big"]);
+
+  writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict: "fine again, since 4.0" }));
+  loadRecallEntries(path); // a delta again
+  renameSync(join(path, "notes", "npm--zod.md"), join(path, "notes", "npm--zod-renamed.md"));
+  const renamed = loadRecallEntries(path);
+  assert.deepEqual(renamed.derived, ["npm--zod-renamed.md"]);
+  assert.deepEqual(recall([{ scope: "personal", path, entries: renamed.entries }], "zod", ["npm"]).map((m) => [m.verdict, m.path]), [["fine again, since 4.0", join(path, "notes", "npm--zod-renamed.md")]]);
+  assert.equal(existsSync(deltaPath(path)), false);
+  assert.deepEqual(renamed.entries, coldEntries(path));
+});
+
+test("the recall cache's delta: a cache of an older version, a corrupt one, or none, is rebuilt, and its delta isn't read", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  const all = ["npm--pdfkit.md", "npm--zod.md"];
+  const withDelta = (verdict: string) => {
+    loadRecallEntries(path);
+    writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict }));
+    loadRecallEntries(path);
+    assert.ok(existsSync(deltaPath(path)));
+  };
+  withDelta("avoid: version 1");
+  const cache = JSON.parse(readFileSync(cachePath(path), "utf8")) as { version: number };
+  writeFileSync(cachePath(path), JSON.stringify({ ...cache, version: 3 }));
+  assert.deepEqual(loadRecallEntries(path).derived, all);
+  assert.equal((JSON.parse(readFileSync(cachePath(path), "utf8")) as { version: number }).version, cache.version);
+  assert.equal(existsSync(deltaPath(path)), false);
+  assert.deepEqual(verdictOf(path, "zod"), ["avoid: version 1"]);
+
+  withDelta("avoid: corrupt");
+  writeFileSync(cachePath(path), "{not json");
+  assert.deepEqual(loadRecallEntries(path).derived, all);
+  assert.ok(readFileSync(cachePath(path), "utf8").startsWith("{\""));
+  assert.equal(existsSync(deltaPath(path)), false);
+  assert.deepEqual(verdictOf(path, "zod"), ["avoid: corrupt"]);
+
+  withDelta("avoid: no cache");
+  unlinkSync(cachePath(path));
+  assert.deepEqual(loadRecallEntries(path).derived, all);
+  assert.equal(existsSync(deltaPath(path)), false);
+  assert.deepEqual(verdictOf(path, "zod"), ["avoid: no cache"]);
+});
+
+test("the recall cache's delta: a corrupt, damaged, forged or stale delta can't change what recall says", () => {
+  const path = journal({ "npm--pdfkit.md": PDFKIT, "npm--zod.md": note({ id: "pkg:npm/zod", verdict: "fine" }) });
+  const zod = (verdict: string) => writeFileSync(join(path, "notes", "npm--zod.md"), note({ id: "pkg:npm/zod", verdict }));
+  loadRecallEntries(path);
+  zod("avoid: one");
+  loadRecallEntries(path);
+  const delta = JSON.parse(readFileSync(deltaPath(path), "utf8")) as { version: number; files: object; data: Record<string, Record<string, unknown>> };
+
+  writeFileSync(deltaPath(path), "{not json");
+  const corrupt = loadRecallEntries(path);
+  assert.deepEqual([corrupt.derived, recall([{ scope: "personal", path, entries: corrupt.entries }], "zod", ["npm"])[0].verdict], [["npm--zod.md"], "avoid: one"]);
+  assert.deepEqual(deltaFiles(path), ["npm--zod.md"], "the delta is written again");
+
+  // An entry of the wrong shape, or one that names another note file (decision 0032), for the note
+  // as it is now: read again from the note, and the cache written whole.
+  for (const [k, change] of [{ verdict: null }, { file: "npm--pdfkit.md" }].entries()) {
+    const verdict = ["avoid: one", "avoid: two"][k];
+    writeFileSync(deltaPath(path), JSON.stringify({ ...delta, data: { "npm--zod.md": { ...delta.data["npm--zod.md"], ...change } } }));
+    const damaged = loadRecallEntries(path);
+    assert.deepEqual(damaged.derived, ["npm--zod.md"], JSON.stringify(change));
+    assert.deepEqual(verdictOf(path, "zod"), [verdict]);
+    assert.equal(existsSync(deltaPath(path)), false);
+    zod(["avoid: two", "avoid: three"][k]); // another text, so a delta again
+    loadRecallEntries(path);
+    Object.assign(delta, JSON.parse(readFileSync(deltaPath(path), "utf8")));
+  }
+
+  // A delta left behind (its removal failed) whose entry is older than the cache's: the cache's is used.
+  const old = readFileSync(deltaPath(path), "utf8");
+  zod("avoid: newest of all");
+  loadRecallEntries(path);
+  unlinkSync(join(path, "notes", "npm--pdfkit.md")); // the cache is written whole, the delta removed
+  loadRecallEntries(path);
+  writeFileSync(deltaPath(path), old);
+  const stale = loadRecallEntries(path);
+  assert.deepEqual([stale.derived, recall([{ scope: "personal", path, entries: stale.entries }], "zod", ["npm"])[0].verdict], [[], "avoid: newest of all"]);
+  assert.deepEqual(stale.entries, coldEntries(path));
+});
+
+test("the recall cache's delta: past 100 entries, the cache is written whole and the delta removed", () => {
+  const notes: Record<string, string> = {};
+  for (let i = 0; i < 102; i++) notes[`npm--p${i}.md`] = note({ id: `pkg:npm/p${i}`, verdict: "fine" });
+  const path = journal(notes);
+  loadRecallEntries(path);
+  const edit = (i: number) => writeFileSync(join(path, "notes", `npm--p${i}.md`), note({ id: `pkg:npm/p${i}`, verdict: `avoid: edited ${i}` }));
+  for (let i = 0; i < 100; i++) edit(i);
+  assert.equal(loadRecallEntries(path).derived.length, 100);
+  assert.equal(deltaFiles(path).length, 100);
+  edit(100);
+  assert.deepEqual(loadRecallEntries(path).derived, ["npm--p100.md"]);
+  assert.equal(existsSync(deltaPath(path)), false);
+  assert.deepEqual(verdictOf(path, "p100"), ["avoid: edited 100"]);
+  assert.deepEqual(verdictOf(path, "p7"), ["avoid: edited 7"]);
+  assert.deepEqual(loadRecallEntries(path).entries, coldEntries(path));
 });
 
 test("a journal without notes writes no cache", () => {
