@@ -1,8 +1,8 @@
 <div align="center">
 
-[English](../../README.md) · **Türkçe**
+[English](../../README.md) · Türkçe · [Deutsch](README_de.md) · [Español](README_es.md) · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_İngilizce README esas metindir; bu çeviri ondan geride kalabilir._
+_Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İngilizce olandır. Çevrildiği metin: 2026-11-04 tarihli İngilizce README._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie logosu: yandan görünen bir saksağan">
 
@@ -42,10 +42,10 @@ Do you want to proceed?
 - **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
 - **Konuya göre bul:** security, database, testing… hakkında istediğin dilde sor; ajanın uyan notları, sorunla tek kelimesi ortak olmayanları bile bulur.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
-- **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama.
+- **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama. Listeler ve kurslar sen istemedikçe gizli kalır; her sonuç neden orada olduğunu söyler.
 - **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
 
-**Durum:** erken test edenler için ön sürüm `0.2.0-beta.19`. [Değişiklik kaydına](../../CHANGELOG.md) ve [yol haritasına](../roadmap.md) bak.
+**Durum:** erken test edenler için beta. [Değişiklik kaydı](../../CHANGELOG.md) her sürümü listeler; [yol haritası](../roadmap.md) sırada ne olduğunu gösterir.
 
 ## Hızlı başlangıç
 
@@ -69,11 +69,11 @@ Do you want to proceed?
 3. İlk notunu yaz. Bir GitHub URL'si deponun lisansını, konularını (topics) ve ajan skill'lerini de çeker; `--use-when` ise notu sonra neye ihtiyacın olduğuyla bulmanı sağlar:
 
    ```bash
-   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm
+   repomagpie note pdfkit "avoid: async streams painful; use puppeteer" --type npm --alternative puppeteer
    repomagpie note https://github.com/microsoft/playwright-cli "use for agent browser tests" --use-when "an agent checks a web UI"
    ```
 
-   Token olmadan GitHub saatte 60 isteğe izin verir. Sınırı yükseltmek için GitHub CLI ile giriş yap (`gh auth login`): RepoMagpie onun girişini kullanır. Ya da `GITHUB_TOKEN` ayarla. Hangisini kullandığını `repomagpie doctor` söyler.
+   Token olmadan GitHub saatte 60 isteğe izin verir. Sınırı yükseltmek için GitHub CLI ile giriş yap (`gh auth login`): RepoMagpie onun girişini kullanır. Ya da `GITHUB_TOKEN` veya `GH_TOKEN` ayarla. Hangisini kullandığını `repomagpie doctor` söyler.
 
 > [!IMPORTANT]
 > RepoMagpie yalnızca üç yerden gelir: [bu depo](https://github.com/Varshavia/RepoMagpie), [`repomagpie`](https://www.npmjs.com/package/repomagpie) npm paketi ve [skills.sh](https://skills.sh/varshavia/repomagpie) üzerindeki ajan skill'i. Kurulum programı, `.exe` ya da başka bir indirme, başka bir paket ve başka bir web sitesi yoktur: kendine RepoMagpie diyen başka her şey bizim değildir ([SECURITY.md](../../SECURITY.md#official-channels)).
@@ -122,7 +122,7 @@ Ya da kendi notlarından birini oraya kopyala: `repomagpie adopt pdfkit`. Bir ek
 
 ## Yerel uygulama
 
-`repomagpie ui` günlüklerini tarayıcıda açar. Gelen kutusundaki (Inbox) bir notu gözden geçir: Verdict'i yaz, türü, alanları, etiketleri ve puanı seç, Ctrl+Enter'a bas.
+`repomagpie ui` günlüklerini tarayıcıda açar. Search (Arama) sen yazmadan önce notlarını listeler, Import (İçe aktar) yapıştırdığın bir listeyi alır. Gelen kutusundaki (Inbox) bir notu gözden geçir: Verdict'i yaz, türü, alanları, etiketleri ve puanı seç, Ctrl+Enter'a bas.
 
 ![repomagpie ui'da gelen kutusu incelemesi: Understand-Anything için yazılmakta olan Verdict; önerilen alanlar olarak çerçeveli ai ve tooling, altında seçilecek etiketler](../assets/screen-inbox-review.png)
 
@@ -153,7 +153,7 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <details>
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
-Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde ya da `discover` ile aradığında. Bunlar o deponun adını ya da aramanı, varsa GitHub token'ını (`GITHUB_TOKEN` ya da GitHub CLI girişi) gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde ya da `discover` ile aradığında. Bunlar o deponun adını ya da aramanı, varsa GitHub token'ını (`GITHUB_TOKEN`, `GH_TOKEN` ya da GitHub CLI girişi) gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
 
 </details>
 
@@ -174,7 +174,7 @@ Hiçbir kurulumu kalıcı olarak engellemez ve hiçbirini onaylamaz. Bir not pak
 <details>
 <summary><strong>Nasıl kaldırırım?</strong></summary>
 
-`repomagpie setup --remove` çalıştır. Yalnızca RepoMagpie'nin kendi MCP girdilerini, hook'larını ve skill klasörlerini kaldırır, sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez; günlüklerini ve `setup`'ın yedeklerini bırakır. Sonra `repomagpie setup --delete-backups` sorduktan sonra yedekleri siler, `npm uninstall -g repomagpie` de komutu kaldırır.
+`repomagpie setup --remove` çalıştır. Yalnızca RepoMagpie'nin kendi MCP girdilerini, hook'larını ve skill klasörlerini kaldırır, sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez; günlüklerini ve `setup`'ın yedeklerini bırakır. `--agents` ile, ortak skill klasörü başka bir ajan onu hâlâ okuyorsa yerinde kalır. Sonra `repomagpie setup --delete-backups` sorduktan sonra yedekleri siler, `npm uninstall -g repomagpie` de komutu kaldırır.
 
 </details>
 
