@@ -9,7 +9,7 @@ import { noteListDocument } from "./documents.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { graphData } from "./graph.ts";
 import { linkEntries } from "./links.ts";
-import { forgetParsed, readCache, writeCache } from "./note-cache.ts";
+import { deltaName, forgetParsed, readCache, writeCache } from "./note-cache.ts";
 
 // Writing a cache on Windows: another process (antivirus, the search indexer) may hold the file the
 // cache replaces for a moment, and the rename fails with EPERM, EACCES or EBUSY. Faults are injected
@@ -219,4 +219,27 @@ test("shared parse: a hostile journal's caches are the same, byte for byte, as w
   const readable = Object.keys(files).length - 1; // all but the oversized note
   assert.equal(noteReads(t, () => build(root, journalPath, "list first", true)), readable);
   assert.equal(noteReads(t, () => build(root, journalPath, "list first", false)), 3 * readable);
+});
+
+// The delta (decision 0057) for the app's caches: an edited and an added note go to each cache's
+// delta, the next read shows them, and what it gives is what a cold build gives.
+test("the note list, the links and the graph: an edit and an added note go to each delta; reads match a cold build", () => {
+  const root = journal();
+  const place = { home: join(root, "home"), env: { MAGPIE_HOME: root }, cwd: root };
+  const read = () => JSON.stringify([noteListDocument("personal", {}, place).document, linkEntries(root).data, graphData(root, { ghosts: true })]);
+  read();
+  const whole = CACHES.map((name) => readFileSync(join(root, ".cache", name), "utf8"));
+  writeFileSync(join(root, "notes", "npm--b.md"), `---\nid: "pkg:npm/b"\ntags: ["pdf", "render"]\n---\n\n## Verdict\navoid: slow\n\n## Related\n[[npm--c]]\n`);
+  writeFileSync(join(root, "notes", "npm--c.md"), `---\nid: "pkg:npm/c"\ntags: ["render"]\n---\n`);
+  const warm = read();
+  assert.match(warm, /avoid: slow/);
+  assert.match(warm, /pkg:npm\/c/);
+  assert.deepEqual(CACHES.map((name) => readFileSync(join(root, ".cache", name), "utf8")), whole);
+  for (const name of CACHES) {
+    const delta = JSON.parse(readFileSync(join(root, ".cache", deltaName(name)), "utf8")) as { files: object };
+    assert.deepEqual(Object.keys(delta.files), ["npm--b.md", "npm--c.md"], name);
+  }
+  removeFolder(join(root, ".cache"));
+  forgetParsed();
+  assert.equal(warm, read());
 });
