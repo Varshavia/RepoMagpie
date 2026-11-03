@@ -10,9 +10,10 @@
 // exactly their expected set. Then the misses, and the cases named in the brief. Reports only: no
 // threshold. Not in CI. No network. `--json` prints only the scores.
 //
-// The held-out set (scripts/fixtures/classification-holdout.json) has kinds only, labelled before any
-// code ran on it. Rules are tuned on the first set; the held-out set is read only with `--holdout`,
-// which adds its kind accuracy, the two sets together, and its misses.
+// The held-out set (scripts/fixtures/classification-holdout.json) has kinds, labelled before any code
+// ran on it, and domains, labelled for the sixteen domains before they were scored (decision 0056).
+// Rules are tuned on the first set; the held-out set is read only with `--holdout`, which adds its
+// kind accuracy, the two sets together, its domain scores, and its misses.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,7 +23,7 @@ import { topicTags } from "../src/core/topic-tags.ts";
 
 export interface Case {
   full_name: string;
-  expected: { kind: string; domains?: Domain[]; reason?: string }; // the held-out set has no domains, and a reason per kind
+  expected: { kind: string; domains?: Domain[]; reason?: string }; // the held-out set has a reason per kind
   description: string | null;
   topics: string[];
   is_template: boolean;
@@ -55,7 +56,7 @@ export function classify(c: Case, signals: boolean): { kind: string; domains: Do
 
 export interface Score { kindRight: number; suggested: number; right: number; expected: number; exact: number }
 
-// Domains count only where the case has expected domains (the first set).
+// Domains count only where the case has expected domains.
 export function score(cases: Case[], signals: boolean): Score {
   const s: Score = { kindRight: 0, suggested: 0, right: 0, expected: 0, exact: 0 };
   for (const c of cases) {
@@ -79,7 +80,7 @@ const NAMED = [
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const withHoldout = process.argv.includes("--holdout");
 // --json: only the scores, for npm run measure: { repositories, before, after }, each a Score, for the
-// first set; with --holdout also `holdout`, the same for the held-out set (kinds only).
+// first set; with --holdout also `holdout`, the same for the held-out set.
 if (isMain && process.argv.includes("--json")) {
   const scores = (cases: Case[]) => ({ repositories: cases.length, before: score(cases, false), after: score(cases, true) });
   console.log(JSON.stringify({ ...scores(fixture.repositories), ...(withHoldout ? { holdout: scores(holdout.repositories) } : {}) }));
@@ -127,10 +128,23 @@ if (isMain && process.argv.includes("--json")) {
       const cell = (cases: Case[]) => `${score(cases, signals).kindRight}/${cases.length} ${pct(score(cases, signals).kindRight, cases.length)}`;
       console.log(`${label.padEnd(8)}${cell(fixture.repositories).padEnd(18)}${cell(holdout.repositories).padEnd(18)}${cell(all)}`);
     }
+    console.log(`\nDomains on the held-out set\n`);
+    console.log("run     domain precision     domain recall     exact domain sets");
+    for (const [label, signals] of [["before", false], ["after", true]] as const) {
+      const s = score(holdout.repositories, signals);
+      console.log(`${label.padEnd(8)}${`${s.right}/${s.suggested} ${pct(s.right, s.suggested)}`.padEnd(21)}${`${s.right}/${s.expected} ${pct(s.right, s.expected)}`.padEnd(18)}${s.exact}/${h}`);
+    }
     console.log("\nHeld-out misses after (expected → got):");
     for (const c of holdout.repositories) {
-      const got = classify(c, true).kind;
-      if (got !== c.expected.kind) console.log(`  ${c.full_name}: ${c.expected.kind} → ${got}`);
+      const got = classify(c, true);
+      const expected = c.expected.domains ?? [];
+      const wrong = got.domains.filter((d) => !expected.includes(d));
+      const missed = expected.filter((d) => !got.domains.includes(d));
+      const parts = [];
+      if (got.kind !== c.expected.kind) parts.push(`kind ${c.expected.kind} → ${got.kind}`);
+      if (wrong.length) parts.push(`wrong ${list(wrong)}`);
+      if (missed.length) parts.push(`missed ${list(missed)}`);
+      if (parts.length) console.log(`  ${c.full_name}: ${parts.join("; ")}`);
     }
   }
 }
