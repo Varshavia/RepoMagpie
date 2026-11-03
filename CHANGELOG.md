@@ -6,26 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.19] - 2026-11-03
+
+The twentieth pre-release: Search lists your notes before you type, Import reads pasted lists, Discover uses your GitHub CLI login and says why each result is there, and there are sixteen domains.
+
 ### Added
 
-- RepoMagpie uses your GitHub CLI login: signed in with `gh auth login`, you get GitHub's higher limits (30 searches a minute, 5,000 requests an hour) with nothing to set. It looks for a token in `GITHUB_TOKEN`, then `GH_TOKEN`, then asks `gh auth token`, once, when it first needs one. The token stays in memory and is never printed, logged or saved.
+- RepoMagpie uses your GitHub CLI login. Signed in with `gh auth login`, you get GitHub's higher limits (30 searches a minute, 5,000 requests an hour) with nothing to set. It looks for a token in `GITHUB_TOKEN`, then `GH_TOKEN`, then asks `gh auth token`, once, when it first needs one. The token stays in memory and is never printed, logged or saved.
 - Discover, Import and Settings in the app, and `repomagpie doctor`, say how RepoMagpie connects to GitHub: "GitHub: using your GitHub CLI login", or "GitHub: not connected, limited to 10 searches a minute." with how to connect.
-- Four domains: `mobile` (Android, iOS and cross-platform apps), `data` (analytics, data visualization and ETL; databases stay `database`), `docs` (documentation sites and generators) and `payments` (payments, checkout and billing). New notes get them from topics such as `android`, `data-visualization`, `documentation` and `stripe`; `repomagpie discover --domain` searches them; the graph has a colour for each.
+- Four domains, for sixteen in all: `mobile` (Android, iOS and cross-platform apps), `data` (analytics, data visualization and ETL; databases stay `database`), `docs` (documentation sites and generators) and `payments` (payments, checkout and billing). New notes get them from topics such as `android`, `data-visualization`, `documentation` and `stripe`; `repomagpie discover --domain` searches them; the graph has a colour for each.
 - Discover hides awesome-lists, courses, books and cheatsheets, and says how many: `7 lists and courses hidden; --include-lists shows them.` In the app, "Show lists and courses" and a **Show** button bring them back. Searching for the `awesome-list` kind shows them as before.
 - Each Discover card says why it is there: "Matched topic: react · matched words: design, system". `--json` has `matched_topics` and `matched_words`.
 - "Hide ones I already have" on the Discover page hides, at once, the results a journal has a note on.
 
 ### Changed
 
-- The `styling` domain is now `frontend`, and covers UI frameworks too; the `frontend` topic suggests it. The `react`, `vue` and `ui` topics don't: libraries that only work with React or Vue carry them too. Notes, flags, searches and links that say `styling` keep working and read as `frontend`; RepoMagpie writes `frontend` the next time it writes that note's domains. `docker` now suggests `devops`, and `docs` moved from `tooling` to its own domain.
-- A Discover search with words is sorted by best match unless you choose a sort; without words, by stars. A domain search sorted by best match now takes each topic's first result, then each one's second, and so on; it listed them by name before, as GitHub gives every result the same score.
-- `repomagpie discover --domain frontend` searches the `react`, `vue` and `css` topics, and `--domain devops` the `docker`, `kubernetes` and `devops` topics, the most common of each domain's topics on GitHub.
-
-- Search in the app lists your notes before you type, Verdicts first, then the most recently explored. When a filter hides what matches, the empty list says so and offers the fix: "No reviewed notes match “pdf”. 2 inbox notes do." with **Show inbox notes**. An empty journal points to Discover and Import. Without a project, Search no longer shows a Journal switch or mentions a project.
-- `repomagpie import` and the app's Import read a list as people paste it: one URL or package name per line, with or without a marker, numbered lines (`1.`, `1)`), `•` bullets and Markdown links (`[zod](https://github.com/colinhacks/zod)`). Headings are skipped; other lines that name nothing, such as a sentence, are listed with why, instead of being ignored silently or failing. A name in backticks counts as that name; a package named twice is imported once. `--json` lists them in `skipped`.
-- The app's Import says what it is for, keeps its help to one line with a "Paste an example" link, and shows a table of each line, the note it becomes and its status. Import is enabled only when a line is new or adds to a note.
-- Recall and the hook answer a little sooner right after you change a note: the caches in `.cache/` keep the changed notes in a small file beside them instead of being written again whole. On 2,000 notes, recall right after one note changed takes 138 ms instead of 145 ms.
+- Search in the app lists your notes before you type: Verdicts first, then the most recently explored. When a filter hides what matches, the empty list says so and offers the fix: "No reviewed notes match “pdf”. 2 inbox notes do." with **Show inbox notes**. An empty journal points to Discover and Import. Without a project, Search no longer shows a Journal switch or mentions a project.
+- `repomagpie import` and the app's Import read a list as people paste it: one URL or package name per line, with or without a marker, numbered lines (`1.`, `1)`), `•` bullets and Markdown links (`[zod](https://github.com/colinhacks/zod)`). Headings are skipped. Other lines that name nothing, such as a sentence, are listed with the reason, instead of being ignored silently or failing. A name in backticks counts as that name; a package named twice is imported once. `--json` lists the skipped lines in `skipped`.
+- Each page in the app opens with one line on what it is for. On Add a note and Check a package, the details are under **How this works**. Import keeps its help to one line with a "Paste an example" link, and shows a table of each line, the note it becomes and its status; Import is enabled only when a line is new or adds to a note.
+- The `styling` domain is now `frontend`, and covers UI frameworks too; the `frontend` topic suggests it. The `react`, `vue` and `ui` topics don't, because libraries that only work with React or Vue carry them too. Notes, flags, searches and links that say `styling` keep working and read as `frontend`; RepoMagpie writes `frontend` the next time it writes that note's domains. `docker` now suggests `devops`, and `docs` moved from `tooling` to its own domain.
+- A Discover search with words is sorted by best match unless you choose a sort; without words, by stars. A domain search sorted by best match now takes each topic's first result, then each one's second, and so on. It listed them by name before, as GitHub gives every result the same score.
+- `repomagpie discover --domain frontend` searches the `react`, `vue` and `css` topics, and `--domain devops` the `docker`, `kubernetes` and `devops` topics: the most common of each domain's topics on GitHub.
 - A domain search without a token says so in one sentence: "Searched 2 of 3 security topics to stay within GitHub's limit. Connect GitHub to search all." In the app you can dismiss it until you close the tab. `repomagpie discover --json` names the topics in `partial_search`.
+- Recall and the hook answer a little sooner right after you change a note: the caches in `.cache/` keep the changed notes in a small file beside them instead of being written again whole. On 2,000 notes, recall right after one note changed takes 138 ms instead of 145 ms.
 
 ### Fixed
 
@@ -398,7 +401,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.18...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.19...HEAD
+[0.2.0-beta.19]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.18...v0.2.0-beta.19
 [0.2.0-beta.18]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.17...v0.2.0-beta.18
 [0.2.0-beta.17]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.16...v0.2.0-beta.17
 [0.2.0-beta.16]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.15...v0.2.0-beta.16
