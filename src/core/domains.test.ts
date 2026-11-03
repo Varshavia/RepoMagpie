@@ -21,7 +21,7 @@ const ROWS: [string, string[]][] = [
   ["architecture", ["architecture", "software-architecture", "clean-architecture", "design-patterns", "state-management", "microservices", "domain-driven-design", "ddd", "event-sourcing", "cqrs"]],
   ["security", ["security", "cybersecurity", "appsec", "vulnerability", "vulnerabilities", "vulnerability-scanner", "secrets", "secret-management", "encryption", "cryptography", "owasp", "sast", "supply-chain-security", "input-validation", "sanitization"]],
   ["performance", ["performance", "web-performance", "caching", "cache", "profiler", "optimization", "benchmark", "benchmarks", "bundle-size", "image-optimization", "lighthouse"]],
-  ["frontend", ["frontend", "react", "vue", "ui", "css", "css-framework", "tailwind", "tailwindcss", "sass", "scss", "css-in-js", "styled-components", "design-system", "design-systems", "ui-components", "component-library", "ui-library", "shadcn", "shadcn-ui", "design", "ui-design", "web-design", "frontend-design", "ui-ux"]],
+  ["frontend", ["frontend", "css", "css-framework", "tailwind", "tailwindcss", "sass", "scss", "css-in-js", "styled-components", "design-system", "design-systems", "ui-components", "component-library", "ui-library", "shadcn", "shadcn-ui", "design", "ui-design", "web-design", "frontend-design", "ui-ux"]],
   ["database", ["database", "databases", "db", "orm", "sql", "nosql", "postgres", "postgresql", "mysql", "sqlite", "mongodb", "migrations", "database-migrations", "query-builder", "vector-database"]],
   ["testing", ["testing", "test", "tests", "unit-testing", "test-automation", "testing-tools", "e2e", "e2e-testing", "end-to-end-testing", "integration-testing", "mocking", "mock", "test-runner", "jest", "vitest", "playwright", "cypress", "mocha"]],
   ["auth", ["auth", "authentication", "authorization", "oauth", "oauth2", "openid-connect", "oidc", "sso", "jwt", "passkeys", "webauthn", "rbac", "permissions", "login"]],
@@ -30,7 +30,7 @@ const ROWS: [string, string[]][] = [
   ["observability", ["observability", "logging", "logger", "logs", "monitoring", "metrics", "tracing", "opentelemetry", "apm", "error-tracking", "error-monitoring", "uptime-monitoring", "status-page"]],
   ["ai", ["ai", "artificial-intelligence", "llm", "llms", "large-language-models", "machine-learning", "ml", "deep-learning", "generative-ai", "genai", "ai-agents", "ai-agent", "agentic-ai", "mcp", "model-context-protocol", "embeddings", "rag", "openai", "chatgpt", "langchain", "ollama", "gpt"]],
   ["tooling", ["cli", "command-line", "command-line-tool", "developer-tools", "devtools", "dev-tools", "linter", "linting", "eslint", "formatter", "code-formatter", "prettier", "vscode", "vscode-extension"]],
-  ["mobile", ["mobile", "mobile-app", "mobile-development", "android", "ios", "react-native", "flutter", "swiftui", "jetpack-compose"]],
+  ["mobile", ["mobile", "mobile-app", "mobile-development", "android", "ios", "react-native", "swiftui", "jetpack-compose"]],
   ["data", ["data-science", "data-engineering", "data-analysis", "data-visualization", "dataviz", "analytics", "etl", "data-pipeline", "pandas", "dataframe", "business-intelligence"]],
   ["docs", ["documentation", "docs", "documentation-tool", "documentation-generator", "api-documentation", "technical-writing"]],
   ["payments", ["payments", "payment", "payment-gateway", "payment-processing", "stripe", "billing"]],
@@ -52,6 +52,15 @@ test("the mapping has exactly the rows above, and every value is a domain", () =
 
 test("words that name a technology but not its concern, or two concerns, map to nothing", () => {
   for (const word of ["supabase", "rust", "python", "typescript", "validation", "session", "node", "profiling", "redis", "editor", "framework", "self-hosted", "pdf", "data", "database-tools"]) {
+    assert.deepEqual(suggestDomains({ topics: [word] }), [], word);
+  }
+});
+
+// Decision 0056: taken out of the mapping, as measured on the eval's fixtures. Discover still searches
+// react, vue and flutter.
+test("react, vue, ui and flutter name no domain", () => {
+  for (const word of ["react", "vue", "ui", "flutter"]) {
+    assert.equal(DOMAIN_MAP[word], undefined, word);
     assert.deepEqual(suggestDomains({ topics: [word] }), [], word);
   }
 });
@@ -90,7 +99,7 @@ const REAL: [string, string[], string[]][] = [
   ["Leonxlnx/taste-skill", ["agent-skills", "ai-agents", "anti-slop", "claude-code", "codex", "cursor", "design-system", "frontend", "landing-page", "ui-design", "web-design"], ["frontend", "ai"]],
   // Checks that the changes keep: a test runner, a container tool with kubernetes, a component library.
   ["microsoft/playwright", ["automation", "chrome", "chromium", "e2e-testing", "electron", "end-to-end-testing", "firefox", "javascript", "playwright", "test", "test-automation", "testing", "testing-tools", "web", "webkit"], ["testing"]],
-  ["portainer/portainer", ["docker", "docker-compose", "docker-container", "docker-deployment", "docker-image", "docker-swarm", "docker-ui", "dockerfile", "hacktoberfest", "kubernetes", "moby", "portainer", "ui"], ["devops", "frontend"]], // ui names frontend since decision 0055
+  ["portainer/portainer", ["docker", "docker-compose", "docker-container", "docker-deployment", "docker-image", "docker-swarm", "docker-ui", "dockerfile", "hacktoberfest", "kubernetes", "moby", "portainer", "ui"], ["devops"]], // ui named frontend from decision 0055 to 0056
   ["shadcn-ui/ui", ["ai", "base-ui", "components", "gen-ui", "generative-ai", "generative-ui", "laravel", "nextjs", "radix-ui", "react", "react-aria", "react-aria-components", "shadcn", "tailwindcss", "tanstack", "ui", "vite"], ["frontend", "ai"]],
 ];
 

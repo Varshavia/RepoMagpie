@@ -59,9 +59,10 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "performance": "performance", "web-performance": "performance", "caching": "performance", "cache": "performance",
   "profiler": "performance", "optimization": "performance", "benchmark": "performance",
   "benchmarks": "performance", "bundle-size": "performance", "image-optimization": "performance", "lighthouse": "performance",
-  // frontend (styling before decision 0055); react and vue name what a project is for here, unlike
-  // most technology names
-  "frontend": "frontend", "react": "frontend", "vue": "frontend", "ui": "frontend",
+  // frontend (styling before decision 0055). Not react, vue or ui: libraries that only work with React
+  // or Vue, and apps with a UI, carry them (decision 0056). Discover still searches react and vue
+  // (DOMAIN_TOPICS).
+  "frontend": "frontend",
   "css": "frontend", "css-framework": "frontend", "tailwind": "frontend", "tailwindcss": "frontend", "sass": "frontend",
   "scss": "frontend", "css-in-js": "frontend", "styled-components": "frontend", "design-system": "frontend",
   "design-systems": "frontend", "ui-components": "frontend", "component-library": "frontend", "ui-library": "frontend",
@@ -106,9 +107,10 @@ export const DOMAIN_MAP: Readonly<Record<string, Domain>> = {
   "devtools": "tooling", "dev-tools": "tooling", "linter": "tooling", "linting": "tooling", "eslint": "tooling",
   "formatter": "tooling", "code-formatter": "tooling", "prettier": "tooling", "vscode": "tooling",
   "vscode-extension": "tooling",
-  // mobile
+  // mobile. Not flutter: apps built with it that are not for mobile development carry it (decision
+  // 0056). Discover still searches it (DOMAIN_TOPICS).
   "mobile": "mobile", "mobile-app": "mobile", "mobile-development": "mobile", "android": "mobile", "ios": "mobile",
-  "react-native": "mobile", "flutter": "mobile", "swiftui": "mobile", "jetpack-compose": "mobile",
+  "react-native": "mobile", "swiftui": "mobile", "jetpack-compose": "mobile",
   // data: analytics, visualization and ETL; databases stay in database
   "data-science": "data", "data-engineering": "data", "data-analysis": "data", "data-visualization": "data",
   "dataviz": "data", "analytics": "data", "etl": "data", "data-pipeline": "data", "pandas": "data",
