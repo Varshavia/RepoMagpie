@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The `styling` domain is now `frontend`, and covers UI frameworks too: `react`, `vue`, `ui` and `frontend` topics suggest it. Notes, flags, searches and links that say `styling` keep working and read as `frontend`; RepoMagpie writes `frontend` the next time it writes that note's domains. `docker` now suggests `devops`, and `docs` moved from `tooling` to its own domain.
+- The `styling` domain is now `frontend`, and covers UI frameworks too; the `frontend` topic suggests it. The `react`, `vue` and `ui` topics don't: libraries that only work with React or Vue carry them too. Notes, flags, searches and links that say `styling` keep working and read as `frontend`; RepoMagpie writes `frontend` the next time it writes that note's domains. `docker` now suggests `devops`, and `docs` moved from `tooling` to its own domain.
 - A Discover search with words is sorted by best match unless you choose a sort; without words, by stars. A domain search sorted by best match now takes each topic's first result, then each one's second, and so on; it listed them by name before, as GitHub gives every result the same score.
 - `repomagpie discover --domain frontend` searches the `react`, `vue` and `css` topics, and `--domain devops` the `docker`, `kubernetes` and `devops` topics, the most common of each domain's topics on GitHub.
 
