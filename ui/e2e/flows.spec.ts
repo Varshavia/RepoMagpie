@@ -1,7 +1,8 @@
 // End-to-end flows of the local app (docs/ui.md §11) against magpie ui on a temporary journal:
 // inbox review, search, add, import, conflicts, live updates, the palette and the keyboard map.
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { removeFolder } from "../../src/core/copy-folder.ts";
 import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { runSearch } from "../../src/core/search.ts";
@@ -16,6 +17,8 @@ import { PDFKIT } from "./journal.ts";
 import { recordTimings } from "./measure.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
+const SHARED_NOTES_OFF = "This repository has no shared notes yet. Shared notes live in .magpie/ inside the repository, so once you commit and push it, everyone who clones it, and their agents, sees them.";
+const TURNED_ON = "Shared notes are on. Commit and push .magpie/ so your team gets them.";
 // Today in local time, as magpie writes it (adopted:).
 const today = () => {
   const now = new Date();
@@ -617,12 +620,12 @@ test.describe("no project", () => {
 
   // §2 of the project-journal brief: outside a git repository, the Project switch stays off, with
   // today's hint, and there is no button to start one.
-  test("project journal: outside a git repository, the Project switch is off with its hint; no Start button", async ({ page, magpie }) => {
+  test("project journal: outside a git repository, the Project switch is off with its hint; no Turn on button", async ({ page, magpie }) => {
     await magpie.open(page);
     const project = page.getByRole("radio", { name: "Project" });
     await expect(project).toBeDisabled();
     await expect(project).toHaveAttribute("title", "No project journal: start repomagpie ui inside a project");
-    await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Turn on shared notes/ })).toHaveCount(0);
   });
 });
 
@@ -1159,8 +1162,9 @@ test("project journal: without .magpie, the Project switch explains it in one se
   await page.getByRole("radio", { name: "Project" }).click();
   for (const screen of [/Inbox/, /All notes/]) {
     await page.getByRole("button", { name: screen }).click();
-    await expect(page.getByText("This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Start this project's journal" })).toBeVisible();
+    await expect(page.getByText(SHARED_NOTES_OFF)).toBeVisible();
+    // The fixture's .git is an empty folder: git answers nothing, so no name.
+    await expect(page.getByRole("button", { name: "Turn on shared notes for this repository" })).toBeVisible();
   }
 
   await page.getByRole("radio", { name: "Personal" }).click();
@@ -1168,45 +1172,104 @@ test("project journal: without .magpie, the Project switch explains it in one se
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
   await expect(page.getByText("Project journal, shared with this repository's contributors")).toHaveCount(0);
   await page.getByRole("button", { name: "Copy to this project" }).click();
-  await page.getByRole("button", { name: "Start the journal and copy" }).click();
+  await page.getByRole("button", { name: "Turn on shared notes and copy" }).click();
   await page.getByRole("button", { name: "Open the project's note" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
   await expect(page.getByText("Project journal, shared with this repository's contributors")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Turn on shared notes/ })).toHaveCount(0);
 });
 
-test("copy to this project before the project journal exists: the Start sentence and a confirm; nothing written before it; then the journal and the note", async ({ page, magpie }) => {
+test("copy to this project before shared notes are on: the same sentence and a confirm; nothing written before it; then the journal and the note", async ({ page, magpie }) => {
   removeFolder(join(magpie.project, ".magpie"));
   await magpie.open(page);
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
   await page.getByRole("button", { name: "Copy to this project" }).click();
   const panel = page.getByRole("group", { name: "Copy to this project" });
-  await expect(panel).toContainText("This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.");
+  await expect(panel).toContainText(SHARED_NOTES_OFF);
   expect(existsSync(join(magpie.project, ".magpie"))).toBe(false);
   // Cancel writes nothing.
   await panel.getByRole("button", { name: "Cancel" }).click();
   expect(existsSync(join(magpie.project, ".magpie"))).toBe(false);
   await page.getByRole("button", { name: "Copy to this project" }).click();
-  await panel.getByRole("button", { name: "Start the journal and copy" }).click();
-  await expect(page.getByRole("status").getByText("Started this project's journal and copied the note. Commit .magpie/ to share it.")).toBeVisible();
+  await panel.getByRole("button", { name: "Turn on shared notes and copy" }).click();
+  await expect(page.getByRole("status").getByText("Shared notes are on. The note is copied. Commit and push .magpie/ so your team gets them.")).toBeVisible();
   for (const file of [".gitignore", "tags.md", join("notes", "npm--pdfkit.md")]) expect(existsSync(join(magpie.project, ".magpie", file)), file).toBe(true);
   await page.getByRole("button", { name: "Open the project's note" }).click();
   await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
 });
 
-// §2: the button creates what note --to project creates, and opens the Project journal.
-test("project journal: Start this project's journal creates .magpie/ with notes/, tags.md and .gitignore, and shows Project", async ({ page, magpie }) => {
+// The button creates what note --to project creates, and stays in the Project journal.
+test("project journal: Turn on shared notes creates .magpie/ with notes/, tags.md and .gitignore, and shows Project", async ({ page, magpie }) => {
   removeFolder(join(magpie.project, ".magpie"));
   await magpie.open(page);
   await page.getByRole("radio", { name: "Project" }).click();
-  await page.getByRole("button", { name: "Start this project's journal" }).click();
-  await expect(page.getByRole("status").getByText("Started this project's journal. Commit .magpie/ to share it.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Turn on shared notes for this repository" }).click();
+  await expect(page.getByRole("status").getByText(TURNED_ON)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Turn on shared notes/ })).toHaveCount(0);
   await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
   expect(readdirSync(join(magpie.project, ".magpie")).sort()).toEqual([".gitignore", "notes", "tags.md"]);
   expect(readFileSync(join(magpie.project, ".magpie", ".gitignore"), "utf8")).toBe(".cache/\n.trash/\n");
+});
+
+// The repository's identity and sharing line, with a real git repository in the fixture (no network:
+// the remote is only a name). Skipped without git on PATH.
+const hasGit = (() => {
+  try {
+    execFileSync("git", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+function realRepository(project: string) {
+  removeFolder(join(project, ".git")); // the fixture's empty fence
+  removeFolder(join(project, ".magpie"));
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: dirname(project) };
+  const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { cwd: project, env, stdio: "ignore" });
+  git("init", "-q");
+  git("remote", "add", "origin", "https://someone:FAKE-token-123@github.com/acme/widget.git");
+  return git;
+}
+
+test.describe("the repository", () => {
+  test.skip(!hasGit, "git isn't on PATH");
+
+  test("an empty repository: its name, host and link, never the credentials; the shared-notes sentence and button", async ({ page, magpie }) => {
+    realRepository(magpie.project);
+    await magpie.open(page);
+    await page.getByRole("radio", { name: "Project" }).click();
+    const repository = page.locator(".repository");
+    await expect(repository.getByRole("link", { name: "acme/widget" })).toHaveAttribute("href", "https://github.com/acme/widget");
+    await expect(repository).toContainText("github.com");
+    await expect(page.getByText(SHARED_NOTES_OFF)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Turn on shared notes for acme/widget" })).toBeVisible();
+    expect(await page.content()).not.toContain("FAKE-token");
+  });
+
+  test("after the click: the toast stays until dismissed, the line says not committed; after a commit, committed", async ({ page, magpie }) => {
+    const git = realRepository(magpie.project);
+    await magpie.open(page);
+    await page.getByRole("radio", { name: "Project" }).click();
+    await page.getByRole("button", { name: "Turn on shared notes for acme/widget" }).click();
+    const toast = page.getByRole("status").getByText(TURNED_ON);
+    await expect(toast).toBeVisible();
+    const repository = page.locator(".repository");
+    await expect(repository).toContainText("2 shared note files aren't committed yet, so your team can't see them."); // .gitignore and tags.md
+    await page.waitForTimeout(4500); // longer than a plain toast stays
+    await expect(toast).toBeVisible();
+    await page.getByRole("status").getByRole("button", { name: "Dismiss" }).click();
+    await expect(toast).toHaveCount(0);
+
+    git("add", ".magpie");
+    git("commit", "-q", "-m", "Turn on shared notes");
+    // The line is asked again when the Project view opens: never polled.
+    await page.getByRole("radio", { name: "Personal" }).click();
+    await page.getByRole("radio", { name: "Project" }).click();
+    await expect(repository).toContainText("Shared notes are committed.");
+  });
 });
 
 test("adopt: a note whose Verdict says to avoid is copied, with no install command", async ({ page, magpie }) => {

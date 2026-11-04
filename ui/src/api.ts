@@ -6,12 +6,14 @@ import type { DeleteJson, RestoreJson } from "../../src/core/delete.ts";
 import type { DiscoverJson } from "../../src/core/discover.ts";
 import type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson } from "../../src/core/documents.ts";
 import type { RecallMatch } from "../../src/core/recall.ts";
+import type { ProjectInfoJson } from "../../src/core/repository.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
 import type { SearchResult } from "../../src/core/search.ts";
 import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { TagsFromTopicsJson } from "../../src/core/tags-from-topics.ts";
 import type { Patch } from "./logic/edits.ts";
 
+export type { ProjectInfoJson };
 export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson, DiscoverJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
@@ -101,6 +103,7 @@ export const api = {
   suggest: (params: { description?: string; limit: number }) => get<SuggestJson>("/api/suggest", { description: params.description, limit: String(params.limit) }),
   adopt: (target: string) => write<AdoptJson>("POST", "/api/adopt", { target }),
   startProject: () => write<{ path: string | null; created: boolean }>("POST", "/api/project/start", {}),
+  project: () => get<ProjectInfoJson>("/api/project"),
   // Discover (decision 0045): GitHub's search, made by magpie ui's server; a failure's document keeps
   // the search's shape with `problem` (rate limit, offline) and `error`.
   discover: (params: Record<string, string | undefined>) => get<DiscoverJson>("/api/discover", params),

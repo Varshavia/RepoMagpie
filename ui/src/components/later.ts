@@ -9,6 +9,7 @@ export { DeleteDialog } from "./DeleteDialog.tsx";
 export { ImportPage } from "./ImportPage.tsx";
 export { KeyMapDialog } from "./KeyMapDialog.tsx";
 export { Palette } from "./Palette.tsx";
+export { RepositoryLine, SharedNotesOff } from "./ProjectHeader.tsx";
 export { RecallPage } from "./RecallPage.tsx";
 export { SettingsPage } from "./SettingsPage.tsx";
 export { SuggestPane } from "./SuggestPane.tsx";

@@ -1,7 +1,7 @@
 // The local app (docs/ui.md §7): three panes, the command palette, the keyboard map, live updates
 // and toasts. All data comes from magpie ui's API; the browser keeps only the theme.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
+import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, type ProjectInfoJson, type Scope, type SearchResult, type SettingsJson, type TagListJson } from "./api.ts";
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { DiscoverMemory } from "./components/DiscoverPage.tsx";
 import type { ProjectState } from "./components/fields.tsx";
@@ -39,6 +39,8 @@ const Import = lazyPart(() => import("./components/later.ts").then((m) => m.Impo
 const Recall = lazyPart(() => import("./components/later.ts").then((m) => m.RecallPage));
 const Settings = lazyPart(() => import("./components/later.ts").then((m) => m.SettingsPage));
 const Suggest = lazyPart(() => import("./components/later.ts").then((m) => m.SuggestPane));
+const Repository = lazyPart(() => import("./components/later.ts").then((m) => m.RepositoryLine));
+const SharedNotesOff = lazyPart(() => import("./components/later.ts").then((m) => m.SharedNotesOff));
 const PaletteDialog = lazyPart(() => import("./components/later.ts").then((m) => m.Palette));
 const KeyMap = lazyPart(() => import("./components/later.ts").then((m) => m.KeyMapDialog));
 
@@ -76,14 +78,17 @@ export function App() {
   const listRef = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
 
-  // A toast with an action (Undo) stays 10 s, and goes once the action runs.
-  const toast = useCallback((text: string, action?: ToastItem["action"]) => {
+  // A toast with an action (Undo) stays 10 s, and goes once the action runs; a sticky one stays
+  // until its action (Dismiss) runs.
+  const toast = useCallback((text: string, action?: ToastItem["action"], sticky = false) => {
     const id = Date.now() + Math.random();
     const dismiss = () => setToasts((t) => t.filter((x) => x.id !== id));
     const run = action && (() => (dismiss(), action.run()));
     setToasts((t) => [...t, { id, text, action: action && run && { label: action.label, run } }]);
-    setTimeout(dismiss, action ? 10000 : 4000);
+    if (!sticky) setTimeout(dismiss, action ? 10000 : 4000);
   }, []);
+  // After shared notes turn on: kept until dismissed, since the next step (commit and push) is the user's.
+  const turnedOn = useCallback((copied: string) => toast(`Shared notes are on.${copied} Commit and push .magpie/ so your team gets them.`, { label: "Dismiss", run: () => {} }, true), [toast]);
 
   const loadList = useCallback((scope: Scope, quiet = false) => {
     if (!quiet) setLists((l) => ({ ...l, [scope]: { status: "loading" } }));
@@ -189,6 +194,14 @@ export function App() {
 
   const projectState: ProjectState = !settings?.journals.project ? "none" : settings.journals.project.exists ? "exists" : "new";
   const hasProject = projectState !== "none";
+
+  // The repository and its sharing line: asked of git only while the Project view is open, when it
+  // opens, when shared notes turn on, and after each change to the project journal. Never polled.
+  const [projectInfo, setProjectInfo] = useState<ProjectInfoJson | null>(null);
+  const inProject = journal === "project" && hasProject;
+  useEffect(() => {
+    if (inProject) api.project().then(setProjectInfo, () => setProjectInfo(null));
+  }, [inProject, projectState, live.project.tick]);
   const list = listOf(view);
   const state = lists[journal];
   const notes = state.status === "ready" ? state.notes : null;
@@ -351,15 +364,16 @@ export function App() {
   );
 
   const onAdopted = useCallback((started: boolean) => {
-    toast(started ? "Started this project's journal and copied the note. Commit .magpie/ to share it." : "Copied to the project journal");
+    if (started) turnedOn(" The note is copied.");
+    else toast("Copied to the project journal");
     afterWrite("project");
-  }, [toast, afterWrite]);
+  }, [toast, turnedOn, afterWrite]);
 
-  // "Start this project's journal": .magpie/ at the git root, as note --to project makes it.
+  // "Turn on shared notes": .magpie/ at the git root, as note --to project makes it.
   const startProject = async () => {
     try {
       await api.startProject();
-      toast("Started this project's journal. Commit .magpie/ to share it.");
+      turnedOn("");
       afterWrite("project");
     } catch (error) {
       toast((error as ApiError).message);
@@ -570,6 +584,11 @@ export function App() {
             ) : null}
             {view.page === "all" && items.length ? <FromTopicsButton busy={fromTopics.busy} onClick={fromTopics.check} /> : null}
           </header>
+          {inProject ? (
+            <LazyFrame fallback={null}>
+              <Repository.Part info={projectInfo} />
+            </LazyFrame>
+          ) : null}
           {view.page === "all" && fromTopics.plan ? (
             <FromTopicsBanner plan={fromTopics.plan} busy={fromTopics.busy} onApply={fromTopics.apply} onCancel={fromTopics.cancel} />
           ) : null}
@@ -600,9 +619,9 @@ export function App() {
               listRef={listRef}
             />
           ) : journal === "project" && projectState === "new" ? (
-            <EmptyState action={<button type="button" className="button primary" onClick={() => void startProject()}>Start this project's journal</button>}>
-              This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.
-            </EmptyState>
+            <LazyFrame fallback={<SkeletonRows label="Loading" />}>
+              <SharedNotesOff.Part info={projectInfo} onTurnOn={() => void startProject()} />
+            </LazyFrame>
           ) : review ? (
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>{`Your inbox is empty. Add a repository here, or from the palette (${MOD}+K).`}</EmptyState>
           ) : (
