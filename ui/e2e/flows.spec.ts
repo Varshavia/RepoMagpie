@@ -13,7 +13,7 @@ import { fromTopicsSummary } from "../src/logic/edits.ts";
 import { suggestItems, whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test, throttle } from "./fixtures.ts";
-import { PDFKIT } from "./journal.ts";
+import { gitOnPath, PDFKIT } from "./journal.ts";
 import { recordTimings } from "./measure.ts";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -1224,7 +1224,9 @@ const hasGit = (() => {
   }
 })();
 
-function realRepository(project: string) {
+function realRepository({ project, server }: { project: string; server: { path: string } }) {
+  // The app hides the repository when git fails; say so here rather than as a missing link.
+  expect(gitOnPath(server.path), `git isn't on magpie ui's PATH: ${server.path}`).toBe(true);
   removeFolder(join(project, ".git")); // the fixture's empty fence
   removeFolder(join(project, ".magpie"));
   const env = { ...process.env, GIT_CEILING_DIRECTORIES: dirname(project) };
@@ -1238,7 +1240,7 @@ test.describe("the repository", () => {
   test.skip(!hasGit, "git isn't on PATH");
 
   test("an empty repository: its name, host and link, never the credentials; the shared-notes sentence and button", async ({ page, magpie }) => {
-    realRepository(magpie.project);
+    realRepository(magpie);
     await magpie.open(page);
     await page.getByRole("radio", { name: "Project" }).click();
     const repository = page.locator(".repository");
@@ -1250,7 +1252,7 @@ test.describe("the repository", () => {
   });
 
   test("after the click: the toast stays until dismissed, the line says not committed; after a commit, committed", async ({ page, magpie }) => {
-    const git = realRepository(magpie.project);
+    const git = realRepository(magpie);
     await magpie.open(page);
     await page.getByRole("radio", { name: "Project" }).click();
     await page.getByRole("button", { name: "Turn on shared notes for acme/widget" }).click();
