@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api, type ApiError, type AdoptJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { FieldError } from "./common.tsx";
+import { SharedNotesSentence } from "./ProjectHeader.tsx";
 
 export interface AdoptPanelProps {
   id: string; // the personal note's PURL
@@ -49,15 +50,19 @@ export function AdoptPanel({ id, name, avoid, start, onAdopted, onOpenNote, onTo
   if (state.step === "confirm") {
     return (
       <div className="adopt-panel" role="group" aria-label="Copy to this project">
-        {start ? <p>This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.</p> : null}
+        {start ? (
+          <p>
+            <SharedNotesSentence />
+          </p>
+        ) : null}
         <p>
-          {start ? "Start it, then copy this note into it" : "Copy this note into the project journal"}, with today's date as <code translate="no">adopted</code>. RepoMagpie names the install command; it installs nothing.
+          {start ? "Turn them on, then copy this note into them" : "Copy this note into the project journal"}, with today's date as <code translate="no">adopted</code>. RepoMagpie names the install command; it installs nothing.
         </p>
         <p>The project journal is committed with the code; anyone who can read this repository can read this note.</p>
         {state.error ? <FieldError>{state.error}</FieldError> : null}
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={adopt} disabled={state.busy}>
-            {state.busy ? "Copying…" : start ? "Start the journal and copy" : "Copy to the project journal"}
+            {state.busy ? "Copying…" : start ? "Turn on shared notes and copy" : "Copy to the project journal"}
           </button>
           <button type="button" className="button ghost" onClick={onClose}>
             Cancel

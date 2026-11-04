@@ -89,6 +89,12 @@
 .suggest-form .field-help { overflow-wrap: anywhere; }
 .suggest-form .page-lede { margin: 0 0 var(--xs); }
 
+/* The Project view's repository: its name and host, then whether the shared notes are committed. */
+.repository { padding: var(--xs) var(--md) var(--sm); border-bottom: 1px solid var(--hairline); font-size: 13px; }
+.repository p { margin: 0; overflow-wrap: anywhere; }
+.repository-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sm); font-weight: 600; }
+.repository-host, .repository-sharing { color: var(--ink-muted); font-weight: 400; }
+
 /* Suggest's last section: every dependency the project uses that a note says to avoid, collapsed. */
 .avoided { flex: none; max-height: 40%; overflow-y: auto; border-top: 1px solid var(--hairline); }
 .avoided > summary { padding: var(--sm) var(--md); color: var(--ink-muted); font-size: 13px; cursor: pointer; }

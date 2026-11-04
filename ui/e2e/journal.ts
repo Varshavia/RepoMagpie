@@ -4,8 +4,8 @@
 // read, and a project journal with one note. No network: nothing here fetches from GitHub, and the
 // Discover tests get a fake one (fake-github.ts).
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { basename, delimiter, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderNote } from "../../src/core/write.ts";
 import { SHOWCASE_PROJECT, SHOWCASE_SUGGESTED, SHOWCASE_TAGS, showcaseNotes } from "./showcase.ts";
@@ -166,8 +166,35 @@ export function makeJournal(options: { generated?: number; empty?: boolean; scre
 export interface Running {
   url: string;
   port: number;
+  path: string; // the PATH magpie ui runs with: without gh's folders, with git (hideGh)
   stop: () => Promise<void>;
 }
+
+const GH = ["gh", "gh.exe", "gh.cmd"];
+const GIT = ["git", "git.exe"];
+const holds = (folder: string, files: string[]) => files.some((file) => existsSync(join(folder, file)));
+
+// Drops the PATH folders that hold gh. Such a folder can hold git too: on Linux both are in /usr/bin
+// (GitHub's Ubuntu runners install gh's .deb there), and dropping it left magpie ui without git, so
+// the Project view showed no repository. Then git comes back alone, linked from the journal's bin/.
+export function hideGh(env: Record<string, string | undefined>, root: string): void {
+  for (const name of ["PATH", "Path"]) {
+    const folders = env[name]?.split(delimiter);
+    if (!folders) continue;
+    const kept = folders.filter((folder) => !holds(folder, GH));
+    const git = folders.filter((folder) => holds(folder, GH)).flatMap((folder) => GIT.map((file) => join(folder, file))).find((file) => existsSync(file));
+    if (git && !kept.some((folder) => holds(folder, GIT))) {
+      const bin = join(root, "bin");
+      mkdirSync(bin, { recursive: true });
+      if (!existsSync(join(bin, basename(git)))) symlinkSync(git, join(bin, basename(git)));
+      kept.unshift(bin);
+    }
+    env[name] = kept.join(delimiter);
+  }
+}
+
+// Whether a PATH value has git: the repository tests check it first, so a missing git says so.
+export const gitOnPath = (path: string) => path.split(delimiter).some((folder) => folder && holds(folder, GIT));
 
 // magpie ui --no-open --json, from the source, on the journal; resolves once it prints its URL.
 // fakeGithub: GitHub answers from fake-github.ts instead of the network (the Discover tests).
@@ -178,9 +205,7 @@ export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProje
   // that holds gh, so the app shows "not connected" here as on a fresh machine.
   delete env.GITHUB_TOKEN;
   delete env.GH_TOKEN;
-  for (const name of ["PATH", "Path"]) {
-    if (env[name]) env[name] = env[name].split(delimiter).filter((folder) => !["gh", "gh.exe", "gh.cmd"].some((file) => existsSync(join(folder, file)))).join(delimiter);
-  }
+  hideGh(env, j.root);
   const preload = options.fakeGithub ? ["--import", pathToFileURL(join(REPO, "ui", "e2e", "fake-github.ts")).href] : [];
   const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: options.noProject ? j.home : j.project, env, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
@@ -197,6 +222,7 @@ export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProje
       resolve({
         url,
         port,
+        path: env.PATH ?? env.Path ?? "",
         // Safe to call twice (a test may stop the server itself).
         stop: () =>
           new Promise((done) => {

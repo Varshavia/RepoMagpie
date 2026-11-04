@@ -179,7 +179,7 @@ test("a write with the cookie but without a matching X-Magpie-Token header gets 
   assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), WIDGET);
 });
 
-// "Start this project's journal" (the app's Project view): a write like the others.
+// "Turn on shared notes" (the app's Project view): a write like the others.
 test("starting the project journal: 403 without the write token; then .magpie/ at the git root, as note --to project makes it", async (t) => {
   const { http, box } = await start(t);
   for (const token of [undefined, "0".repeat(64)]) {
