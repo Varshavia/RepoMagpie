@@ -75,11 +75,33 @@ test("alternatives are names: resolved notes by their name, unresolved targets a
   assert.deepEqual(notes.find((n) => n.name === "pdf-lib")?.alternatives, []);
 });
 
-test("order: by name ignoring case; the same name in both journals, project first", () => {
-  const run = runCatalog(request(), place(PERSONAL, PROJECT));
+test("order: the project's notes, then the personal avoid notes, then the rest; each group by name ignoring case", () => {
+  const run = runCatalog(request(), place(PERSONAL, { ...PROJECT, "npm--left-pad.md": note({ id: "pkg:npm/left-pad", name: "left-pad", verdict: "avoid: one line of code" }) }));
   assert.deepEqual(run.document.notes.map((n) => `${n.name} ${n.journal}`), [
-    "mattpocock/skills personal", "pdf-lib personal", "pdfkit personal", "puppeteer project", "Puppeteer personal",
+    "left-pad project", "puppeteer project",
+    "pdfkit personal",
+    "mattpocock/skills personal", "pdf-lib personal", "Puppeteer personal",
   ]);
+});
+
+test("a big journal: the project's avoid notes, and the personal ones, are on the default first page", () => {
+  const filler: Record<string, string> = {};
+  for (let i = 0; i < 2000; i++) {
+    const n = String(i).padStart(4, "0");
+    filler[`npm--package-${n}.md`] = note({ id: `pkg:npm/package-${n}`, name: `package-${n}`, verdict: i === 1999 ? "avoid: the last one by name" : `fine for job ${i}` });
+  }
+  const project = {
+    "npm--zod-old.md": note({ id: "pkg:npm/zod-old", name: "zod-old", verdict: "avoid: use zod" }),
+    "npm--yup.md": note({ id: "pkg:npm/yup", name: "yup", verdict: "fine", avoidWhen: ["you need async"] }),
+    "npm--zod.md": note({ id: "pkg:npm/zod", name: "zod", verdict: "our schema library" }),
+  };
+  const run = runCatalog(request(), place(filler, project));
+  assert.equal(run.document.total, 2003);
+  const first = run.document.notes.map((n) => `${n.name} ${n.journal}`);
+  assert.equal(first.length, 100);
+  assert.deepEqual(first.slice(0, 4), ["yup project", "zod project", "zod-old project", "package-1999 personal"]);
+  const compact = compactForAgent(run);
+  assert.deepEqual(compact.rows.filter((r) => r[3]).map((r) => `${r[0]} ${r[2]}`), ["yup project", "zod-old project", "package-1999 personal"]);
 });
 
 test("filters: --tag (every tag), --kind and --journal; total counts what the filters keep", () => {
@@ -109,14 +131,15 @@ test("pages: limit, then next_cursor until null; every row exactly once", () => 
 test("a cursor survives a note added before it: the next page starts after the last row shown", () => {
   const p = place(PERSONAL);
   const first = runCatalog(request({ limit: 2 }), p);
-  assert.deepEqual(first.document.notes.map((n) => n.name), ["mattpocock/skills", "pdf-lib"]);
+  assert.deepEqual(first.document.notes.map((n) => n.name), ["pdfkit", "mattpocock/skills"]); // the avoid note first
   writeFileSync(join(p.env.MAGPIE_HOME as string, "notes", "npm--aaa.md"), note({ id: "pkg:npm/aaa", name: "aaa" }));
   const next = runCatalog(request({ limit: 2, cursor: first.document.next_cursor ?? undefined }), p);
-  assert.deepEqual(next.document.notes.map((n) => n.name), ["pdfkit", "Puppeteer"]);
+  assert.deepEqual(next.document.notes.map((n) => n.name), ["pdf-lib", "Puppeteer"]);
 });
 
 test("a cursor that isn't one is a usage error, with the document's empty shape", () => {
-  for (const cursor of ["nope", Buffer.from("[1,2]").toString("base64url"), Buffer.from('["a","elsewhere","b"]').toString("base64url")]) {
+  const old = Buffer.from('["a","personal","b"]').toString("base64url"); // before the groups: start again from the first page
+  for (const cursor of ["nope", Buffer.from("[1,2]").toString("base64url"), Buffer.from('[2,"a","elsewhere","b"]').toString("base64url"), Buffer.from('[3,"a","personal","b"]').toString("base64url"), old]) {
     const run = runCatalog(request({ cursor }), place(PERSONAL));
     assert.equal(run.outcome, "usage", cursor);
     assert.deepEqual({ ...run.document, error: typeof run.document.error }, { notes: [], total: 0, next_cursor: null, error: "string" });
@@ -152,9 +175,9 @@ test("compact (the default for an agent): one array per row under columns; same 
   assert.deepEqual(Object.keys(compact), ["columns", "rows", "total", "next_cursor"]);
   assert.deepEqual(compact.columns, ["name", "kind", "journal", "avoid", "summary", "verdict"]);
   assert.deepEqual(compact.rows, [
-    ["mattpocock/skills", "skill-pack", "personal", false, null, null],
-    ["pdf-lib", "library", "personal", false, "Create and modify PDF documents.", null],
+    ["puppeteer", "library", "project", false, null, "the team's PDF renderer"],
     ["pdfkit", "library", "personal", true, "small PDFs, no streams", "avoid: async streams painful; use puppeteer"],
+    ["mattpocock/skills", "skill-pack", "personal", false, null, null],
   ]);
   const full = catalogForAgent(run.document);
   assert.equal(compact.total, full.total);
@@ -169,8 +192,8 @@ test("compact: avoid follows recall's rule (a Verdict starting with avoid, or Av
     "npm--c.md": note({ id: "pkg:npm/c", name: "c", verdict: "Avoid: slow" }),
   });
   const rows = compactForAgent(runCatalog(request(), p)).rows;
-  assert.deepEqual(rows.map((r) => r[3]), [true, false, true]);
-  const [, , , , summary, verdict] = rows[1];
+  assert.deepEqual(rows.map((r) => `${r[0]} ${r[3]}`), ["a true", "c true", "b false"]); // avoid notes first
+  const [, , , , summary, verdict] = rows[2];
   assert.equal(summary?.length, COMPACT_CAPS.summary);
   assert.ok(summary?.endsWith("…"));
   assert.equal(verdict?.length, COMPACT_CAPS.verdict);

@@ -25,7 +25,7 @@ test("--json prints core's compact document for an agent; --full --json every fi
   assert.equal(compact.code, 0);
   assert.equal(compact.err, "");
   assert.equal(compact.out, `${JSON.stringify(compactForAgent(run))}\n`);
-  assert.deepEqual(JSON.parse(compact.out).rows.map((r: string[]) => r[0]), ["mattpocock/skills", "pdf-lib", "pdfkit", "puppeteer"]);
+  assert.deepEqual(JSON.parse(compact.out).rows.map((r: string[]) => r[0]), ["puppeteer", "pdfkit", "mattpocock/skills", "pdf-lib"]);
   const full = await magpie(box, ["catalog", "--full", "--json"]);
   assert.equal(full.err, "");
   assert.equal(full.out, `${JSON.stringify(catalogForAgent(run.document))}\n`);
@@ -37,16 +37,16 @@ test("--full changes nothing for people", async () => {
   assert.equal((await magpie(box, ["catalog", "--full"])).out, (await magpie(box, ["catalog"])).out);
 });
 
-test("people get one row per note, Verdict first, as search shows them", async () => {
+test("people get one row per note, Verdict first, as search shows them; the project's notes, then avoid notes, then the rest", async () => {
   const box = sandbox(FILES);
   const r = await magpie(box, ["catalog"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
   assert.deepEqual(r.out.trimEnd().split("\n"), [
+    "puppeteer          library     project   Verdict: default for PDF rendering in new projects",
+    "pdfkit             library     personal  Verdict: avoid: async streams painful; use puppeteer",
     "mattpocock/skills  skill-pack  personal  [inbox] no verdict yet",
     "pdf-lib            library     personal  [inbox] no verdict yet",
-    "pdfkit             library     personal  Verdict: avoid: async streams painful; use puppeteer",
-    "puppeteer          library     project   Verdict: default for PDF rendering in new projects",
   ]);
 });
 
@@ -57,7 +57,7 @@ test("pages: the count and the next command on stderr; --cursor continues", asyn
   const hint = first.err.match(/^3 of 4 notes\. Next page: repomagpie catalog --limit 3 --cursor (\S+)\n$/);
   assert.ok(hint, first.err);
   const next = await magpie(box, ["catalog", "--limit", "3", "--cursor", hint[1]]);
-  assert.match(next.out, /^puppeteer\s+library\s+project\s+Verdict: /);
+  assert.match(next.out, /^pdf-lib\s+library\s+personal\s+\[inbox\] /);
   assert.equal(next.err, "");
   const json = JSON.parse((await magpie(box, ["catalog", "--limit", "3", "--json"])).out);
   assert.equal(json.next_cursor, hint[1]);
@@ -66,7 +66,7 @@ test("pages: the count and the next command on stderr; --cursor continues", asyn
 test("filters: --tag (repeatable), --kind and --journal", async () => {
   const box = sandbox(FILES);
   const names = async (...flags: string[]) => JSON.parse((await magpie(box, ["catalog", ...flags, "--json"])).out).rows.map((r: string[]) => r[0]);
-  assert.deepEqual(await names("--tag", "pdf"), ["pdf-lib", "pdfkit", "puppeteer"]);
+  assert.deepEqual(await names("--tag", "pdf"), ["puppeteer", "pdfkit", "pdf-lib"]);
   assert.deepEqual(await names("--tag", "pdf", "--tag", "workflow"), []);
   assert.deepEqual(await names("--kind", "skill-pack"), ["mattpocock/skills"]);
   assert.deepEqual(await names("--journal", "project"), ["puppeteer"]);
