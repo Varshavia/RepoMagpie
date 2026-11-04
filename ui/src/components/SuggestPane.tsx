@@ -1,12 +1,14 @@
 // Suggest for this project (docs/ui.md §7): what magpie suggest finds, from the manifests and README
 // of the project magpie ui was started in, or from a typed description. Candidates come Verdict
-// first; the project's dependencies you noted to avoid follow. Your coding agent picks the fit.
+// first, one row per package; the project's dependencies you noted to avoid follow when the need
+// matched them, and all of them sit in a collapsed section at the end. Your coding agent picks the fit.
 import { useEffect, useId, useRef, useState, type Ref } from "react";
 import { api, type ApiError, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { keywordLine, suggestItems, suggestKey, type SuggestItem } from "../logic/suggest.ts";
 import { EmptyState, SkeletonRows } from "./common.tsx";
-import { SuggestRow } from "./rows.tsx";
+import { visible } from "../logic/text.ts";
+import { InsteadLine, SuggestRow } from "./rows.tsx";
 import { TALL_ROW, VirtualList } from "./VirtualList.tsx";
 
 interface Props {
@@ -65,8 +67,10 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
     // items is read only to keep old rows on screen while the next ones load
   }, [description, limit, refresh, retry]);
 
-  const candidates = items.filter((i) => i.kind === "candidate").length;
-  const avoid = items.length - candidates;
+  const listed = items.filter((i) => !i.section);
+  const avoided = items.filter((i) => i.section);
+  const candidates = listed.filter((i) => i.kind === "candidate").length; // packages, one row each
+  const avoid = listed.length - candidates;
   const source = description === undefined
     ? projectRoot ? `From the manifests and README in ${projectRoot}.` : "From the manifests and README where repomagpie ui started."
     : "From your description.";
@@ -77,7 +81,11 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
         <h1 className="pane-title" id="suggest-title">
           Suggest for this project
         </h1>
-        {state === "ready" ? <span className="pane-count tabular">{candidates}</span> : null}
+        {state === "ready" ? (
+          <span className="pane-count tabular" title={`${candidates} ${candidates === 1 ? "package" : "packages"} suggested`}>
+            {candidates}
+          </span>
+        ) : null}
         {state === "ready" && more ? (
           <button type="button" className="button ghost pane-action" onClick={() => setLimit((l) => l + STEP)}>
             Show more
@@ -135,7 +143,7 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
         {keywords.length ? <p className="field-help">{`Looked for: ${keywordLine(keywords)}`}</p> : null}
       </form>
       <div className="visually-hidden" role="status" aria-live="polite">
-        {state === "ready" ? `${candidates} ${candidates === 1 ? "candidate" : "candidates"}${avoid ? `, ${avoid} in use that you noted to avoid` : ""}` : ""}
+        {state === "ready" ? `${candidates} ${candidates === 1 ? "package" : "packages"} suggested${avoid ? `, ${avoid} in use that you noted to avoid` : ""}` : ""}
       </div>
       {state === "loading" ? (
         <SkeletonRows label="Looking for candidates" />
@@ -152,11 +160,11 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
         >
           {`Couldn't get suggestions. ${error}`}
         </EmptyState>
-      ) : items.length ? (
+      ) : listed.length ? (
         <VirtualList
           id="suggestions"
           label="Suggestions"
-          items={items}
+          items={listed}
           keyOf={suggestKey}
           selected={selected}
           onSelect={(key) => onSelect(key, false)}
@@ -168,6 +176,26 @@ export function SuggestPane({ items, onItems, selected, onSelect, projectRoot, l
       ) : (
         <EmptyState>No notes match these words. Try other words, or add notes for the tools you use.</EmptyState>
       )}
+      {state === "ready" && avoided.length ? (
+        <details className="avoided">
+          <summary>{`In this project but your notes say avoid (${avoided.length})`}</summary>
+          <ul className="avoided-list">
+            {avoided.map((item) => (
+              <li key={suggestKey(item)} className={suggestKey(item) === selected ? "avoided-row selected" : "avoided-row"}>
+                <span className="row-line">
+                  <button type="button" className="link-button row-name" onClick={() => onSelect(suggestKey(item), true)}>
+                    {visible(item.name)}
+                  </button>
+                  {item.nameOnly ? <span className="badge avoid">Name match</span> : null}
+                  <span className="row-meta">{[item.type, ...item.journals].join(" · ")}</span>
+                </span>
+                <span className="row-verdict">{item.verdict === null ? "no verdict yet" : visible(item.verdict)}</span>
+                <InsteadLine item={item} onOpen={onOpenNote} onAdd={onAdd} onSearch={onSearch} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   );
 }

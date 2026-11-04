@@ -88,3 +88,16 @@
 .suggest-form { display: flex; flex-direction: column; gap: var(--xs); padding: var(--sm) var(--md); border-bottom: 1px solid var(--hairline); }
 .suggest-form .field-help { overflow-wrap: anywhere; }
 .suggest-form .page-lede { margin: 0 0 var(--xs); }
+
+/* Suggest's last section: every dependency the project uses that a note says to avoid, collapsed. */
+.avoided { flex: none; max-height: 40%; overflow-y: auto; border-top: 1px solid var(--hairline); }
+.avoided > summary { padding: var(--sm) var(--md); color: var(--ink-muted); font-size: 13px; cursor: pointer; }
+.avoided-list { margin: 0; padding: 0 0 var(--sm); list-style: none; }
+.avoided-row { display: flex; flex-direction: column; gap: 2px; padding: var(--xs) var(--md); }
+.avoided-row.selected { background: var(--accent-wash); }
+.avoided-row .row-name { text-align: left; }
+
+/* Copy to this project (AdoptPanel) */
+.adopt-panel { display: flex; flex-direction: column; gap: var(--sm); padding: var(--md); border-radius: var(--r-md); background: var(--surface-1); font-size: 13px; }
+.install-line { display: flex; align-items: center; gap: var(--xs); }
+.install-line code { padding: 2px var(--sm); }

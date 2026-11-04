@@ -17,20 +17,49 @@ const DOC: SuggestJson = {
   ],
   in_use_avoid: [{
     query: "@foo/pdf", id: "pkg:npm/%40foo/pdf", journal: "personal", confidence: "exact", verdict: "avoid: slow", avoid_when: [], use_when: [], drafts: [], status: "reviewed", path: "/h/notes/npm--foo--pdf.md", alternatives: [],
+    matched: true,
   }],
 };
 
-test("candidates in the API's order, then the in-use avoid notes, each with a unique key", () => {
+const main = (items: ReturnType<typeof suggestItems>) => items.filter((i) => !i.section);
+
+test("one row per package: candidates in the API's order, then the matched in-use avoid notes, then the section; each key unique", () => {
   const items = suggestItems(DOC);
-  assert.deepEqual(items.map((i) => [i.kind, i.journal, i.name, i.verdict]), [
-    ["candidate", "project", "commander", "our CLI parser"],
-    ["candidate", "personal", "commander", "fine"],
-    ["candidate", "personal", "tsx", null],
-    ["avoid", "personal", "@foo/pdf", "avoid: slow"],
+  assert.deepEqual(items.map((i) => [i.kind, i.section, i.journals.join(" · "), i.name, i.verdict]), [
+    ["candidate", false, "project · personal", "commander", "our CLI parser"],
+    ["candidate", false, "personal", "tsx", null],
+    ["avoid", false, "personal", "@foo/pdf", "avoid: slow"],
+    ["avoid", true, "personal", "@foo/pdf", "avoid: slow"],
   ]);
   const keys = items.map(suggestKey);
   assert.equal(new Set(keys).size, keys.length);
   assert.equal(keys[0], "project id pkg:npm/commander", "the same key form as search results");
+  assert.equal(keys[3], "personal id pkg:npm/%40foo/pdf avoided");
+});
+
+test("the merge: the project's note shows whichever journal comes first; notes without an id stay apart", () => {
+  const [project, personal] = DOC.candidates;
+  const items = main(suggestItems({ ...DOC, candidates: [personal, project, { ...personal, id: null, name: "x" }, { ...personal, id: null, name: "y" }], in_use_avoid: [] }));
+  assert.deepEqual(items.map((i) => [i.journal, i.journals.join(" · "), i.name, i.verdict]), [
+    ["project", "project · personal", "commander", "our CLI parser"],
+    ["personal", "personal", "x", "fine"],
+    ["personal", "personal", "y", "fine"],
+  ]);
+});
+
+test("in-use avoid notes: in the list only when the need matched them, one row per package; all of them in the section", () => {
+  const avoid = DOC.in_use_avoid[0];
+  const doc: SuggestJson = {
+    ...DOC,
+    in_use_avoid: [
+      { ...avoid, id: "pkg:npm/lodash", journal: "project", matched: false },
+      { ...avoid, id: "pkg:npm/lodash", journal: "personal", matched: false },
+      { ...avoid, id: "pkg:npm/moment", journal: "personal", matched: true },
+    ],
+  };
+  const items = suggestItems(doc);
+  assert.deepEqual(main(items).filter((i) => i.kind === "avoid").map((i) => i.name), ["moment"]);
+  assert.deepEqual(items.filter((i) => i.section).map((i) => `${i.name} ${i.journals.join(" · ")}`), ["lodash project · personal", "moment personal"]);
 });
 
 test("an avoid row keeps its confidence and its type", () => {
@@ -55,9 +84,9 @@ test("an exact in-use avoid row carries up to 3 alternatives and the count of th
       { ...DOC.in_use_avoid[0], id: "pkg:npm/bar", alternatives: [] },
     ],
   };
-  const items = suggestItems(doc);
+  const items = main(suggestItems(doc));
   assert.deepEqual(items.map((i) => [i.instead.map((a) => a.name), i.moreInstead]), [
-    [[], 0], [[], 0], [[], 0],
+    [[], 0], [[], 0],
     [["a", "b", "c"], 2],
     [[], 0],
     [[], 0],
@@ -66,7 +95,7 @@ test("an exact in-use avoid row carries up to 3 alternatives and the count of th
 
 test("each candidate carries its why line; an avoid row has none", () => {
   const items = suggestItems(DOC);
-  assert.deepEqual(items.map((i) => i.why), ["Why: matched cli", "Why: matched cli", "Why: matched pdf", null]);
+  assert.deepEqual(items.map((i) => i.why), ["Why: matched cli", "Why: matched pdf", null, null]);
 });
 
 test("the why line equals magpie suggest's, word for word", () => {

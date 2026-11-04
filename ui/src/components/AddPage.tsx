@@ -13,16 +13,17 @@ import { ItemsField, JournalChoice, TopicChips, TypeChoice, type ProjectState } 
 interface Props {
   project: ProjectState;
   defaultJournal: Scope;
+  defaultType: PackageType | ""; // npm when the project has no manifest to type a bare name (decision 0058)
   initialTarget?: string; // from an unresolved [[link]]
   onOpenNote: (journal: Scope, id: string) => void;
   onSaved: (journal: Scope) => void;
 }
 
-export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, onSaved }: Props) {
+export function AddPage({ project, defaultJournal, defaultType, initialTarget, onOpenNote, onSaved }: Props) {
   const id = useId();
   const [target, setTarget] = useState(initialTarget ?? "");
   const [to, setTo] = useState<Scope>(defaultJournal);
-  const [type, setType] = useState<PackageType | "">("");
+  const [type, setType] = useState<PackageType | "">(defaultType);
   const [verdict, setVerdict] = useState("");
   const [useWhen, setUseWhen] = useState<{ items: string[]; text: string }>({ items: [], text: "" });
   const [avoidWhen, setAvoidWhen] = useState<{ items: string[]; text: string }>({ items: [], text: "" });
@@ -32,7 +33,8 @@ export function AddPage({ project, defaultJournal, initialTarget, onOpenNote, on
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedNoteJson | null>(null);
 
-  const request = { target: target.trim(), to, type: type || undefined };
+  const bare = !/^(pkg:|https?:\/\/)/i.test(target.trim()); // as core decides: the type field is for bare names
+  const request = { target: target.trim(), to, type: (bare && type) || undefined };
   const locked = Boolean(preview?.exists && preview.verdict); // the Verdict can't be written; items still can
   const useItems = withItem(useWhen.items, useWhen.text);
   const avoidItems = withItem(avoidWhen.items, avoidWhen.text);

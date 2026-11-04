@@ -4,7 +4,7 @@
 // conflict banner. [[Links]] open the note they resolve to, as core resolved them.
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { DOMAIN_LIMIT, DOMAINS } from "../../../src/core/domains.ts";
-import { api, ApiError, type Address, type AdoptJson, type DeleteJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
+import { api, ApiError, type Address, type DeleteJson, type NoteJson, type Scope, type TagListJson } from "../api.ts";
 import { Icon } from "../icons.tsx";
 import { formOf, noteDomainList, patchFor, suggestedPosition, topicSuggestions, triedLine, type Form, type Patch } from "../logic/edits.ts";
 import { alternativesOf, alternativeTo, backlinkGroups, linkFor, linkText, noteHash, unresolvedTitle, type LinkNote } from "../logic/links.ts";
@@ -20,6 +20,8 @@ import { ReviewForm } from "./ReviewForm.tsx";
 
 // Shown only after "Delete note": its own chunk (docs/ui.md §10).
 export const Delete = lazyPart(() => import("./later.ts").then((m) => m.DeleteDialog));
+// Shown only after "Copy to this project".
+const Adopt = lazyPart(() => import("./later.ts").then((m) => m.AdoptPanel));
 
 // What a [[link]] in the note needs: the note's resolved links, and where a click goes.
 const Links = createContext<{ journal: Scope; links: NoteJson["links"]; open: (id: string) => void; add: (target: string) => void; search: (name: string) => void } | null>(null);
@@ -42,7 +44,7 @@ export interface NotePaneProps {
   onToast: (text: string) => void;
   onBack: () => void; // the back button in the one-pane layout
   project: ProjectState; // "none": no project to adopt into
-  onAdopted: () => void;
+  onAdopted: (started: boolean) => void; // started: the copy also started the project journal
   onOpenNote: (journal: Scope, id: string) => void;
   linkNotes: LinkNote[]; // the journal's notes, for the [[ autocomplete
   onFollowLink: (journal: Scope, from: string | null, to: string) => void; // a [[link]] or "Linked from"
@@ -54,7 +56,6 @@ export interface NotePaneProps {
   onModal: (open: boolean) => void; // the delete dialog is open: what is behind it is inert
 }
 
-type Adopting = null | { step: "confirm"; busy: boolean; error: string | null } | { step: "done"; doc: AdoptJson };
 
 // Sections shown even when empty, so the person can fill them. My notes is the free-form place to
 // write (decision 0026).
@@ -77,7 +78,7 @@ export function NotePane(props: NotePaneProps) {
   const [removed, setRemoved] = useState(false);
   const [section, setSection] = useState<{ name: string; text: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [adopting, setAdopting] = useState<Adopting>(null);
+  const [adopting, setAdopting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [refocus, setRefocus] = useState<{ next: string | null } | null>(null); // after a suggestion's ×
   const verdictRef = useRef<HTMLTextAreaElement>(null);
@@ -391,27 +392,12 @@ export function NotePane(props: NotePaneProps) {
     }
   }
 
-  // magpie adopt: copies the note into the project journal and names the install command; it never
-  // installs anything. Only after the confirm, which says who can read the project journal.
-  async function adopt() {
-    if (!note?.id) return;
-    setAdopting({ step: "confirm", busy: true, error: null });
-    try {
-      const doc = await api.adopt(note.id);
-      setAdopting({ step: "done", doc });
-      onAdopted();
-    } catch (error) {
-      setAdopting({ step: "confirm", busy: false, error: (error as ApiError).message });
-    }
-  }
-
-  async function copyInstall(command: string) {
-    try {
-      await navigator.clipboard.writeText(command);
-      onToast("Install command copied");
-    } catch {
-      setActionError("Couldn't copy the command. Select it and copy it yourself.");
-    }
+  // Copy to this project (magpie adopt): a package the project already has a note on opens that
+  // note instead; otherwise the confirm (AdoptPanel).
+  function copyToProject() {
+    if (note?.also_in?.journal !== "project") return setAdopting(true);
+    onToast(`This project already has a note on ${name}`);
+    onOpenNote("project", note.also_in.id);
   }
 
   async function editTagList() {
@@ -455,6 +441,14 @@ export function NotePane(props: NotePaneProps) {
               Project journal, shared with this repository's contributors
             </p>
           ) : null}
+          {note.also_in ? (
+            <p className="note-journal">
+              {note.also_in.journal === "project" ? "This project's journal has a note on it too." : "Your personal journal has a note on it too."}
+              <button type="button" className="link-button" onClick={() => note.also_in && onOpenNote(note.also_in.journal, note.also_in.id)}>
+                {note.also_in.journal === "project" ? "Open the project journal's note" : "Open your note"}
+              </button>
+            </p>
+          ) : null}
           {note.id ? (
             <p className="note-purl">
               <span className="mono" translate="no">
@@ -495,9 +489,9 @@ export function NotePane(props: NotePaneProps) {
               </button>
             ) : null}
             {journal === "personal" && project !== "none" && note.id && !note.read_only ? (
-              <button type="button" className="button secondary" onClick={() => setAdopting({ step: "confirm", busy: false, error: null })} aria-expanded={adopting !== null}>
+              <button type="button" className="button secondary" onClick={copyToProject} aria-expanded={adopting}>
                 <Icon name="users" />
-                Adopt to project
+                Copy to this project
               </button>
             ) : null}
             {onDeleted && note.version ? (
@@ -528,52 +522,20 @@ export function NotePane(props: NotePaneProps) {
         </header>
 
         <div className="stack">
-          {adopting?.step === "confirm" ? (
-            <div className="adopt-panel" role="group" aria-label="Adopt to project">
-              <p>
-                Copy this note into the project journal, with today's date as <code translate="no">adopted</code>. RepoMagpie names the install command; it installs nothing.
-              </p>
-              <p>The project journal is committed with the code; anyone who can read this repository can read this note.</p>
-              {adopting.error ? <FieldError>{adopting.error}</FieldError> : null}
-              <div className="form-actions">
-                <button type="button" className="button secondary" onClick={adopt} disabled={adopting.busy}>
-                  {adopting.busy ? "Copying…" : "Copy to the project journal"}
-                </button>
-                <button type="button" className="button ghost" onClick={() => setAdopting(null)}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : adopting?.step === "done" ? (
-            <div className="adopt-panel" role="group" aria-label="Adopted">
-              <p>Copied to the project journal.</p>
-              {verdictSaysAvoid(note.verdict) ? (
-                <p className="field-help">{`Your note says to avoid ${name}; no install command.`}</p>
-              ) : adopting.doc.install || adopting.doc.install_choices.length ? (
-                <>
-                  {adopting.doc.install_choices.length ? <p>{`This repository publishes ${adopting.doc.install_choices.length} packages; install the one you need:`}</p> : null}
-                  {(adopting.doc.install ? [adopting.doc.install] : adopting.doc.install_choices).map((command) => (
-                    <p className="install-line" key={command}>
-                      <code translate="no">{command}</code>
-                      <button type="button" className="button ghost icon-button" onClick={() => copyInstall(command)} aria-label={`Copy ${command}`} title="Copy the install command">
-                        <Icon name="copy" />
-                      </button>
-                    </p>
-                  ))}
-                  <p className="field-help">Run it yourself when you are ready; RepoMagpie never installs anything.</p>
-                </>
-              ) : (
-                <p className="field-help">No install command for a GitHub repository.</p>
-              )}
-              <div className="form-actions">
-                <button type="button" className="button secondary" onClick={() => adopting.doc.id && onOpenNote("project", adopting.doc.id)}>
-                  Open the project's note
-                </button>
-                <button type="button" className="button ghost" onClick={() => setAdopting(null)}>
-                  Close
-                </button>
-              </div>
-            </div>
+          {adopting && note.id ? (
+            <LazyFrame fallback={null} onClose={() => setAdopting(false)}>
+              <Adopt.Part
+                id={note.id}
+                name={name}
+                avoid={verdictSaysAvoid(note.verdict)}
+                start={project === "new"}
+                onAdopted={onAdopted}
+                onOpenNote={onOpenNote}
+                onToast={onToast}
+                onActionError={setActionError}
+                onClose={() => setAdopting(false)}
+              />
+            </LazyFrame>
           ) : null}
           {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
           {removed ? <Banner tone="warning">Another program deleted this note's file. Choose another note.</Banner> : null}

@@ -216,7 +216,7 @@ test("adopt to project", async ({ page, magpie }) => {
   await magpie.open(page);
   await allNotes(page);
   await page.getByRole("option", { name: /^zod / }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
   await expect(page.getByText("anyone who can read this repository can read this note.")).toBeVisible();
   await shoot(page, "16-adopt-confirm");
   await page.getByRole("button", { name: "Copy to the project journal" }).click();

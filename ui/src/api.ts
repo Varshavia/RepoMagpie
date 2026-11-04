@@ -100,6 +100,7 @@ export const api = {
   recall: (packages: string[], type?: PackageType) => get<RecallJson>("/api/recall", { package: packages, type }),
   suggest: (params: { description?: string; limit: number }) => get<SuggestJson>("/api/suggest", { description: params.description, limit: String(params.limit) }),
   adopt: (target: string) => write<AdoptJson>("POST", "/api/adopt", { target }),
+  startProject: () => write<{ path: string | null; created: boolean }>("POST", "/api/project/start", {}),
   // Discover (decision 0045): GitHub's search, made by magpie ui's server; a failure's document keeps
   // the search's shape with `problem` (rate limit, offline) and `error`.
   discover: (params: Record<string, string | undefined>) => get<DiscoverJson>("/api/discover", params),

@@ -45,7 +45,7 @@ test("addTopicSuggestions: core's ranked topics without the tags chosen so far, 
 const NOTE: NoteJson = {
   id: "pkg:npm/left-pad", journal: "personal", file: "npm--left-pad.md", path: "/j/notes/npm--left-pad.md", version: "sha256:abc",
   read_only: false, status: "inbox", verdict: "", frontmatter: { id: "pkg:npm/left-pad", kind: "library", tags: ["text"], tried: false, rating: null },
-  sections: [], skills: [], links: [], backlinks: [], warnings: [],
+  sections: [], skills: [], links: [], backlinks: [], also_in: null, warnings: [],
 };
 
 test("formOf reads the human-owned fields from the note", () => {

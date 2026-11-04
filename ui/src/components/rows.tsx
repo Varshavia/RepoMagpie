@@ -44,24 +44,36 @@ export function SuggestRow({ item, onOpen, onAdd, onSearch }: {
         {item.kind === "avoid" ? <span className="badge avoid">{item.nameOnly ? "In use, avoid (name match)" : "In use, avoid"}</span> : null}
         {item.status === "inbox" ? <StatusBadge status="inbox" /> : null}
         <span className="row-meta">
-          {item.type} · {item.journal}
+          {[item.type, ...item.journals].join(" · ")}
         </span>
       </span>
       <span className="row-verdict">{item.verdict === null ? "no verdict yet" : visible(item.verdict)}</span>
       {item.why ? <span className="row-why" title={visible(item.why)}>{visible(item.why)}</span> : null}
-      {item.instead.length ? (
-        <span className="row-why">
-          {"Instead: "}
-          {item.instead.map((a, i) => (
-            <Fragment key={`${a.name} ${i}`}>
-              {i ? ", " : null}
-              <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} onSearch={onSearch} inRow />
-            </Fragment>
-          ))}
-          {item.moreInstead ? `, +${item.moreInstead} more` : null}
-        </span>
-      ) : null}
+      <InsteadLine item={item} onOpen={onOpen} onAdd={onAdd} onSearch={onSearch} inRow />
     </>
+  );
+}
+
+// An in-use avoid note's alternatives (decision 0029): in a Suggest row, and in the avoided section.
+export function InsteadLine({ item, onOpen, onAdd, onSearch, inRow = false }: {
+  item: SuggestItem;
+  onOpen: (journal: Scope, id: string) => void;
+  onAdd: (journal: Scope, target: string) => void;
+  onSearch: (name: string) => void;
+  inRow?: boolean;
+}) {
+  if (!item.instead.length) return null;
+  return (
+    <span className="row-why">
+      {"Instead: "}
+      {item.instead.map((a, i) => (
+        <Fragment key={`${a.name} ${i}`}>
+          {i ? ", " : null}
+          <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} onSearch={onSearch} inRow={inRow} />
+        </Fragment>
+      ))}
+      {item.moreInstead ? `, +${item.moreInstead} more` : null}
+    </span>
   );
 }
 
