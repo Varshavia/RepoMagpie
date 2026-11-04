@@ -84,7 +84,7 @@ test("journals: outside a git repository, a parent folder's .magpie is no projec
 test("journals: in a git repository without .magpie, one line says how a project journal starts; elsewhere only none here; never a to-do", async () => {
   const b = box();
   const inGit = await magpie(b, ["doctor"], { env: b.env });
-  assert.match(inGit.out, /^ {2}project {3}none here; repomagpie note <x> --to project starts one, shared through git$/m);
+  assert.match(inGit.out, /^ {2}project {3}none here; turn on shared notes in repomagpie ui \(Project\) or with repomagpie note <x> --to project$/m);
   assert.ok(!/^ {2}- .*--to project/m.test(inGit.out), "information, not a to-do");
   assert.equal(JSON.parse((await magpie(b, ["doctor", "--json"], { env: b.env })).out).git_repository, true);
 

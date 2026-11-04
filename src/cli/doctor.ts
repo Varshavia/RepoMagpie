@@ -79,7 +79,7 @@ export function render(r: DoctorJson, home: string): string {
     for (const u of j.unknown_domains) lines.push(`            unknown domain: ${u.file}: ${u.values.join(", ")}`);
   }
   // Information, not a to-do: a project journal is a choice to share notes through git.
-  if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here; ${r.git_repository ? "repomagpie note <x> --to project starts one, shared through git" : "outside a git repository, use --project <path>"}`);
+  if (!r.journals.some((j) => j.scope === "project")) lines.push(`  project   none here; ${r.git_repository ? "turn on shared notes in repomagpie ui (Project) or with repomagpie note <x> --to project" : "outside a git repository, use --project <path>"}`);
 
   // Information, not a to-do: the same line as on Discover and Import.
   lines.push("", connectionText(r.github.source));

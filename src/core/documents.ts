@@ -60,7 +60,7 @@ export interface StartProjectJson {
   error?: string;
 }
 
-// "Start this project's journal" (the app's Project view): what `note --to project` creates on its
+// "Turn on shared notes" (the app's Project view): what `note --to project` creates on its
 // first write (.magpie/, notes/, tags.md, .gitignore), without a note. Only in a git repository, and
 // only at or under its root (decision 0051); never through a link.
 export function startProjectJournal(place: Place): Result<StartProjectJson> {
