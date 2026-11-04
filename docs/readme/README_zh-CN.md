@@ -43,7 +43,7 @@ Do you want to proceed?
 - **按关注点查找：** 用任何语言询问安全、数据库、测试……你的智能体会找到相关的笔记，即使它们和你的问题没有一个相同的词。
 - **推荐：** `repomagpie suggest` 读取项目的清单文件和 README，列出适合它的笔记。
 - **发现：** 按关键词、关注点和类型搜索 GitHub，附带星标数和近期活跃度，并把你选中的仓库加入 inbox（收件箱）：使用 `repomagpie discover` 或应用。除非你要求，列表和课程会被隐藏，每个结果都会说明它为什么出现。
-- **从项目开始：** `repomagpie init --auto` 按照你的笔记所说列出项目的依赖，然后对每个还没有笔记的依赖询问你的 Verdict。
+- **从项目开始：** `repomagpie init` 按照你的笔记所说列出项目的依赖，然后对每个还没有笔记的依赖询问你的 Verdict。
 
 **状态：** beta 版，面向早期测试者。[更新日志](../../CHANGELOG.md)列出每个版本；[路线图](../roadmap.md)展示接下来的计划。
 
@@ -175,6 +175,13 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 <summary><strong>如何移除它？</strong></summary>
 
 运行 `repomagpie setup --remove`。它只移除 RepoMagpie 自己的 MCP 条目、hook 和 skill 文件夹，从不用备份覆盖你之后做的修改，并保留你的笔记库和 `setup` 的备份。使用 `--agents` 时，只要还有其他智能体在读取共享的 skill 文件夹，它就会保留。之后，`repomagpie setup --delete-backups` 会在询问后删除备份，`npm uninstall -g repomagpie` 会移除命令。
+
+</details>
+
+<details>
+<summary><strong>团队可以用它约定规则吗？</strong></summary>
+
+可以。项目笔记库，即仓库中的 `.magpie/`，与代码一起提交；每位团队成员的智能体在 `git pull` 之后都会读取它。项目笔记与个人笔记冲突时，以项目笔记为准。在 pull request 中审查规则的修改，并用 `CODEOWNERS` 中的一行让负责人来批准。参见[团队协作](../teams.md)（英文）。
 
 </details>
 

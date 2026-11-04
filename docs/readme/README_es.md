@@ -43,7 +43,7 @@ Do you want to proceed?
 - **Buscar por tema:** pregunta por seguridad, bases de datos, pruebas… en cualquier idioma, y tu agente encuentra las notas que encajan, incluso las que no comparten ninguna palabra con tu pregunta.
 - **Sugerir:** `repomagpie suggest` lee los manifiestos y el README de un proyecto, y lista las notas que encajan con él.
 - **Descubrir:** busca en GitHub por palabras, tema y tipo, con estrellas y actividad reciente, y añade los repositorios que elijas a tu inbox (bandeja de entrada): `repomagpie discover`, o la aplicación. Las listas y los cursos quedan ocultos salvo que los pidas, y cada resultado dice por qué está ahí.
-- **Empezar desde un proyecto:** `repomagpie init --auto` lista las dependencias de un proyecto según lo que dicen tus notas y luego te pide tu Verdict para cada una que no tenga nota.
+- **Empezar desde un proyecto:** `repomagpie init` lista las dependencias de un proyecto según lo que dicen tus notas y luego te pide tu Verdict para cada una que no tenga nota.
 
 **Estado:** beta, para los primeros testers. El [registro de cambios](../../CHANGELOG.md) lista cada versión; la [hoja de ruta](../roadmap.md) muestra lo que viene después.
 
@@ -175,6 +175,13 @@ Nunca de forma definitiva, y nunca aprueba ninguna. Cuando una nota dice que evi
 <summary><strong>¿Cómo lo quito?</strong></summary>
 
 Ejecuta `repomagpie setup --remove`. Solo quita las entradas MCP, los hooks y las carpetas de skills de RepoMagpie, nunca restaura una copia de seguridad encima de tus cambios posteriores, y deja tus diarios y las copias de seguridad de `setup`. Con `--agents`, la carpeta compartida del skill se queda mientras otro agente todavía la lea. Después, `repomagpie setup --delete-backups` borra las copias tras preguntarte, y `npm uninstall -g repomagpie` quita el comando.
+
+</details>
+
+<details>
+<summary><strong>¿Puede un equipo acordar reglas con él?</strong></summary>
+
+Sí. El diario del proyecto, `.magpie/` en el repositorio, se hace commit junto con el código, y el agente de cada persona del equipo lo lee después de `git pull`. Cuando una nota del proyecto y una nota personal no coinciden, manda la del proyecto. Revisen los cambios de reglas en pull requests y dejen que los responsables los aprueben con una línea en `CODEOWNERS`. Consulta [trabajar en equipo](../teams.md) (en inglés).
 
 </details>
 

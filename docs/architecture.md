@@ -56,7 +56,7 @@ src/
                recall: recall's matching rules, the journals it reads, its cache, each match's alternatives
                manifests: what a project's manifests and README say (dependencies, keywords, descriptions)
                suggest: suggest's keywords, scoring and the project's dependencies left out
-               init-auto: init --auto's groups of the project's dependencies (avoid, noted, no note)
+               init-auto: init's groups of the project's dependencies (avoid, noted, no note)
                adopt: copying a personal note into the project journal; the install command
                delete: moving a note to <journal>/.trash/ and back (Undo), the version check, the notes
                that link to it, .trash/ in a project's .gitignore (decision 0037)

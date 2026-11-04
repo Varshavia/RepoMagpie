@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Ask your agent to note something "for the team", or "ekip için", and it goes to the project journal, `.magpie/` in the repository, which it creates if needed. When it's unclear which journal you mean, the agent asks. Outside a git repository it offers your personal journal. `repomagpie note --json` says `"journal_created": true` when the note started the journal.
+- The app's Project view, in a git repository without a project journal, has **Start this project's journal**. It creates `.magpie/` and reminds you to commit it.
+- A note in both journals says so in the app: "This project's journal has a note on it too.", with a link to it, and the same from the project's side.
+- [Working as a team](docs/teams.md): starting the project journal, reviewing rules in pull requests, a `CODEOWNERS` line for leads, and what happens when a project note and a personal note disagree. The README's FAQ links it, in all six languages.
+
+### Changed
+
+- The project note is the team's decision. When it and your personal note on the same package disagree, your agent follows the project note and mentions yours. The skill and the MCP tools say so.
+- `repomagpie init` alone now lists your project's dependencies by what your notes say, and asks for a Verdict on each one without a note. It used to only print what `--auto` does; `init --auto` still works.
+- A bare name such as `moment` with no manifest to settle its type takes the type of your existing note on it. In a terminal, `repomagpie note` asks `Which package type is moment? npm, pypi, cargo [npm]:`, and Enter takes npm. The MCP tools tell the agent to pass `type`, and the app says "Choose its type above." instead of naming a CLI flag. The app's Add starts at npm when the project has no manifests. See [decision 0058](docs/decisions/0058-the-type-of-a-bare-name.md).
+- "Adopt to project" in the app is now **Copy to this project**. When the project already has a note on the package, it opens that note. Before the project journal exists, it says what the project journal is and offers **Start the journal and copy**.
+- `repomagpie catalog` and the MCP `catalog` tool list the project's notes first, then your avoid notes, then the rest, each group by name. In a big journal, the first page of 100 now holds the notes that matter most. A cursor from an earlier version starts over from the first page.
+- Suggest for this project in the app shows one row per package. A package in both journals shows the project's note with both journals named. Dependencies you noted to avoid appear among the suggestions only when they match what you described. All of them are in a collapsed section at the end, "In this project but your notes say avoid (N)". The header's number counts the packages suggested. `repomagpie suggest --json` marks each `in_use_avoid` item with `matched`.
+
+### Fixed
+
+- `repomagpie suggest` no longer drops a project note when the same package's personal note scores much higher. Each journal scores against its own notes, so a small project journal's note could fall under the cut-off.
+
 ## [0.2.0-beta.19] - 2026-11-03
 
 The twentieth pre-release: Search lists your notes before you type, Import reads pasted lists, Discover uses your GitHub CLI login and says why each result is there, and there are sixteen domains.
