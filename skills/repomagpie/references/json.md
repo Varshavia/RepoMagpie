@@ -6,7 +6,7 @@ A hidden or control character in note text shows as an ASCII marker in its place
 
 ## `repomagpie recall <package>... --json`
 
-- `matches[]`: one per note found; empty when there is none. Project journal first.
+- `matches[]`: one per note found; empty when there is none. Project journal first: when a project note and a personal note disagree, the project note is the team's decision.
 - `matches[].query`: the package you asked about.
 - `matches[].id`: the note's PURL.
 - `matches[].journal`: `"personal"` or `"project"`.
@@ -42,7 +42,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 ## `repomagpie catalog --json`
 
 - `columns`: the names of a row's values, in order: `["name", "kind", "journal", "avoid", "summary", "verdict"]`.
-- `rows[]`: one array per note, by name, holding:
+- `rows[]`: one array per note, the project's notes first, then the avoid notes, then the rest, each group by name, holding:
   - the note's name and kind, and its journal (`"personal"` or `"project"`: who wrote it);
   - avoid: `true` for an avoid note (as in recall);
   - summary: the note's first "Use when" item, else the first line of "What it does", else `null`; at most 100 characters;
@@ -67,8 +67,9 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `in_use_avoid[].query`: the dependency's name.
 - `in_use_avoid[].verdict`, `in_use_avoid[].avoid_when`: what the note says.
 - `in_use_avoid[].alternatives[]`: what the user noted to use instead, as in recall.
+- `in_use_avoid[].matched`: whether the need matched this note; always `true` without a description. Mention unmatched ones only if they bear on the task.
 
-## `repomagpie init --auto --json`
+## `repomagpie init --json`
 
 - `dependencies`: how many packages the project's manifests list, each once; `manifests`: which files.
 - `avoid[]`: dependencies with an avoid note, in either journal. Name each one to the user.
@@ -83,6 +84,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `journal`: where it was written.
 - `path`: the note's file.
 - `created`: `true` for a new note, `false` for an existing one.
+- `journal_created`: `true` when this note created the journal's folder. For the project journal, that is `.magpie/`: tell the user it is shared with everyone on the repository once committed.
 - `status`: `"reviewed"` with a Verdict, `"inbox"` without.
 - `warnings`: things that went wrong without stopping it, such as no network for a GitHub URL.
 - `alternatives_added`: the `--alternative` names written to the note; `[]` without the flag.

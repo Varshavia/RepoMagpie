@@ -2,7 +2,7 @@
 //
 //   node run.mjs --self-check              the assertions on canned tool calls: no key, no model
 //   node run.mjs --dry [--model <id>]      the dry scenario (dry.yaml)
-//   node run.mjs [--model <id>] [--repeat <n>]   the 25 scenarios (promptfooconfig.yaml)
+//   node run.mjs [--model <id>] [--repeat <n>]   the 26 scenarios (promptfooconfig.yaml)
 //   --only <ids>                           only these scenarios: 3,5,7 or 3-7, by the report's #
 //   --resume                               only those the saved report hasn't finished, merged into it
 //   --agent gemini-cli [--pause <seconds>] [--debug]   Gemini CLI instead of Claude Code (README.md,

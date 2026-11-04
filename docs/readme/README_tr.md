@@ -43,7 +43,7 @@ Do you want to proceed?
 - **Konuya göre bul:** security, database, testing… hakkında istediğin dilde sor; ajanın uyan notları, sorunla tek kelimesi ortak olmayanları bile bulur.
 - **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
 - **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama. Listeler ve kurslar sen istemedikçe gizli kalır; her sonuç neden orada olduğunu söyler.
-- **Bir projeden başla:** `repomagpie init --auto` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
+- **Bir projeden başla:** `repomagpie init` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
 
 **Durum:** erken test edenler için beta. [Değişiklik kaydı](../../CHANGELOG.md) her sürümü listeler; [yol haritası](../roadmap.md) sırada ne olduğunu gösterir.
 
@@ -175,6 +175,13 @@ Hiçbir kurulumu kalıcı olarak engellemez ve hiçbirini onaylamaz. Bir not pak
 <summary><strong>Nasıl kaldırırım?</strong></summary>
 
 `repomagpie setup --remove` çalıştır. Yalnızca RepoMagpie'nin kendi MCP girdilerini, hook'larını ve skill klasörlerini kaldırır, sonradan yaptığın değişikliklerin üzerine asla bir yedeği geri yüklemez; günlüklerini ve `setup`'ın yedeklerini bırakır. `--agents` ile, ortak skill klasörü başka bir ajan onu hâlâ okuyorsa yerinde kalır. Sonra `repomagpie setup --delete-backups` sorduktan sonra yedekleri siler, `npm uninstall -g repomagpie` de komutu kaldırır.
+
+</details>
+
+<details>
+<summary><strong>Bir ekip onunla kurallarda anlaşabilir mi?</strong></summary>
+
+Evet. Proje günlüğü, depodaki `.magpie/`, kodla birlikte commit'lenir ve her ekip arkadaşının ajanı `git pull` sonrası onu okur. Proje notuyla kişisel bir not çeliştiğinde proje notu geçerlidir. Kural değişikliklerini pull request'lerde gözden geçirin ve bir `CODEOWNERS` satırıyla onayı liderlere bırakın. Bkz. [ekip olarak çalışmak](../teams.md) (İngilizce).
 
 </details>
 

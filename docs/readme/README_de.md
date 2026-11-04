@@ -43,7 +43,7 @@ Do you want to proceed?
 - **Nach Thema finden:** Frag nach Sicherheit, Datenbanken, Tests … in jeder Sprache, und dein Agent findet die passenden Notizen, auch solche, die kein Wort mit deiner Frage gemeinsam haben.
 - **Vorschlagen:** `repomagpie suggest` liest die Manifeste und das README eines Projekts und listet die Notizen auf, die dazu passen.
 - **Entdecken:** Durchsuche GitHub nach Wörtern, Thema und Art, mit Sternen und letzter Aktivität, und füge die Repositorys, die du wählst, deiner inbox (Eingang) hinzu: `repomagpie discover` oder die App. Listen und Kurse bleiben ausgeblendet, wenn du nicht danach fragst, und jedes Ergebnis sagt, warum es da ist.
-- **Bei einem Projekt anfangen:** `repomagpie init --auto` listet die Abhängigkeiten eines Projekts danach auf, was deine Notizen sagen, und fragt dann bei jeder ohne Notiz nach deinem Verdict.
+- **Bei einem Projekt anfangen:** `repomagpie init` listet die Abhängigkeiten eines Projekts danach auf, was deine Notizen sagen, und fragt dann bei jeder ohne Notiz nach deinem Verdict.
 
 **Status:** Beta, für erste Tester. Das [Changelog](../../CHANGELOG.md) listet jede Version auf; die [Roadmap](../roadmap.md) zeigt, was als Nächstes kommt.
 
@@ -175,6 +175,13 @@ Nie endgültig, und er genehmigt nie eine. Wenn eine Notiz sagt, das Paket zu me
 <summary><strong>Wie entferne ich es?</strong></summary>
 
 Führ `repomagpie setup --remove` aus. Es entfernt nur die eigenen MCP-Einträge, Hooks und Skill-Ordner von RepoMagpie, spielt nie eine Sicherung über deine späteren Änderungen zurück und lässt deine Journals und die Sicherungen von `setup` stehen. Mit `--agents` bleibt der gemeinsame Skill-Ordner, solange ein anderer Agent ihn noch liest. Danach löscht `repomagpie setup --delete-backups` die Sicherungen nach einer Rückfrage, und `npm uninstall -g repomagpie` entfernt den Befehl.
+
+</details>
+
+<details>
+<summary><strong>Kann sich ein Team damit auf Regeln einigen?</strong></summary>
+
+Ja. Das Projekt-Journal, `.magpie/` im Repository, wird mit dem Code committet, und der Agent jeder Person im Team liest es nach `git pull`. Widersprechen sich eine Projekt-Notiz und eine persönliche Notiz, gilt die Projekt-Notiz. Prüft Regeländerungen in Pull Requests und lasst Leads sie mit einer Zeile in `CODEOWNERS` freigeben. Siehe [Arbeiten im Team](../teams.md) (auf Englisch).
 
 </details>
 

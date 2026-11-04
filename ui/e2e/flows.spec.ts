@@ -9,7 +9,7 @@ import { runSuggest } from "../../src/core/suggest.ts";
 import { tagsFromTopics } from "../../src/core/tags-from-topics.ts";
 import { readNote } from "../../src/core/note.ts";
 import { fromTopicsSummary } from "../src/logic/edits.ts";
-import { whyLine } from "../src/logic/suggest.ts";
+import { suggestItems, whyLine } from "../src/logic/suggest.ts";
 import { renderNote } from "../../src/core/write.ts";
 import { expect, test, throttle } from "./fixtures.ts";
 import { PDFKIT } from "./journal.ts";
@@ -614,6 +614,16 @@ test.describe("no project", () => {
     await expect(page.getByText("No notes match “nothing-matches-this”. Try other words.")).toBeVisible();
     await expect(pane).not.toContainText(/project|both journals/i);
   });
+
+  // §2 of the project-journal brief: outside a git repository, the Project switch stays off, with
+  // today's hint, and there is no button to start one.
+  test("project journal: outside a git repository, the Project switch is off with its hint; no Start button", async ({ page, magpie }) => {
+    await magpie.open(page);
+    const project = page.getByRole("radio", { name: "Project" });
+    await expect(project).toBeDisabled();
+    await expect(project).toHaveAttribute("title", "No project journal: start repomagpie ui inside a project");
+    await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+  });
 });
 
 test.describe("an empty journal", () => {
@@ -1034,8 +1044,37 @@ test("suggest: what magpie suggest finds for this project, in its order; the in-
   await page.getByLabel("Describe what you need").fill("design system");
   await page.getByRole("main").getByRole("button", { name: "Suggest", exact: true }).click();
   await expect(page.getByText(`Looked for: ${described.keywords.join(", ")}`)).toBeVisible();
-  await expect(rows).toHaveCount(described.candidates.length + described.in_use_avoid.length);
+  await expect(rows).toHaveCount(suggestItems(described).filter((i) => !i.section).length);
   await expect(rows.first()).toContainText(described.candidates[0].name);
+});
+
+test("suggest: one row for a package in both journals; an in-use avoid note the need doesn't match only in the collapsed section", async ({ page, magpie }) => {
+  // The project journal's puppeteer note says "default for PDF rendering in new projects".
+  writeFileSync(magpie.note("npm--puppeteer.md"), renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-01", kind: "library", tags: ["pdf"], verdict: "my own take: fine to render pdf" }));
+  writeFileSync(magpie.note("npm--lodash.md"), renderNote({ id: "pkg:npm/lodash", name: "lodash", explored: "2026-10-01", kind: "library", tags: [], verdict: "avoid: use the language's own methods" }));
+  writeFileSync(join(magpie.project, "package.json"), JSON.stringify({ dependencies: { lodash: "*" } }));
+  await magpie.open(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Suggest" }).click();
+  await page.getByLabel("Describe what you need").fill("render pdf");
+  await page.getByRole("main").getByRole("button", { name: "Suggest", exact: true }).click();
+  const rows = page.getByRole("listbox", { name: "Suggestions" }).getByRole("option");
+  const puppeteer = rows.filter({ has: page.locator(".row-name", { hasText: /^puppeteer$/ }) }); // pdfkit's Verdict names it too
+  await expect(puppeteer).toHaveCount(1);
+  await expect(puppeteer).toContainText("npm · project · personal");
+  await expect(puppeteer).toContainText("default for PDF rendering in new projects");
+  await expect(rows.filter({ has: page.locator(".row-name", { hasText: /^lodash$/ }) })).toHaveCount(0);
+  await expect(page.locator(".pane-count")).toHaveText(String(await rows.count()));
+  // Opened, the row shows the project's note and names the personal one.
+  await puppeteer.click();
+  await expect(page.getByRole("region", { name: "Verdict" })).toContainText("default for PDF rendering in new projects");
+  await expect(page.getByText("Your personal journal has a note on it too.")).toBeVisible();
+  // The section: collapsed, counted; a row in it opens its note.
+  const section = page.getByRole("group").filter({ hasText: "In this project but your notes say avoid (1)" });
+  await expect(section.getByRole("button", { name: "lodash" })).toBeHidden();
+  await page.getByText("In this project but your notes say avoid (1)").click();
+  await section.getByRole("button", { name: "lodash" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "lodash" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Verdict" })).toContainText("avoid: use the language's own methods");
 });
 
 test("alternatives before an install: Check a package and Suggest name them; a resolved one opens its note, a missing one Add, an ambiguous one Search", async ({ page, magpie }) => {
@@ -1100,7 +1139,7 @@ test("adopt: the note reaches the project journal only after the confirm; the in
   await magpie.open(page);
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
   await expect(page.getByText("The project journal is committed with the code; anyone who can read this repository can read this note.")).toBeVisible();
   expect(existsSync(magpie.note("npm--pdfkit.md", "project"))).toBe(false);
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
@@ -1111,38 +1150,70 @@ test("adopt: the note reaches the project journal only after the confirm; the in
   await page.getByRole("button", { name: "Open the project's note" }).click();
   await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Adopt to project" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy to this project" })).toHaveCount(0);
 });
 
-test("project journal: without .magpie, the Project switch explains what one is and how to start one; a project note says who reads it", async ({ page, magpie }) => {
+test("project journal: without .magpie, the Project switch explains it in one sentence; copying a note starts it; a project note says who reads it", async ({ page, magpie }) => {
   removeFolder(join(magpie.project, ".magpie"));
   await magpie.open(page);
   await page.getByRole("radio", { name: "Project" }).click();
   for (const screen of [/Inbox/, /All notes/]) {
     await page.getByRole("button", { name: screen }).click();
-    const empty = page.getByText("This repository has no project journal yet.");
-    await expect(empty).toBeVisible();
-    await expect(empty).toContainText("everyone who can read the repository can read its notes");
-    await expect(empty.locator("code")).toHaveText([".magpie/", "repomagpie note <name> --to project"]);
+    await expect(page.getByText("This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start this project's journal" })).toBeVisible();
   }
 
   await page.getByRole("radio", { name: "Personal" }).click();
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
   await expect(page.getByText("Project journal, shared with this repository's contributors")).toHaveCount(0);
-  await page.getByRole("button", { name: "Adopt to project" }).click();
-  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  await page.getByRole("button", { name: "Start the journal and copy" }).click();
   await page.getByRole("button", { name: "Open the project's note" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
   await expect(page.getByText("Project journal, shared with this repository's contributors")).toBeVisible();
-  await expect(page.getByText("This repository has no project journal yet.")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+});
+
+test("copy to this project before the project journal exists: the Start sentence and a confirm; nothing written before it; then the journal and the note", async ({ page, magpie }) => {
+  removeFolder(join(magpie.project, ".magpie"));
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  const panel = page.getByRole("group", { name: "Copy to this project" });
+  await expect(panel).toContainText("This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.");
+  expect(existsSync(join(magpie.project, ".magpie"))).toBe(false);
+  // Cancel writes nothing.
+  await panel.getByRole("button", { name: "Cancel" }).click();
+  expect(existsSync(join(magpie.project, ".magpie"))).toBe(false);
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  await panel.getByRole("button", { name: "Start the journal and copy" }).click();
+  await expect(page.getByRole("status").getByText("Started this project's journal and copied the note. Commit .magpie/ to share it.")).toBeVisible();
+  for (const file of [".gitignore", "tags.md", join("notes", "npm--pdfkit.md")]) expect(existsSync(join(magpie.project, ".magpie", file)), file).toBe(true);
+  await page.getByRole("button", { name: "Open the project's note" }).click();
+  await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+});
+
+// §2: the button creates what note --to project creates, and opens the Project journal.
+test("project journal: Start this project's journal creates .magpie/ with notes/, tags.md and .gitignore, and shows Project", async ({ page, magpie }) => {
+  removeFolder(join(magpie.project, ".magpie"));
+  await magpie.open(page);
+  await page.getByRole("radio", { name: "Project" }).click();
+  await page.getByRole("button", { name: "Start this project's journal" }).click();
+  await expect(page.getByRole("status").getByText("Started this project's journal. Commit .magpie/ to share it.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start this project's journal" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
+  expect(readdirSync(join(magpie.project, ".magpie")).sort()).toEqual([".gitignore", "notes", "tags.md"]);
+  expect(readFileSync(join(magpie.project, ".magpie", ".gitignore"), "utf8")).toBe(".cache/\n.trash/\n");
 });
 
 test("adopt: a note whose Verdict says to avoid is copied, with no install command", async ({ page, magpie }) => {
   await magpie.open(page);
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "pdfkit" }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
   await expect(page.getByText("Your note says to avoid pdfkit; no install command.")).toBeVisible();
   await expect(page.getByText("npm install pdfkit")).toHaveCount(0);
@@ -1155,28 +1226,79 @@ test("adopt: a repository note with one package gets its command; with several, 
   await page.getByRole("button", { name: /All notes/ }).click();
   const notes = page.getByRole("listbox", { name: "All notes" });
   await notes.getByRole("option", { name: /^microsoft\/playwright-cli / }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
   await expect(page.getByText("npm install @playwright/cli")).toBeVisible();
 
   await notes.getByRole("option", { name: /^acme\/tool / }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
   await page.getByRole("button", { name: "Copy to the project journal" }).click();
   await expect(page.getByText("This repository publishes 2 packages; install the one you need:")).toBeVisible();
   await expect(page.getByText("npm install acme-tool")).toBeVisible();
   await expect(page.getByText("cargo add acme-tool")).toBeVisible();
 });
 
-test("adopt: a note the project already has is refused and left as it is", async ({ page, magpie }) => {
+// §3: a package the project already has a note on: the note view names it, and Copy to this project
+// says so and opens that note, copying nothing.
+test("copy to this project: a note the project already has is named in both views, and copying opens it instead", async ({ page, magpie }) => {
   const team = readFileSync(magpie.note("npm--puppeteer.md", "project"), "utf8");
   writeFileSync(magpie.note("npm--puppeteer.md"), renderNote({ id: "pkg:npm/puppeteer", name: "puppeteer", explored: "2026-10-01", kind: "library", tags: [], verdict: "my own take" }));
   await magpie.open(page);
   await page.getByRole("button", { name: /All notes/ }).click();
   await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^puppeteer / }).click();
-  await page.getByRole("button", { name: "Adopt to project" }).click();
-  await page.getByRole("button", { name: "Copy to the project journal" }).click();
-  await expect(page.getByRole("alert").getByText(/Already in this project: .*npm--puppeteer\.md/)).toBeVisible();
+  await expect(page.getByText("This project's journal has a note on it too.")).toBeVisible();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  await expect(page.getByRole("status").getByText("This project already has a note on puppeteer")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
+  await expect(page.getByRole("region", { name: "Verdict" })).toContainText("default for PDF rendering in new projects");
+  await expect(page.getByText("Your personal journal has a note on it too.")).toBeVisible();
+  await page.getByRole("button", { name: "Open your note" }).click();
+  await expect(page.getByRole("radio", { name: "Personal" })).toBeChecked();
+  await expect(page.getByRole("region", { name: "Verdict" })).toContainText("my own take");
   expect(readFileSync(magpie.note("npm--puppeteer.md", "project"), "utf8")).toBe(team);
+});
+
+test("copy to this project: copy, the note appears under Project; copying again opens the existing note", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  await page.getByRole("button", { name: "Copy to the project journal" }).click();
+  await expect(page.getByRole("status").getByText("Copied to the project journal")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("radio", { name: "Project" }).click();
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await expect(page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / })).toBeVisible();
+  const copied = readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8");
+  await page.getByRole("radio", { name: "Personal" }).click();
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option", { name: /^pdfkit / }).click();
+  await page.getByRole("button", { name: "Copy to this project" }).click();
+  await expect(page.getByRole("status").getByText("This project already has a note on pdfkit")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Project" })).toBeChecked();
+  await expect(page.getByRole("heading", { level: 2, name: "pdfkit" })).toBeVisible();
+  expect(readFileSync(magpie.note("npm--pdfkit.md", "project"), "utf8")).toBe(copied);
+});
+
+// §4: the app never names --type. Without a manifest, npm is preselected; with two manifests, a bare
+// name is ambiguous and the message points at the field.
+test("add: without a manifest the type field preselects npm; when it can't settle a name, the message points at the field", async ({ page, magpie }) => {
+  await magpie.open(page);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByLabel("Type of a bare name")).toHaveValue("npm");
+  await page.getByLabel("Package, PURL or GitHub URL").fill("lodash");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("pkg:npm/lodash");
+
+  writeFileSync(join(magpie.project, "package.json"), "{}");
+  writeFileSync(join(magpie.project, "pyproject.toml"), "");
+  await page.reload();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByLabel("Type of a bare name")).toHaveValue("");
+  await page.getByLabel("Package, PURL or GitHub URL").fill("lodash");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByText("lodash could be npm, pypi. Choose its type above.")).toBeVisible();
+  await expect(page.getByRole("main")).not.toContainText("--type");
 });
 
 // Delete note (decision 0037): the note moves to the journal's .trash/; nothing else changes.

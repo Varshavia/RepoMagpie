@@ -70,12 +70,17 @@ export interface CompactCatalogJson {
 export const CATALOG_CAPS = { verdict: 200, summary: 200 } as const;
 export const COMPACT_CAPS = { verdict: 60, summary: 100 } as const;
 
-// A row's place in the order: its name ignoring case (cut, so a cursor stays short), the project
-// journal before the personal one for the same name (spec §3), then its file. Unique per row.
-type Key = [string, Scope, string];
-const keyOf = (row: CatalogRow, file: string): Key => [row.name.toLowerCase().slice(0, CAPS.id), row.journal, file];
+// A row's place in the order: its group (the project journal's notes, then the personal avoid notes,
+// then the rest), so the first page of a big journal holds what matters; then its name ignoring case
+// (cut, so a cursor stays short), the project journal before the personal one for the same name
+// (spec §3), then its file. Unique per row.
+type Group = 0 | 1 | 2;
+type Key = [Group, string, Scope, string];
+const groupOf = (row: CatalogRow, avoid: boolean): Group => (row.journal === "project" ? 0 : avoid ? 1 : 2);
+const keyOf = (row: CatalogRow, avoid: boolean, file: string): Key => [groupOf(row, avoid), row.name.toLowerCase().slice(0, CAPS.id), row.journal, file];
 const rank = (scope: Scope) => (scope === "project" ? 0 : 1);
-const compare = (a: Key, b: Key) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : rank(a[1]) - rank(b[1]) || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0));
+const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const compare = (a: Key, b: Key) => a[0] - b[0] || order(a[1], b[1]) || rank(a[2]) - rank(b[2]) || order(a[3], b[3]);
 
 // A cursor is the last row's key as base64url JSON: the next page starts after it, so a note added or
 // removed before it doesn't shift the pages.
@@ -83,7 +88,7 @@ const encode = (key: Key) => Buffer.from(JSON.stringify(key)).toString("base64ur
 function decode(cursor: string): Key | null {
   try {
     const key: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    const ok = Array.isArray(key) && key.length === 3 && typeof key[0] === "string" && (key[1] === "personal" || key[1] === "project") && typeof key[2] === "string";
+    const ok = Array.isArray(key) && key.length === 4 && [0, 1, 2].includes(key[0]) && typeof key[1] === "string" && (key[2] === "personal" || key[2] === "project") && typeof key[3] === "string";
     return ok ? (key as Key) : null;
   } catch {
     return null;
@@ -147,7 +152,7 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
       };
       // recall's isAvoid on the index's text: "Avoid when" without comments or the draft marker.
       const avoid = verdictSaysAvoid(row.verdict) || doc.avoidWhen.trim() !== "";
-      rows.push({ row, avoid, key: keyOf(row, doc.file) });
+      rows.push({ row, avoid, key: keyOf(row, avoid, doc.file) });
     }
   }
   rows.sort((a, b) => compare(a.key, b.key));

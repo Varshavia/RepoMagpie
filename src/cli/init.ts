@@ -1,6 +1,6 @@
-// repomagpie init --auto (spec §2): the human output of core's runInitAuto, then, in a terminal, a
-// Verdict asked for each dependency without a note, one by one, saved through runNote. It never
-// writes a Verdict of its own: an empty answer skips, q stops. With --json or no terminal it only lists.
+// repomagpie init (spec §2; --auto is an alias): the human output of core's runInitAuto, then, in a
+// terminal, a Verdict asked for each dependency without a note, one by one, saved through runNote. It
+// never writes a Verdict of its own: an empty answer skips, q stops. With --json or no terminal it only lists.
 import { runInitAuto, type InitAutoJson, type NotedDependency } from "../core/init-auto.ts";
 import { exitCode } from "../core/outcome.ts";
 import { runNote, type Journal } from "../core/save.ts";
@@ -8,16 +8,12 @@ import { contextOf, plainIo, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
 
 export interface InitOptions extends GlobalOptions {
-  auto?: boolean;
+  auto?: boolean; // accepted, changes nothing: plain init does what init --auto did
   to: Journal["scope"];
 }
 
 export async function initCommand(options: InitOptions, terminal: Io): Promise<number> {
   const io = plainIo(terminal);
-  if (!options.auto) {
-    io.err("repomagpie init: say what to do. For now there is one action: repomagpie init --auto lists this project's dependencies by what your notes say (an avoid note, a note, no note) and, in a terminal, asks for a Verdict on each one without a note.\n");
-    return 2;
-  }
   const place = contextOf(io, options);
   const run = runInitAuto(place);
   if (options.json) {

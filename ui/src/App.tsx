@@ -350,10 +350,21 @@ export function App() {
     [toast, lists, view.page, journal, items, keyOf, select],
   );
 
-  const onAdopted = useCallback(() => {
-    toast("Copied to the project journal");
+  const onAdopted = useCallback((started: boolean) => {
+    toast(started ? "Started this project's journal and copied the note. Commit .magpie/ to share it." : "Copied to the project journal");
     afterWrite("project");
   }, [toast, afterWrite]);
+
+  // "Start this project's journal": .magpie/ at the git root, as note --to project makes it.
+  const startProject = async () => {
+    try {
+      await api.startProject();
+      toast("Started this project's journal. Commit .magpie/ to share it.");
+      afterWrite("project");
+    } catch (error) {
+      toast((error as ApiError).message);
+    }
+  };
 
   const commands: Command[] = [
     { id: "inbox", label: "Go to Inbox", keywords: "review", icon: "tray", hint: "g i", run: () => go({ page: "inbox" }) },
@@ -382,7 +393,7 @@ export function App() {
   act.current = (action) => {
     // Search and Suggest: a list of results with the note beside it, selected by `hit`.
     const searching = view.page === "search" || view.page === "suggest";
-    const keys = view.page === "search" ? shown.map(resultKey) : view.page === "suggest" ? suggestions.map(suggestKey) : items.map(keyOf);
+    const keys = view.page === "search" ? shown.map(resultKey) : view.page === "suggest" ? suggestions.filter((s) => !s.section).map(suggestKey) : items.map(keyOf);
     const at = searching ? hit : currentKey;
     switch (action) {
       case "next":
@@ -589,8 +600,8 @@ export function App() {
               listRef={listRef}
             />
           ) : journal === "project" && projectState === "new" ? (
-            <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>
-              This repository has no project journal yet. A project journal is a <code>.magpie/</code> folder committed with the code: everyone who can read the repository can read its notes, and RepoMagpie's hook and recall read them for every contributor. Start one with <code>repomagpie note &lt;name&gt; --to project</code>, or with Adopt to project on one of your notes.
+            <EmptyState action={<button type="button" className="button primary" onClick={() => void startProject()}>Start this project's journal</button>}>
+              This project has no shared journal yet. Notes here are committed with the code, so everyone on the repository and their agents see them.
             </EmptyState>
           ) : review ? (
             <EmptyState action={<AddButton onClick={() => go({ page: "add" })} />}>{`Your inbox is empty. Add a repository here, or from the palette (${MOD}+K).`}</EmptyState>
@@ -718,6 +729,7 @@ export function App() {
               key={view.target ?? ""}
               project={projectState}
               defaultJournal={journal}
+              defaultType={settings?.manifest_types.length === 0 ? "npm" : ""}
               initialTarget={view.target}
               onOpenNote={openNote}
               onSaved={afterWrite}

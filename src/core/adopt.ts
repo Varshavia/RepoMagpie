@@ -10,7 +10,7 @@ import { readNote } from "./note.ts";
 import { assertWritable, journalPathProblem } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { verdictSaysAvoid } from "./recall.ts";
-import { locateJournal, resolveInput, type Context } from "./save.ts";
+import { locateJournal, resolveInput, type Context, type Surface } from "./save.ts";
 import { setToolFields } from "./write.ts";
 
 export interface AdoptRequest {
@@ -38,13 +38,13 @@ export interface AdoptRun {
   warnings: string[];
 }
 
-export async function runAdopt(request: AdoptRequest, context: Context, ask?: (question: string) => Promise<string>): Promise<AdoptRun> {
+export async function runAdopt(request: AdoptRequest, context: Context, ask?: (question: string) => Promise<string>, surface: Surface = "cli"): Promise<AdoptRun> {
   const personal = locateJournal("personal", context);
   const warnings = personal.warnings;
   const stop = (error: string, outcome: Outcome, document: Partial<AdoptJson> = {}): AdoptRun =>
     ({ outcome, document: { id: null, from: null, to: null, install: null, install_choices: [], ...document, error }, name: null, url: null, avoid: false, notices: [], warnings });
 
-  const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
+  const resolved = await resolveInput(request.target, request.type, context, { ask, surface });
   if (!resolved.ok) return stop(resolved.error, "usage");
   const source = noteFor(listNotes(personal.path), resolved.purl);
   const readable = readablePurl(resolved.purl);

@@ -940,10 +940,6 @@ button.chip.domain:disabled { cursor: not-allowed; opacity: 0.6; }
 
 .pane-action { margin-left: auto; }
 
-.adopt-panel { display: flex; flex-direction: column; gap: var(--sm); padding: var(--md); border-radius: var(--r-md); background: var(--surface-1); font-size: 13px; }
-.install-line { display: flex; align-items: center; gap: var(--xs); }
-.install-line code { padding: 2px var(--sm); }
-
 /* ---------- The graph page ---------- */
 
 /* The rest of the page's styles load with its chunk (components/GraphPage.css). */

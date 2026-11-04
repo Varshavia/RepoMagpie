@@ -4,6 +4,7 @@
 import "./later.css";
 
 export { AddPage } from "./AddPage.tsx";
+export { AdoptPanel } from "./AdoptPanel.tsx";
 export { DeleteDialog } from "./DeleteDialog.tsx";
 export { ImportPage } from "./ImportPage.tsx";
 export { KeyMapDialog } from "./KeyMapDialog.tsx";

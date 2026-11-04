@@ -179,6 +179,42 @@ test("a write with the cookie but without a matching X-Magpie-Token header gets 
   assert.equal(readFileSync(box.note("github--acme--widget.md"), "utf8"), WIDGET);
 });
 
+// "Start this project's journal" (the app's Project view): a write like the others.
+test("starting the project journal: 403 without the write token; then .magpie/ at the git root, as note --to project makes it", async (t) => {
+  const { http, box } = await start(t);
+  for (const token of [undefined, "0".repeat(64)]) {
+    assert.equal((await http.write("POST", "/api/project/start", {}, { "x-magpie-token": token })).status, 403, String(token));
+  }
+  assert.equal(existsSync(join(box.project, ".magpie")), false);
+  const r = await http.write("POST", "/api/project/start", {});
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(JSON.parse(r.body), { path: join(box.project, ".magpie"), created: true });
+  assert.equal(readFileSync(join(box.project, ".magpie", ".gitignore"), "utf8"), ".cache/\n.trash/\n");
+  assert.ok(existsSync(join(box.project, ".magpie", "tags.md")));
+  assert.ok(existsSync(join(box.project, ".magpie", "notes")));
+  const settings = JSON.parse((await http.get("/api/settings")).body);
+  assert.deepEqual(settings.journals.project, { path: join(box.project, ".magpie"), exists: true });
+  const again = await http.write("POST", "/api/project/start", {});
+  assert.deepEqual(JSON.parse(again.body), { path: join(box.project, ".magpie"), created: false });
+});
+
+test("starting the project journal outside a git repository is refused, and nothing is written", async (t) => {
+  const box = sandbox({ "outside/": null });
+  const outside = join(box.root, "outside");
+  // Home is the scratch root, so the walk stops there and never sees its .git fence.
+  const server = await startServer({
+    context: { home: box.root, env: { MAGPIE_HOME: box.journal }, cwd: outside, fetch: fakeFetch({}), today: () => "2026-10-04" },
+    open: async () => {},
+    log: () => {},
+    assets: APP,
+  });
+  t.after(() => server.close());
+  const r = await client(server).write("POST", "/api/project/start", {});
+  assert.equal(r.status, 422);
+  assert.match(JSON.parse(r.body).error, /isn't in a git repository/);
+  assert.equal(existsSync(join(outside, ".magpie")), false);
+});
+
 test("a bad Host gets 403, before anything else (DNS rebinding)", async (t) => {
   const { http, server } = await start(t);
   const hosts = ["evil.example", `evil.example:${server.port}`, `127.0.0.1:${server.port + 1}`, `localhost.evil.example:${server.port}`, `127.0.0.2:${server.port}`, `[::1]:${server.port}`, "127.0.0.1", ""];

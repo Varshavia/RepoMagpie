@@ -16,6 +16,7 @@ import {
   patchNote,
   previewNote,
   settingsDocument,
+  startProjectJournal,
   tagListDocument,
 } from "./documents.ts";
 import { parseTagList, STARTER_TAGS } from "./journals.ts";
@@ -110,7 +111,10 @@ test("Settings: the home directory, both journals with their paths, and whether 
     journals: { personal: { path: s.journal, exists: true }, project: { path: join(s.project, ".magpie"), exists: true } },
     github_token_set: false,
     github_source: null,
+    manifest_types: [],
   });
+  writeFileSync(join(s.project, "Cargo.toml"), "");
+  assert.deepEqual(settingsDocument(s.context).manifest_types, ["cargo"]);
 });
 
 test("Settings never contains the token's value, only where it came from", () => {
@@ -278,6 +282,40 @@ test("Note list cache: a cached summary of the wrong shape is read again from it
 
 // --- Note ---
 
+// The note view's line for a package with a note in both journals, and what Copy to this project opens.
+test("Note: also_in names the same id in the other journal, both ways; null without one", () => {
+  const s = setup({ "journal/notes/npm--puppeteer.md": PUPPETEER.replace("default for PDF rendering", "my own take") });
+  assert.deepEqual(noteDocument("personal", { id: "pkg:npm/puppeteer" }, s.context).document.also_in, { journal: "project", id: "pkg:npm/puppeteer" });
+  assert.deepEqual(noteDocument("project", { id: "pkg:npm/puppeteer" }, s.context).document.also_in, { journal: "personal", id: "pkg:npm/puppeteer" });
+  assert.equal(noteDocument("personal", { id: "pkg:npm/pdfkit" }, s.context).document.also_in, null);
+  const edited = patchNote({ journal: "personal", id: "pkg:npm/puppeteer", version: noteDocument("personal", { id: "pkg:npm/puppeteer" }, s.context).document.version, fields: { tried: false } }, s.context);
+  assert.deepEqual(edited.document.also_in, { journal: "project", id: "pkg:npm/puppeteer" });
+});
+
+test("startProjectJournal: .magpie/ with notes/, tags.md and .gitignore at the git root; again, nothing changes", () => {
+  const s = setup();
+  removeFolder(join(s.project, ".magpie"));
+  mkdirSync(join(s.project, "src"));
+  const started = startProjectJournal({ ...s.context, cwd: join(s.project, "src") });
+  assert.deepEqual(started, { outcome: "ok", document: { path: join(s.project, ".magpie"), created: true } });
+  assert.deepEqual(readdirSync(join(s.project, ".magpie")).sort(), [".gitignore", "notes", "tags.md"]);
+  assert.equal(readFileSync(join(s.project, ".magpie", "tags.md"), "utf8"), STARTER_TAGS);
+  assert.deepEqual(startProjectJournal(s.context).document, { path: join(s.project, ".magpie"), created: false });
+});
+
+test("startProjectJournal: refused outside a git repository and for a --project folder outside the repository", () => {
+  const s = setup();
+  mkdirSync(join(s.base, "outside"));
+  const outside = startProjectJournal({ ...s.context, home: s.base, cwd: join(s.base, "outside") });
+  assert.equal(outside.outcome, "failed");
+  assert.match(outside.document.error ?? "", /isn't in a git repository/);
+  assert.equal(existsSync(join(s.base, "outside", ".magpie")), false);
+  const elsewhere = startProjectJournal({ ...s.context, projectFlag: join(s.base, "elsewhere") });
+  assert.equal(elsewhere.outcome, "failed");
+  assert.match(elsewhere.document.error ?? "", /outside this repository/);
+  assert.equal(existsSync(join(s.base, "elsewhere")), false);
+});
+
 test("Note: the note as read, with its version", () => {
   const s = setup();
   const { outcome, document } = noteDocument("personal", { id: "pkg:npm/pdfkit" }, s.context);
@@ -301,6 +339,7 @@ test("Note: the note as read, with its version", () => {
     skills: [{ name: "pdf-forms", text: "fill PDF forms from a script" }, { name: "pdf-merge", text: "" }],
     links: [],
     backlinks: [],
+    also_in: null,
     warnings: [],
   });
 });

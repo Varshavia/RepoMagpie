@@ -3,13 +3,14 @@
 // they are. Notes are found only by their id, or by a file name equal to one in the journal's
 // notes/ listing: no request text is ever joined to a path. Never prints.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { noteDomains } from "./domains.ts";
 import { editNote, noteVersion } from "./edit.ts";
 import { githubAuth, type GitHubAuth } from "./github-auth.ts";
 import type { GitHubSource } from "./github-connection.ts";
 import { graphData, type GraphData } from "./graph.ts";
-import { appendTags, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
+import { manifestTypes, type PackageType } from "./identity.ts";
+import { appendTags, createJournal, findManifests, gitRoot, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
 import { readableId, readNote, stripComments } from "./note.ts";
 import { assertWritable, isRecord, isTextOrNull, isTexts, journalPathProblem, noteEntries, noteSignature } from "./note-cache.ts";
@@ -31,6 +32,7 @@ export interface SettingsJson {
   journals: { personal: { path: string; exists: boolean }; project: { path: string; exists: boolean } | null };
   github_token_set: boolean; // a token from any source (decision 0053)
   github_source: GitHubSource | null; // where it came from; never the token
+  manifest_types: PackageType[]; // the package types the project's nearest manifests imply (decision 0058); [] for none
 }
 
 export function settingsDocument(place: Place & { github?: () => GitHubAuth }): SettingsJson {
@@ -46,8 +48,39 @@ export function settingsDocument(place: Place & { github?: () => GitHubAuth }): 
     },
     github_token_set: Boolean(github.token),
     github_source: github.source,
+    manifest_types: manifestTypes(findManifests(place.cwd)),
   };
 }
+
+// --- Starting the project journal ---
+
+export interface StartProjectJson {
+  path: string | null;
+  created: boolean; // false when it was already there
+  error?: string;
+}
+
+// "Start this project's journal" (the app's Project view): what `note --to project` creates on its
+// first write (.magpie/, notes/, tags.md, .gitignore), without a note. Only in a git repository, and
+// only at or under its root (decision 0051); never through a link.
+export function startProjectJournal(place: Place): Result<StartProjectJson> {
+  const root = gitRoot(place.cwd, place.home);
+  const fail = (error: string, path: string | null = null): Result<StartProjectJson> => ({ outcome: "failed", document: { path, created: false, error } });
+  if (!root) return fail("This folder isn't in a git repository, so there is no project to share a journal with. Start repomagpie ui inside a git project.");
+  const journal = locateJournal("project", place);
+  if (journal.error) return fail(journal.error, journal.path);
+  if (!isInside(journal.path, root)) return fail(`${journal.path} is outside this repository (${root}), so it can't be its journal.`, journal.path);
+  try {
+    return { outcome: "ok", document: { path: journal.path, created: createJournal(journal.path, "project") } };
+  } catch (error) {
+    return fail(`Couldn't create ${journal.path}: ${(error as Error).message}`, journal.path);
+  }
+}
+
+const isInside = (path: string, root: string) => {
+  const rel = relative(root, path);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+};
 
 // --- Tag list ---
 
@@ -216,6 +249,7 @@ export interface NoteJson {
   skills: { name: string; text: string }[];
   links: Link[]; // the note's own links, resolved within its journal
   backlinks: Backlink[]; // the other notes in its journal that link to it
+  also_in: { journal: Scope; id: string } | null; // a note with the same id in the other journal
   warnings: string[];
   error?: string;
 }
@@ -267,15 +301,26 @@ export function noteDocument(scope: Scope, address: NoteAddress, place: Place): 
   const entries = linkEntries(journal.path);
   const path = notePath(journal.path, address, entries);
   if (!path || journalPathProblem(journal.path, path)) return { outcome: "not-found", document: { ...emptyNote(scope), error: "No note with that id or file name in this journal." } };
-  return { outcome: "ok", document: noteJson(scope, path, readFileSync(path), entries) };
+  return { outcome: "ok", document: noteJson(scope, path, readFileSync(path), place, entries) };
 }
 
 export function emptyNote(scope: Scope): NoteJson {
-  return { id: null, journal: scope, file: null, path: null, version: null, read_only: false, status: null, verdict: null, frontmatter: {}, sections: [], skills: [], links: [], backlinks: [], warnings: [] };
+  return { id: null, journal: scope, file: null, path: null, version: null, read_only: false, status: null, verdict: null, frontmatter: {}, sections: [], skills: [], links: [], backlinks: [], also_in: null, warnings: [] };
+}
+
+// The same subject in the other journal, by id, from that journal's link cache (one stat per note,
+// no note read): the note view names it, and Copy to this project opens it instead of copying.
+function alsoIn(scope: Scope, id: string | null, place: Place): NoteJson["also_in"] {
+  if (id === null) return null;
+  const other: Scope = scope === "personal" ? "project" : "personal";
+  const journal = locateJournal(other, place);
+  if (journal.error || !existsSync(join(journal.path, "notes"))) return null;
+  const { files, data } = linkEntries(journal.path);
+  return files.some((file) => data[file].id === id) ? { journal: other, id } : null;
 }
 
 // `entries`: the link cache as already read for this request; after an edit, it is read again.
-function noteJson(scope: Scope, path: string, bytes: Buffer, entries?: LinkEntries): NoteJson {
+function noteJson(scope: Scope, path: string, bytes: Buffer, place: Place, entries?: LinkEntries): NoteJson {
   const note = readNote(bytes.toString("utf8"));
   const id = readableId(note);
   const warnings = [...note.warnings];
@@ -303,6 +348,7 @@ function noteJson(scope: Scope, path: string, bytes: Buffer, entries?: LinkEntri
     skills,
     links: index.outgoing[file] ?? [],
     backlinks: index.incoming[file] ?? [],
+    also_in: alsoIn(scope, id, place),
     warnings,
   };
 }
@@ -331,14 +377,14 @@ export function patchNote(request: Record<string, unknown>, place: Place): Resul
   if (!edit.changed) return read;
 
   const now = readFileSync(path);
-  if (noteVersion(now) !== version) return { outcome: "conflict", document: { ...noteJson(scopeName, path, now), error: CONFLICT } };
+  if (noteVersion(now) !== version) return { outcome: "conflict", document: { ...noteJson(scopeName, path, now, place), error: CONFLICT } };
   try {
     assertWritable(dirname(dirname(path)), path); // the journal is the folder above notes/
     writeFileSync(path, edit.text);
   } catch (error) {
     return { outcome: "failed", document: { ...current, error: `Couldn't write ${path}: ${(error as Error).message}` } };
   }
-  return { outcome: "ok", document: noteJson(scopeName, path, Buffer.from(edit.text)) };
+  return { outcome: "ok", document: noteJson(scopeName, path, Buffer.from(edit.text), place) };
 }
 
 // --- Note preview ---
@@ -374,7 +420,7 @@ export async function previewNote(request: { target: string; type?: "npm" | "pyp
   const fail = (outcome: Outcome, error: string, id: string | null = null): Result<NotePreviewJson> =>
     ({ outcome, document: { ...emptyPreview(request.to), id, warnings: journal.warnings, error } });
   if (journal.error) return fail("failed", journal.error);
-  const resolved = await resolveInput(request.target, request.type, context.cwd);
+  const resolved = await resolveInput(request.target, request.type, context, { surface: "app" }); // only the app previews
   if (!resolved.ok) return fail("usage", resolved.error);
 
   const notes = listNotes(journal.path);

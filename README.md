@@ -41,7 +41,7 @@ Do you want to proceed?
 - **Find by concern:** ask about security, databases, testing… in any language, and your agent finds the notes that fit, even ones with no word in common.
 - **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
 - **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app. Lists and courses stay hidden unless you ask, and each result says why it is there.
-- **Start from a project:** `repomagpie init --auto` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
+- **Start from a project:** `repomagpie init` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
 
 **Status:** beta, for early testers. The [changelog](CHANGELOG.md) lists every version; the [roadmap](docs/roadmap.md) shows what comes next.
 
@@ -173,6 +173,13 @@ Never for good, and it never approves one. When a note says to avoid the package
 <summary><strong>How do I remove it?</strong></summary>
 
 Run `repomagpie setup --remove`. It takes out only RepoMagpie's own MCP entries, hooks and skill folders, never restores a backup over your later changes, and leaves your journals and `setup`'s backups. With `--agents`, the shared skill folder stays while another agent still reads it. Then `repomagpie setup --delete-backups` deletes the backups after asking, and `npm uninstall -g repomagpie` removes the command.
+
+</details>
+
+<details>
+<summary><strong>Can a team agree on rules with it?</strong></summary>
+
+Yes. The project journal, `.magpie/` in the repository, is committed with the code, and every teammate's agent reads it after `git pull`. When it and a personal note disagree, the project note wins. Review rule changes in pull requests, and let leads approve them with a `CODEOWNERS` line. See [working as a team](docs/teams.md).
 
 </details>
 

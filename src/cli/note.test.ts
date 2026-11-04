@@ -35,7 +35,7 @@ test("--json prints exactly the spec's document and nothing on stderr", async ()
   const r = await magpie(box, ["note", "pdfkit", "ok", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.err, "");
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, journal_created: true, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
 });
 
 test("a second Verdict is refused: exit 1, the path is printed, the file is unchanged", async () => {
@@ -54,7 +54,7 @@ test("text for an existing note with an empty Verdict writes it", async () => {
   await magpie(box, ["note", "pdfkit"]);
   const r = await magpie(box, ["note", "pdfkit", "later verdict", "--json"]);
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
+  assert.deepEqual(JSON.parse(r.out), { id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: false, journal_created: false, status: "reviewed", warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] });
   valid(box.note("npm--pdfkit.md"));
 });
 
@@ -240,6 +240,70 @@ test("in a terminal, an unsettled bare name is asked for", async () => {
   assert.equal(r.code, 0, r.err);
   assert.equal(questions.length, 1);
   assert.ok(existsSync(box.note("cargo--ripgrep.md")));
+});
+
+// Decision 0058: the prompt preselects npm, reads one line, and asks again on an answer that isn't a type.
+test("the type prompt: Enter takes npm, which the question shows as the default", async () => {
+  const box = sandbox();
+  const questions: string[] = [];
+  const r = await magpie(box, ["note", "moment", "use date-fns"], { interactive: true, ask: async (q) => (questions.push(q), "") });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(questions, ["Which package type is moment? npm, pypi, cargo [npm]: "]);
+  assert.ok(existsSync(box.note("npm--moment.md")));
+});
+
+test("the type prompt: a pasted next command isn't an answer; it asks again, and takes only the first line", async () => {
+  const box = sandbox();
+  const answers = ["repomagpie note lodash --to project", "pypi\nnpm install left-pad"];
+  const questions: string[] = [];
+  const r = await magpie(box, ["note", "requests", "fine"], { interactive: true, ask: async (q) => (questions.push(q), answers.shift() ?? "") });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(questions.length, 2);
+  assert.ok(existsSync(box.note("pypi--requests.md")));
+});
+
+test("the type prompt: after three answers that aren't types, exit 2 with the --type hint, nothing written", async () => {
+  const box = sandbox();
+  let asked = 0;
+  const r = await magpie(box, ["note", "requests", "fine"], { interactive: true, ask: async () => (asked++, "maven") });
+  assert.equal(r.code, 2);
+  assert.equal(asked, 3);
+  assert.match(r.err, /Add --type npm\|pypi\|cargo/);
+  assert.equal(existsSync(box.journal), false);
+});
+
+test("a bare name without a manifest takes the one type an existing note has it under, in either journal", async () => {
+  const box = sandbox();
+  assert.equal((await magpie(box, ["note", "pkg:pypi/requests", "fine"])).code, 0);
+  const again = await magpie(box, ["note", "requests", "--alternative", "httpx", "--json"]);
+  assert.equal(again.code, 0, again.err);
+  assert.equal(JSON.parse(again.out).id, "pkg:pypi/requests");
+
+  const project = sandbox();
+  assert.equal((await magpie(project, ["note", "pkg:cargo/serde", "--to", "project"])).code, 0);
+  const personal = await magpie(project, ["note", "serde", "fine", "--json"]);
+  assert.equal(JSON.parse(personal.out).id, "pkg:cargo/serde");
+
+  // Notes under two types: still ambiguous.
+  assert.equal((await magpie(box, ["note", "pkg:npm/requests"])).code, 0);
+  const two = await magpie(box, ["note", "requests", "x", "--json"]);
+  assert.equal(two.code, 2);
+  assert.match(JSON.parse(two.out).error, /could be npm, pypi, cargo/);
+});
+
+test("manifests come before existing notes: a package.json makes a bare name npm even with a pypi note", async () => {
+  const box = sandbox({ "project/package.json": "{}" });
+  assert.equal((await magpie(box, ["note", "pkg:pypi/requests"])).code, 0);
+  const r = await magpie(box, ["note", "requests", "x", "--json"]);
+  assert.equal(JSON.parse(r.out).id, "pkg:npm/requests");
+});
+
+test("journal_created is true only for the write that made the journal's folder", async () => {
+  const box = sandbox();
+  const first = JSON.parse((await magpie(box, ["note", "pkg:npm/moment", "--to", "project", "--json"])).out);
+  assert.equal(first.journal_created, true);
+  const second = JSON.parse((await magpie(box, ["note", "pkg:npm/dayjs", "--to", "project", "--json"])).out);
+  assert.equal(second.journal_created, false);
 });
 
 test("--json never prompts", async () => {
@@ -441,7 +505,7 @@ test("--alternative on a new note: written with it; a target without a note is w
   const r = await magpie(box, ["note", "pdfkit", "avoid: async streams painful", "--alternative", "puppeteer", "--json"]);
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(JSON.parse(r.out), {
-    id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, status: "reviewed", warnings: [],
+    id: "pkg:npm/pdfkit", journal: "personal", path: box.note("npm--pdfkit.md"), created: true, journal_created: true, status: "reviewed", warnings: [],
     alternatives_added: ["puppeteer"], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [],
   });
   assert.deepEqual(alternativesOf(box.note("npm--pdfkit.md")), ["[[puppeteer]]"]);

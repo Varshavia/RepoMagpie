@@ -96,9 +96,11 @@ test("no note: exit 1; an unsupported input: exit 2; nothing written", async () 
   assert.equal(existsSync(join(box.project, ".magpie")), false);
 });
 
-test("--type settles a bare name outside any manifest", async () => {
+test("outside any manifest, the note's own type settles a bare name (decision 0058); --type still does", async () => {
+  const inferred = await magpie(sandbox({ "journal/notes/npm--pdfkit.md": FILES["journal/notes/npm--pdfkit.md"] }), ["adopt", "pdfkit"]);
+  assert.equal(inferred.code, 0, inferred.err);
+  assert.match(inferred.out, /Install with: npm install pdfkit\n$/);
   const box = sandbox({ "journal/notes/npm--pdfkit.md": FILES["journal/notes/npm--pdfkit.md"] });
-  assert.equal((await magpie(box, ["adopt", "pdfkit"])).code, 2);
   const r = await magpie(box, ["adopt", "pdfkit", "--type", "npm"]);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /Install with: npm install pdfkit\n$/);

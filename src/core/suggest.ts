@@ -39,11 +39,15 @@ export interface Candidate {
 // more; open-lakehouse, which shares a word or two ("agent", "app"), 0.09 or less.
 export const MIN_SHARE = 0.2;
 
+// A dependency with an avoid note: a match as in `magpie recall --json`, and whether the need matched
+// the note as it would a candidate. From the manifests, always: the project uses the package.
+export type InUseAvoid = Omit<RecallMatch, "name"> & { matched: boolean };
+
 export interface SuggestJson {
   source: "manifests" | "description";
   keywords: string[];
   candidates: Candidate[];
-  in_use_avoid: Omit<RecallMatch, "name">[]; // as in `magpie recall --json`
+  in_use_avoid: InUseAvoid[];
   error?: string;
 }
 
@@ -105,9 +109,8 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   const usedIds = new Set(inUse.map((m) => m.id));
   const dependencyNames = [...new Set(project.dependencies.map((d) => d.name))];
   const avoid = inUse.filter((m, i) => isAvoid(m) && inUse.findIndex((o) => o.id === m.id && o.journal === m.journal) === i);
-  document.in_use_avoid = avoid.map(({ name: _name, ...match }) => match);
-
   const scored: { candidate: Candidate; group: number }[] = [];
+  const usedHits: { key: string; score: number }[] = []; // in-use notes the keywords matched, scored as candidates
   for (const [n, journal] of journals.entries()) {
     const index = loadIndex(journal.path).index;
     const best = new Map<string, { score: number; terms: Set<string> }>(); // note file → its best document's score, the keywords of all
@@ -122,7 +125,11 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
     }
     for (const [file, { score, terms }] of best) {
       const doc = index.getStoredFields(file) as unknown as SearchDoc | undefined;
-      if (!doc || (doc.purl && usedIds.has(doc.purl))) continue;
+      if (!doc) continue;
+      if (doc.purl && usedIds.has(doc.purl)) {
+        usedHits.push({ key: `${journal.scope} ${doc.purl}`, score: score + tagPoints(doc.tags, keywords) });
+        continue;
+      }
       const matched = keywords.filter((k) => terms.has(singular(k)));
       scored.push({
         group: doc.status === "reviewed" ? 0 : 1,
@@ -142,7 +149,12 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
     }
   }
   const floor = Math.max(0, ...scored.map((s) => s.candidate.score)) * MIN_SHARE;
-  const kept = scored.filter((s) => s.candidate.score >= floor);
+  // Each journal scores against its own index, so the same package can score far apart in two
+  // journals: a note is kept when its package's note in the other journal passed the floor.
+  const passed = new Set(scored.filter((s) => s.candidate.score >= floor && s.candidate.id).map((s) => s.candidate.id));
+  const kept = scored.filter((s) => s.candidate.score >= floor || (s.candidate.id && passed.has(s.candidate.id)));
+  const matched = new Set(usedHits.filter((h) => h.score >= floor).map((h) => h.key));
+  document.in_use_avoid = avoid.map(({ name: _name, ...match }) => ({ ...match, matched: source === "manifests" || matched.has(`${match.journal} ${match.id}`) }));
   kept.sort((a, b) => a.group - b.group || b.candidate.score - a.candidate.score);
   const candidates = projectFirst(kept.map((s) => s.candidate), (c) => c.id);
   document.candidates = candidates.slice(0, request.limit);
