@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The app's Project view names the repository, for example `acme/widget` on github.com, with a link to its page on GitHub, GitLab or Bitbucket. It reads the git remote, `origin` first, and never shows credentials in the remote's URL. Without a remote it shows the folder's name and "no remote".
+- Under the name, one line says whether the shared notes are committed and pushed: "2 shared note files aren't committed yet, so your team can't see them.", "Committed, not pushed yet." or "Shared notes are committed." It reads only your local git and never fetches.
+
+### Changed
+
+- "Start this project's journal" is now **Turn on shared notes for owner/repo**, with a sentence on where the notes live and who sees them. Afterwards a toast says to commit and push `.magpie/`, and stays until you dismiss it. Copy to this project uses the same words. `repomagpie doctor` says: `none here; turn on shared notes in repomagpie ui (Project) or with repomagpie note <x> --to project`.
+
 ## [0.2.0-beta.20] - 2026-11-04
 
 The twenty-first pre-release: notes "for the team" reach the project journal, the app starts that journal and copies notes into it, a bare package name's type is inferred, and plain `repomagpie init` works.

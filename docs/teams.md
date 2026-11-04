@@ -16,7 +16,7 @@ Outside a git repository there is no project journal ([decision 0051](decisions/
 
 Any of these creates `.magpie/` with its `.gitignore` and `tags.md`:
 
-- **The app:** run `repomagpie ui` in the repository, choose **Project**, then **Start this project's journal**.
+- **The app:** run `repomagpie ui` in the repository and choose **Project**. It names the repository, for example `acme/widget` on github.com. Click **Turn on shared notes for acme/widget**. Under the name, a line says whether the shared notes are committed and pushed yet. It reads only your local git, so it doesn't know about your teammates' new notes until you pull.
 - **Your agent:** ask it to note something for the team, in your words: "We don't use moment here; note it for the team: date-fns instead, moment is unmaintained and big." It writes to the project journal and tells you `.magpie/` was created.
 - **The command line:** `repomagpie note moment "avoid: unmaintained and big; use date-fns" --to project`.
 

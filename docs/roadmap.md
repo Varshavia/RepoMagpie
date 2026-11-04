@@ -32,6 +32,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: optimising what exists, from `0.2.0-beta.14`: no new features until it is done, only fixes. Each optimisation is one branch, measured before and after with `npm run measure` (CLAUDE.md §5, "Optimisations"). First `chore/baseline-and-tag-guard`: the baseline, `npm run check:bundle` checking the other screens' first files against decision 0028's line, and `npm run release:tag`, which tags only a merged release. Then the kind of a new note (`fix/kind-accuracy`, [decision 0047](decisions/0047-kind-rules-measured.md): each kind's deciding question, a held-out set, rule 10 and three new rules; 37 of 69 right instead of 24, and 15 of 30 held out instead of 14, short of its bar of 17), the app's first files (`perf/app-first-load`, [decision 0048](decisions/0048-the-first-load-line-measured.md): the pages the first screen doesn't show in one chunk, prefetched; 109.4 → 103.0 kB, short of 0028's 102.4 kB, so the line is now 104.0 kB with no allowance), the graph's open (`perf/graph-open`, [decision 0049](decisions/0049-the-graph-opens-faster.md): the layout stops when the nodes settle, a reopen draws where it was, and the three caches parse each note once; at 2,000 notes the cold first frame 1,892 → 949 ms, a reopen 1,326 → 241 ms), what every agent waits for (`perf/agent-path`, [decision 0050](decisions/0050-the-agents-path.md): recall's cache per note file; the compile cache and lazy MCP tools tried and dropped; at 2,000 notes recall right after one note changed 673 → 144 ms, the hook 664 → 135 ms; `SKILL.md`'s length stays, since its effect can't be measured without the paid skill eval), and the README (`docs/readme-trim`: 2,500 → 1,884 words, Quick start in three short steps, the moved details in `docs/`, the screenshots retaken from the showcase journal). The plan is done. The first three are merged (#64, #65, #66) and released in `0.2.0-beta.15` (2026-10-28); the graph's open, the agent's path and the README are merged (#69, #70, #71) and released in `0.2.0-beta.16` (2026-10-29).
   Also now: [the project journal before launch](#the-project-journal-before-launch-featproject-journal) (`feat/project-journal`): "for the team" reaches the project journal, the app starts it and copies notes into it, one rule for a bare name's type ([decision 0058](decisions/0058-the-type-of-a-bare-name.md)), plain `init`, one Suggest row per package, the catalog's project and avoid notes first, and [working as a team](teams.md). Merged (#87) and released in `0.2.0-beta.20`. Then [teams after launch](#teams-after-launch).
   Also now: `0.2.0-beta.20` (2026-11-04): the project journal before launch (#87) and the README in German, Spanish, Chinese and Japanese (#85).
+  Also now: [the repository in the Project view](#the-repository-in-the-project-view-featproject-identity) (`feat/project-identity`): its name and host, "Turn on shared notes", and whether they are committed and pushed.
   Also now: recall right after one note changed, over its 150 ms budget on the maintainer's machine (`perf/recall-one-note-changed`, [decision 0057](decisions/0057-the-cache-is-updated-not-rewritten.md)): the per-note caches write a small delta beside them instead of being rewritten whole; at 2,000 notes recall right after one note changed 145 → 138 ms, the hook 136 → 128–131 ms. Merged (#83) and released in `0.2.0-beta.19`.
 - **Next:** the v0.2 Connect release, `0.2.0`, after the testers' feedback on the betas and the open v0.2 follow-ups.
   Also next: the rest of [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 2 (the field boosts, fuzzy and prefix limits, optional `files`), with its decision record. Then follow-ups from `feat/next-batch`: the graph's cold first open (each note parsed once for both caches; done in `perf/graph-open`, above).
@@ -463,6 +464,14 @@ The owner's end-to-end test of the project journal on 0.2.0-beta.19: the core wo
 
 **Done when:** the owner's moment request, repeated in Claude Code, leaves a note in `.magpie/`, and a teammate starts the project journal from the app.
 
+### The repository in the Project view (`feat/project-identity`)
+The last change before launch: the Project view says which repository the shared notes belong to, and what to do next.
+- [x] The repository's name and host from its git remote (`origin`, else the first), linked to its web page for GitHub, GitLab, Bitbucket or an https remote; the folder's name and "no remote" without one. Credentials in a remote URL never reach the page, the API or a log.
+- [x] The wording: "This repository has no shared notes yet. …", **Turn on shared notes for owner/repo**, a toast that stays until dismissed, the same in Copy to this project, and `repomagpie doctor`'s project line.
+- [x] One muted line on whether the shared notes are committed and pushed, from local git only (no fetch), when the Project view opens and after each change to the project journal.
+
+**Done when:** in a fresh repository, the Project view names it, turning on shared notes says to commit and push, and after a commit the line says so.
+
 ## Teams after launch
 The project journal is the team feature. What comes after launch builds on git, not on a server.
 
@@ -470,9 +479,11 @@ The project journal is the team feature. What comes after launch builds on git, 
 1. [ ] **A CI check:** `repomagpie check` in a pull request fails when a manifest adds a package the project journal says to avoid. It works without any agent.
 2. [ ] **Block mode per project:** the hook stops, not just asks, before installing an avoided package, where the agent supports it; the user can still go ahead with an explicit confirmation.
 3. [ ] **Sync in the app:** a button that pulls, commits and pushes `.magpie/` only, with the user's own git credentials.
-4. [ ] **A draft for a new dependency:** when an install adds a package with no note in either journal, a Verdict-less draft goes to the project inbox.
-5. [ ] **A chat notice** (Slack or another) when `.magpie/` changes on the main branch: a documented GitHub Actions recipe, not a plugin.
-6. [ ] **An organisation journal:** a separate repository added as a third journal, synced like the app's sync button.
+4. [ ] **"Your team has new shared notes":** the Project view says when the remote has `.magpie/` changes you haven't pulled. It needs a fetch, so it comes with Sync; the sharing line reads only local git until then.
+5. [ ] **A project switcher in the app:** recently used repositories, plus "open a folder", instead of one `repomagpie ui` per repository.
+6. [ ] **A draft for a new dependency:** when an install adds a package with no note in either journal, a Verdict-less draft goes to the project inbox.
+7. [ ] **A chat notice** (Slack or another) when `.magpie/` changes on the main branch: a documented GitHub Actions recipe, not a plugin.
+8. [ ] **An organisation journal:** a separate repository added as a third journal, synced like the app's sync button.
 
 **Only if users ask for it:** cloud sync and a paid team plan; roles and permissions beyond git and `CODEOWNERS`; a plugin API; a storage layer for a server backend; security-feed hooks (Snyk, npm audit).
 
