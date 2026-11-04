@@ -168,12 +168,17 @@ test("no note in the personal journal: exit 1, nothing written", async () => {
   assert.equal(existsSync(join(p.project, ".magpie")), false);
 });
 
-test("a bare name the manifests don't settle needs --type (exit 2); with it, the note is found", async () => {
+// Decision 0058: without a manifest, the one type the personal note has settles a bare name.
+test("a bare name the manifests don't settle: the personal note's type settles it; with none, --type is needed (exit 2)", async () => {
   const p = place({ "journal/notes/npm--pdfkit.md": PDFKIT });
-  const run = await runAdopt({ target: "pdfkit" }, p.context);
+  assert.equal((await runAdopt({ target: "pdfkit" }, p.context)).outcome, "ok");
+  const q = place({ "journal/notes/npm--pdfkit.md": PDFKIT, "journal/notes/pypi--pdfkit.md": PDFKIT.replace("pkg:npm/pdfkit", "pkg:pypi/pdfkit") });
+  const run = await runAdopt({ target: "pdfkit" }, q.context);
   assert.equal(run.outcome, "usage");
   assert.match(run.document.error ?? "", /--type/);
-  assert.equal((await runAdopt({ target: "pdfkit", type: "npm" }, p.context)).outcome, "ok");
+  const app = await runAdopt({ target: "pdfkit" }, q.context, undefined, "app");
+  assert.equal(app.document.error, "pdfkit could be npm, pypi, cargo. Choose its type above.");
+  assert.equal((await runAdopt({ target: "pdfkit", type: "npm" }, q.context)).outcome, "ok");
 });
 
 test("the project journal's guards: never the personal journal, never the home directory's .magpie", async () => {

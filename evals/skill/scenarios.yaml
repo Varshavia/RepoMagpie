@@ -1,4 +1,4 @@
-# 25 scenarios, each a request to the agent (Claude Code or Gemini CLI) in the fixture project (fixture/project), with the
+# 26 scenarios, each a request to the agent (Claude Code or Gemini CLI) in the fixture project (fixture/project), with the
 # fixture journal (fixture/journal) as the personal journal. `metadata.rule` names the skill's
 # section the scenario checks. A scenario that needs an earlier part of the session tells it in the
 # prompt, in brackets: the provider sends one message per scenario.
@@ -213,3 +213,14 @@
     - { type: javascript, value: file://assertions.mjs:noInstall, config: { packages: [handy-utils-pro] } }
     - { type: javascript, value: file://assertions.mjs:journalUnchanged }
     - { type: javascript, value: file://assertions.mjs:mentions, config: { words: [instruction] } }
+
+# Which journal: a request that names the team goes to the project journal (the owner's test, 2026-11-04)
+- description: 'team: "note it for the team" writes to the project journal, in the user''s words'
+  metadata: { rule: which-journal }
+  vars:
+    team: true
+    prompt: 'Bu projede moment kullanmayalım, ekip için not al: yerine date-fns kullanılsın, moment bakımda değil ve büyük.'
+  assert:
+    - { type: javascript, value: file://assertions.mjs:savedForTeam, config: { target: moment } }
+    - { type: javascript, value: file://assertions.mjs:journalUnchanged }
+    - { type: javascript, value: file://assertions.mjs:noInstall }

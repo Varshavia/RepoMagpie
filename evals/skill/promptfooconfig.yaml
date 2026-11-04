@@ -1,4 +1,4 @@
-# The full set: 25 scenarios (scenarios.yaml), each on a fresh copy of the fixture journal and
+# The full set: 26 scenarios (scenarios.yaml), each on a fresh copy of the fixture journal and
 # project. Run it with `node run.mjs` after the dry scenario (dry.yaml) passes.
 description: RepoMagpie skill compliance
 prompts: ['{{prompt}}']

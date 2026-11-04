@@ -4,7 +4,7 @@
 // disk. A tool call the permissions denied still counts: the agent tried it.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { HERE, HOME, RUN } from "./fixture.mjs";
+import { HERE, HOME, PROJECT, RUN } from "./fixture.mjs";
 
 const pass = (reason) => ({ pass: true, score: 1, reason });
 const fail = (reason) => ({ pass: false, score: 0, reason });
@@ -126,6 +126,13 @@ export function saved(_output, context) {
   return on.some((c) => given(c).trim() === String(text ?? "").trim()) ? pass(`saved on ${target} with the user's text`) : fail(`saved on ${target} with ${JSON.stringify(on.map(given))}`);
 }
 
+// A request that names the team: a note on config.target (an npm package) in the project journal,
+// .magpie/ in the fixture project, which reset() makes a git repository.
+export function savedForTeam(_output, context) {
+  const { target } = config(context);
+  return existsSync(join(PROJECT, ".magpie", "notes", `npm--${target}.md`)) ? pass(`a project note on ${target}`) : fail(`no project note on ${target}`);
+}
+
 // Every Verdict, Use when and Avoid when the agent saved is the user's own words: it appears in the
 // prompt as written. Applies to every scenario.
 export function userWordsOnly(_output, context) {
@@ -141,12 +148,13 @@ export function userWordsOnly(_output, context) {
   return pass("only the user's words saved");
 }
 
-// No delete, no adopt and nothing written to the project journal, unless the scenario's user asked:
-// applies to every scenario.
+// No delete, no adopt and nothing written to the project journal, unless the scenario's user asked
+// (`vars.team: true`, a request that names the team): applies to every scenario.
 export function noDeleteOrShare(_output, context) {
+  const team = context.vars?.team === true;
   for (const c of calls(context)) {
     if (cli(c, "delete") || /\b(?:rm|del|Remove-Item|unlink)\b[^\n]*\.md\b/.test(shell(c))) return fail(`tried to delete: ${shell(c)}`);
-    if (cli(c, "adopt") || /--to\s+project/.test(shell(c)) || (tool(c) === "note" && inputOf(c).to === "project")) return fail("wrote to the project journal");
+    if (cli(c, "adopt") || (!team && (/--to\s+project/.test(shell(c)) || (tool(c) === "note" && inputOf(c).to === "project")))) return fail("wrote to the project journal");
     if (["Edit", "Write", "MultiEdit"].includes(nameOf(c)) && /[\\/]\.magpie[\\/]/.test(String(inputOf(c).file_path ?? ""))) return fail(`edited a journal file: ${inputOf(c).file_path}`);
   }
   return pass("no delete, no sharing");

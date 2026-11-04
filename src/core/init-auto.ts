@@ -46,7 +46,7 @@ export function runInitAuto(place: Place): InitAutoRun {
   const dependencies = project.dependencies.map((d) => ({ ...d, name: clean(d.name) }));
   const document: InitAutoJson = { folder: project.folder, manifests: project.manifests, dependencies: dependencies.length, avoid: [], noted: [], none: [] };
   if (!project.manifests.length) {
-    document.error = `No package.json, pyproject.toml or Cargo.toml in ${project.folder}. Run repomagpie init --auto in a project folder.`;
+    document.error = `No package.json, pyproject.toml or Cargo.toml in ${project.folder}. Run repomagpie init in a project folder.`;
     return { outcome: "usage", document, warnings: [] };
   }
   const { sources, warnings } = openRecallSources({ home: place.home, env: place.env, cwd: place.cwd, homeFlag: place.homeFlag, projectFlag: place.projectFlag });

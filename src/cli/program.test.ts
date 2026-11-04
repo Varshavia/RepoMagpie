@@ -52,11 +52,13 @@ test("--help names the command repomagpie and says once that magpie is a short a
   assert.match((await magpie("note", "--help")).out, /^Usage: repomagpie note /m);
 });
 
-test("init without --auto says what --auto does and exits 2", async () => {
-  const r = await magpie("init");
-  assert.equal(r.code, 2);
-  assert.equal(r.out, "");
-  assert.match(r.err, /^repomagpie init: say what to do\. For now there is one action: repomagpie init --auto /);
+test("init without --auto does what init --auto does; --auto is still accepted", async () => {
+  const plain = await magpie("init", "--json");
+  const auto = await magpie("init", "--auto", "--json");
+  assert.equal(plain.code, auto.code);
+  assert.equal(plain.out, auto.out);
+  assert.doesNotMatch(plain.err, /say what to do/);
+  assert.match((await magpie("init", "--help")).out, /--auto +the same as init alone/);
 });
 
 test("a choice outside --to's list is a usage error (exit 2)", async () => {

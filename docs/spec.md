@@ -114,7 +114,9 @@ $ repomagpie note pdf-lib "fine for invoices" --use-when "filling in an existing
   ~/.magpie/notes/npm--pdf-lib.md
 ```
 
-`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": [], "tags_md_added": [], "sections_changed": [], "drafts_replaced": [], "items_present": [], "domains_added": []}`
+`--json`: `{"id": "pkg:npm/pdfkit", "journal": "personal", "path": "...", "created": true, "journal_created": false, "status": "reviewed", "warnings": [], "alternatives_added": [], "alternatives_present": [], "tags_md_added": [], "sections_changed": [], "drafts_replaced": [], "items_present": [], "domains_added": []}`
+
+- `journal_created` is `true` when this write created the journal's folder: for `--to project`, `.magpie/` with its `.gitignore` and `tags.md`, shared with everyone on the repository once committed. Added in 0.2; an addition.
 
 - `alternatives_added` and `alternatives_present` list the `--alternative` targets as given: those written, and those already there. Both are `[]` without the flag. Added in 0.2; an addition, not a breaking change.
 - `tags_md_added` lists the new note's tags that were appended to `tags.md` (step 3). Added in 0.2; an addition.
@@ -207,7 +209,7 @@ Keyword search across both journals, with domains and tags ([decision 0041](deci
 Lists the journals at a glance: one compact row per note, in pages, so a coding agent can read what the user has and make the semantic choice itself ([decision 0034](decisions/0034-the-mcp-server.md)). The MCP tool `catalog` returns the same document.
 
 - Flags: `--tag <tag>` (repeatable: every tag must be present), `--kind <kind>`, `--journal personal|project`, `--limit <n>` (1 to 1000, default 100), `--cursor <cursor>`, `--full` (with `--json`: every field of each note instead of compact rows; no change for people).
-- **Rows** are notes from both journals; skill lines are not rows. Order: by name, ignoring case; the same name in both journals, the project journal's first (section 3); then by file name.
+- **Rows** are notes from both journals; skill lines are not rows. Order, so the first page of a big journal holds what matters: the project journal's notes, then the personal journal's avoid notes (`avoid` below), then the rest; within each group, by name ignoring case; the same name in both journals, the project journal's first (section 3); then by file name. On 2,000 personal notes, the project's notes and every personal avoid note are on the default first page while they number 100 or fewer. A cursor from before this order (`feat/project-journal`) is refused as not a cursor; the first page starts again.
 - **`summary`:** the note's first "Use when" item, else the first line of "What it does", else `null`.
 - **`avoid`:** whether the note is an avoid note, by recall's rule: its Verdict starts with "avoid", or "Avoid when" has text (section 6).
 - **`alternatives`** (with `--full`): the names of the note's alternatives, in the order of `recall --json` ([decision 0029](decisions/0029-recall-names-alternatives.md)): a note's name, or an unresolved target as written. `[]` when none.
@@ -234,12 +236,14 @@ Shows what the user already has that fits a project.
 - **Nothing to go on** (no manifest, no README and no description, or a description of stop words and common words only): a usage error (exit 2) that asks for a description.
 - Output: one row per candidate, as for `search` (section 8), with a why line after the Verdict (`Why: dependency @playwright/test; matched coding, agent`), then the avoid group under its heading, on stdout. An exact match in the avoid group that has alternatives gets an `Instead:` line after its Verdict, with their names (`Instead: puppeteer, pdf-lib`), at most 3, then `+N more`; candidates get no extra line; the count and the hint on stderr (`3 of 11 candidates. Your coding agent picks the fit; use --limit to see more.`). No candidate: `No notes match: <keywords>.` on stderr, exit 0.
 
-`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "why": {"keywords": [...], "dependencies": [...]}, "path": "...", "alternatives": [<alternatives as in recall --json>]}], "in_use_avoid": [<a match as in recall --json>]}`
+`--json`: `{"source": "manifests|description", "keywords": [...], "candidates": [{"id": "...", "journal": "...", "name": "...", "verdict": "...", "status": "reviewed", "tags": [...], "score": 2.1, "why": {"keywords": [...], "dependencies": [...]}, "path": "...", "alternatives": [<alternatives as in recall --json>]}], "in_use_avoid": [<a match as in recall --json, with "matched": true>]}`
 
 - `keywords` are the words looked for, in order (section 5).
 - `why.keywords` are the keywords the note matched, in the same order. `why.dependencies` are the project's dependencies whose every word the note matched (`@playwright/test` for a note that matched `playwright` and `test`); `[]` for a description. The why line names the dependencies, then the other matched keywords.
 - `verdict` is `null` for a note without one, as in `search`. `in_use_avoid` items have the shape of `recall --json` matches, with `query` the dependency's name.
 - `alternatives`, on every candidate and every `in_use_avoid` item: the note's alternatives in the shape and order of `recall --json` ([decision 0029](decisions/0029-recall-names-alternatives.md)), `[]` when none. Added in 0.2; an addition, not a breaking change.
+- `matched`, on every `in_use_avoid` item: whether the keywords matched the note as they would a candidate (the same floor). From the manifests it is always `true`: the project uses the package. With a description, `lodash`'s avoid note is `false` for "parse and format dates" unless the note mentions dates. The app lists only matched ones among the candidates. Added on `feat/project-journal`; an addition.
+- A package noted in both journals: each journal scores against its own index, so the two notes can score far apart. A note under the floor is kept when the other journal's note with the same `id` passed it, so both come back, the project's first.
 
 ### `repomagpie discover ["words"]`
 
@@ -331,21 +335,21 @@ Looks up notes for packages before an install. Used directly, by agents in skill
 - `skipped`: the note files in the journals searched that weren't read because they are over 256 KB ([decision 0032](decisions/0032-note-text-is-data.md), rule 6), each as `<path> is over 256 KB`; `[]` when none. One may be a note on the package, so no match isn't the whole answer. Added in 0.2; an addition, not a breaking change. The hook says the same in its informing line when the command installs something.
 - `alternatives` ([decision 0029](decisions/0029-recall-names-alternatives.md)): every alternative of the matched note, `[]` when none. They come from the `alternatives` field on both sides: the targets in the note's own field, and every note in the same journal that lists it. Targets resolve within the note's journal as links do (file stem, then a unique name). Each is listed once, never the note itself. `name` is the note's name, or the target as written when it has no note; then `id`, `verdict`, `status` and `path` are `null`, and `reason` is `missing` (no such note) or `ambiguous` (several notes have that name), as for a link in the Note document ("Shared JSON documents", below). A resolved alternative has no `reason`. `avoid` is `true` when the alternative is itself an avoid note (section 6). Order: reviewed alternatives that aren't avoid notes, then inbox ones, then avoid ones, then those without a note; ties by name. Added in 0.2; an addition, not a breaking change.
 
-### `repomagpie init --auto`
+### `repomagpie init`
 
-Reads the project's manifests as `suggest` does (`package.json`, `pyproject.toml`, `Cargo.toml`; section 5) and lists its dependencies, each once, in three groups by what the user's journals say about it (recall's matching, the project journal first): an avoid note (in either journal), a note, no note. Added in 0.2.
+`--auto` is an alias, kept for scripts and agents that pass it: `repomagpie init` and `repomagpie init --auto` do the same. Reads the project's manifests as `suggest` does (`package.json`, `pyproject.toml`, `Cargo.toml`; section 5) and lists its dependencies, each once, in three groups by what the user's journals say about it (recall's matching, the project journal first): an avoid note (in either journal), a note, no note. Added in 0.2.
 
 - **Output:** on stdout, a summary line (`This project uses 6 packages (package.json, pyproject.toml). You have notes on 4; 2 say avoid.`), then `Avoid`, `Noted` (each row: name, type, journal, `Verdict:` and the Verdict's first 8 words, or `[inbox] no verdict yet`) and `No note` (the names on one line).
 - **In a terminal** (without `--json`), it then asks for a Verdict on each dependency without a note, one by one, on stderr: `left-pad (npm): `. Enter skips it; `q` stops. After a Verdict, `  Use when, in a few words (Enter skips): ` takes one Use when item. Each answer is saved as `repomagpie note <name> "<Verdict>" --type <type> [--use-when …]` would save it, to `--to <journal>` (default `personal`). It never writes a Verdict of its own. It ends with `Saved 2 notes.` or `Nothing was written.`; exit 1 if a save failed.
 - **Without a terminal**, or with `--json`, it lists and writes nothing.
 - Offline: no network call.
-- Exit 2 when the folder (or its parents, as for `suggest`) has no manifest: `No package.json, pyproject.toml or Cargo.toml in <folder>. Run repomagpie init --auto in a project folder.`
+- Exit 2 when the folder (or its parents, as for `suggest`) has no manifest: `No package.json, pyproject.toml or Cargo.toml in <folder>. Run repomagpie init in a project folder.`
 
 `--json`: `{"folder": "...", "manifests": ["package.json", "pyproject.toml"], "dependencies": 6, "avoid": [{"name": "moment", "type": "npm", "id": "pkg:npm/moment", "journal": "personal", "confidence": "exact|name-only", "verdict": "...", "status": "reviewed|inbox", "path": "..."}], "noted": [{"name": "zod", "type": "npm", "id": "pkg:npm/zod", "journal": "personal", "confidence": "exact", "verdict": null, "status": "inbox", "path": "..."}], "none": [{"name": "left-pad", "type": "npm"}]}`
 
 Names come from a stranger's manifest in a cloned repository, so they are cleaned (decision 0032); the Verdicts are capped as recall's.
 
-**Plain `repomagpie init`** (without `--auto`) prints what `--auto` does and exits 2. That's all it does. The earlier plan, a draft note without a Verdict (`status: inbox`) for each direct dependency without a note, is dropped (the maintainer, 2026-10-25). `init --auto` asks for your Verdict instead, so the inbox never fills with notes you didn't choose.
+**Plain `repomagpie init`** did nothing but print what `--auto` does until `feat/project-journal`; since `--auto` was its one action, plain `init` now does it. The earlier plan, a draft note without a Verdict (`status: inbox`) for each direct dependency without a note, is dropped (the maintainer, 2026-10-25). `init` asks for your Verdict instead, so the inbox never fills with notes you didn't choose.
 
 ### `repomagpie hook claude-code`
 
@@ -467,10 +471,15 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
  "journals": {"personal": {"path": "/home/ana/.magpie", "exists": true},
               "project": {"path": "/work/app/.magpie", "exists": false}},
  "github_token_set": true,
- "github_source": "gh"}
+ "github_source": "gh",
+ "manifest_types": ["npm"]}
 ```
 
 `journals.project` is `null` when there is no project journal and none can be made here: outside a git repository without `--project`, or a folder that can't be one (section 3).
+
+`manifest_types`: the package types the nearest manifests name (`package.json` npm, `pyproject.toml` pypi, `Cargo.toml` cargo), `[]` without one. The app's Add preselects npm when it is empty ([decision 0058](decisions/0058-the-type-of-a-bare-name.md)). Added on `feat/project-journal`; an addition.
+
+**Starting the project journal** (`POST /api/project/start`, the app's "Start this project's journal"). Creates `.magpie/` with its `.gitignore` and `tags.md` where `note --to project` would, and answers `{"path": "/work/app/.magpie", "created": true}`; `created` is `false` when it was there. 422, with nothing written, outside a git repository ("This folder isn't in a git repository, so there is no project to share a journal with. Start repomagpie ui inside a git project.") or when the journal found is outside the repository's root.
 
 **Tag list.** One journal's tags, from its `tags.md`, or the starter list for a journal not created yet (section 3). `exists` says whether the journal has its `tags.md`.
 
@@ -538,8 +547,11 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
  "links": [{"target": "puppeteer", "label": null, "id": "pkg:npm/puppeteer", "name": "puppeteer", "from": "Verdict"},
            {"target": "wkhtmltopdf", "label": null, "id": null, "name": null, "reason": "missing", "from": "Related"}],
  "backlinks": [{"id": "pkg:npm/puppeteer", "name": "puppeteer", "from": "alternatives"}],
+ "also_in": {"journal": "project", "id": "pkg:npm/pdfkit"},
  "warnings": []}
 ```
+
+- `also_in`: the other journal's note with the same `id`, or `null` (none, no project journal, or a read-only note). Matched by `id` only, from that journal's link cache. The app names it under the note's actions. Added on `feat/project-journal`; an addition.
 
 - `frontmatter` holds the fields as written, unknown ones included. `status` and `verdict` are derived from the Verdict (schema rule 1), whatever the `status` field says.
 - `sections` keeps the file's order. `name` is the canonical section name, or `null` for a section the schema doesn't know; `body` is as written, comments included; `draft` is true when the body starts with the draft marker (schema rule 3).
@@ -608,7 +620,7 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 
 **Finding the personal journal:** `--home <dir>` > `MAGPIE_HOME` > `personal_journal` in the config file > `~/.magpie/` (Windows: `%USERPROFILE%\.magpie`). The config file is always read from `~/.magpie/config.yaml`; it does not move with `MAGPIE_HOME`. In `personal_journal`, a leading `~` means the home directory, and any other relative path is resolved against the config file's folder. Relative paths in `--home` and `MAGPIE_HOME` are resolved against the working directory. If the config file can't be read, `repomagpie` warns and uses the default.
 
-**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise, inside a git repository, walk up from the working directory to the git root (the nearest folder containing `.git`) and take the first `.magpie/` folder; one above the git root is never taken. Outside a git repository there is no project journal without `--project` ([decision 0051](decisions/0051-no-project-journal-outside-git.md)): a `.magpie/` in a parent folder (a shared folder, another user's, the drive's root) is never used. The walk for the git root stops at the home directory, which is not searched, so a git repository at home (dotfiles) is not a project: below home without another repository is outside one. Every command finds the project journal this way: the hooks, recall, search, suggest, catalog, `init --auto`, adopt, the MCP server's `project`, `doctor` and `ui`.
+**Finding the project journal:** `--project <dir>` if given: the project root, like `git -C`, whose `.magpie/` folder is the journal; a path that ends in `.magpie` is taken as the journal itself. Otherwise, inside a git repository, walk up from the working directory to the git root (the nearest folder containing `.git`) and take the first `.magpie/` folder; one above the git root is never taken. Outside a git repository there is no project journal without `--project` ([decision 0051](decisions/0051-no-project-journal-outside-git.md)): a `.magpie/` in a parent folder (a shared folder, another user's, the drive's root) is never used. The walk for the git root stops at the home directory, which is not searched, so a git repository at home (dotfiles) is not a project: below home without another repository is outside one. Every command finds the project journal this way: the hooks, recall, search, suggest, catalog, `init`, adopt, the MCP server's `project`, `doctor` and `ui`.
 
 Two folders are never a project journal:
 - **The personal journal's folder**, or a `.magpie` directly inside it. When `--project`, or the folder `--to project` would create, names one of them, the command fails with exit 1 and writes nothing.
@@ -635,7 +647,7 @@ Every note's `id` is a Package URL ([decision 0017](decisions/0017-package-ident
 | `https://pypi.org/project/<name>` | `pkg:pypi/<name>`, lowercased with `_` replaced by `-` ([purl-spec PyPI type](https://github.com/package-url/purl-spec/blob/main/types/pypi-definition.json)) |
 | `https://crates.io/crates/<name>` | `pkg:cargo/<name>` |
 | A PURL | itself, without its version |
-| A bare name | typed by the nearest manifest: `package.json` → npm, `pyproject.toml` → pypi, `Cargo.toml` → cargo. More than one, or none: ask in a terminal; otherwise fail with exit 2 and suggest `--type` |
+| A bare name | typed by, in order ([decision 0058](decisions/0058-the-type-of-a-bare-name.md)): `--type` (the MCP `type`, the app's "Type of a bare name"); the nearest manifest, `package.json` → npm, `pyproject.toml` → pypi, `Cargo.toml` → cargo; with no manifest, the one type an existing note in either journal has the name under. Still unsettled: in a terminal, ask `Which package type is moment? npm, pypi, cargo [npm]: ` (Enter takes npm; only the first line of an answer counts; an answer that isn't a type asks again, at most 3 times, then exit 2). Otherwise exit 2 with a message for who reads it: the CLI's `Add --type npm\|pypi\|cargo.`, the MCP server's `Pass type (npm, pypi, cargo), or a PURL such as pkg:npm/<name>.`, the app's `Choose its type above.` `import` takes the same steps, without asking |
 
 Any other input (articles, gists, loose Markdown files) is rejected with exit 2 in v0.1. A bare name never holds `\`, `:` or `%`, or starts with a dot (no v0.1 registry allows them), so a file path is never taken for a package name.
 
@@ -888,7 +900,7 @@ An older entry of ours (`repomagpie hook <agent>`, `repomagpie.cmd hook <agent>`
 | `recall`, and the hook | under 150 ms | 2,000 notes, warm cache |
 | `recall`, and the hook with an install, after one note changed | under 150 ms | 2,000 notes, warm cache, another note's file changed just before each run |
 | The Stop reminder (`hook claude-code-stop`) | under 150 ms | 2,000 notes, warm cache, a 2,000-line transcript |
-| `search` (also with domains and tags), `suggest`, `init --auto` | under 500 ms | 2,000 notes, warm cache |
+| `search` (also with domains and tags), `suggest`, `init` | under 500 ms | 2,000 notes, warm cache |
 | `catalog` | under 500 ms | 2,000 notes, warm cache, a page of 1,000 rows |
 | Each `repomagpie mcp` tool call | the CLI command's budget; `vocabulary` search's | 2,000 notes, warm cache, in a running server; the cold start to the first answer is reported, not budgeted |
 | The link index (`linkIndex` in core, for the local app) | under 150 ms | 2,000 notes, warm cache |

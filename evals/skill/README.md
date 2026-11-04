@@ -1,13 +1,13 @@
 # The skill-compliance eval
 
-How well does a coding agent follow RepoMagpie's skill ([`skills/repomagpie/SKILL.md`](../../skills/repomagpie/SKILL.md))? This eval runs Claude Code, or Gemini CLI ([below](#gemini-cli)), on 25 scenarios and checks what it did: which tools it called, what it tried to install, what it saved, and what it answered. It prints a pass rate per scenario and overall, for one agent and one model at a time.
+How well does a coding agent follow RepoMagpie's skill ([`skills/repomagpie/SKILL.md`](../../skills/repomagpie/SKILL.md))? This eval runs Claude Code, or Gemini CLI ([below](#gemini-cli)), on 26 scenarios and checks what it did: which tools it called, what it tried to install, what it saved, and what it answered. It prints a pass rate per scenario and overall, for one agent and one model at a time.
 
 The maintainer runs it by hand. It isn't part of CI or `npm test`: it needs a model and an API key. With Claude Code it costs money; with Gemini CLI it runs on the Gemini API's free tier. What it measures, against which hypotheses: [validation](../../docs/validation.md#skill-compliance-eval).
 
 ## How it works
 
 - **The agent:** Claude Code by default, through promptfoo's Claude Agent SDK provider (`providers.yaml`). For Gemini CLI, see [below](#gemini-cli). It has RepoMagpie's MCP server (`repomagpie mcp --allow-write`, from this repository's source) and the skill, as `repomagpie setup` would give it. Your own Claude Code settings, hooks, skills and MCP servers aren't loaded.
-- **The journal and the project:** before each scenario, `fixture/journal` (11 notes) is copied to `.run/home/.magpie`, the personal journal, and `fixture/project` (a small Express app) to `.run/project`, where the agent works. Your real `~/.magpie` is never read: the MCP server runs with `MAGPIE_HOME` pointing at `.run/`.
+- **The journal and the project:** before each scenario, `fixture/journal` (11 notes) is copied to `.run/home/.magpie`, the personal journal, and `fixture/project` (a small Express app) to `.run/project`, where the agent works. An empty `.git/` makes the project a git repository, so a note for the team has a project journal to go to. Your real `~/.magpie` is never read: the MCP server runs with `MAGPIE_HOME` pointing at `.run/`.
 - **Nothing runs:** Bash, Edit and Write are available to the agent but never allowed, so an `npm install` is tried and denied, never run. The checks count what the agent tried. Only the MCP tools and reading files work.
 - **One message per scenario.** When a scenario needs an earlier part of the session (an offer already made, a "no" already said), the prompt tells it in brackets.
 - **The checks** (`assertions.mjs`) are plain code, no model grades anything: recall before an install, no install after an avoid note, the Verdict and alternatives in the reply, the domains in a search, one offer and nothing saved before the answer, a saved Verdict in the user's words only, no delete, no project journal write, the journal unchanged on disk. Two run in every scenario: only the user's words saved, and no delete or adopt.
@@ -43,7 +43,7 @@ From `evals/skill/`:
    - **"no tool calls in metadata.toolCalls":** the provider doesn't give the checks what the agent did. Don't run the full set.
    - **"tool calls are there, but no install of left-pad":** denied calls are dropped. The install checks would pass for the wrong reason, so don't run the full set either.
    - In every case, `.run/dry-tool-calls.json` shows what the provider returned: its metadata's keys, each tool call and the reply.
-3. **`node run.mjs`** runs the 25 scenarios (`promptfooconfig.yaml`, `scenarios.yaml`), one at a time.
+3. **`node run.mjs`** runs the 26 scenarios (`promptfooconfig.yaml`, `scenarios.yaml`), one at a time. The 26th, "note it for the team" (added 2026-11-04), runs alone with `--only 26`.
 
 **Per model:** `--model claude-opus-5-5`, `--model claude-sonnet-5-5` (the default) or `--model claude-haiku-5-5`. Run each one separately; the report names the model.
 
@@ -84,7 +84,7 @@ With `--resume`, the report covers the saved report's scenarios, from every run 
 
 ## Gemini CLI
 
-`node run.mjs --agent gemini-cli` runs the same 25 scenarios on Gemini CLI, with the same checks. It runs on the Gemini API's free tier: no charge. Facts below were checked on 2026-10-30 against Gemini CLI 0.65.0, from the docs it ships (`bundle/docs` in its npm package) and, where those were silent or wrong, from its code. Gemini CLI changes fast: check again after an update.
+`node run.mjs --agent gemini-cli` runs the same 26 scenarios on Gemini CLI, with the same checks. It runs on the Gemini API's free tier: no charge. Facts below were checked on 2026-10-30 against Gemini CLI 0.65.0, from the docs it ships (`bundle/docs` in its npm package) and, where those were silent or wrong, from its code. Gemini CLI changes fast: check again after an update.
 
 **Status (2026-10-30):** the dry scenario passed on `gemini-3.6-flash`: 6 model turns, and the denied install was among the tool calls. A full run stopped after 2 scenarios at the free tier's daily quota (20 requests a day for that model). The full set is paused: it needs several days with `--resume` ([Limits](#limits)).
 
@@ -112,7 +112,7 @@ From `evals/skill/`:
 
 1. `node run.mjs --self-check`: the checks, and Gemini CLI's output parser on canned output. No key, no model.
 2. `node run.mjs --agent gemini-cli --dry`: the dry scenario. What its result means is in [Running it](#running-it), above. On Gemini CLI, "no install of left-pad among them" also means the shell tool wasn't offered to the model: see `gemini_name` in `.run/dry-tool-calls.json`.
-3. `node run.mjs --agent gemini-cli`: the 25 scenarios. On the free tier, that takes several days: see [Limits](#limits).
+3. `node run.mjs --agent gemini-cli`: the 26 scenarios. On the free tier, that takes several days: see [Limits](#limits).
 4. `node run.mjs --agent gemini-cli --resume`, each day after the quota resets: the scenarios not finished yet, merged into the same report. Give the same `--model` each day.
 
 **Options:**
@@ -176,7 +176,7 @@ RepoMagpie's Gemini CLI hook isn't set up, as in the Claude Code run: this eval 
 ### Limits
 
 - **The free tier's daily limit is per model, and small.** Gemini CLI's `quota-and-pricing.md` says 250 requests a day, but each model has its own limit, and `gemini-3.6-flash`'s was 20 on 2026-10-30, as the API's refusal gave it. Lite models usually have higher limits. Google's rate-limits page doesn't publish the numbers: check AI Studio's (https://aistudio.google.com/rate-limit) for your key, then pick a model with `--model`. Limits are per project and reset at midnight Pacific time.
-- **One request per model turn**, at least. The first two scenarios took 8 and 4 requests, so the 25 need roughly 75 to 200: with a limit of 20, run the set over several days, `--resume` each day. Not `--repeat 3`.
+- **One request per model turn**, at least. The first two scenarios took 8 and 4 requests, so the 26 need roughly 78 to 208: with a limit of 20, run the set over several days, `--resume` each day. Not `--repeat 3`.
 - **Gemini CLI retries on its own.** On a 429 or a 5xx it tries again, up to 10 times, 5 to 30 seconds apart, or after the delay the API asks for. Each attempt is a request to the API. A scenario can spend its 5 minutes this way: "Why it failed" then counts the failed attempts.
 - **The daily quota stops the run at once.** At the first stderr line about it, Gemini CLI is stopped (two seconds later, so the API's limit and wait are in), and the rest of the run is skipped in a moment, with "skipped: the free tier's daily quota ran out earlier in this run". The scenario it stopped fails too, even with a reply: the agent was cut off, so `--resume` runs it again. A per-minute 429 doesn't stop the run; Gemini CLI retries it.
 - **promptfoo doesn't retry either.** Its scheduler retried each refusal with a "429" in it, with a wait: in a stand-in run, two refused scenarios took 507 seconds with it and 2 without. `run.mjs` turns it off for Gemini CLI (`PROMPTFOO_DISABLE_ADAPTIVE_SCHEDULER`).
@@ -198,7 +198,7 @@ A scenario Gemini CLI couldn't finish (no key, a model your key can't use, the q
 
 ### What differs from Claude Code
 
-- **The scenarios are the same 25.** None depends on something only Claude Code has: they check MCP calls, shell commands, edits and the reply, which both agents have.
+- **The scenarios are the same 26.** None depends on something only Claude Code has: they check MCP calls, shell commands, edits and the reply, which both agents have.
 - **The skill is found differently.** Claude Code reads it from the project's `.claude/skills`; Gemini CLI from its home's `.agents/skills`, as `setup` installs it for a user. Gemini CLI activates it with `activate_skill`.
 - **The shell is PowerShell on Windows,** not bash. The checks read the command the same way.
 - **The MCP server starts as `setup` writes it** (`--disallow-code-generation-from-strings`, `--home`); the Claude Code run starts it from `providers.yaml` with `MAGPIE_HOME`.

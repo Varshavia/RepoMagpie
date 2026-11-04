@@ -137,6 +137,23 @@ test("a project-journal alternative is labelled with its source; the agent shows
   });
 });
 
+// A conflict: the project says avoid, the user's own note says use it. The project's note comes
+// first, for the agent and in the prompt, and its avoid decides that the install asks.
+test("a conflict between the journals: the project note is listed first and decides; the personal one follows", () => {
+  const w = world({
+    "project/.magpie/notes/npm--moment.md": note({ id: "pkg:npm/moment", verdict: "avoid: unmaintained and big; use date-fns" }),
+    "journal/notes/npm--moment.md": note({ id: "pkg:npm/moment", verdict: "fine for quick scripts" }),
+  });
+  const out = w.run("npm install moment").hookSpecificOutput;
+  assert.equal(out.permissionDecision, "ask");
+  const context = out.additionalContext.split("\n");
+  assert.equal(context.length, 2);
+  assert.ok(context[0].startsWith(`${PROJECT} moment`), context[0]);
+  assert.ok(context[1].startsWith(`${PERSONAL} moment`), context[1]);
+  assert.ok(out.permissionDecisionReason.startsWith("RepoMagpie: this project's journal says to avoid moment"), out.permissionDecisionReason);
+  assert.ok(out.permissionDecisionReason.indexOf("fine for quick scripts") > out.permissionDecisionReason.indexOf("unmaintained"));
+});
+
 test("any other match informs only: context for the agent, a message for the user, no decision", () => {
   const w = world({ "project/.magpie/notes/npm--puppeteer.md": PUPPETEER });
   const path = `"${join(w.project, ".magpie", "notes", "npm--puppeteer.md")}"`;

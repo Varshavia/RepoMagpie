@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { scratchBase } from "./fixtures/scratch.ts";
 import type { Place } from "./journals.ts";
-import { keywordsOf, runSuggest, tagPoints } from "./suggest.ts";
+import { keywordsOf, MIN_SHARE, runSuggest, tagPoints } from "./suggest.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
 // magpie suggest (spec §2, §5): candidates from both journals by keyword and tags, Verdict first;
@@ -168,7 +168,34 @@ test("a dependency with an avoid note is listed in in_use_avoid, as recall shows
     status: "reviewed",
     path: join(p.root, "journal", "notes", "npm--pdfkit.md"),
     alternatives: [],
+    matched: false,
   }]);
+});
+
+test("matched: whether the need matched an in-use avoid note; always from the manifests", () => {
+  const p = place({ ...PERSONAL, ...PROJECT });
+  const matched = (description?: string) => runSuggest({ description, limit: 20 }, p).document.in_use_avoid.map((m) => `${m.query} ${m.matched}`);
+  assert.deepEqual(matched("render pdf invoices"), ["pdfkit true"], "pdf matches the pdfkit note");
+  assert.deepEqual(matched("parse and format dates"), ["pdfkit false"]);
+  assert.deepEqual(matched(), ["pdfkit true"]);
+});
+
+test("a package noted in both journals keeps both notes, even when one journal's score is under the floor", () => {
+  const filler = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`journal/notes/npm--filler-${i}.md`, note({ id: `pkg:npm/filler-${i}`, name: `filler-${i}`, verdict: "fine for logs" })]));
+  const p = place({
+    ...filler,
+    "journal/notes/npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", name: "puppeteer", tags: ["pdf"], verdict: "fine to render pdf" }),
+    "project/.git/HEAD": "",
+    "project/.magpie/notes/npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", name: "puppeteer", verdict: "the team's pick for PDF rendering" }),
+    "project/.magpie/notes/npm--pdf-one.md": note({ id: "pkg:npm/pdf-one", name: "pdf-one", tags: ["pdf", "render"], verdict: "render pdf, render pdf files" }),
+  });
+  const run = runSuggest({ description: "render pdf", limit: 20 }, p);
+  const list = names(run);
+  assert.ok(list.includes("project puppeteer") && list.includes("personal puppeteer"), list.join(", "));
+  const scores = run.document.candidates.map((c) => c.score);
+  const project = run.document.candidates.find((c) => c.journal === "project" && c.name === "puppeteer")?.score ?? Infinity;
+  assert.ok(project < Math.max(...scores) * MIN_SHARE, `the case under test: the project's note alone is under the floor (${scores.join(", ")})`);
+  assert.ok(list.indexOf("project puppeteer") < list.indexOf("personal puppeteer"), "the project's note first");
 });
 
 test("a name-only avoid note counts too, labelled by its confidence", () => {

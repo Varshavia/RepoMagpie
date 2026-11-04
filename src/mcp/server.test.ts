@@ -251,6 +251,63 @@ test("note's domains: only those the user confirmed, written as note --domain wr
   });
 });
 
+// §1 of the project-journal brief: "note it for the team" reaches the project journal.
+test("note to project in a git repository without .magpie/: creates it as note --to project does, and says so", async () => {
+  const box = sandbox();
+  const twin = sandbox();
+  await withClient(box, { args: ["--allow-write"] }, async (client) => {
+    const result = await client.call("note", { target: "pkg:npm/moment", text: "use date-fns; moment is unmaintained and big", to: "project" });
+    assert.equal(result.isError, undefined, JSON.stringify(result));
+    const document = result.structuredContent as { journal: string; journal_created: boolean; path: string };
+    assert.equal(document.journal, "project");
+    assert.equal(document.journal_created, true);
+    const expected = JSON.parse((await magpie(twin, ["note", "pkg:npm/moment", "use date-fns; moment is unmaintained and big", "--to", "project", "--json"])).out) as { path: string; warnings: string[] };
+    assert.deepEqual(result.structuredContent, { ...expected, path: expected.path.replace(twin.root, box.root), warnings: expected.warnings.map((w) => w.replace(twin.root, box.root)) });
+    for (const file of [".gitignore", "tags.md", join("notes", "npm--moment.md")]) assert.ok(existsSync(join(box.project, ".magpie", file)), file);
+    const tools = (await client.request("tools/list")).result?.tools as { name: string; inputSchema: { properties: Record<string, { description: string }> } }[];
+    assert.match(tools.find((t) => t.name === "note")!.inputSchema.properties.to.description, /names the team or the project/);
+  });
+});
+
+test("note to project outside a git repository: refused, nothing written, and the message offers the personal journal", async () => {
+  const box = sandbox({ "outside/": null });
+  // Home is the scratch root, so the walk stops there and never sees its .git fence.
+  await withClient({ ...box, home: box.root, project: join(box.root, "outside") }, { args: ["--allow-write"] }, async (client) => {
+    const result = await client.call("note", { target: "pkg:npm/moment", text: "use date-fns", to: "project" });
+    assert.equal(result.isError, true);
+    assert.match(String(result.structuredContent?.error), /isn't in a git repository.*offer their personal journal/);
+    assert.ok(!/--project/.test(String(result.structuredContent?.error)), "no CLI flag for an agent");
+  });
+  assert.ok(!existsSync(join(box.root, "outside", ".magpie")));
+});
+
+test("note with a bare name and no manifest: the error names the type field, not --type; an existing note settles it", async () => {
+  const box = sandbox();
+  await withClient(box, { args: ["--allow-write"] }, async (client) => {
+    const ambiguous = await client.call("note", { target: "moment", text: "use date-fns", to: "project" });
+    assert.equal(ambiguous.isError, true);
+    const error = String(ambiguous.structuredContent?.error);
+    assert.match(error, /Pass type \(npm, pypi, cargo\), or a PURL such as pkg:npm\/moment/);
+    assert.ok(!error.includes("--type"), error);
+    assert.ok(!existsSync(join(box.project, ".magpie")));
+    assert.equal((await client.call("note", { target: "pkg:npm/moment", to: "project" })).isError, undefined);
+    const settled = await client.call("note", { target: "moment", text: "use date-fns" });
+    assert.equal((settled.structuredContent as { id: string }).id, "pkg:npm/moment");
+  });
+});
+
+test("the agent text says a project note is the team's decision and wins a conflict", async () => {
+  const client = new Client(sandbox(), ["--allow-write"]);
+  try {
+    const opened = await client.open();
+    assert.match(String(opened?.result?.instructions), /A project-journal note is the team's decision: when it and a personal note on the same package disagree, it wins/);
+    const tools = (await client.request("tools/list")).result?.tools as { name: string; description: string }[];
+    assert.match(tools.find((t) => t.name === "recall")!.description, /Project notes come first: they are the team's decision and win over a personal note/);
+  } finally {
+    await client.close();
+  }
+});
+
 // The tool list as agents see it. A change to a tool's name, description or schema shows up here;
 // when it is meant, update fixtures/tools.json by hand, so the change is read in review.
 test("schema snapshot: tools/list with --allow-write equals fixtures/tools.json", async () => {

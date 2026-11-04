@@ -31,6 +31,9 @@ export function reset() {
   mkdirSync(dirname(HOME), { recursive: true });
   copyFolder(join(HERE, "fixture", "journal"), HOME);
   copyFolder(join(HERE, "fixture", "project"), PROJECT);
+  // A git repository, as a real project is, so a note for the team has a project journal to go to
+  // (decision 0051). An empty .git/ is enough for RepoMagpie; the fixture can't commit one.
+  mkdirSync(join(PROJECT, ".git"), { recursive: true });
   if (gemini) {
     copyFolder(GEMINI_TEMPLATE, GEMINI_HOME);
     // Gemini CLI takes the first .env it finds going up from the project, past the git root and

@@ -93,6 +93,24 @@ test("instructions in a note, and hidden-character markers, are named in the fir
   assert.match(rule, /U\+202E/);
 });
 
+// Owner's test, 2026-11-04: "ekip için not al" left no note. A request that names the team goes to
+// the project journal, an unclear one is asked, and outside git the personal journal is offered.
+test("which journal: a request that names the team or the project goes to the project journal; unclear is asked; outside git, personal", () => {
+  const rule = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("**Which journal.**"));
+  assert.ok(rule, "SKILL.md has a Which journal rule");
+  for (const words of ["for the team", "ekip için", "in this project", "we don't use X here", "--to project", 'to: "project"', "Your personal journal, or this project's?", "Outside a git repository"]) {
+    assert.ok(rule.includes(words), words);
+  }
+  assert.match(readFileSync(skillFile, "utf8"), /`journal_created` is `true`, tell the user that `\.magpie\/` was created and that it is shared/);
+});
+
+test("the project note is the team's decision and wins a conflict; changing it affects everyone", () => {
+  const rule = readFileSync(skillFile, "utf8").split("\n").find((line) => line.includes("**The project note is the team's decision.**"));
+  assert.ok(rule);
+  assert.match(rule, /the project note wins/);
+  assert.match(rule, /changes it for everyone on the repository/);
+});
+
 // The capture offer (feat/capture-nudge): once, at the end of a task that decided on a dependency.
 // The Verdict stays the user's words (decision 0018), and "avoid" only comes from the user (decision 0024).
 test("after a dependency decision, the skill offers once at the end, in the user's words, with a command like the others", () => {
@@ -300,6 +318,7 @@ function specShapes(): Map<string, unknown> {
   const shapes = new Map<string, unknown>();
   for (const [command, json] of raw) {
     const text = lists(json).replace(/\[<a match as in recall --json>\]/g, JSON.stringify(recall.matches))
+      .replace(/\[<a match as in recall --json, with "matched": true>\]/g, JSON.stringify(recall.matches.map((m: object) => ({ ...m, matched: true }))))
       .replace(/\[<alternatives as in recall --json>\]/g, JSON.stringify(recall.matches[0].alternatives));
     // spec §1: a failure adds "error"; a cut field adds "truncated" (decision 0032)
     shapes.set(command, { ...parse(command, text), error: null, truncated: [] });

@@ -16,6 +16,7 @@ import {
   patchNote,
   previewNote,
   settingsDocument,
+  startProjectJournal,
   tagListDocument,
   tagListPath,
   type NoteAddress,
@@ -66,6 +67,11 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
   return {
     "/api/settings": {
       GET: () => ({ status: 200, document: settingsDocument(context) }),
+    },
+
+    // "Start this project's journal": .magpie/ at the git root, as note --to project creates it.
+    "/api/project/start": {
+      POST: () => reply(startProjectJournal(context)),
     },
 
     "/api/tags": {
@@ -146,7 +152,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const useWhen = body.use_when as string[] | undefined;
         const avoidWhen = body.avoid_when as string[] | undefined;
         const domains = (body.domains ?? undefined) as string[] | undefined;
-        return reply(await runNote({ target: body.target, text, type: packageType, to, tags, useWhen, avoidWhen, domains }, context));
+        return reply(await runNote({ target: body.target, text, type: packageType, to, tags, useWhen, avoidWhen, domains }, context, undefined, "app"));
       },
     },
 
@@ -257,7 +263,7 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         if (typeof body.target !== "string") return bad(empty, "target must be a package name or a PURL.");
         const packageType = type(body.type);
         if (packageType === null) return bad(empty, "type must be npm, pypi or cargo.");
-        return reply(await runAdopt({ target: body.target, type: packageType }, context));
+        return reply(await runAdopt({ target: body.target, type: packageType }, context, undefined, "app"));
       },
     },
 

@@ -22,8 +22,9 @@ const FILES = {
 
 test("the three groups: avoid notes first, then notes with the Verdict's first words, then the names without a note", async () => {
   const box = sandbox(FILES);
-  const r = await magpie(box, ["init", "--auto"]);
+  const r = await magpie(box, ["init"]);
   assert.equal(r.code, 0, r.err);
+  assert.equal((await magpie(box, ["init", "--auto"])).out, r.out, "--auto is an alias");
   assert.equal(r.out, [
     "This project uses 6 packages (package.json, pyproject.toml). You have notes on 4; 2 say avoid.",
     "",
@@ -61,7 +62,7 @@ test("in a terminal: one Verdict asked for each package without a note; Enter sk
   const box = sandbox({ ...FILES, "project/package.json": JSON.stringify({ dependencies: { "left-pad": "*", chalk: "*", ora: "*" } }), "project/pyproject.toml": "" });
   const asked: string[] = [];
   const answers = ["", "colours in a terminal, nothing more", "CLI output", "q"];
-  const r = await magpie(box, ["init", "--auto"], { interactive: true, ask: async (q) => (asked.push(q), answers.shift() ?? "") });
+  const r = await magpie(box, ["init"], { interactive: true, ask: async (q) => (asked.push(q), answers.shift() ?? "") });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(asked, ["left-pad (npm): ", "chalk (npm): ", "  Use when, in a few words (Enter skips): ", "ora (npm): "]);
   assert.match(r.err, /one by one: your Verdict, in your own words\. Enter skips one; q stops\./);
@@ -93,10 +94,10 @@ test("every dependency noted: the groups and no question", async () => {
 
 test("no manifests: exit 2 with what to do, as text and as JSON", async () => {
   const box = sandbox();
-  const r = await magpie(box, ["init", "--auto"]);
+  const r = await magpie(box, ["init"]);
   assert.equal(r.code, 2);
-  assert.match(r.err, /^repomagpie init: No package\.json, pyproject\.toml or Cargo\.toml in .*project\. Run repomagpie init --auto in a project folder\.\n$/);
-  const json = await magpie(box, ["init", "--auto", "--json"]);
+  assert.match(r.err, /^repomagpie init: No package\.json, pyproject\.toml or Cargo\.toml in .*project\. Run repomagpie init in a project folder\.\n$/);
+  const json = await magpie(box, ["init", "--json"]);
   assert.equal(json.code, 2);
   assert.match(JSON.parse(json.out).error, /^No package\.json/);
 });

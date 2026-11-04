@@ -261,22 +261,61 @@ function planAlternatives(journal: string, notes: NoteEntry[], path: string, tex
 
 export type Resolved = { ok: true; purl: string; skillPath?: string } | { ok: false; error: string };
 
-// Spec §4: a bare name is typed by the nearest manifests, by --type, or by `ask` (a prompt in a
-// terminal). Without `ask`, an ambiguous name fails with a hint to add --type.
-export async function resolveInput(target: string, type: PackageType | undefined, cwd: string, ask?: (question: string) => Promise<string>): Promise<Resolved> {
+// Who reads an ambiguous name's message (decision 0058): the CLI names --type, an agent the MCP
+// field `type`, the app its "Type of a bare name" field. The app never sees a CLI flag.
+export type Surface = "cli" | "agent" | "app";
+
+export const PACKAGE_TYPES: readonly PackageType[] = ["npm", "pypi", "cargo"];
+const PROMPT_TRIES = 3;
+
+// The package types a bare name has a note under, in either journal (decision 0058, step 3).
+export function notedTypes(name: string, place: Place): PackageType[] {
+  const personal = resolvePersonalJournal({ home: place.home, env: place.env, cwd: place.cwd, flag: place.homeFlag });
+  const project = findProjectJournal({ cwd: place.cwd, home: place.home, personalJournal: personal.path, flag: place.projectFlag });
+  const notes = [personal.path, project].flatMap((path) => (path ? listNotes(path) : []));
+  return PACKAGE_TYPES.filter((type) => {
+    const resolution = resolveTarget(name, { type });
+    return resolution.kind === "ok" && noteFor(notes, resolution.purl) !== undefined;
+  });
+}
+
+// Decision 0058: a bare name's type is, in order, the given type, the project's manifests, the one
+// type an existing note in either journal has it under; otherwise it is ambiguous. Then a terminal
+// (`ask`) asks, npm preselected, again on an answer that isn't a type; elsewhere it fails with a
+// message for its `surface`.
+export async function resolveInput(target: string, type: PackageType | undefined, place: Place, options: { ask?: (question: string) => Promise<string>; surface?: Surface } = {}): Promise<Resolved> {
+  const { ask, surface = "cli" } = options;
   const bare = !/^(pkg:|https?:\/\/)/i.test(target.trim());
-  if (type && !bare) return { ok: false, error: "--type only applies to a bare package name." };
-  let resolution = resolveTarget(target, { manifests: bare ? findManifests(cwd) : [], type });
+  if (type && !bare && surface === "app") type = undefined; // the app's field is for bare names only
+  if (type && !bare) return { ok: false, error: surface === "agent" ? "type only applies to a bare package name." : "--type only applies to a bare package name." };
+  let resolution = resolveTarget(target, { manifests: bare ? findManifests(place.cwd) : [], type });
+  if (resolution.kind === "ambiguous" && !resolution.candidates.length) {
+    const noted = notedTypes(target, place);
+    if (noted.length === 1) resolution = resolveTarget(target, { type: noted[0] });
+  }
   if (resolution.kind === "ambiguous") {
-    const choices: PackageType[] = resolution.candidates.length ? resolution.candidates : ["npm", "pypi", "cargo"];
-    if (!ask) return { ok: false, error: `${target} could be ${choices.join(", ")}. Add --type ${choices.join("|")}.` };
-    const answer = (await ask(`Which package type is ${target}? (${choices.join(", ")}) `)).trim() as PackageType;
-    if (!choices.includes(answer)) return { ok: false, error: `Not one of ${choices.join(", ")}: ${answer || "(nothing)"}.` };
+    const choices: PackageType[] = resolution.candidates.length ? resolution.candidates : [...PACKAGE_TYPES];
+    if (!ask) return { ok: false, error: ambiguousMessage(target, choices, surface) };
+    const preset = choices.includes("npm") ? "npm" : choices[0];
+    let answer: PackageType | null = null;
+    for (let tries = 0; answer === null && tries < PROMPT_TRIES; tries++) {
+      // One line only: a pasted next command is never taken as more than an answer to check.
+      const line = (await ask(`Which package type is ${target}? ${choices.join(", ")} [${preset}]: `)).split(/\r?\n/)[0].trim().toLowerCase();
+      answer = line === "" ? preset : choices.includes(line as PackageType) ? (line as PackageType) : null;
+    }
+    if (answer === null) return { ok: false, error: `No package type chosen for ${target}. Add --type ${choices.join("|")}.` };
     resolution = resolveTarget(target, { type: answer });
   }
   if (resolution.kind === "rejected") return { ok: false, error: resolution.reason };
-  if (resolution.kind === "ambiguous") return { ok: false, error: `Add --type for ${target}.` };
+  if (resolution.kind === "ambiguous") return { ok: false, error: ambiguousMessage(target, PACKAGE_TYPES, surface) };
   return { ok: true, purl: resolution.purl, skillPath: resolution.skillPath };
+}
+
+function ambiguousMessage(target: string, choices: readonly PackageType[], surface: Surface): string {
+  const could = `${target} could be ${choices.join(", ")}.`;
+  if (surface === "app") return `${could} Choose its type above.`;
+  if (surface === "agent") return `${could} Pass type (${choices.join(", ")}), or a PURL such as pkg:${choices[0]}/${target}.`;
+  return `${could} Add --type ${choices.join("|")}.`;
 }
 
 export interface NoteRequest {
@@ -297,6 +336,7 @@ export interface NoteJson {
   journal: Journal["scope"];
   path: string | null;
   created: boolean;
+  journal_created: boolean; // this write created the journal's folder; a project journal is shared once committed
   status: Capture["status"];
   warnings: string[];
   alternatives_added: string[];
@@ -317,7 +357,7 @@ export interface NoteRun {
 }
 
 // magpie note <name-or-url> ["text"]: resolve the target, then save it in the journal.
-export async function runNote(request: NoteRequest, context: Context, ask?: (question: string) => Promise<string>): Promise<NoteRun> {
+export async function runNote(request: NoteRequest, context: Context, ask?: (question: string) => Promise<string>, surface: Surface = "cli"): Promise<NoteRun> {
   const journal = locateJournal(request.to, context);
   const stop = (error: string, outcome: Outcome): NoteRun => ({
     outcome,
@@ -334,9 +374,10 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     const purl = target.trim().toLowerCase().startsWith("pkg:") ? resolveTarget(target.trim()) : null;
     if (purl && purl.kind !== "ok") return stop(`--alternative ${target}: ${purl.kind === "rejected" ? purl.reason : "not a PURL"}`, "usage");
   }
-  const resolved = await resolveInput(request.target, request.type, context.cwd, ask);
+  const resolved = await resolveInput(request.target, request.type, context, { ask, surface });
   if (!resolved.ok) return stop(resolved.error, "usage");
 
+  const existed = existsSync(journal.path);
   const item = { purl: resolved.purl, skillPath: resolved.skillPath, source: request.target, verdict: request.text, alternatives: request.alternatives, ownUseWhen: request.useWhen, ownAvoidWhen: request.avoidWhen, tags: request.tags, domains: request.domains && canonicalDomains(request.domains) };
   const saved = await saveItem(journal, listNotes(journal.path), item, context);
   const document: NoteJson = {
@@ -344,6 +385,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
     journal: journal.scope,
     path: saved.path,
     created: saved.result === "created",
+    journal_created: !existed && existsSync(journal.path),
     status: saved.status,
     warnings: [...journal.warnings, ...saved.notices, ...saved.warnings],
     alternatives_added: saved.alternatives.added,
@@ -360,7 +402,7 @@ export async function runNote(request: NoteRequest, context: Context, ask?: (que
 
 // magpie note's --json document when nothing was saved; the caller adds `error`.
 export function emptyNoteJson(scope: Journal["scope"]): NoteJson {
-  return { id: null, journal: scope, path: null, created: false, status: null, warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] };
+  return { id: null, journal: scope, path: null, created: false, journal_created: false, status: null, warnings: [], alternatives_added: [], alternatives_present: [], tags_md_added: [], sections_changed: [], drafts_replaced: [], items_present: [], domains_added: [] };
 }
 
 // The --json document as agent-facing output shows it (decision 0032, rule 2), for the CLI and the
@@ -427,7 +469,11 @@ export async function runImport(request: ImportRequest, context: Context): Promi
       results.push(failed(item.error));
       continue;
     }
-    const resolution = resolveTarget(item.target, { manifests });
+    let resolution = resolveTarget(item.target, { manifests });
+    if (resolution.kind === "ambiguous" && !resolution.candidates.length) {
+      const noted = notedTypes(item.target, context); // decision 0058, step 3
+      if (noted.length === 1) resolution = resolveTarget(item.target, { type: noted[0] });
+    }
     if (resolution.kind === "ambiguous") {
       const types: PackageType[] = resolution.candidates.length ? resolution.candidates : ["npm", "pypi", "cargo"];
       results.push(failed(`${item.target} could be ${types.join(", ")}; write a PURL instead, such as pkg:${types[0]}/${item.target}.`));

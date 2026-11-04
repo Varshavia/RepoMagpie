@@ -66,3 +66,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0055 | [Four domains, and `styling` becomes `frontend`](0055-four-domains-and-frontend.md) | accepted (changes 0040, 0043 and 0045; `react`, `vue`, `ui` and `flutter` taken out of suggestions by 0056) |
 | 0056 | [Domain labels for the sixteen domains, and the mappings measured](0056-domain-labels-for-sixteen-domains.md) | accepted (changes 0055's rules 1 and 2) |
 | 0057 | [The cache is updated, not rewritten](0057-the-cache-is-updated-not-rewritten.md) | accepted (adds to 0050) |
+| 0058 | [The type of a bare name](0058-the-type-of-a-bare-name.md) | accepted (adds to the spec's bare-name rule) |

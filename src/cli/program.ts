@@ -180,7 +180,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
   program
     .command("init")
     .description("your notes on this project's packages")
-    .option("--auto", "group the dependencies (an avoid note, a note, no note); in a terminal, ask for a Verdict on each one without a note")
+    .addHelpText("after", "\nGroups the project's dependencies by what your notes say (an avoid note, a note, no note); in a terminal, asks for a Verdict on each one without a note.")
+    .option("--auto", "the same as init alone (kept for scripts and agents that pass it)")
     .addOption(new Option("--to <journal>", "the journal new notes go to").choices(["personal", "project"]).default("personal"))
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./init.ts")).initCommand(command.optsWithGlobals<InitOptions>(), io);
