@@ -27,6 +27,7 @@ import type { PackageType } from "../core/identity.ts";
 import { KINDS } from "../core/note.ts";
 import type { Outcome } from "../core/outcome.ts";
 import { runRecall } from "../core/recall.ts";
+import { projectInfo } from "../core/repository.ts";
 import { importFailure, runImport, runNote, type Context } from "../core/save.ts";
 import { runSearch, searchForAgent } from "../core/search.ts";
 import { runSuggest, suggestForAgent } from "../core/suggest.ts";
@@ -69,9 +70,14 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
       GET: () => ({ status: 200, document: settingsDocument(context) }),
     },
 
-    // "Start this project's journal": .magpie/ at the git root, as note --to project creates it.
+    // "Turn on shared notes": .magpie/ at the git root, as note --to project creates it.
     "/api/project/start": {
       POST: () => reply(startProjectJournal(context)),
+    },
+
+    // The Project view's repository and sharing line: local git, asked only when that view opens.
+    "/api/project": {
+      GET: async () => ({ status: 200, document: await projectInfo(context) }),
     },
 
     "/api/tags": {

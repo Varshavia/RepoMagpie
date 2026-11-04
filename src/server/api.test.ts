@@ -9,6 +9,7 @@ import { graphDocument, noteDocument, noteListDocument, settingsDocument, tagLis
 import { noteVersion } from "../core/edit.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
 import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
+import { projectInfo } from "../core/repository.ts";
 import type { Fetch } from "../core/github.ts";
 import type { Context, ImportJson } from "../core/save.ts";
 import { PASTE } from "../core/fixtures/import-paste.ts";
@@ -318,6 +319,11 @@ test("POST /api/note/preview returns the Note preview document and writes nothin
   assert.equal(readFileSync(join(box.journal, "tags.md"), "utf8"), "- `pdf`\n- `testing`\n");
   assert.equal((await http.write("POST", "/api/note/preview", { target: "https://github.com/nobody/nothing", to: "personal" })).status, 422);
   assert.equal((await http.write("POST", "/api/note/preview", { target: "not a name" })).status, 400);
+});
+
+test("GET /api/project returns core's project info", async (t) => {
+  const { http, context } = await start(t);
+  assert.deepEqual(parsed(await http.get("/api/project")), { status: 200, document: await projectInfo(context) });
 });
 
 test("GET /api/settings, /api/tags, /api/notes and /api/note return core's shared documents", async (t) => {
