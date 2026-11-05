@@ -1,10 +1,14 @@
 // The README's screenshots (docs/assets/screen-*.png), dark, 1440×900, from the showcase journal
 // (showcase.ts). Run with README_SHOTS=1; skipped otherwise. They overwrite the files in docs/assets/.
+import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
+import { removeFolder } from "../../src/core/copy-folder.ts";
+import { STARTER_TAGS } from "../../src/core/journals.ts";
 import { expect, test } from "./fixtures.ts";
+import { gitOnPath } from "./journal.ts";
 
 const OUT = fileURLToPath(new URL("../../docs/assets/", import.meta.url));
 
@@ -43,6 +47,30 @@ test("suggest for this project", async ({ page, magpie }) => {
   await rows.first().click();
   await expect(page.getByRole("article").getByRole("heading", { level: 2 })).toBeVisible();
   await shoot(page, "screen-suggest");
+});
+
+// The Project view of a real repository (no network: the remote is only a name) whose project
+// journal is committed, so the header names it and says the shared notes are committed.
+test("project view", async ({ page, magpie }) => {
+  expect(gitOnPath(magpie.server.path), `git isn't on magpie ui's PATH: ${magpie.server.path}`).toBe(true);
+  removeFolder(join(magpie.project, ".git")); // the fixture's empty fence
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: dirname(magpie.project) };
+  const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { cwd: magpie.project, env, stdio: "ignore" });
+  git("init", "-q");
+  git("remote", "add", "origin", "https://github.com/acme/checkout.git");
+  // What "Turn on shared notes" writes beside the notes, so the app's .cache/ stays out of git.
+  writeFileSync(join(magpie.project, ".magpie", ".gitignore"), ".cache/\n.trash/\n");
+  writeFileSync(join(magpie.project, ".magpie", "tags.md"), STARTER_TAGS);
+  git("add", ".magpie");
+  git("commit", "-q", "-m", "Add the team's notes");
+  await magpie.open(page);
+  await page.getByRole("radio", { name: "Project" }).click();
+  await expect(page.locator(".repository").getByRole("link", { name: "acme/checkout" })).toBeVisible();
+  await expect(page.locator(".repository")).toContainText("Shared notes are committed.");
+  await page.getByRole("button", { name: /All notes/ }).click();
+  await page.getByRole("listbox", { name: "All notes" }).getByRole("option").filter({ hasText: "zod" }).click();
+  await expect(page.getByRole("article").getByRole("heading", { level: 2, name: "zod" })).toBeVisible();
+  await shoot(page, "screen-project");
 });
 
 // Nothing selected: a selection dims the rest of the graph and hides its labels, so the shot keeps

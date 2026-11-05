@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · [Español](README_es.md) · 简体中文 · [日本語](README_ja.md)
 
-_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-04 的英文 README。_
+_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-05 的英文 README。_
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie 标志：一只侧身的喜鹊">
 
@@ -20,7 +20,7 @@ _本文是英文 README 的翻译，可能落后于英文版；以英文 README 
 
 [快速开始](#快速开始) · [工作原理](#工作原理) · [每个智能体得到什么](#每个智能体得到什么) · [常见问题](#常见问题) · [文档](#文档)
 
-<code>npm install -g repomagpie@beta</code><br>
+<code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
 
 </div>
@@ -45,14 +45,14 @@ Do you want to proceed?
 - **发现：** 按关键词、关注点和类型搜索 GitHub，附带星标数和近期活跃度，并把你选中的仓库加入 inbox（收件箱）：使用 `repomagpie discover` 或应用。除非你要求，列表和课程会被隐藏，每个结果都会说明它为什么出现。
 - **从项目开始：** `repomagpie init` 按照你的笔记所说列出项目的依赖，然后对每个还没有笔记的依赖询问你的 Verdict。
 
-**状态：** beta 版，面向早期测试者。[更新日志](../../CHANGELOG.md)列出每个版本；[路线图](../roadmap.md)展示接下来的计划。
+**状态：** 稳定版，仍在积极开发中。[更新日志](../../CHANGELOG.md)列出每个版本；[路线图](../roadmap.md)展示接下来的计划。
 
 ## 快速开始
 
 1. 安装 `repomagpie` 命令，并在你的编程智能体中完成设置：
 
    ```bash
-   npm install -g repomagpie@beta
+   npm install -g repomagpie
    repomagpie setup
    ```
 
@@ -119,6 +119,10 @@ git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
 或者把你自己的某条笔记复制过去：`repomagpie adopt pdfkit`。当队友的智能体要运行 `npm install pdfkit` 时，hook 会先询问他们，他们的 `search` 和 `suggest` 也能找到这条笔记。任何能读取这个仓库的人都能读取其中的笔记。
+
+在 `repomagpie ui` 中，Project 视图会显示仓库名称，并说明共享笔记是否已提交并推送。
+
+![repomagpie ui 中的 Project 视图：github.com 上的 acme/checkout 和 "Shared notes are committed."，下方是项目笔记库的三条笔记；zod 已打开，并提示你的个人笔记库中也有关于它的笔记](../assets/screen-project.png)
 
 ## 本地应用
 

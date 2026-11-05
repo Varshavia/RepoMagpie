@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
+The first stable release. RepoMagpie keeps your notes on packages and tools as Markdown files, and your coding agent reads them before it installs anything: through the MCP server, the skill and an install hook, set up in seven agents by `repomagpie setup`. A project journal, `.magpie/` in the repository, shares the team's notes with every contributor. The local app reviews, searches, discovers, suggests and draws your notes as a graph. Install it with `npm install -g repomagpie`; the `@beta` tag is no longer needed. New since 0.2.0-beta.20: the Project view names the repository and says whether its shared notes are committed.
+
 ### Added
 
 - The app's Project view names the repository, for example `acme/widget` on github.com, with a link to its page on GitHub, GitLab or Bitbucket. It reads the git remote, `origin` first, and never shows credentials in the remote's URL. Without a remote it shows the folder's name and "no remote".
@@ -434,7 +438,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.20...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.20...v0.2.0
 [0.2.0-beta.20]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.19...v0.2.0-beta.20
 [0.2.0-beta.19]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.18...v0.2.0-beta.19
 [0.2.0-beta.18]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.17...v0.2.0-beta.18

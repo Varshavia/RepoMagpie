@@ -2,7 +2,7 @@
 
 The checks that only a person can run, on a real machine with real agents. The tests and CI can't run them: they need a signed-in agent, an installed app, or a browser other than Chromium. Each row names the release its feature came in, and its status: "pending", or "passed on <date>" with the version checked.
 
-Run them with the installed package (`npm install -g repomagpie@beta`), and on a scratch journal where a check writes notes: `export MAGPIE_HOME="$PWD/.scratch/journal"` (in PowerShell, `$env:MAGPIE_HOME = "$PWD\.scratch\journal"`). Testers follow [TESTING.md](../../TESTING.md) instead.
+Run them with the installed package (`npm install -g repomagpie`), and on a scratch journal where a check writes notes: `export MAGPIE_HOME="$PWD/.scratch/journal"` (in PowerShell, `$env:MAGPIE_HOME = "$PWD\.scratch\journal"`). Testers follow [TESTING.md](../../TESTING.md) instead.
 
 ## macOS
 

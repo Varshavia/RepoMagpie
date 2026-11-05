@@ -87,16 +87,18 @@ test("the merged release on main: every check passes, the typed tag tags and pus
     "gh run view 987654 --log | Select-String $h",
     `h=$(shasum -a 256 .scratch/repomagpie-${VERSION}.tgz | cut -c1-8)`,
     "gh run view 987654 --log | grep $h",
-    `npm dist-tag add repomagpie@${VERSION} latest`,
-    "npm view repomagpie dist-tags --prefer-online shows beta and latest",
+    "A pre-release is staged under beta and stays off latest: npm view repomagpie dist-tags --prefer-online",
+    `shows beta on ${VERSION}, latest unchanged.`,
     `gh release create ${TAG} --prerelease --title "${VERSION}" --notes-file .scratch/release-notes-${VERSION}.md`,
     `npm install -g repomagpie@${VERSION}`,
     "repomagpie setup --yes",
     "repomagpie doctor",
   ]) assert.ok(r.out.includes(line), line);
-  // The tarball can be fetched only once approved, and latest moved first: approve, dist-tag, then the SHA.
+  // From 0.2.0 on, a beta never moves latest (docs/release.md, step 6). The tarball can be fetched
+  // only once approved: approve, then the SHA check.
+  assert.ok(!r.out.includes("npm dist-tag add"));
   const at = (text: string) => r.out.indexOf(text);
-  assert.ok(at("stage approve") < at("npm dist-tag add") && at("npm dist-tag add") < at("npm pack repomagpie@"), "approve, then dist-tag, then the SHA check");
+  assert.ok(at("stage approve") < at("npm pack repomagpie@"), "approve, then the SHA check");
   assert.ok(!/npm view(?![^\n]*--prefer-online)/.test(r.out), "every npm view has --prefer-online");
   assert.ok(!r.out.includes("$run"), "with the run's id known, no placeholder line");
   assert.ok(!r.out.includes("isn't there yet"));
@@ -117,6 +119,45 @@ test("--dry-run: checks 1 to 8 pass, nothing is tagged, and it needs no terminal
   assert.equal(r.code, 0, r.out);
   assert.equal(r.tagged, false);
   assert.match(r.out, /Dry run: every check passed\. Without --dry-run this asks you to type v0\.2\.0-beta\.15, then tags aaaaaaa and pushes v0\.2\.0-beta\.15 to origin\.\n$/);
+});
+
+test("a stable version, v0.2.0: staged under latest, latest not moved by hand, the GitHub release not a prerelease", async () => {
+  const stable = "0.2.0";
+  const tag = `v${stable}`;
+  const merge = `Merge pull request #90 from Varshavia/release/${tag}`;
+  const r = await run({
+    "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: stable }),
+    [`tag --list ${tag}`]: "",
+    [`ls-remote --tags origin refs/tags/${tag}`]: "",
+    "log -1 --format=%s HEAD": merge,
+    [`tag -a ${tag} -m ${tag}`]: "",
+    [`push origin ${tag}`]: "",
+    [`ls-files --others --ignored --exclude-standard -- .scratch/release-notes-${stable}.md`]: `.scratch/release-notes-${stable}.md`,
+  }, { ask: async () => tag });
+  assert.equal(r.code, 0, r.out);
+  for (const line of [
+    `ok  HEAD is the merge of release/${tag}: ${merge}`,
+    "ok  the release workflow's check (scripts/release-check.ts): dist-tag latest",
+    "npm      staged by the release workflow under the dist-tag latest",
+    `Tagged aaaaaaa as ${tag} and pushed it.`,
+    "A stable version is staged under latest: npm view repomagpie dist-tags --prefer-online shows it.",
+    `gh release create ${tag} --title "${stable}" --notes-file .scratch/release-notes-${stable}.md`,
+    `npm install -g repomagpie@${stable}`,
+  ]) assert.ok(r.out.includes(line), line);
+  assert.ok(!r.out.includes("--prerelease"));
+  assert.ok(!r.out.includes("npm dist-tag add"));
+});
+
+test("the merge of release/v0.2.0-beta.20 isn't the merge of release/v0.2.0", async () => {
+  const r = await run({
+    "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: "0.2.0" }),
+    "tag --list v0.2.0": "",
+    "ls-remote --tags origin refs/tags/v0.2.0": "",
+    "log -1 --format=%s HEAD": "Merge pull request #88 from Varshavia/release/v0.2.0-beta.20",
+  });
+  assert.equal(r.code, 1);
+  assert.equal(r.tagged, false);
+  assert.match(stopped(r.out), /not the merge of release\/v0\.2\.0\./);
 });
 
 test("the beta.14 case: the release pull request isn't merged yet, HEAD is the merge before it", async () => {

@@ -18,7 +18,7 @@ English · [Türkçe](docs/readme/README_tr.md) · [Deutsch](docs/readme/README_
 
 [Quick start](#quick-start) · [How it works](#how-it-works) · [What each agent gets](#what-each-agent-gets) · [FAQ](#faq) · [Documentation](#documentation)
 
-<code>npm install -g repomagpie@beta</code><br>
+<code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
 
 </div>
@@ -43,14 +43,14 @@ Do you want to proceed?
 - **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app. Lists and courses stay hidden unless you ask, and each result says why it is there.
 - **Start from a project:** `repomagpie init` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
 
-**Status:** beta, for early testers. The [changelog](CHANGELOG.md) lists every version; the [roadmap](docs/roadmap.md) shows what comes next.
+**Status:** stable and in active development. The [changelog](CHANGELOG.md) lists every version; the [roadmap](docs/roadmap.md) shows what comes next.
 
 ## Quick start
 
 1. Install the `repomagpie` command and set it up in your coding agents:
 
    ```bash
-   npm install -g repomagpie@beta
+   npm install -g repomagpie
    repomagpie setup
    ```
 
@@ -117,6 +117,10 @@ git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
 Or copy one of your own notes there: `repomagpie adopt pdfkit`. When a teammate's agent is about to run `npm install pdfkit`, the hook asks them first, and their `search` and `suggest` find the note too. Anyone who can read the repository can read its notes.
+
+In `repomagpie ui`, the Project view names the repository and says whether its shared notes are committed and pushed.
+
+![The Project view in repomagpie ui: acme/checkout on github.com and "Shared notes are committed." above the project journal's three notes; zod is open, and says your personal journal has a note on it too](docs/assets/screen-project.png)
 
 ## The local app
 

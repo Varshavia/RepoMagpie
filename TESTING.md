@@ -18,7 +18,7 @@ The checks the maintainer runs by hand before the launch are listed in [manual c
 ### 1. Install, set up and check
 
 ```bash
-npm install -g repomagpie@beta
+npm install -g repomagpie
 repomagpie setup
 repomagpie doctor
 ```
@@ -30,7 +30,7 @@ repomagpie doctor
 ### 2. Known traps
 
 - **Windows PowerShell says "running scripts is disabled on this system".** PowerShell's default execution policy blocks npm's `.ps1` scripts. Use `repomagpie.cmd` instead of `repomagpie` (and `npm.cmd` instead of `npm`), or run the commands in Command Prompt.
-- **macOS: `npm install -g` fails with `EACCES`.** Node from the nodejs.org installer puts global packages in a folder your user can't write to. Don't use `sudo`. Install Node with Homebrew instead (`brew install node`), then run `npm install -g repomagpie@beta` again. npm's page on [EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) has other ways.
+- **macOS: `npm install -g` fails with `EACCES`.** Node from the nodejs.org installer puts global packages in a folder your user can't write to. Don't use `sudo`. Install Node with Homebrew instead (`brew install node`), then run `npm install -g repomagpie` again. npm's page on [EACCES errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) has other ways.
 - **An agent's folder is there, but not its command or app** (an old install, or a folder another tool made). `setup` lists it as `not chosen: found ~/.codex only` and leaves it alone. If you do use it, run `repomagpie setup --agents codex` (with the agent's name).
 - **Codex CLI without its command: paste the entry.** `setup` adds Codex's MCP entry through `codex mcp add`. Without `codex` on `PATH`, it prints the entry instead: paste it into `~/.codex/config.toml` yourself. `repomagpie setup --dry-run --agents codex` prints it again.
 - **Codex CLI runs a new hook only after you trust it.** Open `/hooks` in Codex and trust RepoMagpie's hook. Run `repomagpie doctor` again: the Codex line says `trusted`.

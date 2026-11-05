@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · [Español](README_es.md) · [简体中文](README_zh-CN.md) · 日本語
 
-_これは英語版 README の翻訳で、英語版より古い場合があります。正本は英語版 README です。2026-11-04 時点の英語版 README から翻訳しました。_
+_これは英語版 README の翻訳で、英語版より古い場合があります。正本は英語版 README です。2026-11-05 時点の英語版 README から翻訳しました。_
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie のロゴ：横向きのカササギ">
 
@@ -20,7 +20,7 @@ _これは英語版 README の翻訳で、英語版より古い場合があり�
 
 [クイックスタート](#クイックスタート) · [仕組み](#仕組み) · [各エージェントに設定されるもの](#各エージェントに設定されるもの) · [よくある質問](#よくある質問) · [ドキュメント](#ドキュメント)
 
-<code>npm install -g repomagpie@beta</code><br>
+<code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
 
 </div>
@@ -45,14 +45,14 @@ Do you want to proceed?
 - **発見する：** GitHub をキーワード、関心事、種類で検索し、スター数と最近の活動も確認して、選んだリポジトリを inbox（受信箱）に追加します：`repomagpie discover` またはアプリで行えます。リストやコースは求めない限り非表示で、各結果にはそれが表示される理由が示されます。
 - **プロジェクトから始める：** `repomagpie init` はプロジェクトの依存関係をあなたのメモの内容ごとに一覧にし、メモのないものそれぞれについてあなたの Verdict を尋ねます。
 
-**ステータス：** 初期テスター向けのベータ版です。[変更履歴](../../CHANGELOG.md)にすべてのバージョンが載っています。今後の予定は[ロードマップ](../roadmap.md)をご覧ください。
+**ステータス：** 安定版で、開発が続いています。[変更履歴](../../CHANGELOG.md)にすべてのバージョンが載っています。今後の予定は[ロードマップ](../roadmap.md)をご覧ください。
 
 ## クイックスタート
 
 1. `repomagpie` コマンドをインストールし、コーディングエージェントに設定します：
 
    ```bash
-   npm install -g repomagpie@beta
+   npm install -g repomagpie
    repomagpie setup
    ```
 
@@ -119,6 +119,10 @@ git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
 または、自分のメモをそこにコピーします：`repomagpie adopt pdfkit`。チームメイトのエージェントが `npm install pdfkit` を実行しようとすると、フックがまずその人に確認し、その人の `search` と `suggest` もそのメモを見つけます。リポジトリを読める人は誰でも、そのメモを読めます。
+
+`repomagpie ui` の Project ビューには、リポジトリ名と、共有メモがコミット・プッシュ済みかどうかが表示されます。
+
+![repomagpie ui の Project ビュー：github.com の acme/checkout と「Shared notes are committed.」の下に、プロジェクトジャーナルの 3 件のメモがあります。zod が開いていて、個人ジャーナルにもメモがあることが示されています](../assets/screen-project.png)
 
 ## ローカルアプリ
 

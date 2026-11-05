@@ -219,7 +219,7 @@ function nextSteps(version: string, prerelease: boolean, head: string, io: Io): 
     "    ask the registry with --prefer-online.",
     ` 6. npm view repomagpie@${version} version dist.tarball --prefer-online`,
     prerelease
-      ? `    Until the first stable version, move latest too: npm dist-tag add repomagpie@${version} latest\n    then npm view repomagpie dist-tags --prefer-online shows beta and latest on ${version}.`
+      ? `    A pre-release is staged under beta and stays off latest: npm view repomagpie dist-tags --prefer-online\n    shows beta on ${version}, latest unchanged.`
       : "    A stable version is staged under latest: npm view repomagpie dist-tags --prefer-online shows it.",
     " 7. Check that the released tarball is the one the run packed: npm fetches it into .scratch/ (git-ignored).",
     "    From the repository's folder, copy these lines as they are. PowerShell:",
