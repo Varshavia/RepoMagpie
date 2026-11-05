@@ -20,6 +20,7 @@
     "url": "git+https://github.com/Varshavia/RepoMagpie.git"
   },
   "license": "MIT",
+  "mcpName": "io.github.Varshavia/repomagpie",
   "type": "module",
   "bin": {
     "repomagpie": "dist/cli/main.js",
