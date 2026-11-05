@@ -18,7 +18,7 @@ RepoMagpie'yi bir hafta test ettiğin için teşekkürler. 1. gün yaklaşık 20
 ### 1. Kur, ayarla ve kontrol et
 
 ```bash
-npm install -g repomagpie@beta
+npm install -g repomagpie
 repomagpie setup
 repomagpie doctor
 ```
@@ -30,7 +30,7 @@ repomagpie doctor
 ### 2. Bilinen tuzaklar
 
 - **Windows PowerShell "running scripts is disabled on this system" diyor.** PowerShell'in varsayılan çalıştırma ilkesi npm'in `.ps1` betiklerini engeller. `repomagpie` yerine `repomagpie.cmd` (ve `npm` yerine `npm.cmd`) kullan ya da komutları Komut İstemi'nde (Command Prompt) çalıştır.
-- **macOS: `npm install -g` `EACCES` ile başarısız oluyor.** nodejs.org kurulum programıyla gelen Node, global paketleri kullanıcının yazamadığı bir klasöre koyar. `sudo` kullanma. Bunun yerine Node'u Homebrew ile kur (`brew install node`), sonra `npm install -g repomagpie@beta` komutunu yeniden çalıştır. npm'in [EACCES hataları](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) sayfasında başka yollar da var.
+- **macOS: `npm install -g` `EACCES` ile başarısız oluyor.** nodejs.org kurulum programıyla gelen Node, global paketleri kullanıcının yazamadığı bir klasöre koyar. `sudo` kullanma. Bunun yerine Node'u Homebrew ile kur (`brew install node`), sonra `npm install -g repomagpie` komutunu yeniden çalıştır. npm'in [EACCES hataları](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) sayfasında başka yollar da var.
 - **Bir ajanın klasörü var, ama komutu ya da uygulaması yok** (eski bir kurulum ya da başka bir aracın açtığı bir klasör). `setup` onu `not chosen: found ~/.codex only` diye listeler ve dokunmaz. O ajanı kullanıyorsan `repomagpie setup --agents codex` çalıştır (ajanın adıyla).
 - **Komutu olmayan Codex CLI: kaydı elle yapıştır.** `setup`, Codex'in MCP kaydını `codex mcp add` ile ekler. `PATH`'te `codex` yoksa kaydı yazdırır: onu `~/.codex/config.toml` dosyasına kendin yapıştır. `repomagpie setup --dry-run --agents codex` kaydı yeniden yazdırır.
 - **Codex CLI yeni bir hook'u ancak ona güvendiğinde çalıştırır.** Codex'te `/hooks` açıp RepoMagpie'nin hook'una güven. `repomagpie doctor` komutunu yeniden çalıştır: Codex satırında `trusted` yazar.

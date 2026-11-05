@@ -22,7 +22,7 @@ There are no installers, no `.exe` or other downloads, no other packages and no 
 
 ## Supported versions
 
-RepoMagpie is in beta (`0.x`). Security fixes go into the next release; only the newest version gets them. Upgrade with `npm install -g repomagpie@beta`.
+RepoMagpie is at `0.x`. Security fixes go into the next release; only the newest version gets them. Upgrade with `npm install -g repomagpie`.
 
 ## What RepoMagpie reads, writes and sends
 
