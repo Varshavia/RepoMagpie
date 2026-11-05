@@ -1,6 +1,7 @@
 // Which repository the project journal belongs to, and whether its shared notes are committed and
 // pushed, for the app's Project view (docs/ui.md §7). Read from local git only: `git config` for the
-// remotes, `git status` and `git rev-list` for .magpie/. No fetch, nothing over the network, no shell.
+// remotes, `git status` and `git rev-list` for .magpie/, `git rev-parse` for the branch's upstream.
+// No fetch, nothing over the network, no shell.
 // Only `repomagpie ui` calls it, when the Project view opens; recall and the hooks never do.
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -20,6 +21,7 @@ export interface Repository {
 export interface ProjectInfoJson {
   repository: Repository | null; // null outside a git repository, or when git can't be run
   sharing: string | null; // one line on whether .magpie/ is committed and pushed; null when unknown
+  upstream: boolean; // the current branch tracks a remote branch, as local git knows it (no fetch)
 }
 
 const WEB_HOSTS = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
@@ -105,7 +107,7 @@ function gitIn(root: string, place: Place): Git | null {
 }
 
 export async function projectInfo(place: Place, git?: Git): Promise<ProjectInfoJson> {
-  const none: ProjectInfoJson = { repository: null, sharing: null };
+  const none: ProjectInfoJson = { repository: null, sharing: null, upstream: false };
   const journal = locateJournal("project", place);
   // The journal's repository (with --project, not the working folder's).
   const root = gitRoot(journal.error ? place.cwd : dirname(journal.path), place.home);
@@ -114,10 +116,12 @@ export async function projectInfo(place: Place, git?: Git): Promise<ProjectInfoJ
   if (!run) return none;
   const inside = !journal.error && existsSync(journal.path) && !relative(root, journal.path).startsWith("..");
   const pathspec = inside ? relative(root, journal.path).split(sep).join("/") || "." : null;
-  const [config, status, ahead] = await Promise.all([
+  const [config, status, ahead, upstream] = await Promise.all([
     run(["config", "--get-regexp", "^remote\\..*\\.url$"]),
     pathspec ? run(["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", pathspec]) : Promise.resolve(null),
     pathspec ? run(["rev-list", "--count", "@{upstream}..HEAD", "--", pathspec]) : Promise.resolve(null),
+    // The branch's upstream by name, from local config: fails (null) when there is none.
+    run(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]),
   ]);
   // `git config --get-regexp` exits 1 when there is no remote: that is "no remote", not a failure.
   // Telling them apart costs a call, so the repository's own check answers whether git works here.
@@ -127,5 +131,5 @@ export async function projectInfo(place: Place, git?: Git): Promise<ProjectInfoJ
   const parsed = remote === null ? null : parseRemote(remote);
   const repository = parsed ?? { name: clean(basename(resolve(root))), host: null, url: null };
   const count = ahead === null ? null : Number.parseInt(ahead.trim(), 10);
-  return { repository, sharing: status === null ? null : sharingLine(countChanged(status), Number.isNaN(count) ? null : count) };
+  return { repository, sharing: status === null ? null : sharingLine(countChanged(status), Number.isNaN(count) ? null : count), upstream: Boolean(upstream?.trim()) };
 }

@@ -2,7 +2,7 @@
 // they are committed and pushed, and, before there are any, the button that turns them on. In the
 // later chunk: only the Project view shows them.
 import type { ProjectInfoJson } from "../api.ts";
-import { hostLabel, turnOnLabel } from "../logic/project.ts";
+import { hostLabel, pullFirstLine, turnOnLabel } from "../logic/project.ts";
 import { visible } from "../logic/text.ts";
 import { EmptyState } from "./common.tsx";
 
@@ -38,6 +38,7 @@ export function SharedNotesSentence() {
 }
 
 export function SharedNotesOff({ info, onTurnOn }: { info: ProjectInfoJson | null; onTurnOn: () => void }) {
+  const pullFirst = pullFirstLine(info);
   return (
     <EmptyState
       action={
@@ -47,6 +48,7 @@ export function SharedNotesOff({ info, onTurnOn }: { info: ProjectInfoJson | nul
       }
     >
       <SharedNotesSentence />
+      {pullFirst ? ` ${pullFirst}` : null}
     </EmptyState>
   );
 }

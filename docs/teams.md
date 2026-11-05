@@ -27,6 +27,17 @@ git add .magpie
 git commit -m "Add our note on moment"
 ```
 
+## Turned on shared notes on two machines?
+
+One person turns shared notes on and pushes `.magpie/`; everyone else pulls first. In the app, **Turn on shared notes** says "If a teammate may have turned them on already, pull first." when your branch tracks a remote branch.
+
+If two people turned them on, the second `git pull` stops with "untracked working tree files would be overwritten by merge", naming `.magpie/.gitignore`, `.magpie/tags.md` and any note. Your notes are still there. To keep them:
+
+1. Move your `.magpie/` folder out of the repository, for example to `../magpie-mine`.
+2. `git pull`. Now `.magpie/` holds your teammate's notes.
+3. Copy your notes back in. For a note that came from your personal journal, use **Copy to this project** in the app or `repomagpie adopt <name>`. Otherwise, copy the files from `../magpie-mine/notes/` into `.magpie/notes/` by hand. A note on a package the project already has stays out: open both and merge the text yourself. Add any lines you wrote in your `tags.md` to the pulled one.
+4. Commit and push `.magpie/`, then delete `../magpie-mine`.
+
 ## Reviewing rules with pull requests
 
 A change to `.magpie/` is a change to the code, so it goes through a pull request like any other.

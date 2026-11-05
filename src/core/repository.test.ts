@@ -79,30 +79,45 @@ test("projectInfo: the identity and the line from git's answers; the credentials
     config: "remote.origin.url https://me:ghp_FAKEtoken@github.com/acme/widget.git\n",
     status: "?? .magpie/notes/npm--a.md\0?? .magpie/tags.md\0",
     "rev-list": null, // no upstream
+    "rev-parse": null,
   };
   const info = await projectInfo(box(), async (args) => (calls.push(args), answers[args[0]] ?? null));
   assert.deepEqual(info, {
     repository: { name: "acme/widget", host: "github.com", url: "https://github.com/acme/widget" },
     sharing: "2 shared note files aren't committed yet, so your team can't see them.",
+    upstream: false,
   });
   assert.ok(!JSON.stringify(info).includes("ghp_"));
   assert.deepEqual(calls.find((c) => c[0] === "status"), ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ".magpie"]);
-  assert.ok(calls.every((c) => !["fetch", "pull", "push", "remote"].includes(c[0])), "local calls only");
+  assert.ok(calls.every((c) => !["fetch", "pull", "push", "remote", "ls-remote"].includes(c[0])), "local calls only");
 });
 
 test("projectInfo: no remote shows the folder's name; no journal yet, no line", async () => {
-  const git = async (args: string[]) => (args[0] === "rev-parse" ? ".git\n" : null);
-  assert.deepEqual(await projectInfo(box(false), git), { repository: { name: "app", host: null, url: null }, sharing: null });
+  const git = async (args: string[]) => (args.join(" ") === "rev-parse --git-dir" ? ".git\n" : null);
+  assert.deepEqual(await projectInfo(box(false), git), { repository: { name: "app", host: null, url: null }, sharing: null, upstream: false });
+});
+
+// Before shared notes are on, the app says to pull first when the branch tracks one (docs/teams.md).
+test("projectInfo: a branch with an upstream says so, from local git, before the journal exists", async () => {
+  const calls: string[] = [];
+  const git = async (args: string[]) => {
+    calls.push(args.join(" "));
+    if (args[0] === "config") return "remote.origin.url git@github.com:acme/widget.git\n";
+    return args.join(" ") === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}" ? "origin/main\n" : null;
+  };
+  assert.deepEqual(await projectInfo(box(false), git), { repository: { name: "acme/widget", host: "github.com", url: "https://github.com/acme/widget" }, sharing: null, upstream: true });
+  assert.deepEqual(calls, ["config --get-regexp ^remote\\..*\\.url$", "rev-parse --abbrev-ref --symbolic-full-name @{upstream}"]);
 });
 
 test("projectInfo: git that fails or isn't there shows nothing; outside a repository, nothing", async () => {
-  assert.deepEqual(await projectInfo(box(), async () => null), { repository: null, sharing: null });
+  const nothing = { repository: null, sharing: null, upstream: false };
+  assert.deepEqual(await projectInfo(box(), async () => null), nothing);
   const root = scratchBase("repository");
   mkdirSync(join(root, "home", "notes-folder"), { recursive: true }); // below home without a repository: outside one
-  assert.deepEqual(await projectInfo({ home: join(root, "home"), env: {}, cwd: join(root, "home", "notes-folder") }, async () => "x"), { repository: null, sharing: null });
+  assert.deepEqual(await projectInfo({ home: join(root, "home"), env: {}, cwd: join(root, "home", "notes-folder") }, async () => "x"), nothing);
   // No git on PATH.
   const place = box();
-  assert.deepEqual(await projectInfo({ ...place, env: { ...place.env, PATH: "", Path: "" } }), { repository: null, sharing: null });
+  assert.deepEqual(await projectInfo({ ...place, env: { ...place.env, PATH: "", Path: "" } }), nothing);
 });
 
 // The real git, when there is one: a fresh repository, then a commit. Skipped without git.
@@ -122,7 +137,7 @@ test("projectInfo with git: uncommitted, then committed; an empty .git never rea
   // Before git init: the folder's .git is empty, and this scratch folder sits inside RepoMagpie's
   // own repository. Nothing of that one may show.
   const outside = await projectInfo({ ...place, env: process.env as Record<string, string> });
-  assert.deepEqual(outside, { repository: null, sharing: null });
+  assert.deepEqual(outside, { repository: null, sharing: null, upstream: false });
 
   git("init", "-q");
   git("remote", "add", "origin", "https://u:FAKE@github.com/acme/widget.git");
@@ -134,8 +149,13 @@ test("projectInfo with git: uncommitted, then committed; an empty .git never rea
   assert.deepEqual(await projectInfo(real), {
     repository: { name: "acme/widget", host: "github.com", url: "https://github.com/acme/widget" },
     sharing: "2 shared note files aren't committed yet, so your team can't see them.",
+    upstream: false,
   });
   git("add", ".magpie");
   git("commit", "-q", "-m", "notes");
   assert.equal((await projectInfo(real)).sharing, "Shared notes are committed.");
+  // A remote branch as a fetch would leave it, tracked: nothing is fetched.
+  git("update-ref", "refs/remotes/origin/main", "HEAD");
+  git("branch", "--set-upstream-to=origin/main");
+  assert.deepEqual(await projectInfo(real).then(({ sharing, upstream }) => ({ sharing, upstream })), { sharing: "Shared notes are committed.", upstream: true });
 });
