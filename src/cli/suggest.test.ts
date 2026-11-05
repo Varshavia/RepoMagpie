@@ -143,6 +143,15 @@ test("in a terminal, the Instead line follows the Verdict, under the name; more 
   ].join("\n"));
 });
 
+test("an alternative your notes say to avoid is marked on the Instead line (decision 0059)", async () => {
+  const box = sandbox({
+    ...ALTERNATIVES,
+    "journal/notes/npm--pdf-lib.md": note({ id: "pkg:npm/pdf-lib", verdict: "avoid: too low-level" }),
+  });
+  const r = await magpie(box, ["suggest"]);
+  assert.match(r.out, /\n {2}pdfkit {2}npm {2}personal {2}Verdict: avoid: async streams painful; use puppeteer {2}Instead: puppeteer, pdf-lib \(your notes say avoid\)\n/);
+});
+
 test("a name-only avoid note gets no Instead line", async () => {
   const box = sandbox({
     "journal/notes/pypi--pdfkit.md": withAlternatives(note({ id: "pkg:pypi/pdfkit", verdict: "avoid: wkhtmltopdf wrapper" }), ["[[weasyprint]]"]),

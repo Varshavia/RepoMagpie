@@ -27,6 +27,7 @@ How RepoMagpie versions, records and ships releases. What each release contains 
 | Stage the version on npm (package `repomagpie`) | the release workflow, on the tag ([decision 0033](decisions/0033-releases-staged-from-ci.md)) |
 | Approve the staged version on npmjs.com, with 2FA | maintainer, by hand |
 | Create GitHub releases | maintainer, by hand |
+| List a stable version in the MCP Registry (`mcp-publisher`) | maintainer, by hand |
 
 Agents can't tag, release or publish: git-guard and the deny list block those commands, and `npm run release:tag` without `--dry-run` ([CLAUDE.md](../CLAUDE.md), section 1).
 
@@ -38,7 +39,7 @@ The example is a pre-release, `0.2.0-beta.2`. For a final release, drop `--tag b
 
 The maintainer creates the branch `release/vX.Y.Z` (or `release/vX.Y.Z-beta.N`) from `main`. On it, the agent:
 
-- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), and in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's; `npm test` fails until the three agree);
+- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's), and in `server.json`'s `version` and `packages[0].version` (the MCP Registry lists the version it names, step 11). `npm test` fails until they all agree, and the release workflow refuses a tag whose `server.json` names another version;
 - [ ] moves the Unreleased entries in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`, with a one-line summary, leaves an empty `## [Unreleased]`, and updates the compare links at the end of the file;
 - [ ] checks that the section covers everything merged since the last release (`git log --oneline vPREVIOUS..HEAD`);
 - [ ] updates the roadmap's Now and Next (the READMEs name no version: their status line has said "stable" in all six since `0.2.0`);
@@ -73,7 +74,7 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
 
 1. Commit the release branch, push it, and open a pull request to `main`.
 2. Merge it once CI is green ("Rebase and merge" or a merge commit, not squash).
-3. Tag the merge: `git switch main`, `git pull`, then `npm run release:tag`. It checks, in order: on `main` with a clean tree; after `git fetch origin main --tags`, `main` is `origin/main` (not behind, not ahead); `package.json`'s version isn't tagged yet, here or on GitHub; `HEAD` is the merge of `release/v<version>` (or, after "Rebase and merge", that branch's last commit, patch for patch); and the release workflow's own check (`scripts/release-check.ts`). It stops at the first that fails and says what to do. Then it asks you to type the tag (`v0.2.0-beta.2`), creates it with `git tag -a`, pushes it, and prints steps 4 to 10 filled in with the version. `npm run release:tag -- --dry-run` runs the checks only. It needs a terminal to tag, and agents can run only the dry run ([CLAUDE.md](../CLAUDE.md), section 1).
+3. Tag the merge: `git switch main`, `git pull`, then `npm run release:tag`. It checks, in order: on `main` with a clean tree; after `git fetch origin main --tags`, `main` is `origin/main` (not behind, not ahead); `package.json`'s version isn't tagged yet, here or on GitHub; `HEAD` is the merge of `release/v<version>` (or, after "Rebase and merge", that branch's last commit, patch for patch); and the release workflow's own check (`scripts/release-check.ts`, which also wants `server.json`'s two versions to be the release's). It stops at the first that fails and says what to do. Then it asks you to type the tag (`v0.2.0-beta.2`), creates it with `git tag -a`, pushes it, and prints steps 4 to 11 filled in with the version. `npm run release:tag -- --dry-run` runs the checks only. It needs a terminal to tag, and agents can run only the dry run ([CLAUDE.md](../CLAUDE.md), section 1).
 
    By hand, if the script can't run, in this order (three releases were tagged before their merge):
    1. Merge the release pull request (step 2).
@@ -81,7 +82,7 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
    3. `git log -1` shows that merge, and `package.json`'s `version` is the release's (`0.2.0-beta.2`). If either isn't so, stop: the pull hasn't brought the merge yet.
    4. `git tag v0.2.0-beta.2`, then `git push origin v0.2.0-beta.2`.
 4. The tag starts `.github/workflows/release.yml`. Its first job:
-   - checks out with the whole history, then refuses a tag that isn't `v` plus `package.json`'s version, or whose commit isn't on `main`'s history (`scripts/release-check.ts`; it also refuses a shallow checkout);
+   - checks out with the whole history, then refuses a tag that isn't `v` plus `package.json`'s version, a `server.json` that names another version, or a commit that isn't on `main`'s history (`scripts/release-check.ts`; it also refuses a shallow checkout);
    - runs every check in step 2 except the benchmarks, and the end-to-end tests;
    - refuses a version npm already has;
    - packs the package once, prints the tarball's name and SHA-256, and uploads it as the artifact `package`.
@@ -95,6 +96,13 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
 8. **Check the provenance:** the version's page on npmjs.com shows "Built and signed on GitHub Actions", linked to this repository, the tagged commit and the `release.yml` run. `npm audit signatures` in a project that installed it checks the same signatures.
 9. Create the GitHub release from the drafted notes: `gh release create v0.2.0-beta.2 --prerelease --title "RepoMagpie 0.2.0-beta.2" --notes-file <notes>`.
 10. Install the exact version and check it: `npm install -g repomagpie@0.2.0-beta.2`, then `repomagpie --version` prints `0.2.0-beta.2`.
+11. **List a stable version in the [MCP Registry](https://registry.modelcontextprotocol.io)** (in preview), after step 10. A pre-release is never listed: the registry's entry is what clients run, so it stays on the last stable version. The registry holds metadata only: `server.json` at the repository's root, whose `name`, `io.github.Varshavia/repomagpie`, must equal `package.json`'s `mcpName` in the published package, case and all (GitHub sign-in allows only names under `io.github.<your GitHub login>/`). A client runs `npx -y repomagpie@<version> mcp`: the read-only tools, without `--allow-write`. From the repository's folder, on `main` at the tag:
+    1. Install `mcp-publisher` once ([quickstart](https://modelcontextprotocol.io/registry/quickstart)): `brew install mcp-publisher` on macOS; on Linux, its release archive from `https://github.com/modelcontextprotocol/registry/releases/latest`; on Windows, `mcp-publisher_windows_amd64.tar.gz` (or `_arm64`) from the same page, unpacked with `tar xf` and `mcp-publisher.exe` moved to a folder on `PATH`. `mcp-publisher --help` answers.
+    2. `mcp-publisher login github`: it prints a code to enter at `https://github.com/login/device`. Sign in as `Varshavia`. A later "Invalid or expired Registry JWT token" means logging in again.
+    3. `mcp-publisher publish`: it reads `server.json` and answers "Successfully published". The registry checks that the npm package at that version has the `mcpName`; "Registry validation failed for package" means the version on npm hasn't it (`0.2.0` hasn't; `0.2.1` is the first that can be listed).
+    4. Check it: open `https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Varshavia/repomagpie` (or `curl` it). It lists the server with the new `version`.
+
+    `npx` runs the server from a clean machine, with no global install: checked on 2026-11-05 with an empty npm cache and prefix, `npx -y repomagpie@0.2.0 mcp` answered `initialize` and listed its five read-only tools. Publishing from CI (GitHub's OIDC sign-in) isn't set up yet ([roadmap](roadmap.md#launch)).
 
 **If the release workflow can't stage** (an npm or GitHub outage, not a red check: fix that and tag again with a new version): from the tagged commit, `npm ci`, `npm run build`, `npm login`, then `npm stage publish --tag beta` with 2FA, and approve as in step 5. That version has no provenance; the release notes say so.
 

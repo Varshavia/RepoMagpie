@@ -20,7 +20,8 @@ A hidden or control character in note text shows as an ASCII marker in its place
 - `matches[].alternatives[]`: what the user noted to use instead, from the note's own alternatives field and from notes that list this one; `[]` when none. Reviewed ones first, then inbox ones, then avoid ones, then names without a note.
 - `matches[].alternatives[].name`: the alternative's name.
 - `matches[].alternatives[].verdict`: its Verdict, or `null` (in the inbox, or no note).
-- `matches[].alternatives[].avoid`: `true` when the user also noted to avoid it.
+- `matches[].alternatives[].avoid`: `true` when a note in either journal says to avoid it.
+- `matches[].alternatives[].avoid_in`: the journals whose note says to avoid it, `"project"` first; `[]` when none.
 - `matches[].alternatives[].path`: its note's file, or `null` when the journal has no note on it.
 - `matches[].alternatives[].reason`: only for an alternative without a note: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name; `repomagpie search <name> --json` lists them).
 An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `matches[].avoid_when` has items.

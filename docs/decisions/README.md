@@ -37,7 +37,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0026 | [The app is the workspace; v0.2 is "Connect"](0026-the-app-is-the-workspace.md) | accepted (changes the graph's status in 0010) |
 | 0027 | [`alternatives` becomes active; `works_with` stays planned](0027-alternatives-active.md) | accepted (accepts 0007 in part) |
 | 0028 | [The graph page](0028-the-graph-page.md) | accepted (the "Tag nodes" row and labelling every node under 150 superseded by 0044; the first files' size line superseded by 0048) |
-| 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted |
+| 0029 | [Recall names alternatives](0029-recall-names-alternatives.md) | accepted (the avoid mark superseded by 0059) |
 | 0030 | [GitHub topics become tags](0030-github-topics-become-tags.md) | accepted (kind of a registry package note added by 0039; kind rule 10 changed and rules 3a, 7a and 8a added by 0047) |
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
@@ -67,3 +67,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0056 | [Domain labels for the sixteen domains, and the mappings measured](0056-domain-labels-for-sixteen-domains.md) | accepted (changes 0055's rules 1 and 2) |
 | 0057 | [The cache is updated, not rewritten](0057-the-cache-is-updated-not-rewritten.md) | accepted (adds to 0050) |
 | 0058 | [The type of a bare name](0058-the-type-of-a-bare-name.md) | accepted (adds to the spec's bare-name rule) |
+| 0059 | [An avoided alternative is marked](0059-an-avoided-alternative-is-marked.md) | accepted (supersedes 0029's avoid mark) |

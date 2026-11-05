@@ -82,10 +82,10 @@ test("every candidate lists its alternatives from both sides, in recall's shape;
   const candidates = runSuggest({ limit: 20 }, p).document.candidates;
   const of = (journal: string, name: string) => candidates.find((c) => c.journal === journal && c.name === name)?.alternatives;
   assert.deepEqual(of("personal", "commander"), [
-    { name: "yargs", id: "pkg:npm/yargs", journal: "personal", verdict: "too much for small CLIs", status: "reviewed", avoid: false, path: join(p.root, "journal", "notes", "npm--yargs.md") },
-    { name: "cac", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null, reason: "missing" },
+    { name: "yargs", id: "pkg:npm/yargs", journal: "personal", verdict: "too much for small CLIs", status: "reviewed", avoid: false, avoid_in: [], path: join(p.root, "journal", "notes", "npm--yargs.md") },
+    { name: "cac", id: null, journal: "personal", verdict: null, status: null, avoid: false, avoid_in: [], path: null, reason: "missing" },
   ]);
-  assert.deepEqual(of("project", "commander"), [{ name: "yargs", id: null, journal: "project", verdict: null, status: null, avoid: false, path: null, reason: "missing" }]);
+  assert.deepEqual(of("project", "commander"), [{ name: "yargs", id: null, journal: "project", verdict: null, status: null, avoid: false, avoid_in: [], path: null, reason: "missing" }]);
   assert.deepEqual(of("personal", "tsx")?.map((a) => a.name), ["ts-node"], "the reverse side");
 });
 
@@ -98,8 +98,20 @@ test("an in_use_avoid item lists its alternatives, as recall does", () => {
   });
   const [pdfkit] = runSuggest({ limit: 20 }, p).document.in_use_avoid;
   assert.deepEqual(pdfkit.alternatives, [
-    { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: join(p.root, "journal", "notes", "npm--puppeteer.md") },
+    { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, avoid_in: [], path: join(p.root, "journal", "notes", "npm--puppeteer.md") },
   ]);
+});
+
+// Decision 0059: a project candidate's alternative that only the personal journal says to avoid.
+test("a candidate's alternative avoided in the other journal is marked", () => {
+  const p = place({
+    ...PERSONAL,
+    "journal/notes/npm--yargs.md": note({ id: "pkg:npm/yargs", verdict: "avoid: too much for small CLIs" }),
+    ...PROJECT,
+    "project/.magpie/notes/npm--commander.md": withAlternatives(note({ id: "pkg:npm/commander", verdict: "our CLI parser", tags: ["cli"] }), ["[[yargs]]"]),
+  });
+  const commander = runSuggest({ limit: 20 }, p).document.candidates.find((c) => c.journal === "project" && c.name === "commander");
+  assert.deepEqual(commander?.alternatives.map((a) => [a.name, a.path, a.avoid, a.avoid_in]), [["yargs", null, true, ["personal"]]]);
 });
 
 test("why: the keywords a note matched, in keyword order, and the dependencies whose every word it matched", () => {

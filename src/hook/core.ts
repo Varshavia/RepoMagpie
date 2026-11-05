@@ -5,7 +5,7 @@
 import { sep } from "node:path";
 import { detectCommand, type Install } from "../core/install-detect.ts";
 import { usable, type Env } from "../core/journals.ts";
-import { isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
+import { AVOID_MARK, isAvoid, openRecallSources, recall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { CAPS, clean, cut, nameConcern, quote } from "../core/text.ts";
 
 export interface HookContext {
@@ -141,16 +141,22 @@ function contextLine(m: RecallMatch, texts: { home: string }): string {
   return `${line} ${isAvoid(m) ? `Offer them to the user instead of ${name}. ${show}` : show}`;
 }
 
-// One alternative, its name quoted: its Verdict quoted, or why it has none; an avoid mark; and a
-// name that can't be the package it seems (non-ASCII letters, or no valid package name).
+// One alternative, its name quoted: its Verdict quoted, or why it has none; who says to avoid it;
+// and a name that can't be the package it seems (non-ASCII letters, or no valid package name).
 function alternativeText(a: Alternative, m: RecallMatch, label: string): string {
   const name = quoted(a.name, CAPS.name);
   const concern = nameConcern(a.name, a.path === null);
   const flag = concern === "non-ascii" ? "; its name has non-ASCII letters, which can look like others" : concern === "invalid" ? "; its name isn't a valid package name" : "";
-  if (a.path === null) return `${name} (no note${flag})`;
+  const avoid = a.avoid_in.map((journal) => avoidWho(journal, m)).join("");
+  if (a.path === null) return `${name} (no note${avoid}${flag})`;
   const about = a.verdict === null ? "inbox, no Verdict yet" : `${label}: ${quoted(a.verdict, HOOK_CAPS.alternativeVerdict)}`;
-  const avoid = a.avoid ? (personal(m) ? "; you also noted to avoid it" : "; this journal also says to avoid it") : "";
   return `${name} (${about}${avoid}${flag})`;
+}
+
+// Who says to avoid an alternative (decision 0059): the match's own journal, or the other one.
+function avoidWho(journal: Alternative["journal"], m: RecallMatch): string {
+  if (journal === m.journal) return personal(m) ? "; you also noted to avoid it" : "; this journal also says to avoid it";
+  return journal === "personal" ? "; your personal journal says to avoid it" : "; this project's journal says to avoid it";
 }
 
 // One match in the permission prompt's reason, for the user (and for the agent when a -p run
@@ -177,7 +183,7 @@ function message(m: RecallMatch): string {
   const avoidWhen = avoidWhenOf(m);
   return `RepoMagpie: ${packageName(m)} (${where}): ${verdictOf(m) ?? "[inbox] no verdict yet"}` +
     (avoidWhen ? `. Avoid when: ${avoidWhen}` : "") +
-    (alternatives(m).length ? `. Alternatives: ${few(alternatives(m), (a) => quoted(a.name, CAPS.name), ", ")}` : "");
+    (alternatives(m).length ? `. Alternatives: ${few(alternatives(m), (a) => `${quoted(a.name, CAPS.name)}${a.avoid ? ` (${AVOID_MARK})` : ""}`, ", ")}` : "");
 }
 
 // At most 3 alternatives, then "+N more" (decision 0029).

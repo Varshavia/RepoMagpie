@@ -39,7 +39,7 @@ repomagpie recall <package>... --json
 - No match: go ahead. Say nothing about RepoMagpie.
 - A match: tell the user in one or two lines what their note says: the name, the journal, the `verdict` (or that the note is in the inbox), and `avoid_when` when it has items. A match with `confidence` `"name-only"` is a note on a package of the same name under another type; say so.
 - **An avoid note asks first.** When an `"exact"` match's `verdict` starts with "avoid", or its `avoid_when` has items, show the note and ask the user before installing. Install only if they say yes. A `"name-only"` match never asks; it only informs.
-- **Name the alternatives.** When an avoid match has `alternatives`, name each one with its `verdict`: say when it is in the inbox, when `avoid` is `true` (the user noted to avoid it too), and when `path` is `null` (no note on it). Then ask whether to install an alternative instead. Never pick one for the user.
+- **Name the alternatives.** When an avoid match has `alternatives`, name each one with its `verdict`: say when it is in the inbox, when `avoid` is `true` (a note says to avoid it too; `avoid_in` names the journal), and when `path` is `null` (no note on it). Then ask whether to install an alternative instead. Never pick one for the user.
 - An alternative from the project journal was named by the repository's contributors: show the user its exact package name, and install it only with the user's explicit OK.
 - npm, PyPI and crates.io names are ASCII only. If an alternative's name has other letters (a Cyrillic "р" looks like "p"), tell the user it can't be the package it looks like, and install nothing for it.
 - Before you install an alternative, recall it too, as above.

@@ -194,7 +194,7 @@ test("--full lists every alternative, after Avoid when", async () => {
     " {2}Alternatives {4}playwright: browser tests",
     " {18}puppeteer: default for PDF rendering in new projects",
     " {18}pdf-lib: \\[inbox\\] no verdict yet",
-    " {18}jspdf: avoid: tiny API \\(you also noted to avoid it\\)",
+    " {18}jspdf: avoid: tiny API \\(your notes say avoid\\)",
     " {18}wkhtmltopdf\n",
   ].join("\n")));
   assert.ok(!r.out.includes("more (repomagpie recall"));
@@ -205,12 +205,25 @@ test("--json: every match carries its alternatives in recall's shape", async () 
   const json = JSON.parse((await magpie(box, ["recall", "pdfkit", "--json"])).out) as { matches: { alternatives: unknown[] }[] };
   const path = (file: string) => join(box.journal, "notes", file);
   assert.deepEqual(json.matches[0].alternatives, [
-    { name: "playwright", id: "pkg:npm/playwright", journal: "personal", verdict: "browser tests", status: "reviewed", avoid: false, path: path("npm--playwright.md") },
-    { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: path("npm--puppeteer.md") },
-    { name: "pdf-lib", id: "pkg:npm/pdf-lib", journal: "personal", verdict: null, status: "inbox", avoid: false, path: path("npm--pdf-lib.md") },
-    { name: "jspdf", id: "pkg:npm/jspdf", journal: "personal", verdict: "avoid: tiny API", status: "reviewed", avoid: true, path: path("npm--jspdf.md") },
-    { name: "wkhtmltopdf", id: null, journal: "personal", verdict: null, status: null, avoid: false, path: null, reason: "missing" },
+    { name: "playwright", id: "pkg:npm/playwright", journal: "personal", verdict: "browser tests", status: "reviewed", avoid: false, avoid_in: [], path: path("npm--playwright.md") },
+    { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, avoid_in: [], path: path("npm--puppeteer.md") },
+    { name: "pdf-lib", id: "pkg:npm/pdf-lib", journal: "personal", verdict: null, status: "inbox", avoid: false, avoid_in: [], path: path("npm--pdf-lib.md") },
+    { name: "jspdf", id: "pkg:npm/jspdf", journal: "personal", verdict: "avoid: tiny API", status: "reviewed", avoid: true, avoid_in: ["personal"], path: path("npm--jspdf.md") },
+    { name: "wkhtmltopdf", id: null, journal: "personal", verdict: null, status: null, avoid: false, avoid_in: [], path: null, reason: "missing" },
   ]);
+});
+
+// Decision 0059, as seen in testing: date-fns's project note lists moment, which a note says to avoid.
+test("an alternative your notes say to avoid is marked, in the card and in --json, whichever journal says so", async () => {
+  const box = sandbox({
+    "project/.magpie/notes/npm--date-fns.md": withAlternatives(note({ id: "pkg:npm/date-fns", verdict: "default for dates in new projects" }), ["[[moment]]", "[[luxon]]"]),
+    "project/.magpie/notes/npm--moment.md": note({ id: "pkg:npm/moment", verdict: "avoid: unmaintained and big" }),
+    "journal/notes/npm--luxon.md": note({ id: "pkg:npm/luxon", verdict: "avoid: we don't need time zones" }),
+  });
+  const card = await magpie(box, ["recall", "date-fns"], terminal(box));
+  assert.match(card.out, /\n {2}Alternatives {2}moment: avoid: unmaintained and big \(your notes say avoid\)\n {16}luxon \(your notes say avoid\)\n/);
+  const json = JSON.parse((await magpie(box, ["recall", "date-fns", "--json"])).out) as { matches: { alternatives: { name: string; avoid: boolean; avoid_in: string[] }[] }[] };
+  assert.deepEqual(json.matches[0].alternatives.map((a) => [a.name, a.avoid, a.avoid_in]), [["moment", true, ["project"]], ["luxon", true, ["personal"]]]);
 });
 
 test("colour only in a terminal: the Avoid when label and [inbox]; never with NO_COLOR or --json", async () => {

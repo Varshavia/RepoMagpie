@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- RepoMagpie's MCP server can be listed in the official MCP Registry as `io.github.Varshavia/repomagpie`. A client installs it from there and runs `npx -y repomagpie@<version> mcp`, the read-only tools.
+- The JSON of `repomagpie recall`, `repomagpie suggest`, the MCP tools and the app's API gives each alternative `avoid_in`: the journals whose note says to avoid it.
+
+### Fixed
+
+- An alternative that your notes say to avoid is marked as such wherever alternatives are shown: `Alternatives: "moment" (your notes say avoid)` in the hook's line for you, the recall card, suggest's Instead line, and the app's Check a package and Suggest. Before, the hook's line for you named it with no mark, so it read as a recommendation. The note in the other journal counts too: a project note's alternative that you noted to avoid in your personal journal is marked, and the other way round.
+- When shared notes were turned on on two machines, the second `git pull` failed with "untracked working tree files would be overwritten". In the app, **Turn on shared notes** now says "If a teammate may have turned them on already, pull first." when your branch tracks a remote branch, and [working as a team](docs/teams.md#turned-on-shared-notes-on-two-machines) says how to recover.
+
 ## [0.2.0] - 2026-11-05
 
 The first stable release. RepoMagpie keeps your notes on packages and tools as Markdown files, and your coding agent reads them before it installs anything: through the MCP server, the skill and an install hook, set up in seven agents by `repomagpie setup`. A project journal, `.magpie/` in the repository, shares the team's notes with every contributor. The local app reviews, searches, discovers, suggests and draws your notes as a graph. Install it with `npm install -g repomagpie`; the `@beta` tag is no longer needed. New since 0.2.0-beta.20: the Project view names the repository and says whether its shared notes are committed.

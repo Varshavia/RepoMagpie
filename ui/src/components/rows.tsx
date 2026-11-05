@@ -4,6 +4,7 @@
 import { Fragment } from "react";
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import type { Scope, SearchResult } from "../api.ts";
+import { avoidMark } from "../logic/schema.ts";
 import { whyLine } from "../logic/search.ts";
 import type { SuggestItem } from "../logic/suggest.ts";
 import { visible } from "../logic/text.ts";
@@ -70,6 +71,7 @@ export function InsteadLine({ item, onOpen, onAdd, onSearch, inRow = false }: {
         <Fragment key={`${a.name} ${i}`}>
           {i ? ", " : null}
           <AlternativeName alternative={a} onOpen={onOpen} onAdd={onAdd} onSearch={onSearch} inRow={inRow} />
+          {avoidMark(a)}
         </Fragment>
       ))}
       {item.moreInstead ? `, +${item.moreInstead} more` : null}

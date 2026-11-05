@@ -1,6 +1,6 @@
 # 0029 — Recall names alternatives
 
-**Status:** accepted (2026-10-08). Builds on [0027](0027-alternatives-active.md) (the `alternatives` relation) and [0024](0024-recall-asks-on-avoid-notes.md) (the hook asks on avoid notes); changes neither.
+**Status:** accepted (2026-10-08). Builds on [0027](0027-alternatives-active.md) (the `alternatives` relation) and [0024](0024-recall-asks-on-avoid-notes.md) (the hook asks on avoid notes); changes neither. The avoid mark ("`(you also noted to avoid it)` when it is itself an avoid note") superseded by [0059](0059-an-avoided-alternative-is-marked.md) (2026-11-05): it reads both journals, and people read `(your notes say avoid)`.
 
 ## Context
 When the agent is about to install pdfkit, the hook says the user noted to avoid it. It doesn't say what to use instead, even when the journal knows: v0.2 part 1 made `alternatives` an active field, and one side of the relation is enough ([0027](0027-alternatives-active.md)).

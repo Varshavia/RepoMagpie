@@ -34,6 +34,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: `0.2.0-beta.20` (2026-11-04): the project journal before launch (#87) and the README in German, Spanish, Chinese and Japanese (#85).
   Also now: [the repository in the Project view](#the-repository-in-the-project-view-featproject-identity) (`feat/project-identity`): its name and host, "Turn on shared notes", and whether they are committed and pushed. Merged (#89) and released in `0.2.0`.
   Also now: `0.2.0` (2026-11-05), the first stable release: the repository in the Project view (#89) since `0.2.0-beta.20`. The install command is `npm install -g repomagpie`, without `@beta`, in the six READMEs, the tester guide and the docs; the README's screenshots are retaken, with one of the Project view.
+  Also now: [the MCP Registry listing](#launch) (`feat/mcp-registry`, for `0.2.1` before the launch): `server.json` and `mcpName`, an avoided alternative marked as such ([decision 0059](decisions/0059-an-avoided-alternative-is-marked.md)), and shared notes turned on on two machines.
   Also now: recall right after one note changed, over its 150 ms budget on the maintainer's machine (`perf/recall-one-note-changed`, [decision 0057](decisions/0057-the-cache-is-updated-not-rewritten.md)): the per-note caches write a small delta beside them instead of being rewritten whole; at 2,000 notes recall right after one note changed 145 → 138 ms, the hook 136 → 128–131 ms. Merged (#83) and released in `0.2.0-beta.19`.
 - **Next:** the [launch](#launch) steps left (the demo, good first issues, `CODE_OF_CONDUCT.md`, the announcements), then [teams after launch](#teams-after-launch).
   Also next: the rest of [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 2 (the field boosts, fuzzy and prefix limits, optional `files`), with its decision record. Then follow-ups from `feat/next-batch`: the graph's cold first open (each note parsed once for both caches; done in `perf/graph-open`, above).
@@ -276,6 +277,9 @@ See [marketing.md](marketing.md).
 - [x] Logo: a magpie, legible at 16 px; direction with `taste-skill` (`docs/assets/logo.svg`, also the app's favicon)
 - [ ] Five "good first issue" issues
 - [ ] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact.
+- [x] The MCP Registry listing, prepared (`feat/mcp-registry`, for `0.2.1`): `mcpName` in `package.json`, `server.json` at the root (`npx -y repomagpie@<version> mcp`, stdio), its two versions checked by `npm test` and the release workflow, and the publishing steps ([release process](release.md), step 11). With it, two fixes from testing: an alternative your notes say to avoid is marked as such wherever alternatives are shown ([decision 0059](decisions/0059-an-avoided-alternative-is-marked.md)), and [working as a team](teams.md) says what to do when shared notes were turned on on two machines.
+- [ ] List `0.2.1` in the MCP Registry, by hand with `mcp-publisher` ([release process](release.md), step 11).
+- [ ] Later: publish to the MCP Registry from the release workflow (GitHub's OIDC sign-in) instead of by hand. Not before the by-hand listing has worked once.
 - [ ] Soft launch in niche communities
 - [ ] Show HN
 - [ ] Product Hunt

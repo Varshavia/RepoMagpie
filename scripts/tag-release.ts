@@ -124,6 +124,13 @@ export async function tagRelease(argv: string[], io: Io): Promise<number> {
   const check = releaseCheck({
     tag,
     version,
+    server: (() => {
+      try {
+        return JSON.parse(io.git(["show", "HEAD:server.json"]));
+      } catch {
+        return undefined; // missing or not JSON: the check names it
+      }
+    })(),
     isOnMain: () => {
       try {
         io.git(["merge-base", "--is-ancestor", "HEAD", "origin/main"]);
@@ -206,7 +213,7 @@ function nextSteps(version: string, prerelease: boolean, head: string, io: Io): 
   })();
   const steps = [
     "",
-    "Next (docs/release.md, section 3, steps 4 to 10):",
+    "Next (docs/release.md, section 3, steps 4 to 11):",
     run
       ? ` 4. The release workflow runs on ${tag}: ${run.url}\n    Wait for both jobs: gh run watch ${id}`
       : ` 4. The release workflow starts on ${tag}. Its run: gh run list --workflow release.yml --limit 1`,
@@ -240,6 +247,14 @@ function nextSteps(version: string, prerelease: boolean, head: string, io: Io): 
     "    repomagpie --version",
     "    repomagpie setup --yes",
     "    repomagpie doctor",
+    ...(prerelease
+      ? ["11. The MCP Registry keeps the last stable version: a pre-release isn't listed there."]
+      : [
+        "11. List it in the MCP Registry, from the repository's folder (mcp-publisher installed, docs/release.md):",
+        "      mcp-publisher login github",
+        "      mcp-publisher publish",
+        `    Then https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Varshavia/repomagpie lists ${version}.`,
+      ]),
     "",
   ];
   return steps.join("\n");

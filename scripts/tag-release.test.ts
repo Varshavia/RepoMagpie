@@ -16,6 +16,8 @@ const HEAD = "a".repeat(40);
 const MERGE = `Merge pull request #64 from Varshavia/release/${TAG}`;
 
 type Answer = string | Error | ((input?: string) => string);
+// server.json as HEAD has it: both versions the release's.
+const serverJson = (version: string) => JSON.stringify({ name: "io.github.Varshavia/repomagpie", version, packages: [{ registryType: "npm", identifier: "repomagpie", version }] });
 const HAPPY: Record<string, Answer> = {
   "rev-parse --show-toplevel": "/repo",
   "rev-parse --abbrev-ref HEAD": "main",
@@ -24,6 +26,7 @@ const HAPPY: Record<string, Answer> = {
   "rev-parse HEAD": HEAD,
   "rev-parse origin/main": HEAD,
   "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: VERSION }),
+  "show HEAD:server.json": serverJson(VERSION),
   [`tag --list ${TAG}`]: "",
   [`ls-remote --tags origin refs/tags/${TAG}`]: "",
   "log -1 --format=%s HEAD": MERGE,
@@ -93,7 +96,9 @@ test("the merged release on main: every check passes, the typed tag tags and pus
     `npm install -g repomagpie@${VERSION}`,
     "repomagpie setup --yes",
     "repomagpie doctor",
+    "11. The MCP Registry keeps the last stable version: a pre-release isn't listed there.",
   ]) assert.ok(r.out.includes(line), line);
+  assert.ok(!r.out.includes("mcp-publisher publish"));
   // From 0.2.0 on, a beta never moves latest (docs/release.md, step 6). The tarball can be fetched
   // only once approved: approve, then the SHA check.
   assert.ok(!r.out.includes("npm dist-tag add"));
@@ -127,6 +132,7 @@ test("a stable version, v0.2.0: staged under latest, latest not moved by hand, t
   const merge = `Merge pull request #90 from Varshavia/release/${tag}`;
   const r = await run({
     "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: stable }),
+    "show HEAD:server.json": serverJson(stable),
     [`tag --list ${tag}`]: "",
     [`ls-remote --tags origin refs/tags/${tag}`]: "",
     "log -1 --format=%s HEAD": merge,
@@ -143,9 +149,20 @@ test("a stable version, v0.2.0: staged under latest, latest not moved by hand, t
     "A stable version is staged under latest: npm view repomagpie dist-tags --prefer-online shows it.",
     `gh release create ${tag} --title "${stable}" --notes-file .scratch/release-notes-${stable}.md`,
     `npm install -g repomagpie@${stable}`,
+    "11. List it in the MCP Registry, from the repository's folder (mcp-publisher installed, docs/release.md):",
+    "      mcp-publisher login github",
+    "      mcp-publisher publish",
+    `    Then https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Varshavia/repomagpie lists ${stable}.`,
   ]) assert.ok(r.out.includes(line), line);
   assert.ok(!r.out.includes("--prerelease"));
   assert.ok(!r.out.includes("npm dist-tag add"));
+});
+
+test("a server.json left at the version before stops before tagging", async () => {
+  const r = await run({ "show HEAD:server.json": serverJson("0.2.0-beta.14") });
+  assert.equal(r.code, 1);
+  assert.equal(r.tagged, false);
+  assert.match(stopped(r.out), /^server\.json's versions \(0\.2\.0-beta\.14, 0\.2\.0-beta\.14\) must be package\.json's version \(0\.2\.0-beta\.15\)/);
 });
 
 test("the merge of release/v0.2.0-beta.20 isn't the merge of release/v0.2.0", async () => {
@@ -295,11 +312,14 @@ test("against a throwaway repository with a bare origin: refuses before the rele
   const env = { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: join(base, "gitconfig"), GIT_CEILING_DIRECTORIES: base, HOME: base, USERPROFILE: base };
   writeFileSync(join(base, "gitconfig"), "[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n");
   const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trimEnd();
-  const write = (version: string) => writeFileSync(join(work, "package.json"), `${JSON.stringify({ name: "x", version }, null, 2)}\n`);
+  const write = (version: string) => {
+    writeFileSync(join(work, "package.json"), `${JSON.stringify({ name: "x", version }, null, 2)}\n`);
+    writeFileSync(join(work, "server.json"), `${serverJson(version)}\n`);
+  };
   git(base, "init", "--bare", origin);
   git(work, "init");
   write("0.0.1-beta.1");
-  git(work, "add", "package.json");
+  git(work, "add", "package.json", "server.json");
   git(work, "commit", "-m", "chore: release 0.0.1-beta.1");
   git(work, "tag", "-a", "v0.0.1-beta.1", "-m", "v0.0.1-beta.1");
   git(work, "remote", "add", "origin", origin);

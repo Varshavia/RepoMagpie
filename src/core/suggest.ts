@@ -143,7 +143,7 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
           score: Math.round((score + tagPoints(doc.tags, keywords)) * 100) / 100,
           why: { keywords: matched, dependencies: source === "manifests" ? matchedDependencies(dependencyNames, matched) : [] },
           path: join(journal.path, "notes", file),
-          alternatives: alternativesOfFile(sources[n], file),
+          alternatives: alternativesOfFile(sources[n], file, sources),
         },
       });
     }

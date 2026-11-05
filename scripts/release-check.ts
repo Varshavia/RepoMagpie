@@ -1,6 +1,7 @@
 // node scripts/release-check.ts <tag>: the release workflow's checks before anything is staged
 // (decision 0033). The tag must be "v" plus package.json's version, and its commit must be on main's
-// history (release tags are created on main only, decision 0012). Prints the npm dist-tag: "beta"
+// history (release tags are created on main only, decision 0012), and server.json's two versions
+// (the MCP Registry's listing, docs/release.md) must be that version too. Prints the npm dist-tag: "beta"
 // for a prerelease (a version with "-"), "latest" otherwise; in GitHub Actions it is also written to
 // the step's outputs as dist-tag. Exits 1 with the reason otherwise. The workflow runs it; locally
 // it needs origin/main fetched.
@@ -13,15 +14,35 @@ export const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 
 export type Check = { ok: true; distTag: "beta" | "latest" } | { ok: false; error: string };
 
-export function releaseCheck(options: { tag: string; version: string; isOnMain: () => boolean; isShallow?: () => boolean }): Check {
+// server.json's versions: its own, then each package's. Anything else in their place is listed as is.
+export function serverVersions(server: unknown): unknown[] {
+  const s = (server ?? {}) as { version?: unknown; packages?: unknown };
+  const packages = Array.isArray(s.packages) ? s.packages : [];
+  return [s.version, ...packages.map((p) => (p as { version?: unknown } | null)?.version)];
+}
+
+// `server`: server.json as parsed; undefined when it is missing or isn't JSON.
+export function releaseCheck(options: { tag: string; version: string; server: unknown; isOnMain: () => boolean; isShallow?: () => boolean }): Check {
   const { tag, version } = options;
   if (!SEMVER.test(version)) return { ok: false, error: `package.json's version (${version}) isn't a version npm can publish.` };
   if (tag !== `v${version}`) return { ok: false, error: `The tag ${tag || "(none)"} doesn't match the version in package.json (${version}): it must be v${version}.` };
+  const listed = serverVersions(options.server);
+  if (listed.length < 2 || listed.some((v) => v !== version)) {
+    return { ok: false, error: `server.json's versions (${listed.map((v) => String(v)).join(", ")}) must be package.json's version (${version}): set its version and its npm package's version to ${version}. The MCP Registry lists the version server.json names.` };
+  }
   // In a shallow clone merge-base can't see the history, and would refuse a good tag or worse.
   if (options.isShallow?.()) return { ok: false, error: "The checkout is shallow, so main's history can't be checked. Check out with fetch-depth: 0." };
   if (!options.isOnMain()) return { ok: false, error: `The tag ${tag} points to a commit that isn't on main's history. Release tags are created on main only (decision 0012).` };
   return { ok: true, distTag: version.includes("-") ? "beta" : "latest" };
 }
+
+const readJson = (file: string): unknown => {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return undefined;
+  }
+};
 
 const main = () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
@@ -37,7 +58,7 @@ const main = () => {
     }
   };
   const isShallow = () => execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: root, encoding: "utf8" }).trim() !== "false";
-  const check = releaseCheck({ tag, version, isOnMain, isShallow });
+  const check = releaseCheck({ tag, version, server: readJson(resolve(root, "server.json")), isOnMain, isShallow });
   if (!check.ok) {
     console.error(check.error);
     process.exitCode = 1;

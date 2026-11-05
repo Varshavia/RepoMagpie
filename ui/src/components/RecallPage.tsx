@@ -5,7 +5,7 @@
 import { useId, useState } from "react";
 import { api, type ApiError, type PackageType, type RecallJson, type Scope } from "../api.ts";
 import { Icon } from "../icons.tsx";
-import { concernLabel, hookWouldAsk, packageLabel } from "../logic/schema.ts";
+import { avoidMark, concernLabel, hookWouldAsk, packageLabel } from "../logic/schema.ts";
 import { homePath, visible } from "../logic/text.ts";
 import { MOD } from "../platform.ts";
 import { AlternativeName, FieldError } from "./common.tsx";
@@ -156,7 +156,8 @@ function Card({ match, home, onOpenNote, onAdd, onSearch }: { match: Match; home
               <li key={`${a.name} ${i}`}>
                 <AlternativeName alternative={a} onOpen={onOpenNote} onAdd={onAdd} onSearch={onSearch} />
                 {concernLabel(a.name, a.path === null)}
-                {a.id ? `: ${a.verdict === null ? "[inbox] no verdict yet" : visible(a.verdict)}${a.avoid ? " (you also noted to avoid it)" : ""}` : null}
+                {a.id ? `: ${a.verdict === null ? "[inbox] no verdict yet" : visible(a.verdict)}` : null}
+                {avoidMark(a)}
               </li>
             ))}
           </ul>

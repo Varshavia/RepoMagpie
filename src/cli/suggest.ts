@@ -2,6 +2,7 @@
 import { exitCode } from "../core/outcome.ts";
 import type { JournalSource } from "../core/search.ts";
 import { runSuggest, suggestForAgent, type Candidate, type SuggestJson } from "../core/suggest.ts";
+import { AVOID_MARK } from "../core/recall.ts";
 import { clean } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
@@ -24,11 +25,12 @@ export function whyLine(why: Candidate["why"]): string {
   return `Why: ${parts.join("; ")}`;
 }
 
-// An in-use avoid note's alternatives, by name: at most 3, then +N more (decision 0029). A name-only
-// match names none: its note is on another package.
+// An in-use avoid note's alternatives, by name: at most 3, then +N more (decision 0029), each one
+// your notes say to avoid marked (decision 0059). A name-only match names none: its note is on
+// another package.
 function insteadLine(m: SuggestJson["in_use_avoid"][number]): string[] {
   if (m.confidence !== "exact" || !m.alternatives.length) return [];
-  const names = m.alternatives.slice(0, 3).map((a) => a.name);
+  const names = m.alternatives.slice(0, 3).map((a) => `${a.name}${a.avoid ? ` (${AVOID_MARK})` : ""}`);
   if (m.alternatives.length > 3) names.push(`+${m.alternatives.length - 3} more`);
   return [`Instead: ${names.join(", ")}`];
 }
