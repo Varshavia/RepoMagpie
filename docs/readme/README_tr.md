@@ -2,7 +2,7 @@
 
 [English](../../README.md) · Türkçe · [Deutsch](README_de.md) · [Español](README_es.md) · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İngilizce olandır. Çevrildiği metin: 2026-11-04 tarihli İngilizce README._
+_Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İngilizce olandır. Çevrildiği metin: 2026-11-05 tarihli İngilizce README._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie logosu: yandan görünen bir saksağan">
 
@@ -20,7 +20,7 @@ _Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İ
 
 [Hızlı başlangıç](#hızlı-başlangıç) · [Nasıl çalışır](#nasıl-çalışır) · [Her ajan ne alır](#her-ajan-ne-alır) · [SSS](#sss) · [Belgeler](#belgeler)
 
-<code>npm install -g repomagpie@beta</code><br>
+<code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
 
 </div>
@@ -45,14 +45,14 @@ Do you want to proceed?
 - **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama. Listeler ve kurslar sen istemedikçe gizli kalır; her sonuç neden orada olduğunu söyler.
 - **Bir projeden başla:** `repomagpie init` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
 
-**Durum:** erken test edenler için beta. [Değişiklik kaydı](../../CHANGELOG.md) her sürümü listeler; [yol haritası](../roadmap.md) sırada ne olduğunu gösterir.
+**Durum:** kararlı sürüm, geliştirme sürüyor. [Değişiklik kaydı](../../CHANGELOG.md) her sürümü listeler; [yol haritası](../roadmap.md) sırada ne olduğunu gösterir.
 
 ## Hızlı başlangıç
 
 1. `repomagpie` komutunu yükle ve kodlama ajanlarında ayarla:
 
    ```bash
-   npm install -g repomagpie@beta
+   npm install -g repomagpie
    repomagpie setup
    ```
 
@@ -119,6 +119,10 @@ git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
 Ya da kendi notlarından birini oraya kopyala: `repomagpie adopt pdfkit`. Bir ekip arkadaşının ajanı `npm install pdfkit` çalıştırmak üzereyken hook önce ona sorar; onun `search` ve `suggest` komutları da notu bulur. Depoyu okuyabilen herkes notlarını da okuyabilir.
+
+`repomagpie ui`'da Project görünümü deponun adını verir ve paylaşılan notların commit ve push edilip edilmediğini söyler.
+
+![repomagpie ui'da Project görünümü: github.com'daki acme/checkout ve "Shared notes are committed." satırı, altında proje günlüğünün üç notu; zod açık ve kişisel günlüğünde de onunla ilgili bir not olduğunu söylüyor](../assets/screen-project.png)
 
 ## Yerel uygulama
 

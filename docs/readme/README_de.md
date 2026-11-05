@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · Deutsch · [Español](README_es.md) · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_Dies ist eine Übersetzung des englischen README und kann ihm hinterherhinken; maßgeblich ist das englische README. Übersetzt vom englischen README mit Stand 2026-11-04._
+_Dies ist eine Übersetzung des englischen README und kann ihm hinterherhinken; maßgeblich ist das englische README. Übersetzt vom englischen README mit Stand 2026-11-05._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie-Logo: eine Elster im Profil">
 
@@ -20,7 +20,7 @@ _Dies ist eine Übersetzung des englischen README und kann ihm hinterherhinken; 
 
 [Schnellstart](#schnellstart) · [So funktioniert es](#so-funktioniert-es) · [Was jeder Agent bekommt](#was-jeder-agent-bekommt) · [FAQ](#faq) · [Dokumentation](#dokumentation)
 
-<code>npm install -g repomagpie@beta</code><br>
+<code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
 
 </div>
@@ -45,14 +45,14 @@ Do you want to proceed?
 - **Entdecken:** Durchsuche GitHub nach Wörtern, Thema und Art, mit Sternen und letzter Aktivität, und füge die Repositorys, die du wählst, deiner inbox (Eingang) hinzu: `repomagpie discover` oder die App. Listen und Kurse bleiben ausgeblendet, wenn du nicht danach fragst, und jedes Ergebnis sagt, warum es da ist.
 - **Bei einem Projekt anfangen:** `repomagpie init` listet die Abhängigkeiten eines Projekts danach auf, was deine Notizen sagen, und fragt dann bei jeder ohne Notiz nach deinem Verdict.
 
-**Status:** Beta, für erste Tester. Das [Changelog](../../CHANGELOG.md) listet jede Version auf; die [Roadmap](../roadmap.md) zeigt, was als Nächstes kommt.
+**Status:** stabil und in aktiver Entwicklung. Das [Changelog](../../CHANGELOG.md) listet jede Version auf; die [Roadmap](../roadmap.md) zeigt, was als Nächstes kommt.
 
 ## Schnellstart
 
 1. Installiere den Befehl `repomagpie` und richte ihn in deinen Coding-Agents ein:
 
    ```bash
-   npm install -g repomagpie@beta
+   npm install -g repomagpie
    repomagpie setup
    ```
 
@@ -119,6 +119,10 @@ git add .magpie && git commit -m "Add our note on pdfkit"
 ```
 
 Oder kopier eine deiner eigenen Notizen dorthin: `repomagpie adopt pdfkit`. Wenn der Agent einer Kollegin oder eines Kollegen `npm install pdfkit` ausführen will, fragt der Hook zuerst nach, und auch ihre `search` und `suggest` finden die Notiz. Wer das Repository lesen kann, kann auch seine Notizen lesen.
+
+In `repomagpie ui` nennt die Ansicht Project das Repository und sagt, ob seine geteilten Notizen committet und gepusht sind.
+
+![Die Ansicht Project in repomagpie ui: acme/checkout auf github.com und "Shared notes are committed." über den drei Notizen des Projekt-Journals; zod ist geöffnet und sagt, dass dein persönliches Journal auch eine Notiz dazu hat](../assets/screen-project.png)
 
 ## Die lokale App
 
