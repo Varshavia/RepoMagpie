@@ -8,7 +8,7 @@ import { copyFolder, removeFolder } from "./copy-folder.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import { linkIndex } from "./links.ts";
 import { deltaName, forgetParsed } from "./note-cache.ts";
-import { isAvoid, loadRecallEntries, recall, RECALL_CACHE, runRecall, type RecallSource } from "./recall.ts";
+import { alternativesOfFile, isAvoid, loadRecallEntries, recall, RECALL_CACHE, runRecall, type RecallSource } from "./recall.ts";
 import { renderNote, type NewNote } from "./write.ts";
 
 // Recall (spec §2 recall, §5 matching) over journals in scratch folders.
@@ -406,12 +406,12 @@ const withAlternatives = (text: string, entries: string[]) => text.replace("\nst
 const PUPPETEER = note({ id: "pkg:npm/puppeteer", verdict: "default for PDF rendering in new projects" });
 const alternatives = (s: RecallSource[], query: string) => recall(s, query, ["npm"])[0].alternatives;
 const names = (s: RecallSource[], query: string) => alternatives(s, query).map((a) => a.name);
-const unresolved = (name: string, journal = "personal", reason = "missing") => ({ name, id: null, journal, verdict: null, status: null, avoid: false, path: null, reason });
+const unresolved = (name: string, journal = "personal", reason = "missing") => ({ name, id: null, journal, verdict: null, status: null, avoid: false, avoid_in: [], path: null, reason });
 
 test("alternatives: forward (by file stem or name), reverse, and both sides once", () => {
   const forward = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[npm--puppeteer]]"]), "npm--puppeteer.md": PUPPETEER });
   const path = join(forward, "notes", "npm--puppeteer.md");
-  const puppeteer = { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path };
+  const puppeteer = { name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, avoid_in: [], path };
   assert.deepEqual(alternatives(sources(["personal", forward]), "pdfkit"), [puppeteer]);
   assert.deepEqual(names(sources(["personal", forward]), "puppeteer"), ["pdfkit"], "the reverse side");
 
@@ -470,6 +470,50 @@ test("alternatives: resolved within the note's own journal; a target only in the
   const [inProject, inPersonal] = recall(sources(["personal", personal], ["project", project]), "pdfkit", ["npm"]);
   assert.deepEqual([inProject.journal, inProject.alternatives], ["project", [unresolved("puppeteer", "project")]]);
   assert.deepEqual([inPersonal.journal, inPersonal.alternatives], ["personal", []]);
+});
+
+// --- An avoided alternative is marked (decision 0059): an avoid note on it in either journal ---
+
+const DATE_FNS = note({ id: "pkg:npm/date-fns", verdict: "default for dates in new projects" });
+const MOMENT_AVOID = note({ id: "pkg:npm/moment", verdict: "avoid: unmaintained and big" });
+
+test("avoid mark: as seen in testing, a project note's alternative whose own project note says avoid", () => {
+  const project = journal({ "npm--date-fns.md": withAlternatives(DATE_FNS, ["[[moment]]"]), "npm--moment.md": MOMENT_AVOID });
+  const [moment] = alternatives(sources(["personal", journal({})], ["project", project]), "date-fns");
+  assert.deepEqual([moment.name, moment.id, moment.avoid, moment.avoid_in], ["moment", "pkg:npm/moment", true, ["project"]]);
+});
+
+test("avoid mark: an alternative with no note in its journal, avoided in the other journal, stays unresolved and is marked", () => {
+  const project = journal({ "npm--date-fns.md": withAlternatives(DATE_FNS, ["[[moment]]", "[[dayjs]]"]) });
+  const personal = journal({ "npm--moment.md": MOMENT_AVOID, "npm--dayjs.md": note({ id: "pkg:npm/dayjs", verdict: "fine" }) });
+  assert.deepEqual(alternatives(sources(["personal", personal], ["project", project]), "date-fns"), [
+    unresolved("dayjs", "project"),
+    { ...unresolved("moment", "project"), avoid: true, avoid_in: ["personal"] },
+  ]);
+});
+
+test("avoid mark: a resolved alternative avoided in the other journal by the same id; both journals, project first", () => {
+  const personal = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]", "[[lodash]]"]), "npm--puppeteer.md": PUPPETEER, "npm--lodash.md": note({ id: "pkg:npm/lodash", verdict: "fine" }) });
+  const project = journal({
+    "npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", verdict: "avoid: we use playwright" }),
+    "pypi--lodash.md": note({ id: "pkg:pypi/lodash", name: "lodash", verdict: "avoid: not the JavaScript one" }), // another package: no mark
+  });
+  const s = sources(["personal", personal], ["project", project]);
+  const inPersonal = recall(s, "pdfkit", ["npm"]).find((m) => m.journal === "personal");
+  assert.deepEqual(inPersonal?.alternatives.map((a) => [a.name, a.avoid, a.avoid_in]), [["lodash", false, []], ["puppeteer", true, ["project"]]]);
+
+  const both = journal({ "npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]), "npm--puppeteer.md": note({ id: "pkg:npm/puppeteer", verdict: "avoid: slow" }) });
+  const [alternative] = recall(sources(["personal", both], ["project", project]), "pdfkit", ["npm"])[0].alternatives;
+  assert.deepEqual(alternative.avoid_in, ["project", "personal"]);
+});
+
+test("avoid mark: suggest's candidates read both journals too", () => {
+  const project = journal({ "npm--date-fns.md": withAlternatives(DATE_FNS, ["[[moment]]"]) });
+  const personal = journal({ "npm--moment.md": MOMENT_AVOID });
+  const s = sources(["personal", personal], ["project", project]);
+  const [projectSource] = s.filter((x) => x.scope === "project");
+  assert.deepEqual(alternativesOfFile(projectSource, "npm--date-fns.md", s).map((a) => a.avoid_in), [["personal"]]);
+  assert.deepEqual(alternativesOfFile(projectSource, "npm--date-fns.md").map((a) => a.avoid_in), [[]], "its own journal only");
 });
 
 test("alternatives resolve as the link index resolves the same field (one rule, src/core/wikilinks.ts)", () => {

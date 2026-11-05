@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DRAFT_MARKER as CORE_DRAFT_MARKER, KINDS as CORE_KINDS } from "../../../src/core/note.ts";
 import { readablePurl as coreReadablePurl } from "../../../src/core/identity.ts";
-import { isAvoid as coreIsAvoid, verdictSaysAvoid as coreVerdictSaysAvoid } from "../../../src/core/recall.ts";
+import { AVOID_MARK as CORE_AVOID_MARK, isAvoid as coreIsAvoid, verdictSaysAvoid as coreVerdictSaysAvoid } from "../../../src/core/recall.ts";
 import { isStopTopic as coreIsStopTopic } from "../../../src/core/topic-tags.ts";
-import { concernLabel, DRAFT_MARKER, hookWouldAsk, isAvoid, isStopTopic, KINDS, nameConcern, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
+import { AVOID_MARK, avoidMark, concernLabel, DRAFT_MARKER, hookWouldAsk, isAvoid, isStopTopic, KINDS, nameConcern, packageLabel, readablePurl, TAG_PATTERN, verdictSaysAvoid } from "./schema.ts";
 import { nameConcern as coreNameConcern } from "../../../src/core/text.ts";
 
 test("nameConcern agrees with core's (decision 0032) on every case", () => {
@@ -61,6 +61,12 @@ test("the hook asks only for an exact avoid match; a name-only match informs", (
   assert.equal(hookWouldAsk({ confidence: "exact", verdict: "avoid: slow", avoid_when: [] }), true);
   assert.equal(hookWouldAsk({ confidence: "name-only", verdict: "avoid: slow", avoid_when: [] }), false);
   assert.equal(hookWouldAsk({ confidence: "exact", verdict: "fine", avoid_when: [] }), false);
+});
+
+test("an avoided alternative's mark is core's words (decision 0059); none for one that isn't", () => {
+  assert.equal(AVOID_MARK, CORE_AVOID_MARK);
+  assert.equal(avoidMark({ avoid: true }), " (your notes say avoid)");
+  assert.equal(avoidMark({ avoid: false }), "");
 });
 
 test("readablePurl equals core's; packageLabel gives the type and the package name as people write it", () => {

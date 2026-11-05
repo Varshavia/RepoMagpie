@@ -8,6 +8,8 @@ import { goldenOutputs } from "./fixtures/claude-code-cases.ts";
 // Claude Code's hook output, byte for byte, as it was before the hook was split into an
 // agent-neutral core and adapters (decision 0036). The golden file holds each case's SHA-256 (or
 // null for no output), taken from the hook before the split; claude-code.test.ts shows the texts.
+// Since decision 0059, the six cases whose user line names an avoided alternative mark it
+// ("pdfkit" (your notes say avoid)); their agent text is unchanged.
 
 const GOLDEN: Record<string, string | null> = JSON.parse(readFileSync(new URL("./fixtures/claude-code-golden.json", import.meta.url), "utf8"));
 

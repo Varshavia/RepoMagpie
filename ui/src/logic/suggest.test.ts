@@ -71,7 +71,7 @@ test("an avoid row keeps its confidence and its type", () => {
 
 // The Instead line (decision 0029), as magpie suggest prints it: an exact in-use avoid note's
 // alternatives, at most 3 and a count of the rest; none for a name-only match or a candidate.
-const alternative = (name: string) => ({ name, id: `pkg:npm/${name}`, journal: "personal" as const, verdict: "fine", status: "reviewed" as const, avoid: false, path: `/h/notes/npm--${name}.md` });
+const alternative = (name: string) => ({ name, id: `pkg:npm/${name}`, journal: "personal" as const, verdict: "fine", status: "reviewed" as const, avoid: false, avoid_in: [], path: `/h/notes/npm--${name}.md` });
 
 test("an exact in-use avoid row carries up to 3 alternatives and the count of the rest; name-only and candidate rows none", () => {
   const five = ["a", "b", "c", "d", "e"].map(alternative);

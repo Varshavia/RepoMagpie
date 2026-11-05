@@ -73,6 +73,21 @@ for (const modern of [false, true]) {
   });
 }
 
+// Decision 0059: the agent learns which journal says to avoid an alternative, as recall --json says.
+test("recall marks an alternative a note says to avoid, in either journal, as the CLI's --json does", async () => {
+  const box = sandbox({
+    "project/.magpie/notes/npm--date-fns.md": note({ id: "pkg:npm/date-fns", name: "date-fns", verdict: "default for dates in new projects" })
+      .replace("\nstatus:", '\nalternatives: ["[[moment]]"]\nstatus:'),
+    "journal/notes/npm--moment.md": note({ id: "pkg:npm/moment", name: "moment", verdict: "avoid: unmaintained and big" }),
+  });
+  await withClient(box, {}, async (client) => {
+    const result = await client.call("recall", { packages: ["date-fns"] });
+    const { matches } = result.structuredContent as { matches: { journal: string; alternatives: { name: string; id: string | null; avoid: boolean; avoid_in: string[] }[] }[] };
+    assert.deepEqual(matches.map((m) => [m.journal, m.alternatives.map((a) => [a.name, a.id, a.avoid, a.avoid_in])]), [["project", [["moment", null, true, ["personal"]]]]]);
+    assert.equal(result.content[0].text, (await magpie(box, ["recall", "date-fns", "--json"])).out.trimEnd());
+  });
+});
+
 test("a 2025-11-25 client gets the server's identity and instructions with the skill's rules", async () => {
   const box = sandbox(FILES);
   const client = new Client(box);

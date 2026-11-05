@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { sep } from "node:path";
 import type { PackageType } from "../core/identity.ts";
 import { readNote, stripComments } from "../core/note.ts";
-import { runRecall, type Alternative, type RecallMatch } from "../core/recall.ts";
+import { AVOID_MARK, runRecall, type Alternative, type RecallMatch } from "../core/recall.ts";
 import { clean, cleanAll, nameConcern } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
@@ -73,13 +73,14 @@ function alternativeLines(m: RecallMatch, options: CardOptions, head: string, wi
   return [`  ${head}${items[0]}`, ...items.slice(1).map((item) => `  ${" ".repeat(width)}${item}`)];
 }
 
-// One alternative: its name and Verdict (or [inbox]), and whether it is noted to avoid too. One
-// without a note in the journal is its name alone.
+// One alternative: its name and Verdict (or [inbox]), and whether your notes say to avoid it, in
+// either journal (decision 0059). One without a note in the journal is its name and that mark alone.
 function alternativeText(a: Alternative, color: boolean): string {
   const concern = nameConcern(a.name, a.path === null);
   const name = `${a.name}${concern === "non-ascii" ? " (non-ASCII letters)" : concern === "invalid" ? " (not a valid package name)" : ""}`;
-  if (a.path === null) return name;
-  return `${name}: ${a.verdict ?? `${paint(color, 33, "[inbox]")} no verdict yet`}${a.avoid ? " (you also noted to avoid it)" : ""}`;
+  const mark = a.avoid ? ` (${AVOID_MARK})` : "";
+  if (a.path === null) return name + mark;
+  return `${name}: ${a.verdict ?? `${paint(color, 33, "[inbox]")} no verdict yet`}${mark}`;
 }
 
 // Every section of the note with text, in the file's order: the label, then its lines. The

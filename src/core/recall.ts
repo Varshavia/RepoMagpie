@@ -61,10 +61,14 @@ export interface Alternative {
   journal: RecallSource["scope"];
   verdict: string | null;
   status: "reviewed" | "inbox" | null;
-  avoid: boolean;
+  avoid: boolean; // avoid_in isn't empty
+  avoid_in: RecallSource["scope"][]; // the journals whose note on it is an avoid note, project first (decision 0059)
   path: string | null;
   reason?: "missing" | "ambiguous"; // only when id is null, as a [[link]]'s (links.ts)
 }
+
+// How the alternative's mark reads for people (decision 0059): `moment (your notes say avoid)`.
+export const AVOID_MARK = "your notes say avoid";
 
 // The journals recall reads (spec §3): the personal journal and, if found, the project journal,
 // which is never the personal journal's folder nor the home directory's own .magpie.
@@ -160,14 +164,14 @@ export function recall(sources: RecallSource[], query: string, types: PackageTyp
       const isExact = entry.keys.some(([type, name]) => wanted.some((c) => c.type === type && exactName(type, c.name) === exactName(type, name)));
       const isNameOnly = !isExact && entry.keys.some(([type, name]) =>
         !kinds.has(type) && wanted.some((c) => looseName(c.name) === looseName(type === "github" ? name.split("/").pop() ?? "" : name)));
-      if (isExact) exact.push(match(query, source, entry, "exact"));
-      else if (isNameOnly) nameOnly.push(match(query, source, entry, "name-only"));
+      if (isExact) exact.push(match(query, source, entry, "exact", sources));
+      else if (isNameOnly) nameOnly.push(match(query, source, entry, "name-only", sources));
     }
   }
   return exact.length ? exact : nameOnly;
 }
 
-function match(query: string, source: RecallSource, entry: RecallEntry, confidence: RecallMatch["confidence"]): RecallMatch {
+function match(query: string, source: RecallSource, entry: RecallEntry, confidence: RecallMatch["confidence"], sources: RecallSource[]): RecallMatch {
   return {
     query,
     id: entry.id,
@@ -180,7 +184,7 @@ function match(query: string, source: RecallSource, entry: RecallEntry, confiden
     drafts: entry.drafts,
     status: entry.status,
     path: join(source.path, "notes", entry.file),
-    alternatives: alternativesOf(source, entry),
+    alternatives: alternativesOf(source, entry, sources),
   };
 }
 
@@ -190,7 +194,10 @@ interface AlternativeIndex {
   resolve: (target: string) => Resolution;
   byFile: Map<string, RecallEntry>;
   listedBy: Map<string, RecallEntry[]>;
+  avoidIds: Set<string>; // the ids of the journal's avoid notes
 }
+
+const entryIsAvoid = (entry: RecallEntry) => isAvoid({ verdict: entry.verdict || null, avoid_when: entry.avoidWhen });
 const alternativeIndexes = new WeakMap<RecallEntry[], AlternativeIndex>();
 
 function alternativeIndex(entries: RecallEntry[]): AlternativeIndex {
@@ -206,20 +213,32 @@ function alternativeIndex(entries: RecallEntry[]): AlternativeIndex {
       if (file && file !== entry.file) listedBy.set(file, [...(listedBy.get(file) ?? []), entry]);
     }
   }
-  index = { resolve, byFile, listedBy };
+  index = { resolve, byFile, listedBy, avoidIds: new Set(entries.filter(entryIsAvoid).map((entry) => entry.id)) };
   alternativeIndexes.set(entries, index);
   return index;
 }
 
 // The alternatives of the note in `file` of the source's journal; [] for a file recall can't read.
-export function alternativesOfFile(source: RecallSource, file: string): Alternative[] {
+// `sources`: every journal read, for the avoid mark (decision 0059).
+export function alternativesOfFile(source: RecallSource, file: string, sources: RecallSource[] = [source]): Alternative[] {
   const entry = alternativeIndex(source.entries).byFile.get(file);
-  return entry ? alternativesOf(source, entry) : [];
+  return entry ? alternativesOf(source, entry, sources) : [];
+}
+
+// Whether `journal` has an avoid note on an alternative (decision 0059): one with the same id when
+// the alternative has a note, else the one its name resolves to there, by the link rules.
+function avoidedIn(journal: RecallSource, alternative: { id: string | null; name: string }): boolean {
+  const { avoidIds, resolve, byFile } = alternativeIndex(journal.entries);
+  if (alternative.id !== null) return avoidIds.has(alternative.id);
+  const { file } = resolve(alternative.name);
+  const entry = file ? byFile.get(file) : undefined;
+  return entry ? entryIsAvoid(entry) : false;
 }
 
 // The alternatives of one note (decision 0029): the targets in its own field, then the notes that
 // list it; each once, never the note itself. Reviewed first, then inbox, avoid and unresolved ones.
-function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[] {
+// They resolve in the note's own journal; only the avoid mark reads every journal (decision 0059).
+function alternativesOf(source: RecallSource, entry: RecallEntry, sources: RecallSource[]): Alternative[] {
   const { resolve, byFile, listedBy } = alternativeIndex(source.entries);
   const found = new Map<string, Alternative>();
   const note = (other: RecallEntry): Alternative => ({
@@ -228,7 +247,8 @@ function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[]
     journal: source.scope,
     verdict: other.verdict || null,
     status: other.status,
-    avoid: isAvoid({ verdict: other.verdict || null, avoid_when: other.avoidWhen }),
+    avoid: false,
+    avoid_in: [],
     path: join(source.path, "notes", other.file),
   });
   for (const { target } of entry.alternatives) {
@@ -238,9 +258,14 @@ function alternativesOf(source: RecallSource, entry: RecallEntry): Alternative[]
     if (file === entry.file || found.has(key)) continue;
     const other = file ? byFile.get(file) : undefined;
     const reason = resolution.file === null ? resolution.reason : "missing";
-    found.set(key, other ? note(other) : { name: target, id: null, journal: source.scope, verdict: null, status: null, avoid: false, path: null, reason });
+    found.set(key, other ? note(other) : { name: target, id: null, journal: source.scope, verdict: null, status: null, avoid: false, avoid_in: [], path: null, reason });
   }
   for (const other of listedBy.get(entry.file) ?? []) if (!found.has(other.file)) found.set(other.file, note(other));
+  const journals = [...sources].sort((a, b) => (a.scope === b.scope ? 0 : a.scope === "project" ? -1 : 1));
+  for (const alternative of found.values()) {
+    alternative.avoid_in = journals.filter((j) => avoidedIn(j, alternative)).map((j) => j.scope);
+    alternative.avoid = alternative.avoid_in.length > 0;
+  }
   const rank = (a: Alternative) => (a.path === null ? 3 : a.avoid ? 2 : a.status === "inbox" ? 1 : 0);
   const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
   return [...found.values()].sort((a, b) => rank(a) - rank(b) || compare(a.name.toLowerCase(), b.name.toLowerCase()) || compare(a.name, b.name));

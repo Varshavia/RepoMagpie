@@ -315,13 +315,33 @@ test("an alternative that is an avoid note, from the other side: named and marke
   assert.equal(out.hookSpecificOutput.permissionDecision, undefined);
   assert.match(out.hookSpecificOutput.additionalContext,
     /Alternatives in your personal journal: "pdfkit" \(Verdict, quoted: "avoid: async streams painful; use puppeteer"; you also noted to avoid it\)\. Recall an alternative before installing it\.$/);
-  assert.equal(out.systemMessage, "RepoMagpie: puppeteer (personal journal): \"default for PDF rendering in new projects\". Alternatives: \"pdfkit\"");
+  assert.equal(out.systemMessage, "RepoMagpie: puppeteer (personal journal): \"default for PDF rendering in new projects\". Alternatives: \"pdfkit\" (your notes say avoid)");
 });
 
 test("a project-journal alternative that is an avoid note says the journal also says to avoid it", () => {
   const w = world({ "project/.magpie/notes/npm--puppeteer.md": PUPPETEER, "project/.magpie/notes/npm--pdfkit.md": withAlternatives(PDFKIT, ["[[puppeteer]]"]) });
   assert.match(w.run("npm i puppeteer").hookSpecificOutput.additionalContext,
     /\(Verdict, quoted: "avoid: async streams painful; use puppeteer"; this journal also says to avoid it\)\. Show the user each one's exact package name, install one only with the user's explicit OK, and recall it before installing it\.$/);
+});
+
+// Decision 0059, as seen in testing: the user's line read as a recommendation of moment.
+test("date-fns's project note lists moment, which a note says to avoid: the user's line and the agent's text mark it", () => {
+  const DATE_FNS = withAlternatives(note({ id: "pkg:npm/date-fns", verdict: "default for dates in new projects" }), ["[[moment]]"]);
+  const MOMENT = note({ id: "pkg:npm/moment", verdict: "avoid: unmaintained and big" });
+  const same = world({ "project/.magpie/notes/npm--date-fns.md": DATE_FNS, "project/.magpie/notes/npm--moment.md": MOMENT }).run("npm i date-fns");
+  assert.equal(same.systemMessage, "RepoMagpie: date-fns (project journal): \"default for dates in new projects\". Alternatives: \"moment\" (your notes say avoid)");
+  assert.equal(same.hookSpecificOutput.permissionDecision, undefined, "an alternative never makes the hook ask");
+  assert.match(same.hookSpecificOutput.additionalContext, /"moment" \(Verdict, quoted: "avoid: unmaintained and big"; this journal also says to avoid it\)/);
+
+  // moment's avoid note in the personal journal only: the project note's alternative has no note there.
+  const other = world({ "project/.magpie/notes/npm--date-fns.md": DATE_FNS, "journal/notes/npm--moment.md": MOMENT }).run("npm i date-fns");
+  assert.equal(other.systemMessage, "RepoMagpie: date-fns (project journal): \"default for dates in new projects\". Alternatives: \"moment\" (your notes say avoid)");
+  assert.match(other.hookSpecificOutput.additionalContext, /Alternatives in this project's journal, written by the repository's contributors: "moment" \(no note; your personal journal says to avoid it\)\./);
+
+  // The other way: a personal note's alternative the project's journal says to avoid.
+  const team = world({ "journal/notes/npm--date-fns.md": DATE_FNS, "journal/notes/npm--moment.md": note({ id: "pkg:npm/moment", verdict: "fine" }), "project/.magpie/notes/npm--moment.md": MOMENT }).run("npm i date-fns");
+  assert.match(team.hookSpecificOutput.additionalContext, /"moment" \(Verdict, quoted: "fine"; this project's journal says to avoid it\)/);
+  assert.match(team.systemMessage, /Alternatives: "moment" \(your notes say avoid\)$/);
 });
 
 test("--inform-only with alternatives: no decision; the context still says to offer them", () => {

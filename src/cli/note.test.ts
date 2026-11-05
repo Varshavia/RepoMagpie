@@ -541,7 +541,7 @@ test("a PURL target is written as the file stem its note would have, so a note c
   await magpie(box, ["note", "puppeteer", "default for PDF rendering in new projects"]);
   const [pdfkit] = JSON.parse((await magpie(box, ["recall", "pdfkit", "--json"])).out).matches;
   assert.deepEqual(pdfkit.alternatives[0], {
-    name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, path: box.note("npm--puppeteer.md"),
+    name: "puppeteer", id: "pkg:npm/puppeteer", journal: "personal", verdict: "default for PDF rendering in new projects", status: "reviewed", avoid: false, avoid_in: [], path: box.note("npm--puppeteer.md"),
   });
   const again = JSON.parse((await magpie(box, ["note", "pdfkit", "--alternative", "npm--babel--core", "--json"])).out);
   assert.deepEqual(again.alternatives_present, ["npm--babel--core"], "the stem written for a PURL counts as there");

@@ -57,3 +57,8 @@ export function verdictSaysAvoid(verdict: string | null): boolean {
 export function hookWouldAsk(match: { confidence: "exact" | "name-only"; verdict: string | null; avoid_when: string[] }): boolean {
   return match.confidence === "exact" && isAvoid(match);
 }
+
+// An alternative your notes say to avoid, in either journal, after its name (core's AVOID_MARK,
+// decision 0059): `moment (your notes say avoid)`.
+export const AVOID_MARK = "your notes say avoid";
+export const avoidMark = (alternative: { avoid: boolean }) => (alternative.avoid ? ` (${AVOID_MARK})` : "");
