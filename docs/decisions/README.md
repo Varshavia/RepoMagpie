@@ -17,7 +17,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0006 | [One note per repository; skills are searchable lines](0006-skills-as-searchable-lines.md) | accepted |
 | 0007 | [Typed relations in frontmatter](0007-typed-relations-in-frontmatter.md) | accepted in part by 0027 (`alternatives`); `works_with` stays proposed |
 | 0008 | [Machine-readable output for every command](0008-machine-readable-output.md) | accepted |
-| 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted |
+| 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted (the one-liner superseded by 0060) |
 | 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024; the graph's status changed by 0026; "MCP server: later" superseded by 0034) |
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
 | 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
@@ -68,3 +68,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0057 | [The cache is updated, not rewritten](0057-the-cache-is-updated-not-rewritten.md) | accepted (adds to 0050) |
 | 0058 | [The type of a bare name](0058-the-type-of-a-bare-name.md) | accepted (adds to the spec's bare-name rule) |
 | 0059 | [An avoided alternative is marked](0059-an-avoided-alternative-is-marked.md) | accepted (supersedes 0029's avoid mark) |
+| 0060 | [Positioning: your journal of repos and tools, checked before your agent picks one](0060-positioning-your-journal-checked-before-your-agent-picks.md) | accepted (supersedes 0009's one-liner) |

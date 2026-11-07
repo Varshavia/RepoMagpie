@@ -1,7 +1,7 @@
 {
   "name": "repomagpie",
   "version": "0.2.1",
-  "description": "Remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.",
+  "description": "Your coding agent remembers the repos you've tried, and what you thought of them.",
   "keywords": [
     "dependencies",
     "coding-agent",

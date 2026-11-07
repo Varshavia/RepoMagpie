@@ -6,9 +6,9 @@ English · [Türkçe](docs/readme/README_tr.md) · [Deutsch](docs/readme/README_
 
 # RepoMagpie
 
-### Your dependency notes, checked before your coding agent installs anything.
+### Your coding agent remembers the repos you've tried, and what you thought of them.
 
-**Write down why you dropped a package. Your agent reads it before it installs that package again.**
+**RepoMagpie is your personal journal of the open-source repos and tools you've tried (libraries, CLIs, MCP servers, agent skills), with your own verdict on each. Your coding agent checks it before it picks a tool: it suggests what worked for you, and it stops on what you ruled out.**
 
 [![npm version](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP server](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](docs/spec.md#repomagpie-mcp)
@@ -36,12 +36,11 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-- **Remember:** write a Verdict in one line, `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Your agent also offers, once at a task's end, to save a dependency decision with your reason. Notes are Markdown files you own.
-- **Recall before install:** when your agent runs `npm install pdfkit`, it sees your note first.
-- **Find by concern:** ask about security, databases, testing… in any language, and your agent finds the notes that fit, even ones with no word in common.
-- **Suggest:** `repomagpie suggest` reads a project's manifests and README, and lists the notes that fit it.
-- **Discover:** search GitHub by words, concern and kind, with stars and recent activity, and add the repositories you choose to your inbox: `repomagpie discover`, or the app. Lists and courses stay hidden unless you ask, and each result says why it is there.
-- **Start from a project:** `repomagpie init` lists a project's dependencies by what your notes say, then asks for your Verdict on each one without a note.
+- **Remember:** write your verdict, in your own words, on every repo and tool you try: when to use it, when to avoid it, and what to use instead. `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"` writes one, and your agent offers, once at a task's end, to save a decision with your reason. Each note is a Markdown file you own.
+- **Recall:** your agent checks those verdicts before it picks a tool, through the skill and the MCP server. Ask "what do I have for browser testing?" in any language, or let `repomagpie suggest` list the notes that fit a project. If your agent tries to install something you ruled out, the hook stops it so that you're asked first.
+- **Discover:** find new repos on GitHub by words, concern and kind, and add them to your journal with your take: `repomagpie discover`, or the app. Each result says why it is there.
+
+It works in [seven coding agents](#what-each-agent-gets), among them Claude Code, Codex CLI, Cursor and Gemini CLI. Everything stays local: plain Markdown files on your machine, no account, no cloud server. For teams, the same notes can live in the repository and be shared through git ([below](#share-notes-with-your-team)).
 
 **Status:** stable and in active development. The [changelog](CHANGELOG.md) lists every version; the [roadmap](docs/roadmap.md) shows what comes next.
 
@@ -80,7 +79,7 @@ Do you want to proceed?
 
 ![How RepoMagpie works: your agent is about to run npm install pdfkit; the skill or the MCP tool recall checks first, and the hook checks the install command as a backstop; both read your personal journal in ~/.magpie and the project journal in .magpie/; your Verdict, "avoid: async streams painful; use puppeteer", comes back, and your agent asks you before the install.](docs/assets/how-it-works.svg)
 
-Before an install, the skill tells your agent to call `recall`, the MCP tool or the `repomagpie recall` command. When a note says to avoid the package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step.
+Before your agent picks a tool, the skill tells it to check your journals: `search` or `suggest` while it chooses, and `recall` before an install, as MCP tools or `repomagpie` commands. Your verdicts come back first. What worked for you is suggested; when a note says to avoid a package, your agent shows it to you and asks first. The hook checks the install command itself, in case the agent skips that step.
 
 There is no extra model, no API key and no telemetry. RepoMagpie works as well as your agent follows the skill; without a hook, that includes the check before an install.
 
@@ -148,7 +147,7 @@ See a journal as a graph: notes, their tags, `[[links]]` and alternatives, colou
 | Supply-chain scanners, such as [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | Malware, vulnerabilities and popularity, from global data | Before an install |
 | RepoMagpie | Your verdicts and your team's | Before an install, when you search, and when you start a project |
 
-A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install. RepoMagpie isn't a scanner: it never claims to detect malware or vulnerabilities, so run one next to it ([vision](docs/vision.md#non-goals)).
+A line like "avoid pdfkit" in `CLAUDE.md` covers one project. A RepoMagpie note works across projects, shows up in search, and the hook checks it on every install. It isn't session or conversation memory: it remembers your decisions about tools, which you write. A star list or an awesome list holds no opinion your agent can use; a note does. RepoMagpie isn't a scanner: it never claims to detect malware or vulnerabilities, so run one next to it ([vision](docs/vision.md#non-goals)).
 
 ## FAQ
 

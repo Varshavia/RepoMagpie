@@ -1,6 +1,6 @@
 # Competitive landscape
 
-Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on that date; re-check before launch. RepoMagpie's position is set in [decision 0009](decisions/0009-positioning-dependency-memory.md).
+Researched 2026-10-03 ([strategy](strategy.md), §5). Sources were checked on that date; re-check before launch. RepoMagpie's position is set in [decision 0009](decisions/0009-positioning-dependency-memory.md), whose one-liner [decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md) replaced.
 
 ## A. Star managers: "find my stars again"
 

@@ -2,15 +2,15 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · [Español](README_es.md) · 简体中文 · [日本語](README_ja.md)
 
-_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-05 的英文 README。_
+_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-07 的英文 README。_
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie 标志：一只侧身的喜鹊">
 
 # RepoMagpie
 
-### 你的依赖笔记，在编程智能体安装任何东西之前先被查看。
+### 你的编程智能体会记住你试过的仓库，以及你对它们的看法。
 
-**写下你为什么放弃了一个包。你的智能体在再次安装这个包之前会读到它。**
+**RepoMagpie 是你的个人笔记库，记录你试过的开源仓库和工具（库、CLI、MCP 服务器、智能体 skill），每一个都附有你自己的结论。你的编程智能体在选用工具之前会先查看它：推荐对你有用的，遇到你已排除的就停下来。**
 
 [![npm 版本](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP 服务器](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](../spec.md#repomagpie-mcp)
@@ -38,12 +38,11 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-- **记录：** 用一行写下 Verdict（你的结论）：`repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`。你的智能体也会在一个任务结束时提出一次，把这次关于依赖的决定连同你的理由一起保存。笔记是归你所有的 Markdown 文件。
-- **安装前提醒：** 当你的智能体运行 `npm install pdfkit` 时，它会先看到你的笔记。
-- **按关注点查找：** 用任何语言询问安全、数据库、测试……你的智能体会找到相关的笔记，即使它们和你的问题没有一个相同的词。
-- **推荐：** `repomagpie suggest` 读取项目的清单文件和 README，列出适合它的笔记。
-- **发现：** 按关键词、关注点和类型搜索 GitHub，附带星标数和近期活跃度，并把你选中的仓库加入 inbox（收件箱）：使用 `repomagpie discover` 或应用。除非你要求，列表和课程会被隐藏，每个结果都会说明它为什么出现。
-- **从项目开始：** `repomagpie init` 按照你的笔记所说列出项目的依赖，然后对每个还没有笔记的依赖询问你的 Verdict。
+- **记录：** 用你自己的话，为你试过的每个仓库和工具写下结论：什么时候用，什么时候避免，以及用什么代替。`repomagpie note pdfkit "avoid: async streams painful; use puppeteer"` 会写下一条笔记；你的智能体也会在一个任务结束时提出一次，把决定连同你的理由一起保存。每条笔记都是归你所有的 Markdown 文件。
+- **查阅：** 你的智能体在选用工具之前，会通过 skill 和 MCP 服务器查看这些结论。用任何语言问"我有什么可以用来做浏览器测试？"，或者让 `repomagpie suggest` 列出适合某个项目的笔记。如果你的智能体要安装你已排除的东西，hook 会拦下它，让你先被询问。
+- **发现：** 按关键词、关注点和类型在 GitHub 上寻找新仓库，并附上你的看法，把它们加入你的笔记库：使用 `repomagpie discover` 或应用。每个结果都会说明它为什么出现。
+
+它可用于[七个编程智能体](#每个智能体得到什么)，包括 Claude Code、Codex CLI、Cursor 和 Gemini CLI。一切都留在本地：你机器上的纯 Markdown 文件，无需账号，没有云端服务器。对于团队，同样的笔记可以放在仓库中，通过 git 共享（[见下文](#与团队共享笔记)）。
 
 **状态：** 稳定版，仍在积极开发中。[更新日志](../../CHANGELOG.md)列出每个版本；[路线图](../roadmap.md)展示接下来的计划。
 
@@ -82,7 +81,7 @@ Do you want to proceed?
 
 ![RepoMagpie 的工作原理：你的智能体要运行 npm install pdfkit；skill 或 MCP 工具 recall 先检查，hook 作为兜底检查安装命令；两者都读取 ~/.magpie 中的个人笔记库和 .magpie/ 中的项目笔记库；你的 Verdict "avoid: async streams painful; use puppeteer" 被返回，你的智能体在安装前询问你。](../assets/how-it-works.svg)
 
-在安装之前，skill 会让你的智能体调用 `recall`，即 MCP 工具或 `repomagpie recall` 命令。当一条笔记说要避免这个包时，你的智能体会把它展示给你并先询问你。hook 会检查安装命令本身，以防智能体跳过这一步。
+在你的智能体选用工具之前，skill 会让它查看你的笔记库：挑选时用 `search` 或 `suggest`，安装前用 `recall`，可以作为 MCP 工具，也可以作为 `repomagpie` 命令。你的结论会最先返回。对你有用的会被推荐；当一条笔记说要避免这个包时，你的智能体会把它展示给你并先询问你。hook 会检查安装命令本身，以防智能体跳过这一步。
 
 没有额外的模型，没有 API 密钥，也没有遥测。RepoMagpie 的效果取决于你的智能体遵循 skill 的程度；没有 hook 时，安装前的检查也是如此。
 
@@ -150,7 +149,7 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 | 供应链扫描器，例如 [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | 来自全球数据的恶意软件、漏洞和流行度 | 安装之前 |
 | RepoMagpie | 你和团队的结论 | 安装之前、搜索时，以及开始一个项目时 |
 
-`CLAUDE.md` 中像 "avoid pdfkit" 这样的一行只覆盖一个项目。RepoMagpie 的笔记跨项目有效，会出现在搜索中，hook 会在每次安装时检查它。RepoMagpie 不是扫描器：它从不声称能检测恶意软件或漏洞，所以请在它旁边再运行一个扫描器（[愿景](../vision.md#non-goals)）。
+`CLAUDE.md` 中像 "avoid pdfkit" 这样的一行只覆盖一个项目。RepoMagpie 的笔记跨项目有效，会出现在搜索中，hook 会在每次安装时检查它。它不是会话或对话记忆：它记住的是你自己写下的、关于工具的决定。星标列表或 awesome 列表里没有你的智能体能用的观点；笔记里有。RepoMagpie 不是扫描器：它从不声称能检测恶意软件或漏洞，所以请在它旁边再运行一个扫描器（[愿景](../vision.md#non-goals)）。
 
 ## 常见问题
 

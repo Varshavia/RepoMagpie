@@ -1,6 +1,6 @@
 # 0009 — Positioning: what you learned, shown before install
 
-**Status:** accepted (2026-10-03)
+**Status:** accepted (2026-10-03). The one-liner and the framing as dependency memory superseded by [0060](0060-positioning-your-journal-checked-before-your-agent-picks.md) (2026-11-07); the empty square and composing with security tools stay.
 
 ## Context
 The first positioning was a curated journal of repositories and skills that your coding agent can search ([vision](../vision.md)). Desk research in October 2026 ([strategy](../strategy.md), §5) found two things:

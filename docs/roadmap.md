@@ -280,6 +280,7 @@ See [marketing.md](marketing.md).
 - [ ] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact.
 - [x] The MCP Registry listing, prepared (`feat/mcp-registry`, for `0.2.1`): `mcpName` in `package.json`, `server.json` at the root (`npx -y repomagpie@<version> mcp`, stdio), its two versions checked by `npm test` and the release workflow, and the publishing steps ([release process](release.md), step 11). With it, two fixes from testing: an alternative your notes say to avoid is marked as such wherever alternatives are shown ([decision 0059](decisions/0059-an-avoided-alternative-is-marked.md)), and [working as a team](teams.md) says what to do when shared notes were turned on on two machines.
 - [ ] List `0.2.1` in the MCP Registry, by hand with `mcp-publisher` ([release process](release.md), step 11).
+- [ ] In the next release, set `server.json`'s `description` to the one-liner, "Your coding agent remembers the repos you've tried, and what you thought of them." (81 characters; the registry allows 100). The registry stores it per version, so it changes only with a release ([decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md)).
 - [ ] Later: publish to the MCP Registry from the release workflow (GitHub's OIDC sign-in) instead of by hand. Not before the by-hand listing has worked once.
 - [ ] Soft launch in niche communities
 - [ ] Show HN
