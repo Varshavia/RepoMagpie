@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-07
+
+RepoMagpie's MCP server can be listed in the official MCP Registry, an alternative your notes say to avoid is marked as such, and turning on shared notes says to pull first when a teammate may have done it already.
+
 ### Added
 
 - RepoMagpie's MCP server can be listed in the official MCP Registry as `io.github.Varshavia/repomagpie`. A client installs it from there and runs `npx -y repomagpie@<version> mcp`, the read-only tools.
@@ -448,7 +452,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.20...v0.2.0
 [0.2.0-beta.20]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.19...v0.2.0-beta.20
 [0.2.0-beta.19]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.18...v0.2.0-beta.19
