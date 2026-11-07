@@ -2,15 +2,15 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · Español · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_Esta es una traducción del README en inglés y puede ir por detrás de él; el README en inglés es el que manda. Traducida del README en inglés del 2026-11-05._
+_Esta es una traducción del README en inglés y puede ir por detrás de él; el README en inglés es el que manda. Traducida del README en inglés del 2026-11-07._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="Logo de RepoMagpie: una urraca de perfil">
 
 # RepoMagpie
 
-### Tus notas sobre dependencias, consultadas antes de que tu agente de programación instale nada.
+### Tu agente de programación recuerda los repos que has probado y lo que pensaste de ellos.
 
-**Anota por qué dejaste un paquete. Tu agente lo lee antes de volver a instalar ese paquete.**
+**RepoMagpie es tu diario personal de los repos y herramientas de código abierto que has probado (bibliotecas, CLI, servidores MCP, skills de agentes), con tu propio veredicto sobre cada uno. Tu agente de programación lo consulta antes de elegir una herramienta: te sugiere lo que te funcionó y se detiene ante lo que descartaste.**
 
 [![Versión en npm](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![Servidor MCP](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](../spec.md#repomagpie-mcp)
@@ -38,12 +38,11 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-- **Recordar:** escribe un Verdict (tu veredicto) en una línea: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Tu agente también ofrece, una vez al final de una tarea, guardar una decisión sobre una dependencia con tu motivo. Las notas son archivos Markdown que te pertenecen.
-- **Consultar antes de instalar:** cuando tu agente ejecuta `npm install pdfkit`, primero ve tu nota.
-- **Buscar por tema:** pregunta por seguridad, bases de datos, pruebas… en cualquier idioma, y tu agente encuentra las notas que encajan, incluso las que no comparten ninguna palabra con tu pregunta.
-- **Sugerir:** `repomagpie suggest` lee los manifiestos y el README de un proyecto, y lista las notas que encajan con él.
-- **Descubrir:** busca en GitHub por palabras, tema y tipo, con estrellas y actividad reciente, y añade los repositorios que elijas a tu inbox (bandeja de entrada): `repomagpie discover`, o la aplicación. Las listas y los cursos quedan ocultos salvo que los pidas, y cada resultado dice por qué está ahí.
-- **Empezar desde un proyecto:** `repomagpie init` lista las dependencias de un proyecto según lo que dicen tus notas y luego te pide tu Verdict para cada una que no tenga nota.
+- **Recordar:** escribe tu veredicto, con tus propias palabras, sobre cada repo y herramienta que pruebes: cuándo usarlo, cuándo evitarlo y qué usar en su lugar. `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"` escribe una nota, y tu agente ofrece, una vez al final de una tarea, guardar una decisión con tu motivo. Cada nota es un archivo Markdown que te pertenece.
+- **Consultar:** tu agente revisa esos veredictos antes de elegir una herramienta, a través del skill y del servidor MCP. Pregunta "¿qué tengo para pruebas de navegador?" en cualquier idioma, o deja que `repomagpie suggest` liste las notas que encajan con un proyecto. Si tu agente intenta instalar algo que descartaste, el hook lo detiene para que se te pregunte primero.
+- **Descubrir:** encuentra repos nuevos en GitHub por palabras, tema y tipo, y añádelos a tu diario con tu opinión: `repomagpie discover`, o la aplicación. Cada resultado dice por qué está ahí.
+
+Funciona en [siete agentes de programación](#qué-recibe-cada-agente), entre ellos Claude Code, Codex CLI, Cursor y Gemini CLI. Todo se queda en local: archivos Markdown simples en tu equipo, sin cuenta y sin servidor en la nube. Para equipos, las mismas notas pueden vivir en el repositorio y compartirse con git ([más abajo](#comparte-notas-con-tu-equipo)).
 
 **Estado:** estable y en desarrollo activo. El [registro de cambios](../../CHANGELOG.md) lista cada versión; la [hoja de ruta](../roadmap.md) muestra lo que viene después.
 
@@ -82,7 +81,7 @@ Do you want to proceed?
 
 ![Cómo funciona RepoMagpie: tu agente está a punto de ejecutar npm install pdfkit; el skill o la herramienta MCP recall lo comprueba primero, y el hook comprueba el comando de instalación como respaldo; ambos leen tu diario personal en ~/.magpie y el diario del proyecto en .magpie/; tu Verdict, "avoid: async streams painful; use puppeteer", vuelve, y tu agente te pregunta antes de instalar.](../assets/how-it-works.svg)
 
-Antes de una instalación, el skill le dice a tu agente que llame a `recall`, la herramienta MCP o el comando `repomagpie recall`. Cuando una nota dice que evites el paquete, tu agente te la muestra y te pregunta primero. El hook comprueba el propio comando de instalación, por si el agente se salta ese paso.
+Antes de que tu agente elija una herramienta, el skill le dice que consulte tus diarios: `search` o `suggest` mientras elige, y `recall` antes de una instalación, como herramientas MCP o comandos `repomagpie`. Tus veredictos llegan primero. Se sugiere lo que te funcionó; cuando una nota dice que evites el paquete, tu agente te la muestra y te pregunta primero. El hook comprueba el propio comando de instalación, por si el agente se salta ese paso.
 
 No hay ningún modelo adicional, ni clave de API, ni telemetría. RepoMagpie funciona tan bien como tu agente sigue el skill; sin hook, eso incluye la comprobación antes de una instalación.
 
@@ -150,7 +149,7 @@ Mira un diario como un grafo: las notas, sus etiquetas, `[[links]]` y alternativ
 | Escáneres de la cadena de suministro, como [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | Malware, vulnerabilidades y popularidad, a partir de datos globales | Antes de una instalación |
 | RepoMagpie | Tus veredictos y los de tu equipo | Antes de una instalación, cuando buscas y cuando empiezas un proyecto |
 
-Una línea como "avoid pdfkit" en `CLAUDE.md` cubre un proyecto. Una nota de RepoMagpie sirve en todos los proyectos, aparece en las búsquedas y el hook la comprueba en cada instalación. RepoMagpie no es un escáner: nunca afirma detectar malware ni vulnerabilidades, así que ejecuta uno junto a él ([visión](../vision.md#non-goals)).
+Una línea como "avoid pdfkit" en `CLAUDE.md` cubre un proyecto. Una nota de RepoMagpie sirve en todos los proyectos, aparece en las búsquedas y el hook la comprueba en cada instalación. No es memoria de sesión ni de conversación: recuerda tus decisiones sobre herramientas, que escribes tú. Una lista de estrellas o una lista awesome no contiene ninguna opinión que tu agente pueda usar; una nota sí. RepoMagpie no es un escáner: nunca afirma detectar malware ni vulnerabilidades, así que ejecuta uno junto a él ([visión](../vision.md#non-goals)).
 
 ## Preguntas frecuentes
 

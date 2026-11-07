@@ -2,15 +2,15 @@
 
 [English](../../README.md) · Türkçe · [Deutsch](README_de.md) · [Español](README_es.md) · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İngilizce olandır. Çevrildiği metin: 2026-11-05 tarihli İngilizce README._
+_Bu, İngilizce README'nin çevirisidir ve ondan geride kalabilir; esas metin İngilizce olandır. Çevrildiği metin: 2026-11-07 tarihli İngilizce README._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie logosu: yandan görünen bir saksağan">
 
 # RepoMagpie
 
-### Kodlama ajanın bir şey kurmadan önce bağımlılık notlarına bakar.
+### Kodlama ajanın denediğin depoları ve onlar hakkında ne düşündüğünü hatırlar.
 
-**Bir paketten neden vazgeçtiğini yaz; ajanın onu yeniden kurmadan önce notunu okur.**
+**RepoMagpie, denediğin açık kaynak depoların ve araçların (kütüphaneler, CLI'lar, MCP sunucuları, ajan skill'leri) kişisel günlüğüdür; her birinde kendi kararın yazılıdır. Kodlama ajanın bir araç seçmeden önce ona bakar: işine yarayanları önerir, elediklerinde durur.**
 
 [![npm sürümü](https://img.shields.io/npm/v/repomagpie?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/repomagpie)
 [![MCP sunucusu](https://img.shields.io/badge/MCP-server-5c4ee5?style=flat-square&logo=modelcontextprotocol&logoColor=white)](../spec.md#repomagpie-mcp)
@@ -38,12 +38,11 @@ Alternatives in your personal journal: "puppeteer" (Verdict: "default for PDF re
 Do you want to proceed?
 ```
 
-- **Not al:** kararını tek satırda yaz: `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"`. Ajanın da bir işin sonunda, bir bağımlılık kararını senin nedeninle kaydetmeyi bir kez önerir. Notlar, sahibi olduğun Markdown dosyalarıdır.
-- **Kurulumdan önce hatırlat:** ajanın `npm install pdfkit` çalıştırdığında önce senin notunu görür.
-- **Konuya göre bul:** security, database, testing… hakkında istediğin dilde sor; ajanın uyan notları, sorunla tek kelimesi ortak olmayanları bile bulur.
-- **Öner:** `repomagpie suggest` bir projenin manifest dosyalarını ve README'sini okur, projeye uyan notları listeler.
-- **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle, yıldızları ve son etkinliğiyle birlikte ara; seçtiğin depoları gelen kutuna ekle: `repomagpie discover` ya da uygulama. Listeler ve kurslar sen istemedikçe gizli kalır; her sonuç neden orada olduğunu söyler.
-- **Bir projeden başla:** `repomagpie init` projenin bağımlılıklarını notlarının söylediğine göre listeler, sonra notu olmayan her biri için senin Verdict'ini sorar.
+- **Not al:** denediğin her depo ve araç için kararını kendi sözlerinle yaz: ne zaman kullanılır, ne zaman kaçınılır, yerine ne kullanılır. `repomagpie note pdfkit "avoid: async streams painful; use puppeteer"` bir not yazar; ajanın da bir işin sonunda, bir kararı senin nedeninle kaydetmeyi bir kez önerir. Her not, sahibi olduğun bir Markdown dosyasıdır.
+- **Hatırla:** ajanın bir araç seçmeden önce, skill ve MCP sunucusu üzerinden bu kararlara bakar. "Tarayıcı testleri için neyim var?" diye istediğin dilde sor ya da `repomagpie suggest` bir projeye uyan notları listelesin. Ajanın elediğin bir şeyi kurmaya kalkarsa hook onu durdurur, böylece önce sana sorulur.
+- **Keşfet:** GitHub'da kelimeyle, ilgi alanıyla ve türle yeni depolar bul, onları kendi yorumunla günlüğüne ekle: `repomagpie discover` ya da uygulama. Her sonuç neden orada olduğunu söyler.
+
+[Yedi kodlama ajanında](#her-ajan-ne-alır) çalışır; aralarında Claude Code, Codex CLI, Cursor ve Gemini CLI var. Her şey yerelde kalır: makinendeki düz Markdown dosyaları; hesap yok, bulut sunucusu yok. Ekipler için aynı notlar depoda durabilir ve git ile paylaşılabilir ([aşağıda](#notlarını-ekibinle-paylaş)).
 
 **Durum:** kararlı sürüm, geliştirme sürüyor. [Değişiklik kaydı](../../CHANGELOG.md) her sürümü listeler; [yol haritası](../roadmap.md) sırada ne olduğunu gösterir.
 
@@ -82,7 +81,7 @@ Do you want to proceed?
 
 ![RepoMagpie nasıl çalışır: ajanın npm install pdfkit çalıştırmak üzere; önce skill ya da MCP aracı recall kontrol eder, hook ise kurulum komutunu son güvence olarak kontrol eder; ikisi de ~/.magpie'deki kişisel günlüğünü ve .magpie/ içindeki proje günlüğünü okur; Verdict'in, "avoid: async streams painful; use puppeteer", geri gelir ve ajanın kurmadan önce sana sorar.](../assets/how-it-works.svg)
 
-Bir kurulumdan önce skill, ajanına `recall`'u çağırmasını söyler: MCP aracını ya da `repomagpie recall` komutunu. Bir not paketten kaçınmanı söylüyorsa ajanın notu sana gösterir ve önce sorar. Ajan bu adımı atlarsa diye hook, kurulum komutunun kendisini kontrol eder.
+Ajanın bir araç seçmeden önce skill, ona günlüklerine bakmasını söyler: seçerken `search` ya da `suggest`, kurulumdan önce `recall`; MCP araçları ya da `repomagpie` komutları olarak. Önce senin kararların gelir. İşine yarayanlar önerilir; bir not paketten kaçınmanı söylüyorsa ajanın notu sana gösterir ve önce sorar. Ajan bu adımı atlarsa diye hook, kurulum komutunun kendisini kontrol eder.
 
 Ek bir model, API anahtarı ya da telemetri yoktur. RepoMagpie, ajanın skill'e uyduğu kadar işe yarar; hook yoksa bu, kurulumdan önceki kontrol için de geçerlidir.
 
@@ -150,7 +149,7 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 | Tedarik zinciri tarayıcıları, örneğin [Socket Firewall Free](https://github.com/SocketDev/sfw-free) | Küresel verilerden kötü amaçlı yazılım, güvenlik açıkları ve popülerlik | Bir kurulumdan önce |
 | RepoMagpie | Senin ve ekibinin kararları | Bir kurulumdan önce, arama yaptığında ve bir projeye başladığında |
 
-`CLAUDE.md` içindeki "avoid pdfkit" gibi bir satır tek bir projeyi kapsar. Bir RepoMagpie notu bütün projelerinde geçerlidir, aramada çıkar ve hook onu her kurulumda kontrol eder. RepoMagpie bir tarayıcı değildir: kötü amaçlı yazılım ya da güvenlik açığı bulduğunu asla iddia etmez; yanında bir tarayıcı çalıştır ([vizyon](../vision.md#non-goals)).
+`CLAUDE.md` içindeki "avoid pdfkit" gibi bir satır tek bir projeyi kapsar. Bir RepoMagpie notu bütün projelerinde geçerlidir, aramada çıkar ve hook onu her kurulumda kontrol eder. Oturum ya da sohbet belleği değildir: araçlar hakkında senin yazdığın kararları hatırlar. Bir yıldız listesinde ya da awesome listesinde ajanının kullanabileceği bir görüş yoktur; bir notta vardır. RepoMagpie bir tarayıcı değildir: kötü amaçlı yazılım ya da güvenlik açığı bulduğunu asla iddia etmez; yanında bir tarayıcı çalıştır ([vizyon](../vision.md#non-goals)).
 
 ## SSS
 
