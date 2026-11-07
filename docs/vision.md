@@ -2,9 +2,9 @@
 
 ## One-liner
 
-RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
+Your coding agent remembers the repos you've tried, and what you thought of them.
 
-([Decision 0009](decisions/0009-positioning-dependency-memory.md).)
+RepoMagpie is your personal journal of the open-source repos and tools you've tried (libraries, CLIs, MCP servers, agent skills), with your own verdict on each. Your coding agent checks it before it picks a tool: it suggests what worked for you, and it stops on what you ruled out. ([Decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md), which keeps [0009](decisions/0009-positioning-dependency-memory.md)'s empty square.)
 
 ## The problem
 

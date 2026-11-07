@@ -8,11 +8,11 @@ The ideas that shape RepoMagpie beyond note capture and search. Each one lists i
 
 The product's category moved:
 - **from:** a better bookmark manager for GitHub repositories
-- **to:** the memory of what you and your team learned, shown before your agent installs a dependency
+- **to:** your journal of the repos and tools you've tried, with your verdict on each, checked by your coding agent before it picks a tool
 
-**One-liner** ([decision 0009](decisions/0009-positioning-dependency-memory.md)):
+**One-liner** ([decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md), superseding [0009](decisions/0009-positioning-dependency-memory.md)'s):
 
-> RepoMagpie remembers what you and your team learned about every dependency, and tells your coding agent before it installs one.
+> Your coding agent remembers the repos you've tried, and what you thought of them.
 
 ## Rules every idea follows
 

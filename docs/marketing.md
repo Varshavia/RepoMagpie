@@ -4,7 +4,15 @@ Marketing starts now, not at launch. Researched October 2026.
 
 ## Core message
 
-> You understand it, the magpie remembers it.
+> Your coding agent remembers the repos you've tried, and what you thought of them.
+
+RepoMagpie is your personal journal of the open-source repos and tools you've tried (libraries, CLIs, MCP servers, agent skills), with your own verdict on each. Your coding agent checks it before it picks a tool: it suggests what worked for you, and it stops on what you ruled out ([decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md)).
+
+- **Three parts, in this order:** Remember (write your verdict on every repo and tool you try: when to use it, when to avoid it, what to use instead), Recall (your agent checks those verdicts before it picks a tool; the hook stops an install you ruled out), Discover (find new repos on GitHub and add them with your take).
+- **Proof:** the hook's output, seven agents, everything local (plain files, no account, no hosted server).
+- **Teams second:** the same notes can live in the repository and be shared through git. After the individual story, never in the tagline.
+- **What it isn't:** session or conversation memory; a star list or an awesome list.
+- **Words:** "repos and tools" in the opening. "Package" only where it is about package managers: the hook, install commands.
 
 Lead with the habit, not the features: *every day, find one repo worth keeping, write one sentence about when you'd use it.*
 
