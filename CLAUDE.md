@@ -80,6 +80,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 
 | Path | What it is |
 |---|---|
+| `.claude-plugin/` | The Claude Code plugin's manifest, `plugin.json`, shipped in the npm package ([decision 0063](docs/decisions/0063-a-claude-code-plugin.md)). Not agent config for this repository. |
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
 | `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old), `ISSUE_TEMPLATE/` (`beta-feedback.yml`, the testers' day-7 form, [TESTING.md](TESTING.md); `bug.yml`, `feature.yml` and `config.yml`) and `PULL_REQUEST_TEMPLATE.md` (what an outside pull request must contain, [CONTRIBUTING.md](CONTRIBUTING.md)). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |

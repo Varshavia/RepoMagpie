@@ -28,7 +28,8 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    ".claude-plugin/plugin.json"
   ],
   "engines": {
     "node": ">=22.12.0"

@@ -18,6 +18,8 @@ const MERGE = `Merge pull request #64 from Varshavia/release/${TAG}`;
 type Answer = string | Error | ((input?: string) => string);
 // server.json as HEAD has it: both versions the release's.
 const serverJson = (version: string) => JSON.stringify({ name: "io.github.Varshavia/repomagpie", version, packages: [{ registryType: "npm", identifier: "repomagpie", version }] });
+// The Claude Code plugin's manifest as HEAD has it.
+const pluginJson = (version: string) => JSON.stringify({ name: "repomagpie", version });
 const HAPPY: Record<string, Answer> = {
   "rev-parse --show-toplevel": "/repo",
   "rev-parse --abbrev-ref HEAD": "main",
@@ -27,6 +29,7 @@ const HAPPY: Record<string, Answer> = {
   "rev-parse origin/main": HEAD,
   "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: VERSION }),
   "show HEAD:server.json": serverJson(VERSION),
+  "show HEAD:.claude-plugin/plugin.json": pluginJson(VERSION),
   [`tag --list ${TAG}`]: "",
   [`ls-remote --tags origin refs/tags/${TAG}`]: "",
   "log -1 --format=%s HEAD": MERGE,
@@ -133,6 +136,7 @@ test("a stable version, v0.2.0: staged under latest, latest not moved by hand, t
   const r = await run({
     "show HEAD:package.json": JSON.stringify({ name: "repomagpie", version: stable }),
     "show HEAD:server.json": serverJson(stable),
+    "show HEAD:.claude-plugin/plugin.json": pluginJson(stable),
     [`tag --list ${tag}`]: "",
     [`ls-remote --tags origin refs/tags/${tag}`]: "",
     "log -1 --format=%s HEAD": merge,
@@ -163,6 +167,13 @@ test("a server.json left at the version before stops before tagging", async () =
   assert.equal(r.code, 1);
   assert.equal(r.tagged, false);
   assert.match(stopped(r.out), /^server\.json's versions \(0\.2\.0-beta\.14, 0\.2\.0-beta\.14\) must be package\.json's version \(0\.2\.0-beta\.15\)/);
+});
+
+test("a plugin manifest left at the version before stops before tagging", async () => {
+  const r = await run({ "show HEAD:.claude-plugin/plugin.json": pluginJson("0.2.0-beta.14") });
+  assert.equal(r.code, 1);
+  assert.equal(r.tagged, false);
+  assert.match(stopped(r.out), /^\.claude-plugin\/plugin\.json's version \(0\.2\.0-beta\.14\) must be package\.json's version \(0\.2\.0-beta\.15\)/);
 });
 
 test("the merge of release/v0.2.0-beta.20 isn't the merge of release/v0.2.0", async () => {
@@ -315,11 +326,13 @@ test("against a throwaway repository with a bare origin: refuses before the rele
   const write = (version: string) => {
     writeFileSync(join(work, "package.json"), `${JSON.stringify({ name: "x", version }, null, 2)}\n`);
     writeFileSync(join(work, "server.json"), `${serverJson(version)}\n`);
+    writeFileSync(join(work, ".claude-plugin", "plugin.json"), `${pluginJson(version)}\n`);
   };
   git(base, "init", "--bare", origin);
   git(work, "init");
+  mkdirSync(join(work, ".claude-plugin"));
   write("0.0.1-beta.1");
-  git(work, "add", "package.json", "server.json");
+  git(work, "add", "package.json", "server.json", ".claude-plugin/plugin.json");
   git(work, "commit", "-m", "chore: release 0.0.1-beta.1");
   git(work, "tag", "-a", "v0.0.1-beta.1", "-m", "v0.0.1-beta.1");
   git(work, "remote", "add", "origin", origin);

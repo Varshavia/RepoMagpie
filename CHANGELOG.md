@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The npm package is also a Claude Code plugin. It carries `.claude-plugin/plugin.json`, which gives Claude Code the RepoMagpie skill, the MCP server's read-only tools and the hook that checks installs, with no `repomagpie setup`. Both start `node` from `PATH`, so the plugin needs Node.js 22.12 or later there. A marketplace to install the plugin from comes in a later release.
+
 ### Fixed
 
 - The install detector read the value of npm’s `--before`, `--cpu`, `--os` and `--libc`, and of uv’s `--refresh-package`, `--upgrade-package` (`-P`), `--reinstall-package`, `--no-binary-package` and `--no-build-package`, as a package name; the same for `uv pip install`’s `--index-strategy`, `--resolution`, `--prerelease`, `--exclude-newer`, `--keyring-provider`, `--no-binary`, `--only-binary` and `--config-setting` (`-C`). Those values are now skipped like the other value-taking flags’.
