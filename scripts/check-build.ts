@@ -144,13 +144,14 @@ function checkPackage(dir: string): number {
 
 // The libraries the MCP SDK inlines in its own files each have a notice in the built
 // THIRD-PARTY-LICENSES.md, at that version (scripts/licenses-inlined.md), and no notice is left for
-// one the bundle no longer carries. The bundle names each SDK file it includes in a //#region
-// comment; that file, in node_modules, names what it inlines by its pnpm path (a scope's "/" is
+// one the bundle no longer carries. The bundle names each SDK file it includes in a comment where
+// the file starts: `//#region <path>` up to rolldown 1.2.14, `// <path>` from 1.2.15 (rolldown
+// #11235). That file, in node_modules, names what it inlines by its pnpm path (a scope's "/" is
 // "+" there). A newer SDK that inlines other versions fails here until the notices are updated.
 function checkInlinedLicenses(): number {
   const dist = fileURLToPath(new URL("../dist/cli/", import.meta.url));
   const bundle = readdirSync(dist).filter((file) => file.endsWith(".js")).map((file) => readFileSync(join(dist, file), "utf8")).join("\n");
-  const sdkFiles = new Set([...bundle.matchAll(/\/\/#region (node_modules\/@modelcontextprotocol\/[a-z]+\/dist\/[\w.-]+\.mjs)/g)].map((m) => m[1]));
+  const sdkFiles = new Set([...bundle.matchAll(/\/\/(?:#region)? (node_modules\/@modelcontextprotocol\/[a-z]+\/dist\/[\w.-]+\.mjs)/g)].map((m) => m[1]));
   const inlined = new Set<string>();
   for (const file of sdkFiles) {
     const text = readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8");
