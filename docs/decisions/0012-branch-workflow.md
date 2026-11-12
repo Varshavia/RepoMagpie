@@ -1,6 +1,6 @@
 # 0012 — Branch workflow
 
-**Status:** accepted (2026-10-03)
+**Status:** accepted (2026-10-03). The merge method for pull requests from outside contributors superseded by [0062](0062-outside-pull-requests-are-squash-merged.md) (2026-11-12): they are squash-merged; the maintainer's own branches keep this rule.
 
 ## Context
 Until October 2026, all work was committed straight to `main`. Releases need a `main` that is always consistent. Agents can't create branches or pull requests: git-guard blocks those commands ([CLAUDE.md](../../CLAUDE.md), section 1).
