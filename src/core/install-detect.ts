@@ -102,7 +102,7 @@ function argsOf(tokens: Token[], i: number): string[] {
 
 // Flags that take a value as the next word, per tool (--flag=value is handled for every flag).
 const NPM_VALUES = ["--prefix", "-C", "--registry", "-w", "--workspace", "--tag", "--omit", "--include", "--cache", "--userconfig",
-  "--globalconfig", "--install-strategy", "--loglevel", "--save-prefix"];
+  "--globalconfig", "--install-strategy", "--loglevel", "--save-prefix", "--before", "--cpu", "--os", "--libc", "--scope"];
 const PNPM_VALUES = ["-C", "--dir", "--filter", "-F", "--registry", "--store-dir", "--reporter", "--loglevel", "--config"];
 const YARN_VALUES = ["--cwd", "--registry", "--modules-folder", "--cache-folder"];
 const BUN_VALUES = ["--cwd", "--registry", "--backend", "--cache-dir", "--config", "-c"];
@@ -114,7 +114,9 @@ const PIP_VALUES = ["-r", "--requirement", "-c", "--constraint", "-e", "--editab
 const UV_VALUES = ["-r", "--requirements", "-c", "--constraints", "--overrides", "--group", "--optional", "--package", "--index",
   "--default-index", "--index-url", "--extra-index-url", "--directory", "--project", "--python", "-p", "--tag", "--branch", "--rev",
   "--marker", "-m", "--extra", "--script", "--bounds", "--config-file", "--cache-dir", "-e", "--editable", "--target", "--prefix",
-  "-i", "-f", "--find-links"];
+  "-i", "-f", "--find-links", "--refresh-package", "--upgrade-package", "-P", "--reinstall-package", "--no-binary-package",
+  "--no-build-package", "--index-strategy", "--resolution", "--prerelease", "--exclude-newer", "--keyring-provider", "--no-binary",
+  "--only-binary", "--config-setting", "-C"];
 const CARGO_VALUES = ["-F", "--features", "-p", "--package", "--git", "--branch", "--tag", "--rev", "--path", "--registry", "--rename",
   "--target", "--manifest-path", "--lockfile-path", "--config", "-Z", "--base", "--color"];
 

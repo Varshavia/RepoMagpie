@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The install detector read the value of npm’s `--before`, `--cpu`, `--os` and `--libc`, and of uv’s `--refresh-package`, `--upgrade-package` (`-P`), `--reinstall-package`, `--no-binary-package` and `--no-build-package`, as a package name; the same for `uv pip install`’s `--index-strategy`, `--resolution`, `--prerelease`, `--exclude-newer`, `--keyring-provider`, `--no-binary`, `--only-binary` and `--config-setting` (`-C`). Those values are now skipped like the other value-taking flags’.
 - On Claude Code older than 2.1.139, RepoMagpie's hook could silently never run, because `repomagpie setup` always wrote the exec form (`command` and `args`), which those versions don't have. `setup` now reads `claude --version`: from 2.1.139 it writes the exec form as before, below it the shell form, `repomagpie hook claude-code`. When the version can't be read, a new entry gets the shell form, an exec entry already there is left as it is, and the plan warns. If your Claude Code is older than 2.1.139, run `repomagpie setup` again.
 - `repomagpie doctor` said the hook was wired when Claude Code couldn't run it. It now prints Claude Code's version and each entry's form, and puts a `FAIL:` line first under To do when an exec-form entry is installed on a version below 2.1.139, with `claude_code.failures` in `--json`. It still exits 0. When the version can't be read, an exec-form entry is an ordinary to-do.
 
