@@ -39,7 +39,7 @@ The example is a pre-release, `0.2.0-beta.2`. For a final release, drop `--tag b
 
 The maintainer creates the branch `release/vX.Y.Z` (or `release/vX.Y.Z-beta.N`) from `main`. On it, the agent:
 
-- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's), and in `server.json`'s `version` and `packages[0].version` (the MCP Registry lists the version it names, step 11). `npm test` fails until they all agree, and the release workflow refuses a tag whose `server.json` names another version;
+- [ ] sets the version in `package.json` and in `package-lock.json` (the top-level `version` and `packages[""].version`), in `skills/repomagpie/SKILL.md`'s `metadata.version` (`repomagpie doctor` compares the installed skill's version with the CLI's), in `server.json`'s `version` and `packages[0].version` (the MCP Registry lists the version it names, step 11), and in `.claude-plugin/plugin.json`'s `version` (Claude Code updates an installed plugin only when it changes, [decision 0063](decisions/0063-a-claude-code-plugin.md)). `npm test` fails until they all agree, and the release workflow refuses a tag whose `server.json` or plugin manifest names another version;
 - [ ] moves the Unreleased entries in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`, with a one-line summary, leaves an empty `## [Unreleased]`, and updates the compare links at the end of the file;
 - [ ] checks that the section covers everything merged since the last release (`git log --oneline vPREVIOUS..HEAD`);
 - [ ] updates the roadmap's Now and Next (the READMEs name no version: their status line has said "stable" in all six since `0.2.0`);
@@ -66,7 +66,7 @@ Run from the repository root, in this order. Every command must pass; report eac
 | `PLAYWRIGHT_BROWSERS_PATH="$PWD/.scratch/ms-playwright" npm run test:e2e` | no flow fails; the graph's 2,000-note timing is under 2 s |
 | `npm run bench` | every command within its budget (spec §7) |
 | `node dist/cli/main.js --version` | it prints the new version |
-| `npm pack --dry-run` | the package is `repomagpie@X.Y.Z` and lists `LICENSE`, `dist/cli/THIRD-PARTY-LICENSES.md`, `dist/ui/THIRD-PARTY-LICENSES.md` and `dist/ui/icons-LICENSE.txt`; no runtime dependencies |
+| `npm pack --dry-run` | the package is `repomagpie@X.Y.Z` and lists `LICENSE`, `dist/cli/THIRD-PARTY-LICENSES.md`, `dist/ui/THIRD-PARTY-LICENSES.md`, `dist/ui/icons-LICENSE.txt` and `.claude-plugin/plugin.json`; no runtime dependencies |
 
 ### 3. Ship (maintainer; CI stages)
 
@@ -74,7 +74,7 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
 
 1. Commit the release branch, push it, and open a pull request to `main`.
 2. Merge it once CI is green ("Rebase and merge" or a merge commit, not squash).
-3. Tag the merge: `git switch main`, `git pull`, then `npm run release:tag`. It checks, in order: on `main` with a clean tree; after `git fetch origin main --tags`, `main` is `origin/main` (not behind, not ahead); `package.json`'s version isn't tagged yet, here or on GitHub; `HEAD` is the merge of `release/v<version>` (or, after "Rebase and merge", that branch's last commit, patch for patch); and the release workflow's own check (`scripts/release-check.ts`, which also wants `server.json`'s two versions to be the release's). It stops at the first that fails and says what to do. Then it asks you to type the tag (`v0.2.0-beta.2`), creates it with `git tag -a`, pushes it, and prints steps 4 to 11 filled in with the version. `npm run release:tag -- --dry-run` runs the checks only. It needs a terminal to tag, and agents can run only the dry run ([CLAUDE.md](../CLAUDE.md), section 1).
+3. Tag the merge: `git switch main`, `git pull`, then `npm run release:tag`. It checks, in order: on `main` with a clean tree; after `git fetch origin main --tags`, `main` is `origin/main` (not behind, not ahead); `package.json`'s version isn't tagged yet, here or on GitHub; `HEAD` is the merge of `release/v<version>` (or, after "Rebase and merge", that branch's last commit, patch for patch); and the release workflow's own check (`scripts/release-check.ts`, which also wants `server.json`'s two versions and the plugin manifest's version to be the release's). It stops at the first that fails and says what to do. Then it asks you to type the tag (`v0.2.0-beta.2`), creates it with `git tag -a`, pushes it, and prints steps 4 to 11 filled in with the version. `npm run release:tag -- --dry-run` runs the checks only. It needs a terminal to tag, and agents can run only the dry run ([CLAUDE.md](../CLAUDE.md), section 1).
 
    By hand, if the script can't run, in this order (three releases were tagged before their merge):
    1. Merge the release pull request (step 2).
@@ -82,7 +82,7 @@ Releases are staged from CI and approved by the maintainer ([decision 0033](deci
    3. `git log -1` shows that merge, and `package.json`'s `version` is the release's (`0.2.0-beta.2`). If either isn't so, stop: the pull hasn't brought the merge yet.
    4. `git tag v0.2.0-beta.2`, then `git push origin v0.2.0-beta.2`.
 4. The tag starts `.github/workflows/release.yml`. Its first job:
-   - checks out with the whole history, then refuses a tag that isn't `v` plus `package.json`'s version, a `server.json` that names another version, or a commit that isn't on `main`'s history (`scripts/release-check.ts`; it also refuses a shallow checkout);
+   - checks out with the whole history, then refuses a tag that isn't `v` plus `package.json`'s version, a `server.json` or `.claude-plugin/plugin.json` that names another version, or a commit that isn't on `main`'s history (`scripts/release-check.ts`; it also refuses a shallow checkout);
    - runs every check in step 2 except the benchmarks, and the end-to-end tests;
    - refuses a version npm already has;
    - packs the package once, prints the tarball's name and SHA-256, and uploads it as the artifact `package`.

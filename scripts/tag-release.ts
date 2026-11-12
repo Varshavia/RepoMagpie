@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { releaseCheck, SEMVER } from "./release-check.ts";
+import { PLUGIN_MANIFEST, releaseCheck, SEMVER } from "./release-check.ts";
 
 export interface Io {
   cwd: string;
@@ -121,16 +121,18 @@ export async function tagRelease(argv: string[], io: Io): Promise<number> {
   }
 
   // 8. the release workflow's check
+  const atHead = (file: string): unknown => {
+    try {
+      return JSON.parse(io.git(["show", `HEAD:${file}`]));
+    } catch {
+      return undefined; // missing or not JSON: the check names it
+    }
+  };
   const check = releaseCheck({
     tag,
     version,
-    server: (() => {
-      try {
-        return JSON.parse(io.git(["show", "HEAD:server.json"]));
-      } catch {
-        return undefined; // missing or not JSON: the check names it
-      }
-    })(),
+    server: atHead("server.json"),
+    plugin: atHead(PLUGIN_MANIFEST),
     isOnMain: () => {
       try {
         io.git(["merge-base", "--is-ancestor", "HEAD", "origin/main"]);
