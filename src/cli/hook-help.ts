@@ -2,8 +2,8 @@
 // doesn't load the hook.
 
 export const HOOK_HELP = `
-Add this to ~/.claude/settings.json or a project's .claude/settings.json
-(RepoMagpie never edits a settings file for you):
+\`repomagpie setup\` writes this entry for you. To write it by hand, add this
+to ~/.claude/settings.json or a project's .claude/settings.json:
 
 {
   "hooks": {
@@ -20,7 +20,8 @@ For unattended runs (claude -p), where nobody can answer, use
 `;
 
 export const CODEX_HOOK_HELP = `
-Add this to ~/.codex/hooks.json:
+\`repomagpie setup\` writes this entry for you. To write it by hand, add this
+to ~/.codex/hooks.json:
 
 {
   "hooks": {
@@ -42,7 +43,8 @@ then only inform.
 `;
 
 export const GEMINI_HOOK_HELP = `
-Add this to ~/.gemini/settings.json:
+\`repomagpie setup\` writes this entry for you. To write it by hand, add this
+to ~/.gemini/settings.json:
 
 {
   "hooks": {
@@ -62,8 +64,9 @@ with the note in its prompt. Other notes show you a line. For unattended runs
 `;
 
 export const ANTIGRAVITY_HOOK_HELP = `
-Add this to ~/.gemini/config/hooks.json (Antigravity CLI and the Antigravity IDE
-both read it):
+\`repomagpie setup\` writes this entry for you. To write it by hand, add this
+to ~/.gemini/config/hooks.json (Antigravity CLI and the Antigravity IDE both
+read it):
 
 {
   "repomagpie": {
@@ -83,8 +86,9 @@ Other notes add nothing: Antigravity shows a hook's other answers to nobody.
 `;
 
 export const COPILOT_HOOK_HELP = `
-Save this as ~/.copilot/hooks/repomagpie.json (its own file; Copilot CLI reads
-every .json file in that folder):
+\`repomagpie setup\` writes this file for you. To write it by hand, save it as
+~/.copilot/hooks/repomagpie.json (its own file; Copilot CLI reads every .json
+file in that folder):
 
 {
   "version": 1,
@@ -106,7 +110,8 @@ VS Code reads this folder too, but sends its own input, which gets no answer.
 `;
 
 export const CURSOR_HOOK_HELP = `
-Add this to ~/.cursor/hooks.json:
+\`repomagpie setup\` writes this entry for you. To write it by hand, add this
+to ~/.cursor/hooks.json:
 
 {
   "version": 1,
