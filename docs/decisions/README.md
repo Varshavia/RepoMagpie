@@ -20,7 +20,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0009 | [Positioning: what you learned, shown before install](0009-positioning-dependency-memory.md) | accepted (the one-liner superseded by 0060) |
 | 0010 | [v0.1 scope](0010-v0-1-scope.md) | accepted (scope extended by 0021; recall's "never blocks" refined by 0024; the graph's status changed by 0026; "MCP server: later" superseded by 0034) |
 | 0011 | [Vet and drift: record and integrate, no scanner](0011-vet-and-drift-reduced.md) | accepted |
-| 0012 | [Branch workflow](0012-branch-workflow.md) | accepted |
+| 0012 | [Branch workflow](0012-branch-workflow.md) | accepted (the merge method for outside pull requests superseded by 0062) |
 | 0013 | [Two journal scopes, one format](0013-two-journal-scopes.md) | accepted |
 | 0014 | [Close step 1.5 with desk research instead of interviews](0014-step-1-5-desk-research.md) | accepted |
 | 0015 | [Language and runtime: TypeScript on Node.js](0015-typescript-on-node.md) | accepted (command name settled by 0031) |
@@ -70,3 +70,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0059 | [An avoided alternative is marked](0059-an-avoided-alternative-is-marked.md) | accepted (supersedes 0029's avoid mark) |
 | 0060 | [Positioning: your journal of repos and tools, checked before your agent picks one](0060-positioning-your-journal-checked-before-your-agent-picks.md) | accepted (supersedes 0009's one-liner) |
 | 0061 | [The Claude Code hook's form follows Claude Code's version](0061-the-hook-form-follows-claude-code-version.md) | accepted (supersedes 0035's hook form) |
+| 0062 | [Outside pull requests are squash-merged](0062-outside-pull-requests-are-squash-merged.md) | accepted (supersedes 0012's merge method for outside pull requests) |

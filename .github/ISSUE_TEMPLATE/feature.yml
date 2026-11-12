@@ -1,0 +1,37 @@
+name: Feature request
+description: An idea for something RepoMagpie should do, or do differently.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the idea. The [vision](https://github.com/Varshavia/RepoMagpie/blob/main/docs/vision.md) says what RepoMagpie is for, and the [roadmap](https://github.com/Varshavia/RepoMagpie/blob/main/docs/roadmap.md) what is planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, and where RepoMagpie gets in the way or falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+      description: The behaviour you have in mind. A command, its output or a screen sketch helps.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do instead today?
+      description: Workarounds or other tools you tried.
+    validations:
+      required: false
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself (see CONTRIBUTING.md).
+          required: false

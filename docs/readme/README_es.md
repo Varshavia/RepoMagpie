@@ -204,7 +204,7 @@ Cada nota es un archivo Markdown con frontmatter YAML, en `~/.magpie/notes/` o e
 - [Probar la beta](../../TESTING.md): los pasos para una semana con la beta y cómo enviar comentarios
 - [Visión](../vision.md), [competidores](../competitors.md) y [decisiones](../decisions/)
 
-Abre un issue para errores e ideas. El proyecto todavía no acepta pull requests ([CONTRIBUTING.md](../../CONTRIBUTING.md)). Para informar de una vulnerabilidad, consulta [SECURITY.md](../../SECURITY.md).
+Abre un issue para errores e ideas. Los pull requests son bienvenidos: consulta [CONTRIBUTING.md](../../CONTRIBUTING.md). Para informar de una vulnerabilidad, consulta [SECURITY.md](../../SECURITY.md).
 
 ## Licencia
 

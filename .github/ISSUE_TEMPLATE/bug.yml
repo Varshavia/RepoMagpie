@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in RepoMagpie doesn't work as the docs say.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. Don't report vulnerabilities here: see SECURITY.md.
+        Paste nothing personal: `repomagpie doctor --json` hides secrets, but its paths show your user name.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: The command you ran, and what you saw. Paste the output as text.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead, and where the docs say so, if they do.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that shows it, starting from a fresh journal if you can.
+      placeholder: |
+        1. repomagpie note pdfkit "avoid: test" --type npm
+        2. repomagpie recall pdfkit
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: RepoMagpie version
+      description: The output of `repomagpie --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS, Node.js version and coding agent
+      description: For example "Windows 11, Node 24.13, Claude Code 2.1.150".
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `repomagpie doctor --json` (optional)
+      description: Helps with setup, hook and MCP problems. Replace your user name in paths if you want.
+      render: json
+    validations:
+      required: false

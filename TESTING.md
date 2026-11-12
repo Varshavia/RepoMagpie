@@ -1,4 +1,4 @@
-# Testing the beta
+# Testing RepoMagpie for a week
 
 **English** · [Türkçe](docs/testing/TESTING_tr.md)
 

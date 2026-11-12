@@ -206,7 +206,7 @@ Belgeler İngilizcedir.
 - [Betayı test etmek](../testing/TESTING_tr.md): beta ile bir haftanın adımları ve geri bildirimin nasıl gönderileceği
 - [Vizyon](../vision.md), [rakipler](../competitors.md) ve [kararlar](../decisions/)
 
-Hatalar ve fikirler için bir issue aç. Proje henüz pull request kabul etmiyor ([CONTRIBUTING.md](../../CONTRIBUTING.md)). Bir güvenlik açığı bildirmek için [SECURITY.md](../../SECURITY.md) sayfasına bak.
+Hatalar ve fikirler için bir issue aç. Pull request'lere açığız: [CONTRIBUTING.md](../../CONTRIBUTING.md) sayfasına bak. Bir güvenlik açığı bildirmek için [SECURITY.md](../../SECURITY.md) sayfasına bak.
 
 ## Lisans
 

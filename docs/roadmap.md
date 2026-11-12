@@ -38,7 +38,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: `0.2.1` (2026-11-07): the MCP Registry listing, prepared, and its two fixes (#91). Next, the maintainer lists `0.2.1` in the MCP Registry ([release process](release.md), step 11).
   Also now: recall right after one note changed, over its 150 ms budget on the maintainer's machine (`perf/recall-one-note-changed`, [decision 0057](decisions/0057-the-cache-is-updated-not-rewritten.md)): the per-note caches write a small delta beside them instead of being rewritten whole; at 2,000 notes recall right after one note changed 145 → 138 ms, the hook 136 → 128–131 ms. Merged (#83) and released in `0.2.0-beta.19`.
   Also now: the Claude Code hook on older versions (`fix/setup-claude-code-version`, [decision 0061](decisions/0061-the-hook-form-follows-claude-code-version.md)): `setup` writes the exec form only from Claude Code 2.1.139, and `doctor` prints the version and each entry's form, with a `FAIL:` line when exec form is installed below it.
-- **Next:** the [launch](#launch) steps left (the MCP Registry listing of `0.2.1`, the demo, good first issues, `CODE_OF_CONDUCT.md`, the announcements), then [teams after launch](#teams-after-launch).
+- **Next:** the [launch](#launch) steps left (the MCP Registry listing of `0.2.1`, the demo, opening the good first issues drafted on `docs/contributing`, the announcements), then [teams after launch](#teams-after-launch).
   Also next: the rest of [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 2 (the field boosts, fuzzy and prefix limits, optional `files`), with its decision record. Then follow-ups from `feat/next-batch`: the graph's cold first open (each note parsed once for both caches; done in `perf/graph-open`, above).
 - **Later:** v0.3 Trust, v0.4 Share. Also later: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 3, opt-in semantic search, decided after Phase 2's eval (D3).
 
@@ -48,8 +48,8 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
 | 1. Agent instructions | ✅ done |
 | 1.5. Validation | ✅ done (desk research) |
 | 2. Spec and tech-stack decision | ✅ done |
-| v0.1 Remember | ⬜ |
-| v0.2 Connect | ⬜ |
+| v0.1 Remember | 🟡 released; launch steps left |
+| v0.2 Connect | 🟡 released in 0.2.0; follow-ups open |
 | v0.3 Trust | ⬜ |
 | v0.4 Share | ⬜ |
 | Later | ⬜ |
@@ -277,8 +277,8 @@ See [marketing.md](marketing.md).
 - [ ] 30-second demo GIF: the "pdfkit moment", in the terminal theme from `DESIGN.md`
 - [x] Social preview image, with `taste-skill` (`docs/assets/social-preview.png`, 1280×640; the maintainer sets it in the repository settings)
 - [x] Logo: a magpie, legible at 16 px; direction with `taste-skill` (`docs/assets/logo.svg`, also the app's favicon)
-- [ ] Five "good first issue" issues
-- [ ] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact.
+- [ ] Five "good first issue" issues (`docs/contributing`: 15 drafted, six of them labelled "good first issue"; done once the maintainer opens them)
+- [x] Add `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) with a private contact. (`docs/contributing`, with the rewritten `CONTRIBUTING.md`, the issue and pull-request templates, and [decision 0062](decisions/0062-outside-pull-requests-are-squash-merged.md): outside pull requests are squash-merged.)
 - [x] The MCP Registry listing, prepared (`feat/mcp-registry`, for `0.2.1`): `mcpName` in `package.json`, `server.json` at the root (`npx -y repomagpie@<version> mcp`, stdio), its two versions checked by `npm test` and the release workflow, and the publishing steps ([release process](release.md), step 11). With it, two fixes from testing: an alternative your notes say to avoid is marked as such wherever alternatives are shown ([decision 0059](decisions/0059-an-avoided-alternative-is-marked.md)), and [working as a team](teams.md) says what to do when shared notes were turned on on two machines.
 - [ ] List `0.2.1` in the MCP Registry, by hand with `mcp-publisher` ([release process](release.md), step 11).
 - [ ] In the next release, set `server.json`'s `description` to the one-liner, "Your coding agent remembers the repos you've tried, and what you thought of them." (81 characters; the registry allows 100). The registry stores it per version, so it changes only with a release ([decision 0060](decisions/0060-positioning-your-journal-checked-before-your-agent-picks.md)).

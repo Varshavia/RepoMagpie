@@ -204,7 +204,7 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 - [测试 beta 版](../../TESTING.md)：使用 beta 版一周的步骤，以及如何发送反馈
 - [愿景](../vision.md)、[竞品](../competitors.md)和[决策](../decisions/)
 
-报告 bug 和提出想法请开 issue。本项目暂不接受 pull request（[CONTRIBUTING.md](../../CONTRIBUTING.md)）。报告安全漏洞请参见 [SECURITY.md](../../SECURITY.md)。
+报告 bug 和提出想法请开 issue。欢迎提交 pull request，请参见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。报告安全漏洞请参见 [SECURITY.md](../../SECURITY.md)。
 
 ## 许可证
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/Varshavia/RepoMagpie/security/advisories/new
+    about: Report security problems privately, never in a public issue (SECURITY.md).
+  - name: How to contribute
+    url: https://github.com/Varshavia/RepoMagpie/blob/main/CONTRIBUTING.md
+    about: Setup, tests, how to claim an issue and what a pull request needs.
