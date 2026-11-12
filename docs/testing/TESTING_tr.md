@@ -1,4 +1,4 @@
-# Betayı test etmek
+# RepoMagpie'yi bir hafta test etmek
 
 [English](../../TESTING.md) · **Türkçe**
 

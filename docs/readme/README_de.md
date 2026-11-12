@@ -204,7 +204,7 @@ Jede Notiz ist eine Markdown-Datei mit YAML-Frontmatter, in `~/.magpie/notes/` o
 - [Die Beta testen](../../TESTING.md): die Schritte für eine Woche mit der Beta und wie du Feedback schickst
 - [Vision](../vision.md), [Mitbewerber](../competitors.md) und [Entscheidungen](../decisions/)
 
-Öffne ein Issue für Fehler und Ideen. Das Projekt nimmt noch keine Pull Requests an ([CONTRIBUTING.md](../../CONTRIBUTING.md)). Um eine Schwachstelle zu melden, siehe [SECURITY.md](../../SECURITY.md).
+Öffne ein Issue für Fehler und Ideen. Pull Requests sind willkommen: siehe [CONTRIBUTING.md](../../CONTRIBUTING.md). Um eine Schwachstelle zu melden, siehe [SECURITY.md](../../SECURITY.md).
 
 ## Lizenz
 

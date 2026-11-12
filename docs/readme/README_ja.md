@@ -204,7 +204,7 @@ Suggest for this project（このプロジェクトへの提案）：合うメ�
 - [ベータ版のテスト](../../TESTING.md)：ベータ版を 1 週間使う手順と、フィードバックの送り方
 - [ビジョン](../vision.md)、[競合](../competitors.md)、[意思決定](../decisions/)
 
-バグやアイデアは issue でお知らせください。このプロジェクトはまだプルリクエストを受け付けていません（[CONTRIBUTING.md](../../CONTRIBUTING.md)）。脆弱性の報告については [SECURITY.md](../../SECURITY.md) をご覧ください。
+バグやアイデアは issue でお知らせください。プルリクエストも歓迎します。[CONTRIBUTING.md](../../CONTRIBUTING.md) をご覧ください。脆弱性の報告については [SECURITY.md](../../SECURITY.md) をご覧ください。
 
 ## ライセンス
 

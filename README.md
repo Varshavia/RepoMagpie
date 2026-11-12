@@ -199,10 +199,12 @@ Each note is one Markdown file with YAML frontmatter, in `~/.magpie/notes/` or a
 - [Agents](docs/agents.md): what each coding agent supports, and [setting up by hand](docs/setup-by-hand.md)
 - [Note schema](docs/note-schema.md): the format of a note
 - [The local app](docs/ui.md): screens, API and security rules
-- [Testing the beta](TESTING.md): the steps for a week with the beta, and how to send feedback
+- [Testing RepoMagpie for a week](TESTING.md): the steps for a week with RepoMagpie, and how to send feedback
 - [Vision](docs/vision.md), [competitors](docs/competitors.md) and [decisions](docs/decisions/)
 
-Open an issue for bugs and ideas. The project doesn't take pull requests yet ([CONTRIBUTING.md](CONTRIBUTING.md)). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the five-minute setup, the tests to run, and how to claim an issue: look for [`good first issue`](https://github.com/Varshavia/RepoMagpie/labels/good%20first%20issue). Everyone follows the [code of conduct](CODE_OF_CONDUCT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Licence
 
