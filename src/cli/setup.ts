@@ -239,7 +239,7 @@ export function render(plan: SetupPlan, home: string, allowWrite?: boolean): str
   if (plan.hook) {
     const h = plan.hook;
     lines.push(`  ${"Hook".padEnd(12)}  ${what(HOOK_WHAT, h.action)}: ${tilde(h.file)}${h.reason ? `: ${h.reason}` : ""}`);
-    if (h.action === "add" || h.action === "migrate") lines.push(`                it will start: ${plan.project ? "repomagpie hook claude-code (through a shell, so any teammate's install runs it)" : "node directly, as the MCP entry does, then hook claude-code"}`);
+    if (h.action === "add" || h.action === "migrate") lines.push(`                it will start: ${plan.project ? "repomagpie hook claude-code (through a shell, so any teammate's install runs it)" : plan.claude_code?.hook_form === "shell" ? "repomagpie hook claude-code (through a shell, which every Claude Code version runs)" : "node directly, as the MCP entry does, then hook claude-code"}`);
     if (h.backup) lines.push(`                backup first: ${tilde(h.backup)}`);
     if (h.snippet) lines.push(...h.snippet.split("\n").map((line) => `                  ${line}`));
   }
@@ -250,6 +250,7 @@ export function render(plan: SetupPlan, home: string, allowWrite?: boolean): str
     if (r.backup) lines.push(`                backup first: ${tilde(r.backup)}`);
     if (r.snippet) lines.push(...r.snippet.split("\n").map((line) => `                  ${line}`));
   }
+  if (plan.claude_code?.warning) lines.push("", plan.claude_code.warning);
   return `${lines.map((line) => clean(line)).join("\n")}\n`;
 }
 

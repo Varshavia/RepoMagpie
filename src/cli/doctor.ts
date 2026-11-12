@@ -37,11 +37,12 @@ export function render(r: DoctorJson, home: string): string {
   for (const s of r.skills) lines.push(`  ${tilde(s.path)}  ${s.version ? `version ${s.version}` : "version unknown"}${s.link ? `  (a link to ${tilde(s.link)})` : ""}`);
 
   lines.push("", "Claude Code hook");
+  lines.push(`  Claude Code ${r.claude_code.version ?? "version unknown"} (exec form needs ${r.claude_code.exec_form_minimum} or later)`);
   if (!r.hook.some((h) => h.entries.length)) lines.push("  none");
   for (const h of r.hook) {
     for (const e of h.entries) {
       const shown = [e.command, ...(e.args ?? [])].map((part) => tilde(part)).join(" ");
-      const note = e.form === "old" ? "  (the old name)" : e.form === "exec" ? `  (node started directly${e.node_found && e.entry_found ? "" : "; a path is missing"}${e.code_generation_off ? ", code generation off" : ""})` : "";
+      const note = e.form === "old" ? "  (shell form, the old name)" : e.form === "exec" ? `  (exec form, node started directly${e.node_found && e.entry_found ? "" : "; a path is missing"}${e.code_generation_off ? ", code generation off" : ""})` : "  (shell form)";
       lines.push(`  ${tilde(h.file)}: ${shown}${note}`);
     }
     if (h.error) lines.push(`  ${tilde(h.file)}: can't be read: ${h.error}`);

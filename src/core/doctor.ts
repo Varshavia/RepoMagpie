@@ -1,9 +1,11 @@
 // repomagpie doctor (decision 0035): what is wired and what isn't, for the user and for a bug
-// report. Read-only: it writes nothing, not even a cache. Values from config files' `env` never
-// appear, only their names. Never prints.
+// report. Read-only: it writes nothing, not even a cache; it starts `claude --version` to read
+// Claude Code's version (decision 0061). Values from config files' `env` never appear, only their
+// names. Never prints.
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
+import { claudeCodeVersion, EXEC_FORM_MIN_VERSION, supportsExecForm } from "./claude-version.ts";
 import { findProjectJournal, gitRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { CONFIG_LIMIT, pathProblem } from "./config-write.ts";
@@ -102,6 +104,9 @@ export interface DoctorJson {
   platform: Platform;
   commands: { name: "repomagpie" | "magpie"; found: Command[] }[]; // the first one found runs
   skills: { path: string; link: string | null; version: string | null }[]; // the folders that exist
+  // Claude Code's version, null when it can't be read (decision 0061). failures: the FAIL lines, also
+  // first in problems: exec form installed on a version known to be below the minimum.
+  claude_code: { version: string | null; exec_form_minimum: string; failures: string[] };
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
   // The opt-in Stop reminder (decision 0042): its entries in the user's settings; [] when off.
   reminder: HookEntry[];
@@ -173,6 +178,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   const userRead = existsSync(userSettings) ? readConfig(userSettings) : null;
   const userParsed = userRead && !("error" in userRead) ? readJsonc(userRead.text) : null;
   const reminder = userParsed && !("error" in userParsed) ? hookEntries(userParsed.value, where, STOP) : [];
+  const claudeVersion = claudeCodeVersion(where);
+  const execForm = claudeVersion === null ? null : supportsExecForm(claudeVersion);
   // What fixes an entry in this file, as setup would: in the user's settings `setup`, in the
   // project's `setup --project .`; by hand where setup leaves the file (comments, a link) or never
   // writes it (settings.local.json). `why` says what the run does ("to change it", "again").
@@ -190,7 +197,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
     if (entries.some((e) => e.form !== "other" && lacksMonitor(e.matcher))) {
       problems.push(`The Claude Code hook in ${tilde(file)} doesn't run on Claude Code's Monitor tool, which also runs shell commands. ${sharedMatcher.get(file) ? "Add Monitor to its matcher by hand: its group holds another hook too." : hookFix(file, "to add it")}`);
     }
-    if (file === userSettings && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. ${hookFix(file, "to start node directly")}`);
+    // Only where setup would change it: a version too old or unknown keeps the shell form (decision 0061).
+    if (file === userSettings && execForm === true && entries.some((e) => e.form === "shell")) problems.push(`The Claude Code hook in ${tilde(file)} starts through a shell, which takes about 190 ms longer on Windows. ${hookFix(file, "to start node directly")}`);
     for (const e of entries.filter((x) => x.form === "exec")) {
       if (!e.node_found || !e.entry_found) problems.push(`The Claude Code hook in ${tilde(file)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(file, "again")}`);
       else if (!e.code_generation_off) problems.push(`The Claude Code hook in ${tilde(file)} doesn't start node with ${NO_CODEGEN}. ${hookFix(file, "again")}`);
@@ -198,6 +206,13 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   }
   for (const e of reminder.filter((x) => x.form === "exec" && (!x.node_found || !x.entry_found))) {
     problems.push(`The Claude Code Stop reminder in ${tilde(userSettings)} starts ${!e.node_found ? e.command : e.args?.find((a) => /\.[cm]?js$/.test(a)) ?? "(no entry file)"}, which doesn't exist. ${hookFix(userSettings, "again")}`);
+  }
+  // Exec form against the version (decision 0061): a FAIL only when the version is known to be too old.
+  const isExec = (e: HookEntry) => e.form === "exec";
+  const failures: string[] = [];
+  for (const file of new Set([...hook.filter((h) => h.entries.some(isExec)).map((h) => h.file), ...(reminder.some(isExec) ? [userSettings] : [])])) {
+    if (execForm === false) failures.push(`FAIL: Claude Code ${claudeVersion} is older than ${EXEC_FORM_MIN_VERSION}, which exec form needs, so the hook in ${tilde(file)} doesn't run. ${hookFix(file, "to write the shell form")} Or update Claude Code.`);
+    else if (execForm === null) problems.push(`Couldn't read Claude Code's version (claude --version), so RepoMagpie can't tell whether it runs the exec-form hook in ${tilde(file)}, which needs ${EXEC_FORM_MIN_VERSION} or later.`);
   }
 
   // The other agents' hooks. A broken Copilot CLI hook goes first: Copilot CLI denies every tool
@@ -355,7 +370,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
 
   // Information, not a to-do: RepoMagpie works without GitHub, only more slowly.
   const { source } = githubAuth(request);
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
+  problems.unshift(...failures); // last, so that nothing goes above them
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, claude_code: { version: claudeVersion, exec_form_minimum: EXEC_FORM_MIN_VERSION, failures }, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked

@@ -43,7 +43,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
 | 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |
 | 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
-| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036; which agents are chosen, deleting backups and doctor's to-dos refined by 0038; removing the shared skill refined by 0052) |
+| 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036; which agents are chosen, deleting backups and doctor's to-dos refined by 0038; removing the shared skill refined by 0052; the hook's form superseded by 0061) |
 | 0036 | [The hook in agents that can't ask](0036-hooks-in-other-agents.md) | accepted (refines 0024 and 0035) |
 | 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |
 | 0038 | [`setup` chooses agents found by command or app, and deletes its backups on request](0038-setup-chooses-found-agents-and-deletes-backups-on-request.md) | accepted (refines 0035) |
@@ -69,3 +69,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0058 | [The type of a bare name](0058-the-type-of-a-bare-name.md) | accepted (adds to the spec's bare-name rule) |
 | 0059 | [An avoided alternative is marked](0059-an-avoided-alternative-is-marked.md) | accepted (supersedes 0029's avoid mark) |
 | 0060 | [Positioning: your journal of repos and tools, checked before your agent picks one](0060-positioning-your-journal-checked-before-your-agent-picks.md) | accepted (supersedes 0009's one-liner) |
+| 0061 | [The Claude Code hook's form follows Claude Code's version](0061-the-hook-form-follows-claude-code-version.md) | accepted (supersedes 0035's hook form) |

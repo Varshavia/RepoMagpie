@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- On Claude Code older than 2.1.139, RepoMagpie's hook could silently never run, because `repomagpie setup` always wrote the exec form (`command` and `args`), which those versions don't have. `setup` now reads `claude --version`: from 2.1.139 it writes the exec form as before, below it the shell form, `repomagpie hook claude-code`. When the version can't be read, a new entry gets the shell form, an exec entry already there is left as it is, and the plan warns. If your Claude Code is older than 2.1.139, run `repomagpie setup` again.
+- `repomagpie doctor` said the hook was wired when Claude Code couldn't run it. It now prints Claude Code's version and each entry's form, and puts a `FAIL:` line first under To do when an exec-form entry is installed on a version below 2.1.139, with `claude_code.failures` in `--json`. It still exits 0. When the version can't be read, an exec-form entry is an ordinary to-do.
+
 ## [0.2.1] - 2026-11-07
 
 RepoMagpie's MCP server can be listed in the official MCP Registry, an alternative your notes say to avoid is marked as such, and turning on shared notes says to pull first when a teammate may have done it already.

@@ -9,13 +9,14 @@ import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
+import { claudeCodeVersion, EXEC_FORM_MIN_VERSION, supportsExecForm } from "./claude-version.ts";
 import { AGENTS, foundBy, mcpEntry, onPath, readJsonc, type Agent, type Found, type McpEntry, type McpFormat, type Where } from "./agents.ts";
 import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
 import { setMember } from "./json-edit.ts";
 import { redactArgs, redactText } from "./redact.ts";
 import { ALLOW_WRITE, noteTool, type Launch } from "./launch.ts";
 import { applyAgentHook, HOOK_SPECS, planAgentHook, type AgentHookPlan, type AgentHookTarget } from "./setup-agent-hooks.ts";
-import { applyHook, planHook, STOP, type HookPlan, type HookTarget } from "./setup-hook.ts";
+import { applyHook, KEPT_EXEC, planHook, STOP, type HookPlan, type HookTarget } from "./setup-hook.ts";
 import { applySkill, linksTo, planSkill, type SkillPlan, type SkillRequest } from "./setup-skill.ts";
 
 // The package's skill: beside dist/ in the package, beside src/ in the repository.
@@ -44,11 +45,20 @@ export interface AgentPlan {
   error?: string;
 }
 
+// What decided the form of the Claude Code hook in the user's settings (decision 0061).
+export interface ClaudeCodeForm {
+  version: string | null; // null: `claude --version` can't be read
+  exec_form_minimum: string;
+  hook_form: "exec" | "shell";
+  warning: string | null; // for the plan
+}
+
 export interface SetupPlan {
   remove: boolean;
   project: string | null; // --project: where the skill and the hook go
   launch: { command: string; args: string[] } | null; // the entry a new agent gets
   launch_error: string | null;
+  claude_code: ClaudeCodeForm | null; // only when a hook goes in the user's settings
   agents: AgentPlan[]; // the MCP entries, always in the user's settings
   skill: SkillPlan | null; // when any agent is set up
   hook: HookPlan | null; // when Claude Code is set up
@@ -94,7 +104,7 @@ const jsonEntry = (id: Agent["id"], l: { command: string; args: string[] }) =>
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
   const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
-  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, agents: [], skill: null, hook: null, reminder: null, hooks: [] };
+  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, claude_code: null, agents: [], skill: null, hook: null, reminder: null, hooks: [] };
   for (const agent of AGENTS) {
     const found = foundBy(agent, where);
     const installed = found !== null;
@@ -115,14 +125,19 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const claude = chosen.some((a) => a.id === "claude-code");
   const root = request.project ?? where.home;
   if (chosen.length) plan.skill = planSkill(skillRequest(request, plan));
-  if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request));
+  if (claude && !request.remove && request.project === undefined && launch) plan.claude_code = readClaudeCode(where);
+  const target = hookTarget(request, plan.claude_code);
+  if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, target);
   // The reminder is personal: never in a project's committed settings.
   // Listed only when asked for or when it changes: a reminder that isn't there stays unmentioned.
   if (claude && request.project === undefined) {
-    const reminder = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, hookTarget(request), STOP, request.captureReminder === true);
+    const reminder = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, target, STOP, request.captureReminder === true);
     // The same file as the hook's: a second backup in this run gets its own name.
     if (reminder.backup && reminder.backup === plan.hook?.backup) reminder.backup = `${reminder.backup}-2`;
     if (reminder.action !== "keep" || request.captureReminder) plan.reminder = reminder;
+    if (plan.claude_code?.version === null && (plan.hook?.reason === KEPT_EXEC || reminder.reason === KEPT_EXEC)) {
+      plan.claude_code = { ...plan.claude_code, hook_form: "exec", warning: `Warning: couldn't read Claude Code's version (claude --version), so setup leaves the exec-form hook entry as it is. Claude Code before ${EXEC_FORM_MIN_VERSION} doesn't run exec form; repomagpie doctor checks it once the version can be read.` };
+    }
   }
   // The other agents' hooks: always in the user's settings, as the MCP entries are.
   for (const spec of HOOK_SPECS.filter((s) => chosen.some((a) => a.id === s.id))) {
@@ -174,12 +189,24 @@ function agentHookTarget(request: SetupRequest): AgentHookTarget {
   return { node: request.launch.command, entry: request.launch.args[1] };
 }
 
+function readClaudeCode(where: Where): ClaudeCodeForm {
+  const version = claudeCodeVersion(where);
+  const base = { version, exec_form_minimum: EXEC_FORM_MIN_VERSION };
+  if (version === null) return { ...base, hook_form: "shell", warning: "Warning: couldn't read Claude Code's version (claude --version), so the hook uses the shell form, which every version runs. Run repomagpie setup again once the version can be read." };
+  if (supportsExecForm(version)) return { ...base, hook_form: "exec", warning: null };
+  return { ...base, hook_form: "shell", warning: `Claude Code ${version} is older than ${EXEC_FORM_MIN_VERSION}, which exec form needs, so the hook uses the shell form. After updating Claude Code, run repomagpie setup again to start node directly.` };
+}
+
 // The hook entry: in a project the shell form, which a teammate's machine can run; in the user's
 // settings the exec form, from the same node and entry file as the MCP entry, with code generation
-// off (decision 0035).
-function hookTarget(request: SetupRequest): HookTarget {
+// off (decision 0035). Only a version known to be too old moves an exec entry to the shell form; an
+// unknown one leaves it, and writes the shell form when there is none (decision 0061).
+function hookTarget(request: SetupRequest, claudeCode: ClaudeCodeForm | null): HookTarget {
   if (request.project !== undefined) return { shell: true };
   if ("error" in request.launch) return { error: request.launch.error };
+  const version = claudeCode?.version;
+  if (version === null) return { shell: true, keepExec: true };
+  if (version !== undefined && !supportsExecForm(version)) return { shell: true };
   const [flag, entry] = request.launch.args;
   return { exec: { command: request.launch.command, args: [flag, entry, "hook", "claude-code"] } };
 }
@@ -304,8 +331,9 @@ export function applySetup(plan: SetupPlan, request: SetupRequest): SetupPlan {
     return { ...p, result: "done" };
   });
   const skill = plan.skill && applySkill(plan.skill, skillRequest(request, plan));
-  const hook = plan.hook && applyHook(plan.hook, ROOT(request), hookTarget(request));
-  const reminder = plan.reminder && applyHook(plan.reminder, ROOT(request), hookTarget(request), STOP);
+  const target = hookTarget(request, plan.claude_code);
+  const hook = plan.hook && applyHook(plan.hook, ROOT(request), target);
+  const reminder = plan.reminder && applyHook(plan.reminder, ROOT(request), target, STOP);
   const hooks = plan.hooks.map((h) => applyAgentHook(h, HOOK_SPECS.find((s) => s.id === h.id) as (typeof HOOK_SPECS)[number], where, request.stamp, agentHookTarget(request)));
   return { ...plan, agents, skill, hook, reminder, hooks };
 }

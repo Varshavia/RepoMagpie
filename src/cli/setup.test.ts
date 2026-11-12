@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { AGENTS } from "../core/agents.ts";
 import { NO_CODEGEN } from "../core/launch.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
@@ -82,7 +83,7 @@ test("--json needs --yes or --dry-run, and prints the plan with each result", as
   const r = await magpie(b, ["setup", "--yes", "--json"], b.over);
   assert.equal(r.err, "");
   const doc = JSON.parse(r.out);
-  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "project", "launch", "launch_error", "agents", "skill", "hook", "reminder", "hooks"]);
+  assert.deepEqual(Object.keys(doc), ["dry_run", "allow_write", "remove", "project", "launch", "launch_error", "claude_code", "agents", "skill", "hook", "reminder", "hooks"]);
   assert.equal(doc.skill.result, "done");
   assert.equal(doc.hook, null, "no Claude Code here");
   assert.equal(doc.reminder, null);
@@ -273,24 +274,60 @@ test("--project: the skill and the Claude Code hook go into the project; the MCP
   assert.equal((await magpie(b, ["--project", join(b.root, "nope"), "setup", "--yes"], b.over)).code, 2);
 });
 
+// A claude command from core's fake agent CLIs; `version` is what claude --version prints ("fail":
+// it exits 1). The options to run setup with.
+function withClaude(b: ReturnType<typeof box>, version: string) {
+  const fake = fileURLToPath(new URL("../core/fixtures/fake-agent.ts", import.meta.url));
+  if (process.platform === "win32") writeFileSync(join(b.root, "bin", "claude.cmd"), `@"${process.execPath}" "${fake}" claude %*\r\n`);
+  else {
+    writeFileSync(join(b.root, "bin", "claude"), `#!/bin/sh\nexec "${process.execPath}" "${fake}" claude "$@"\n`);
+    chmodSync(join(b.root, "bin", "claude"), 0o755);
+  }
+  return { ...b.over, env: { ...b.over.env, HOME: b.home, USERPROFILE: b.home, FAKE_AGENT_LOG: join(b.root, "agents.jsonl"), FAKE_CLAUDE_VERSION: version } };
+}
+
+test("the plan says when Claude Code's version changes the hook's form: too old, and unreadable with an exec entry there", async () => {
+  const old = box();
+  const oldRun = await magpie(old, ["setup", "--dry-run", "--agents", "claude-code"], withClaude(old, "2.1.100"));
+  assert.match(oldRun.err, /^ {16}it will start: repomagpie hook claude-code \(through a shell, which every Claude Code version runs\)$/m);
+  assert.match(oldRun.err, /^Claude Code 2\.1\.100 is older than 2\.1\.139, which exec form needs, so the hook uses the shell form\. /m);
+
+  const fresh = box();
+  const freshRun = await magpie(fresh, ["setup", "--dry-run", "--agents", "claude-code"], withClaude(fresh, "fail"));
+  assert.match(freshRun.err, /^Warning: couldn't read Claude Code's version \(claude --version\), so the hook uses the shell form, which every version runs\. /m);
+
+  const kept = box();
+  const over = withClaude(kept, "fail");
+  mkdirSync(join(kept.home, ".claude"));
+  const settings = join(kept.home, ".claude", "settings.json");
+  const text = JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [{ type: "command", command: kept.self.execPath, args: [NO_CODEGEN, kept.self.entry, "hook", "claude-code"] }] }] } });
+  writeFileSync(settings, text);
+  const keptRun = await magpie(kept, ["setup", "--yes", "--agents", "claude-code"], over);
+  assert.equal(keptRun.code, 0, keptRun.err);
+  assert.match(keptRun.err, /^ {2}Hook {10}already set up: ~[\\/]\.claude[\\/]settings\.json: Claude Code's version can't be read, so setup leaves this entry in exec form$/m);
+  assert.match(keptRun.err, /^Warning: couldn't read Claude Code's version \(claude --version\), so setup leaves the exec-form hook entry as it is\. /m);
+  assert.equal(readFileSync(settings, "utf8"), text);
+});
+
 test("--capture-reminder adds the Stop reminder beside the hook, in the user's settings; a second run keeps it; --remove takes both", async () => {
   const b = box();
+  const over = withClaude(b, "2.1.200");
   mkdirSync(join(b.home, ".claude"));
   const settings = join(b.home, ".claude", "settings.json");
-  const plain = await magpie(b, ["setup", "--dry-run", "--agents", "claude-code"], b.over);
+  const plain = await magpie(b, ["setup", "--dry-run", "--agents", "claude-code"], over);
   assert.doesNotMatch(plain.err, /Reminder/, "off by default, and not mentioned");
-  const r = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], b.over);
+  const r = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], over);
   assert.equal(r.code, 0, r.err);
   assert.match(r.err, /^ {2}Reminder {6}add the Stop reminder: ~[\\/]\.claude[\\/]settings\.json$/m);
   assert.match(r.err, /^Done: the Claude Code Stop reminder, added\.$/m);
   const hooks = JSON.parse(readFileSync(settings, "utf8")).hooks;
   assert.deepEqual(hooks.Stop, [{ hooks: [{ type: "command", command: b.self.execPath, args: [NO_CODEGEN, b.self.entry, "hook", "claude-code-stop"] }] }]);
   assert.equal(hooks.PreToolUse[0].hooks[0].args.at(-1), "claude-code", "the hook, added in the same run, is still there");
-  const again = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], b.over);
+  const again = await magpie(b, ["setup", "--yes", "--agents", "claude-code", "--capture-reminder"], over);
   assert.match(again.err, /^ {2}Reminder {6}already set up: /m);
-  assert.doesNotMatch((await magpie(b, ["setup", "--yes", "--agents", "claude-code"], b.over)).err, /Reminder/, "kept without the flag, unmentioned");
+  assert.doesNotMatch((await magpie(b, ["setup", "--yes", "--agents", "claude-code"], over)).err, /Reminder/, "kept without the flag, unmentioned");
   assert.ok(JSON.parse(readFileSync(settings, "utf8")).hooks.Stop.length);
-  const removed = await magpie(b, ["setup", "--remove", "--yes", "--agents", "claude-code"], b.over);
+  const removed = await magpie(b, ["setup", "--remove", "--yes", "--agents", "claude-code"], over);
   assert.match(removed.err, /^Done: the Claude Code Stop reminder, removed \(backup: .*-2\)\.$/m);
   const after = JSON.parse(readFileSync(settings, "utf8")).hooks;
   assert.deepEqual([after.Stop, after.PreToolUse], [[], []]);

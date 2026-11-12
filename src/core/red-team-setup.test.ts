@@ -229,7 +229,7 @@ test("S12: a hook file that starts with a byte-order mark (Notepad writes one) g
   for (const file of [codexHooks, s.settings]) {
     const text = readFileSync(file, "utf8");
     assert.equal(text.charCodeAt(0), 0xfeff, file);
-    assert.match(text, /hook codex|"hook",\s*"claude-code"/);
+    assert.match(text, /hook codex|hook claude-code|"hook",\s*"claude-code"/); // no claude command here: the shell form (decision 0061)
   }
   assert.equal(planSetup(s.request({ only: ["claude-code", "codex"] })).hooks[0].action, "keep");
 });
