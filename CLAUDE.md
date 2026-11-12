@@ -28,7 +28,7 @@ The maintainer prefers **small, frequent commits**. Split work so each piece can
 From [decision 0012](docs/decisions/0012-branch-workflow.md):
 - `main` is always consistent and releasable. Release tags are created on `main` only.
 - All work happens on a branch: `docs/...`, `feat/...`, `fix/...`, or `spike/...` for experiments that may be thrown away.
-- The maintainer creates branches, opens pull requests and merges them, with "Rebase and merge" or a merge commit, not squash. You can't: git-guard blocks `git switch`, `git branch`, `gh pr create` and `gh pr merge`.
+- The maintainer creates branches, opens pull requests and merges them, with "Rebase and merge" or a merge commit, not squash. Pull requests from outside contributors are squash-merged instead ([decision 0062](docs/decisions/0062-outside-pull-requests-are-squash-merged.md)). You can't: git-guard blocks `git switch`, `git branch`, `gh pr create` and `gh pr merge`.
 - **Report the current branch at the start of every task** (`git status`). If it is `main` and the task changes files that get committed, stop and ask the maintainer to create a branch. Tasks that only change the work log don't need one.
 - **At the end of a branch**, draft the pull-request description: summary, decisions, files, evidence. Don't open the pull request.
 
@@ -81,7 +81,7 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | Path | What it is |
 |---|---|
 | `.claude/` | Agent config: `settings.json` (backup deny list, hook wiring) and `hooks/` (git-guard and its tests). `settings.local.json` is personal and git-ignored. |
-| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old) and `ISSUE_TEMPLATE/beta-feedback.yml` (the testers' day-7 form, [TESTING.md](TESTING.md)). |
+| `.github/` | CI (`workflows/ci.yml`: tests, typecheck and hook tests, section 13), the release workflow (`workflows/release.yml`: on a `v*` tag, checks, then `npm stage publish` through trusted publishing; [decision 0033](docs/decisions/0033-releases-staged-from-ci.md)) `dependabot.yml` (weekly npm and GitHub Actions updates as pull requests, each release proposed only once it is 7 days old), `ISSUE_TEMPLATE/` (`beta-feedback.yml`, the testers' day-7 form, [TESTING.md](TESTING.md); `bug.yml`, `feature.yml` and `config.yml`) and `PULL_REQUEST_TEMPLATE.md` (what an outside pull request must contain, [CONTRIBUTING.md](CONTRIBUTING.md)). |
 | `.scratch/` | Agent scratch space for temporary files. Git-ignored. The tests use `.scratch/tests/` and the benchmarks `.scratch/bench/`. |
 | `.worklog/` | Private agent work log, one file per day; `briefs/` holds the maintainer's briefs. Git-ignored. |
 | `docs/` | Vision, roadmap, ideas, product, release process, validation, note schema, glossary, architecture, standards, the local app (`ui.md`), the coding agents' config formats (`agents.md`), the Turkish READMEs and tester guide (`readme/`, `testing/`), research, `decisions/` (decision records), `rfcs/` (design proposals; accepted parts become decision records), and `assets/` (the logo, also the app's favicon; the social preview; the README's screenshots). |
@@ -99,7 +99,8 @@ If a task conflicts with a document, **stop and ask**. Do not silently diverge. 
 | `AGENTS.md` | Points other coding agents to this file. |
 | `CHANGELOG.md` | User-visible changes per release (Keep a Changelog). |
 | `CLAUDE.md` | This rulebook. |
-| `CONTRIBUTING.md` | How to contribute while the project is early: issues and ideas yes, pull requests not yet. |
+| `CODE_OF_CONDUCT.md` | Contributor Covenant 2.1, with the maintainer's private contact. |
+| `CONTRIBUTING.md` | How outside contributors set up, test, claim an issue and open a pull request (squash-merged, [decision 0062](docs/decisions/0062-outside-pull-requests-are-squash-merged.md)). |
 | `DESIGN.md` | The visual language: design tokens (colour, type, spacing, radius), components and writing tone, for the local app, the landing page and the demo GIF. |
 | `LICENSE` | MIT. |
 | `README.md` | Landing page: what RepoMagpie is and how it will work. |
