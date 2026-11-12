@@ -7,6 +7,7 @@ import { AGENTS, foundBy, type Agent, type Platform, type Where } from "./agents
 import { scratchBase } from "./fixtures/scratch.ts";
 import { NO_CODEGEN } from "./launch.ts";
 import { applySetup, mcpByHand, planSetup, type SetupRequest } from "./setup.ts";
+import { KEPT_EXEC } from "./setup-hook.ts";
 
 // repomagpie setup's MCP part (decision 0035) on a scratch home, with fake agent CLIs on PATH that
 // record their arguments and change their files as the real ones' docs say (fixtures/fake-agent.ts).
@@ -295,6 +296,116 @@ test("a launch that can't work refuses every agent and writes nothing; --agents 
   const only = planSetup(s.request({ only: ["codex", "cursor"] }));
   assert.deepEqual(only.agents.map((a) => [a.id, a.action]), [["codex", "add"], ["cursor", "skip"]]);
   assert.match(only.agents[1].reason ?? "", /^not installed: no /);
+});
+
+// The hook's form follows Claude Code's version (decision 0061).
+function hookBox(version?: string, clis: (keyof typeof CLIS)[] = ["claude-code"]) {
+  const s = scratch(clis, version === undefined ? {} : { FAKE_CLAUDE_VERSION: version });
+  const file = join(s.home, ".claude", "settings.json");
+  const execEntry = (sub = "claude-code", ...flags: string[]) => ({ type: "command", command: s.launch.command, args: [NO_CODEGEN, s.launch.args[1], "hook", sub, ...flags] });
+  const hooks = () => (JSON.parse(readFileSync(file, "utf8")) as { hooks: Record<string, { hooks: unknown[] }[]> }).hooks;
+  const entry = (event = "PreToolUse") => hooks()[event][0].hooks[0];
+  const withEntry = (hook: unknown) => s.write(file, `${JSON.stringify({ model: "opus", hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [hook] }] } }, null, 2)}\n`);
+  const backups = () => readdirSync(dirname(file)).filter((name) => name.includes(".repomagpie-backup-"));
+  return { ...s, file, execEntry, entry, withEntry, backups };
+}
+
+test("Claude Code at or above the minimum: the exec form, for the hook and the Stop reminder, with no warning", () => {
+  for (const version of ["2.1.139", "2.1.200", "3.0.0"]) {
+    const s = hookBox(version);
+    const request = s.request({ captureReminder: true });
+    const plan = planSetup(request);
+    assert.deepEqual(plan.claude_code, { version, exec_form_minimum: "2.1.139", hook_form: "exec", warning: null });
+    const done = applySetup(plan, request);
+    assert.deepEqual([done.hook?.result, done.reminder?.result], ["done", "done"]);
+    assert.deepEqual(s.entry(), s.execEntry());
+    assert.deepEqual(s.entry("Stop"), s.execEntry("claude-code-stop"));
+  }
+});
+
+test("Claude Code below the minimum: the shell form for a new entry, with a note; the hook and the Stop reminder", () => {
+  const s = hookBox("2.1.138");
+  const request = s.request({ captureReminder: true });
+  const plan = planSetup(request);
+  assert.deepEqual([plan.claude_code?.version, plan.claude_code?.hook_form], ["2.1.138", "shell"]);
+  assert.match(plan.claude_code?.warning ?? "", /^Claude Code 2\.1\.138 is older than 2\.1\.139, which exec form needs, so the hook uses the shell form\./);
+  applySetup(plan, request);
+  assert.deepEqual(s.entry(), { type: "command", command: "repomagpie hook claude-code" });
+  assert.deepEqual(s.entry("Stop"), { type: "command", command: "repomagpie hook claude-code-stop" });
+});
+
+test("Claude Code below the minimum: an exec entry becomes the shell form, its flags and other keys kept; a second run changes nothing", () => {
+  const s = hookBox("2.1.100");
+  s.withEntry({ ...s.execEntry("claude-code", "--inform-only"), timeout: 5 });
+  const plan = planSetup(s.request());
+  assert.equal(plan.hook?.action, "migrate");
+  assert.equal(applySetup(plan, s.request()).hook?.result, "done");
+  assert.deepEqual(s.entry(), { type: "command", command: "repomagpie hook claude-code --inform-only", timeout: 5 });
+  assert.equal(planSetup(s.request({ stamp: "20261014-130000" })).hook?.action, "keep");
+});
+
+test("updated past the minimum: the shell entry becomes the exec form again", () => {
+  const s = hookBox("2.1.139");
+  s.withEntry({ type: "command", command: "repomagpie hook claude-code" });
+  assert.equal(applySetup(planSetup(s.request()), s.request()).hook?.action, "migrate");
+  assert.deepEqual(s.entry(), s.execEntry());
+});
+
+test("version unreadable, an exec entry there: it stays byte for byte, no backup, and the plan warns", () => {
+  for (const version of ["fail", "not a version"]) {
+    const s = hookBox(version);
+    const stale = { type: "command", command: join(s.root, "old", "node.exe"), args: [join(s.root, "old", "main.js"), "hook", "claude-code", "--inform-only"] };
+    s.withEntry(stale);
+    const before = readFileSync(s.file, "utf8");
+    const plan = planSetup(s.request());
+    assert.deepEqual([plan.hook?.action, plan.hook?.backup, plan.hook?.reason], ["keep", null, KEPT_EXEC]);
+    assert.deepEqual([plan.claude_code?.version, plan.claude_code?.hook_form], [null, "exec"]);
+    assert.match(plan.claude_code?.warning ?? "", /^Warning: couldn't read Claude Code's version \(claude --version\), so setup leaves the exec-form hook entry as it is\./);
+    applySetup(plan, s.request());
+    assert.equal(readFileSync(s.file, "utf8"), before);
+    assert.deepEqual(s.backups(), []);
+  }
+});
+
+test("version unreadable, no exec entry: the shell form and a warning; the old name still moves; a shell entry stays", () => {
+  const fresh = hookBox("fail");
+  const plan = planSetup(fresh.request());
+  assert.deepEqual([plan.claude_code?.version, plan.claude_code?.hook_form], [null, "shell"]);
+  assert.match(plan.claude_code?.warning ?? "", /^Warning: couldn't read Claude Code's version \(claude --version\), so the hook uses the shell form, which every version runs\./);
+  applySetup(plan, fresh.request());
+  assert.deepEqual(fresh.entry(), { type: "command", command: "repomagpie hook claude-code" });
+
+  const old = hookBox("fail");
+  old.withEntry({ type: "command", command: "magpie hook claude-code" });
+  applySetup(planSetup(old.request()), old.request());
+  assert.deepEqual(old.entry(), { type: "command", command: "repomagpie hook claude-code" });
+
+  const shell = hookBox("fail");
+  shell.withEntry({ type: "command", command: "repomagpie hook claude-code" });
+  assert.equal(planSetup(shell.request()).hook?.action, "keep");
+});
+
+test("no claude command, chosen with --agents: unreadable, so the shell form", () => {
+  const s = hookBox(undefined, []);
+  mkdirSync(join(s.home, ".claude"));
+  const plan = planSetup(s.request({ only: ["claude-code"] }));
+  assert.deepEqual([plan.hook?.action, plan.claude_code?.version, plan.claude_code?.hook_form], ["add", null, "shell"]);
+});
+
+test("the version isn't read when it decides nothing: --project, --remove, a launch that can't work, Claude Code not chosen", () => {
+  const s = hookBox("fail", ["claude-code", "codex"]);
+  const project = join(s.root, "project");
+  mkdirSync(project);
+  const inProject = planSetup(s.request({ project }));
+  assert.equal(inProject.claude_code, null);
+  applySetup(inProject, s.request({ project }));
+  assert.deepEqual(JSON.parse(readFileSync(join(project, ".claude", "settings.json"), "utf8")).hooks.PreToolUse[0].hooks[0], { type: "command", command: "repomagpie hook claude-code" });
+
+  assert.equal(planSetup(s.request({ remove: true })).claude_code, null);
+  const npx = planSetup(s.request({ launch: { error: "This copy of RepoMagpie runs from npx's cache" } }));
+  assert.equal(npx.claude_code, null);
+  assert.deepEqual([npx.hook?.action, npx.hook?.reason], ["refused", "This copy of RepoMagpie runs from npx's cache"]);
+  assert.equal(planSetup(s.request({ only: ["codex"] })).claude_code, null);
 });
 
 test("Copilot CLI: its CLI adds and removes the entry; without it, its mcp-config.json is edited with the type and the tools", () => {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DoctorJson } from "../core/doctor.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
@@ -8,6 +8,7 @@ import { magpie, sandbox } from "./fixtures/sandbox.ts";
 // repomagpie doctor (decision 0035): human output and --json, exit 0 whatever it finds.
 
 const RTL = String.fromCharCode(0x202e);
+const CLAUDE_CODE = { version: "2.1.200", exec_form_minimum: "2.1.139", failures: [] };
 
 function box() {
   const b = sandbox({ "bin/": null });
@@ -23,7 +24,7 @@ test("--json prints the report; human output has every section and what to do; e
   assert.equal(json.code, 0);
   assert.equal(json.err, "");
   const report = JSON.parse(json.out);
-  assert.deepEqual(Object.keys(report), ["version", "node", "platform", "commands", "skills", "hook", "reminder", "agent_hooks", "agents", "backups", "journals", "git_repository", "github", "problems"]);
+  assert.deepEqual(Object.keys(report), ["version", "node", "platform", "commands", "skills", "claude_code", "hook", "reminder", "agent_hooks", "agents", "backups", "journals", "git_repository", "github", "problems"]);
   assert.equal(report.hook[0].entries[0].form, "old");
   assert.deepEqual(report.github, { connected: false, source: null }, "no token in the environment, no gh on PATH");
   assert.deepEqual(report.reminder, [], "the Stop reminder is off unless asked for");
@@ -35,11 +36,48 @@ test("--json prints the report; human output has every section and what to do; e
   for (const heading of ["Commands on PATH (the first one runs)", "Skill", "Claude Code hook", "Hooks in other agents", "MCP server in each agent", "Backups from setup", "Journals", "GitHub: not connected, limited to 10 searches a minute.", "To do"]) {
     assert.ok(human.out.split(/\r?\n/).includes(heading), heading);
   }
-  assert.match(human.out, /^ {2}~[\\/]\.claude[\\/]settings\.json: magpie hook claude-code {2}\(the old name\)$/m);
+  assert.match(human.out, /^ {2}Claude Code version unknown \(exec form needs 2\.1\.139 or later\)$/m);
+  assert.match(human.out, /^ {2}~[\\/]\.claude[\\/]settings\.json: magpie hook claude-code {2}\(shell form, the old name\)$/m);
   // ~/.claude without the claude command: found by its folder only, so not called installed (decision 0038).
   assert.match(human.out, /^ {2}Claude Code {3}found ~[\\/]\.claude only; no repomagpie entry in ~[\\/]\.claude\.json$/m);
   assert.match(human.out, /^ {2}VS Code \(GitHub Copilot\) {2}not installed$/m);
   assert.match(human.out, /^ {2}- The Claude Code hook in ~[\\/]\.claude[\\/]settings\.json runs magpie hook claude-code, the old name\./m);
+});
+
+// A settings file with one hook, and a claude command that prints `version`.
+function versioned(b: ReturnType<typeof box>, version: string, hook: unknown) {
+  mkdirSync(join(b.home, ".claude"), { recursive: true });
+  writeFileSync(join(b.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [hook] }] } }));
+  if (process.platform === "win32") writeFileSync(join(b.root, "bin", "claude.cmd"), `@echo off\r\necho ${version} (Claude Code)\r\n`);
+  else {
+    writeFileSync(join(b.root, "bin", "claude"), `#!/bin/sh\necho '${version} (Claude Code)'\n`);
+    chmodSync(join(b.root, "bin", "claude"), 0o755);
+  }
+}
+
+test("exec form below Claude Code's minimum: FAIL first under To do, the field in --json, and still exit 0; the version and the form are printed", async () => {
+  const b = box();
+  const exec = { type: "command", command: process.execPath, args: ["--disallow-code-generation-from-strings", join(b.root, "main.js"), "hook", "claude-code"] };
+  versioned(b, "2.1.100", exec);
+  const human = await magpie(b, ["doctor"], { env: b.env });
+  assert.equal(human.code, 0, "a report, not a check (decision 0035)");
+  assert.match(human.out, /^ {2}Claude Code 2\.1\.100 \(exec form needs 2\.1\.139 or later\)$/m);
+  assert.match(human.out, /settings\.json: .* hook claude-code {2}\(exec form, /);
+  assert.match(human.out, /^To do\n {2}- FAIL: Claude Code 2\.1\.100 is older than 2\.1\.139, /m);
+  const json = await magpie(b, ["doctor", "--json"], { env: b.env });
+  assert.equal(json.code, 0);
+  const report = JSON.parse(json.out);
+  assert.equal(report.claude_code.version, "2.1.100");
+  assert.equal(report.claude_code.failures.length, 1);
+  assert.equal(report.problems[0], report.claude_code.failures[0]);
+});
+
+test("the shell form is named as such on a Claude Code too old for exec form, with no FAIL", async () => {
+  const b = box();
+  versioned(b, "2.1.100", { type: "command", command: "repomagpie hook claude-code" });
+  const human = await magpie(b, ["doctor"], { env: b.env });
+  assert.match(human.out, /settings\.json: repomagpie hook claude-code {2}\(shell form\)$/m);
+  assert.doesNotMatch(human.out, /FAIL:/);
 });
 
 test("the Stop reminder on: its entry under its heading, and a to-do when its paths are gone; never mistaken for the hook", async () => {
@@ -102,7 +140,7 @@ test("journals: in a git repository without .magpie, one line says how a project
 test("everything wired: no To do section", async () => {
   // A report without problems renders its closing line; core's tests cover how each problem arises.
   const { render } = await import("./doctor.ts");
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
   assert.ok(out.endsWith("Everything is wired.\n"));
   assert.ok(!out.includes("To do"));
   assert.match(out, /^Backups from setup\n {2}none$/m);
@@ -117,7 +155,7 @@ test("everything wired: no To do section", async () => {
 
 test("GitHub connected: one line naming where the token comes from, never the token", async () => {
   const { render } = await import("./doctor.ts");
-  const report = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [] };
+  const report = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [] };
   assert.match(render({ ...report, github: { connected: true, source: "gh" } }, "/home/me"), /^GitHub: using your GitHub CLI login\n\nEverything is wired\.$/m);
   assert.match(render({ ...report, github: { connected: true, source: "GH_TOKEN" } }, "/home/me"), /^GitHub: using GH_TOKEN\n\n/m);
 });
@@ -127,7 +165,7 @@ test("hooks in other agents: one line per agent, with the form, the flags and Co
   const hook = (id: string, name: string, by: "command" | "folder" | null, entries: unknown[], off: string | null = null) =>
     ({ id, name, installed: by !== null, found: by && { by, path: `/home/me/.${id}` }, file: `/home/me/.${id}/hooks.json`, entries, off });
   const entry = { form: "setup", command: "x", node: "/n", entry: "/e", node_found: true, entry_found: true, flags: [], trust: null };
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], hook: [], reminder: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null },
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null },
     agent_hooks: [
       hook("codex", "Codex CLI", "command", [{ ...entry, trust: "not trusted" }]),
       hook("cursor", "Cursor", "command", [{ ...entry, flags: ["--inform-only"], entry_found: false }]),
@@ -152,7 +190,7 @@ test("backups from setup: each with its date, one word on tokens and deleting; s
     { path: "/home/me/.claude.json.repomagpie-backup-20261015-010147Z", date: "2026-10-15T01:01:47Z" },
     { path: "/home/me/.cursor/mcp.json.repomagpie-backup-20261015-020000Z", date: "2026-10-15T02:00:00Z" },
   ];
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], hook: [], reminder: [], agent_hooks: [], agents: [], backups, journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups, journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
   assert.ok(out.includes([
     "Backups from setup",
     "  ~/.claude.json.repomagpie-backup-20261015-010147Z  2026-10-15 01:01 UTC",

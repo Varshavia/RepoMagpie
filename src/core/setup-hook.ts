@@ -1,8 +1,9 @@
-// repomagpie setup's Claude Code hook (spec §6, decision 0035): one PreToolUse entry on Bash and
+// repomagpie setup's Claude Code hook (spec §6, decisions 0035 and 0061): one PreToolUse entry on Bash and
 // PowerShell. In the user's settings it is Claude Code's exec form, which starts node directly with
 // no shell: `node --disallow-code-generation-from-strings <entry file> hook claude-code` (on
-// Windows a shell and npm's shim cost about 190 ms on every shell command). In a project
-// (--project), which is committed, it stays `repomagpie hook claude-code`. Older entries (the
+// Windows a shell and npm's shim cost about 190 ms on every shell command). On a Claude Code too old
+// for exec form, or of unknown version, and in a project (--project), which is committed, it is
+// `repomagpie hook claude-code`. Older entries (the
 // `magpie` and `repomagpie` shell forms, an exec form with other paths) are changed in place, their
 // flags kept. Only plain JSON is edited, and only our entries. Never prints.
 // The same code writes the opt-in Stop entry, `hook claude-code-stop` (decision 0042): `kind`.
@@ -36,8 +37,11 @@ const needsMonitor = (settings: unknown, kind: HookKind, f: FoundHook) => kind =
 export const STOP: HookKind = { event: "Stop", sub: "claude-code-stop", matcher: null };
 
 // The entry setup writes: the exec form (the node, and the arguments up to "claude-code"), or the
-// shell form for a project. An error when no entry can be written (RepoMagpie runs from npx's cache).
-export type HookTarget = { exec: { command: string; args: string[] } } | { shell: true } | { error: string };
+// shell form. An error when no entry can be written (RepoMagpie runs from npx's cache). keepExec:
+// Claude Code's version is unknown, so an exec entry already there stays as it is (decision 0061).
+export type HookTarget = { exec: { command: string; args: string[] } } | { shell: true; keepExec?: boolean } | { error: string };
+
+export const KEPT_EXEC = "Claude Code's version can't be read, so setup leaves this entry in exec form";
 
 export interface HookPlan {
   file: string;
@@ -121,6 +125,7 @@ export function planHook(file: string, root: string, remove: boolean, stamp: str
   }
   if (!add && !mine.length) return base;
   if ("error" in target) return { ...base, action: "refused", reason: target.error };
+  if ("shell" in target && target.keepExec && mine.some((f) => f.form === "exec")) return { ...base, reason: KEPT_EXEC };
   const done = mine.length === 1 && matches(mine[0], wanted(target, mine[0].flags, kind)) && !needsMonitor(read.value, kind, mine[0]);
   if (done) return base;
   if (!mine.length && found.length) return { ...base, reason: "a hook entry already runs RepoMagpie another way; setup keeps it" };

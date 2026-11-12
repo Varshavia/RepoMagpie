@@ -52,6 +52,16 @@ function command(box: ReturnType<typeof scratchHome>, name: string, pkg: { name:
   }
 }
 
+// A claude command that prints `print` for any arguments; null: one that fails. On Windows a .cmd
+// shim, as npm installs it.
+function claude(box: ReturnType<typeof scratchHome>, print: string | null) {
+  if (windows) box.write(join(box.bin, "claude.cmd"), print === null ? "@exit /b 1\r\n" : `@echo off\r\necho ${print}\r\n`);
+  else {
+    box.write(join(box.bin, "claude"), print === null ? "#!/bin/sh\nexit 1\n" : `#!/bin/sh\necho '${print}'\n`);
+    chmodSync(join(box.bin, "claude"), 0o755);
+  }
+}
+
 // Every file under a folder, with its size and modification time: proves nothing was written.
 function snapshot(folder: string): string[] {
   return readdirSync(folder, { recursive: true, withFileTypes: true }).map((d) => {
@@ -136,6 +146,7 @@ test("the hook's shell forms in the user's settings: the old name, and the slowe
   assert.ok(!old.problems.some((p) => p.startsWith("Claude Code has no")), old.problems.join("\n"));
 
   box.write(join(box.home, ".claude", "settings.json"), settings("repomagpie hook claude-code"));
+  claude(box, "2.1.200 (Claude Code)");
   const shell = runDoctor(box.request);
   assert.equal(shell.hook[0].entries[0].form, "shell");
   assert.ok(!shell.problems.some((p) => p.includes("old name")));
@@ -159,6 +170,77 @@ test("the hook's exec form: fine when both paths exist and code generation is of
   assert.match(hookProblems()[0], /starts .*gone.*node\.exe, which doesn't exist\. Run repomagpie setup again\.$/);
   box.write(file, settings(process.execPath, [entry, "hook", "claude-code"]));
   assert.match(hookProblems()[0], /doesn't start node with --disallow-code-generation-from-strings/);
+});
+
+// The hook's form against Claude Code's version (decision 0061).
+function execBox() {
+  const box = scratchHome();
+  command(box, "repomagpie", { name: "repomagpie", version: "0.2.0" });
+  const entry = join(box.bin, "node_modules", "repomagpie", "dist", "cli", "main.js");
+  const exec = (sub: string) => ({ type: "command", command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "hook", sub] });
+  const file = join(box.home, ".claude", "settings.json");
+  return { ...box, file, exec, entry };
+}
+const execSettings = (hook: unknown) => JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [hook] }] } });
+
+test("exec form on a Claude Code known to be too old is a FAIL, first of all, with a matching field; nothing in the journal changes", () => {
+  const box = execBox();
+  claude(box, "2.1.138 (Claude Code)");
+  box.write(box.file, execSettings(box.exec("claude-code")));
+  // Copilot CLI's broken hook, which otherwise goes first of all.
+  box.write(join(box.bin, "copilot.cmd"), "");
+  box.write(join(box.bin, "copilot"), "");
+  chmodSync(join(box.bin, "copilot"), 0o755);
+  box.write(join(box.home, ".copilot", "hooks", "repomagpie.json"), JSON.stringify({ version: 1, hooks: { preToolUse: [{ type: "command", bash: "repomagpie hook copilot", powershell: "repomagpie hook copilot", command: "repomagpie hook copilot", timeoutSec: 10 }] } }));
+  const before = snapshot(box.root);
+  const report = runDoctor(box.request);
+  assert.deepEqual(snapshot(box.root), before);
+  const expected = `FAIL: Claude Code 2.1.138 is older than 2.1.139, which exec form needs, so the hook in ~${sep}.claude${sep}settings.json doesn't run. Run repomagpie setup to write the shell form. Or update Claude Code.`;
+  assert.deepEqual(report.claude_code, { version: "2.1.138", exec_form_minimum: "2.1.139", failures: [expected] });
+  assert.equal(report.problems[0], expected);
+  assert.equal(report.problems.filter((p) => p.startsWith("FAIL:")).length, 1);
+});
+
+test("exec form: the Stop reminder alone counts too, and one file is named once", () => {
+  const box = execBox();
+  claude(box, "2.1.100 (Claude Code)");
+  box.write(box.file, JSON.stringify({ hooks: { Stop: [{ hooks: [box.exec("claude-code-stop")] }] } }));
+  assert.equal(runDoctor(box.request).claude_code.failures.length, 1);
+  box.write(box.file, JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [box.exec("claude-code")] }], Stop: [{ hooks: [box.exec("claude-code-stop")] }] } }));
+  assert.equal(runDoctor(box.request).claude_code.failures.length, 1);
+});
+
+test("exec form with the version unreadable is a warning, not a FAIL: a failing claude and no claude at all", () => {
+  for (const print of [null, "not a version", undefined]) {
+    const box = execBox();
+    if (print !== undefined) claude(box, print);
+    box.write(box.file, execSettings(box.exec("claude-code")));
+    const report = runDoctor(box.request);
+    assert.equal(report.claude_code.version, null);
+    assert.deepEqual(report.claude_code.failures, []);
+    assert.ok(!report.problems.some((p) => p.startsWith("FAIL:")), report.problems.join("\n"));
+    assert.ok(report.problems.includes(`Couldn't read Claude Code's version (claude --version), so RepoMagpie can't tell whether it runs the exec-form hook in ~${sep}.claude${sep}settings.json, which needs 2.1.139 or later.`), report.problems.join("\n"));
+  }
+});
+
+test("exec form on a new enough Claude Code: neither FAIL nor warning", () => {
+  const box = execBox();
+  claude(box, "2.1.139 (Claude Code)");
+  box.write(box.file, execSettings(box.exec("claude-code")));
+  const report = runDoctor(box.request);
+  assert.deepEqual(report.claude_code, { version: "2.1.139", exec_form_minimum: "2.1.139", failures: [] });
+  assert.ok(!report.problems.some((p) => p.includes("exec")), report.problems.join("\n"));
+});
+
+test("the shell form is a to-do only where setup would change it: not on a version too old or unknown", () => {
+  for (const print of ["2.1.138 (Claude Code)", null]) {
+    const box = execBox();
+    claude(box, print);
+    box.write(box.file, execSettings({ type: "command", command: "repomagpie hook claude-code" }));
+    const report = runDoctor(box.request);
+    assert.deepEqual(report.claude_code.failures, []);
+    assert.ok(!report.problems.some((p) => p.includes("starts through a shell") || p.includes("Claude Code's version")), report.problems.join("\n"));
+  }
 });
 
 // An entry from before Monitor was matched is a to-do; setup fixes a group of ours alone,
@@ -195,6 +277,7 @@ test("run in the home folder, ~/.claude/settings.json is the user's settings and
   const box = scratchHome();
   box.write(join(box.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell", hooks: [{ type: "command", command: "repomagpie hook claude-code" }] }] } }));
   box.write(join(box.home, ".claude", "settings.local.json"), JSON.stringify({ permissions: {} }));
+  claude(box, "2.1.200 (Claude Code)");
   const report = runDoctor({ ...box.request, cwd: box.home });
   assert.deepEqual(report.hook.map((h) => h.file), [join(box.home, ".claude", "settings.json"), join(box.home, ".claude", "settings.local.json")]);
   assert.equal(report.problems.filter((p) => p.includes("starts through a shell")).length, 1);

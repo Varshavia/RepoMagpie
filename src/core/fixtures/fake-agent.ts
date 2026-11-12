@@ -3,11 +3,19 @@
 // to a file in the scratch home (HOME / USERPROFILE): `mcp add` and `mcp remove` for claude, codex,
 // gemini and copilot, `--add-mcp` for code. FAKE_AGENT_FAIL=<agent> makes that agent exit 1;
 // FAKE_AGENT_MANGLE=<agent> makes it record a different command, as a CLI with a bug would.
+// `claude --version` prints FAKE_CLAUDE_VERSION (a current one by default; "fail": exit 1), and isn't
+// logged: setup only reads it (decision 0061).
 // Not part of the build.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const [agent, ...args] = process.argv.slice(2);
+if (agent === "claude" && args[0] === "--version") {
+  const version = process.env.FAKE_CLAUDE_VERSION ?? "2.1.200";
+  if (version === "fail") process.exit(1);
+  process.stdout.write(`${version} (Claude Code)\r\n`);
+  process.exit(0);
+}
 appendFileSync(process.env.FAKE_AGENT_LOG as string, `${JSON.stringify({ agent, args, cwd: process.cwd() })}\n`);
 // A failure as yargs prints one: the error first, then the whole help.
 const failWithHelp = (error: string): never => {
