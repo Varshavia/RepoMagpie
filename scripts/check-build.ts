@@ -4,7 +4,8 @@
 // open), so its output is what shows a broken bundle. Then the packed package (decision 0031): the
 // tarball from npm pack, installed into a scratch prefix with no network, runs as `repomagpie` and as
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
-// runs the one named like the package, and fails when none is. Run npm run build first.
+// runs the one named like the package, and fails when none is. The Claude Code plugin's hook and MCP
+// server run from the installed package's manifest (decision 0063). Run npm run build first.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -55,9 +56,9 @@ const CASES: { args: string[]; input?: string; quiet?: boolean; restores?: strin
 ];
 const vault = fileURLToPath(new URL("../examples/vault/notes/", import.meta.url));
 
-// What the package may ship: npm's own files, the licences, the built CLI and app, and the agent
-// skill that repomagpie setup installs (decision 0035).
-const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt", "skills/repomagpie/SKILL.md"];
+// What the package may ship: npm's own files, the licences, the built CLI and app, the agent
+// skill that repomagpie setup installs (decision 0035), and the Claude Code plugin's manifest (decision 0063).
+const REQUIRED = ["package.json", "README.md", "LICENSE", "dist/cli/main.js", "dist/cli/THIRD-PARTY-LICENSES.md", "dist/ui/index.html", "dist/ui/THIRD-PARTY-LICENSES.md", "dist/ui/icons-LICENSE.txt", "skills/repomagpie/SKILL.md", ".claude-plugin/plugin.json"];
 const SHIPPED = [
   ...REQUIRED.map((file) => new RegExp(`^${file.replace(/[.]/g, "\\.")}$`)),
   /^dist\/cli\/[A-Za-z0-9_-]+\.js$/,
@@ -95,7 +96,7 @@ try {
   }
   failed += checkInlinedLicenses();
   failed += checkHookChunks();
-  failed += checkPackage(join(root, "pack"));
+  failed += checkPackage(join(root, "pack"), (pkgDir) => checkPlugin(pkgDir, project, env));
 } finally {
   removeFolder(root);
 }
@@ -106,7 +107,8 @@ if (failed) {
 
 // Returns the number of failed checks. npm and npx are .cmd files on Windows, which Node runs only
 // through a shell; the shell gets every argument quoted. The npm cache is a scratch folder too.
-function checkPackage(dir: string): number {
+// `installed` checks the package as npm installed it, given its folder.
+function checkPackage(dir: string, installed: (pkgDir: string) => number): number {
   const windows = process.platform === "win32";
   const repo = fileURLToPath(new URL("..", import.meta.url));
   const shell = (command: string, args: string[], cwd = dir) =>
@@ -134,11 +136,49 @@ function checkPackage(dir: string): number {
     const run = shell(windows ? join(prefix, `${name}.cmd`) : join(prefix, "bin", name), ["--version"]);
     failures += report(run.status === 0 && run.stdout.trim() === version, `${name} --version from the installed tarball`, run.stdout + run.stderr);
   }
+  failures += installed(windows ? join(prefix, "node_modules", "repomagpie") : join(prefix, "lib", "node_modules", "repomagpie"));
   // A relative path: npx takes an absolute Windows path (C:\…) for a command, not a package. npx
   // resolves it from the nearest package.json, so the folder gets its own, away from the repository's.
   writeFileSync(join(dir, "package.json"), "{}\n");
   const npx = shell("npx", ["--yes", ...npm, `./${basename(tarball)}`, "--version"]);
   failures += report(npx.status === 0 && npx.stdout.trim() === version, "npx <tarball> --version", `exit ${npx.status}: ${npx.stdout}${npx.stderr}`);
+  return failures;
+}
+
+// The Claude Code plugin's two commands (decision 0063), from the manifest in the installed package,
+// as Claude Code runs them: ${CLAUDE_PLUGIN_ROOT} is the package's folder, and "node" the node on
+// PATH, here the one running this check. The hook answers as the built CLI did above; the MCP server
+// lists its tools, without the note tool. Returns the number of failed checks.
+function checkPlugin(pkgDir: string, cwd: string, env: NodeJS.ProcessEnv): number {
+  let manifest: { mcpServers?: Record<string, { command: string; args: string[] }>; hooks?: { PreToolUse?: { hooks: { command: string; args: string[] }[] }[] } };
+  try {
+    manifest = JSON.parse(readFileSync(join(pkgDir, ".claude-plugin", "plugin.json"), "utf8"));
+  } catch (error) {
+    return report(false, "the plugin's manifest in the installed package", String(error));
+  }
+  const expand = (entry: { command: string; args: string[] } | undefined) =>
+    entry && entry.command === "node" ? entry.args.map((arg) => arg.replaceAll("${CLAUDE_PLUGIN_ROOT}", pkgDir)) : null;
+  let failures = 0;
+
+  const hookArgs = expand(manifest.hooks?.PreToolUse?.[0]?.hooks[0]);
+  const input = hook("npm install @playwright/cli");
+  const fromPlugin = hookArgs && spawnSync(process.execPath, hookArgs, { cwd, input, encoding: "utf8", env });
+  const direct = spawnSync(process.execPath, [built, "hook", "claude-code"], { cwd, input, encoding: "utf8", env });
+  failures += report(Boolean(fromPlugin && fromPlugin.status === 0 && fromPlugin.stdout !== "" && fromPlugin.stdout === direct.stdout),
+    "the plugin's hook from the installed package answers as the built CLI", fromPlugin ? `exit ${fromPlugin.status}: ${fromPlugin.stdout}${fromPlugin.stderr}` : "no node hook in the manifest");
+
+  const mcpArgs = expand(manifest.mcpServers?.repomagpie);
+  const message = (id: number | null, method: string, params: object = {}) => JSON.stringify({ jsonrpc: "2.0", ...(id === null ? {} : { id }), method, params });
+  const requests = [
+    message(1, "initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "check-build", version: "1" } }),
+    message(null, "notifications/initialized"),
+    message(2, "tools/list"),
+  ].join("\n");
+  const server = mcpArgs && spawnSync(process.execPath, mcpArgs, { cwd, input: `${requests}\n`, encoding: "utf8", env, timeout: 30_000 });
+  const listed = server ? server.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line) as { id?: number; result?: { tools?: { name: string }[] } }).find((m) => m.id === 2) : undefined;
+  const tools = listed?.result?.tools?.map((t) => t.name) ?? [];
+  failures += report(server?.status === 0 && tools.includes("recall") && !tools.includes("note"),
+    `the plugin's MCP server from the installed package lists its tools, without note (${tools.join(", ")})`, server ? `exit ${server.status}: ${server.stdout}${server.stderr}` : "no node MCP server named repomagpie in the manifest");
   return failures;
 }
 

@@ -370,7 +370,7 @@ Internal: the command Claude Code's opt-in `Stop` reminder runs ([decision 0042]
 
 ### `repomagpie mcp`
 
-A stdio MCP server for the coding agent that starts it ([decision 0034](decisions/0034-the-mcp-server.md)). Not meant to be typed by people; `repomagpie setup` registers it in each agent ([decision 0035](decisions/0035-setup-and-doctor.md)).
+A stdio MCP server for the coding agent that starts it ([decision 0034](decisions/0034-the-mcp-server.md)). Not meant to be typed by people; `repomagpie setup` registers it in each agent ([decision 0035](decisions/0035-setup-and-doctor.md)), and the Claude Code plugin starts it without `--allow-write` ([decision 0063](decisions/0063-a-claude-code-plugin.md), section 9).
 
 - Flags: `--allow-write` (also serve the `note` tool), and the global `--home` and `--project`.
 - **Protocol:** serves 2025-11-25 clients (an `initialize` handshake) and 2026-07-28 clients (no handshake; `server/discover`, the revision in each request's `_meta`) from one process, through the official TypeScript SDK's `serveStdio`. Tools only: no resources, prompts, Roots, Sampling, Elicitation or Logging.
@@ -1026,6 +1026,11 @@ Already in use, you noted to avoid:
 - **Source under type stripping:** contributors run the `.ts` source directly on Node 22.18.0 or later. `tsconfig.json` follows the [Node.js recommendation](https://nodejs.org/api/typescript.html): `module: nodenext`, `target: esnext`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `rewriteRelativeImportExtensions`. In practice: no enums or namespaces, types imported with `import type`, and file extensions in every import.
 - **Build:** for publishing only, Vite bundles the CLI and its libraries into `dist/cli/`: `main.js` and the chunks it loads on demand, with the libraries' licences in `THIRD-PARTY-LICENSES.md` ([decision 0025](decisions/0025-bundle-the-cli.md)). `tsc` only typechecks; tests run on the source. `npm run check:build` checks that the bundle answers as the source does.
 - **Tests:** `node:test`, with fixture journals and no network, as for git-guard.
+- **The Claude Code plugin** ([decision 0063](decisions/0063-a-claude-code-plugin.md)): the package is also a plugin. `.claude-plugin/plugin.json` ships in it, with the name `repomagpie` and `package.json`'s version (`npm test` and the release check refuse another). Claude Code reads the skill from `skills/repomagpie/`, and two inline entries, each starting `node` from `PATH` with `--disallow-code-generation-from-strings` and `${CLAUDE_PLUGIN_ROOT}/dist/cli/main.js`:
+  - `mcpServers.repomagpie`: then `mcp`, without `--allow-write`;
+  - `hooks.PreToolUse`: matcher `Bash|PowerShell|Monitor`, exec form, then `hook claude-code`. There is no Stop reminder.
+
+  `npm run check:build` runs both from the installed tarball.
 
 ### Libraries (dependency policy check)
 
