@@ -9,6 +9,7 @@ import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
 const RTL = String.fromCharCode(0x202e);
 const CLAUDE_CODE = { version: "2.1.200", exec_form_minimum: "2.1.139", failures: [] };
+const NO_PLUGIN = { settings: [], enabled: null, installed: [], active: false, setup: [] };
 
 function box() {
   const b = sandbox({ "bin/": null });
@@ -24,7 +25,7 @@ test("--json prints the report; human output has every section and what to do; e
   assert.equal(json.code, 0);
   assert.equal(json.err, "");
   const report = JSON.parse(json.out);
-  assert.deepEqual(Object.keys(report), ["version", "node", "platform", "commands", "skills", "claude_code", "hook", "reminder", "agent_hooks", "agents", "backups", "journals", "git_repository", "github", "problems"]);
+  assert.deepEqual(Object.keys(report), ["version", "node", "platform", "commands", "skills", "claude_code", "claude_plugin", "hook", "reminder", "agent_hooks", "agents", "backups", "journals", "git_repository", "github", "problems"]);
   assert.equal(report.hook[0].entries[0].form, "old");
   assert.deepEqual(report.github, { connected: false, source: null }, "no token in the environment, no gh on PATH");
   assert.deepEqual(report.reminder, [], "the Stop reminder is off unless asked for");
@@ -33,7 +34,8 @@ test("--json prints the report; human output has every section and what to do; e
   const human = await magpie(b, ["doctor"], { env: b.env });
   assert.equal(human.code, 0);
   assert.match(human.out, /^Claude Code Stop reminder\n {2}off \(repomagpie setup --capture-reminder turns it on\)$/m);
-  for (const heading of ["Commands on PATH (the first one runs)", "Skill", "Claude Code hook", "Hooks in other agents", "MCP server in each agent", "Backups from setup", "Journals", "GitHub: not connected, limited to 10 searches a minute.", "To do"]) {
+  assert.match(human.out, /^Claude Code plugin\n {2}none$/m);
+  for (const heading of ["Commands on PATH (the first one runs)", "Skill", "Claude Code plugin", "Claude Code hook", "Hooks in other agents", "MCP server in each agent", "Backups from setup", "Journals", "GitHub: not connected, limited to 10 searches a minute.", "To do"]) {
     assert.ok(human.out.split(/\r?\n/).includes(heading), heading);
   }
   assert.match(human.out, /^ {2}Claude Code version unknown \(exec form needs 2\.1\.139 or later\)$/m);
@@ -140,7 +142,7 @@ test("journals: in a git repository without .magpie, one line says how a project
 test("everything wired: no To do section", async () => {
   // A report without problems renders its closing line; core's tests cover how each problem arises.
   const { render } = await import("./doctor.ts");
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, claude_plugin: NO_PLUGIN, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
   assert.ok(out.endsWith("Everything is wired.\n"));
   assert.ok(!out.includes("To do"));
   assert.match(out, /^Backups from setup\n {2}none$/m);
@@ -153,9 +155,37 @@ test("everything wired: no To do section", async () => {
   ].join("\n")), out);
 });
 
+test("the Claude Code plugin: each settings entry, each installed version, and whether Claude Code runs it", async () => {
+  const { render } = await import("./doctor.ts");
+  const base = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } };
+  const user = { file: "/home/me/.claude/settings.json", scope: "user" as const, id: "repomagpie@repomagpie", enabled: true };
+  const local = { file: "/work/app/.claude/settings.local.json", scope: "local" as const, id: "repomagpie@repomagpie", enabled: false };
+  const installed = [{ id: "repomagpie@repomagpie", version: "0.3.0", path: "/home/me/.claude/plugins/cache/repomagpie/repomagpie/0.3.0" }];
+  const section = (plugin: DoctorJson["claude_plugin"]) => render({ ...base, claude_plugin: plugin }, "/home/me").split("\n\n").find((block) => block.startsWith("Claude Code plugin"));
+  assert.equal(section({ settings: [user], enabled: user, installed, active: true, setup: [] }), [
+    "Claude Code plugin",
+    "  ~/.claude/settings.json: repomagpie@repomagpie on",
+    "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
+    "  Claude Code runs repomagpie@repomagpie",
+  ].join("\n"));
+  assert.equal(section({ settings: [user, local], enabled: null, installed, active: false, setup: [] }), [
+    "Claude Code plugin",
+    "  ~/.claude/settings.json: repomagpie@repomagpie on",
+    "  /work/app/.claude/settings.local.json: repomagpie@repomagpie off",
+    "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
+    "  off",
+  ].join("\n"));
+  assert.equal(section({ settings: [user], enabled: user, installed: [], active: false, setup: [] }), [
+    "Claude Code plugin",
+    "  ~/.claude/settings.json: repomagpie@repomagpie on",
+    "  repomagpie@repomagpie is on but not installed here, so Claude Code doesn't run it",
+  ].join("\n"));
+  assert.equal(section(NO_PLUGIN), "Claude Code plugin\n  none");
+});
+
 test("GitHub connected: one line naming where the token comes from, never the token", async () => {
   const { render } = await import("./doctor.ts");
-  const report = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [] };
+  const report = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, claude_plugin: NO_PLUGIN, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [] };
   assert.match(render({ ...report, github: { connected: true, source: "gh" } }, "/home/me"), /^GitHub: using your GitHub CLI login\n\nEverything is wired\.$/m);
   assert.match(render({ ...report, github: { connected: true, source: "GH_TOKEN" } }, "/home/me"), /^GitHub: using GH_TOKEN\n\n/m);
 });
@@ -165,7 +195,7 @@ test("hooks in other agents: one line per agent, with the form, the flags and Co
   const hook = (id: string, name: string, by: "command" | "folder" | null, entries: unknown[], off: string | null = null) =>
     ({ id, name, installed: by !== null, found: by && { by, path: `/home/me/.${id}` }, file: `/home/me/.${id}/hooks.json`, entries, off });
   const entry = { form: "setup", command: "x", node: "/n", entry: "/e", node_found: true, entry_found: true, flags: [], trust: null };
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null },
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, claude_plugin: NO_PLUGIN, hook: [], reminder: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null },
     agent_hooks: [
       hook("codex", "Codex CLI", "command", [{ ...entry, trust: "not trusted" }]),
       hook("cursor", "Cursor", "command", [{ ...entry, flags: ["--inform-only"], entry_found: false }]),
@@ -190,7 +220,7 @@ test("backups from setup: each with its date, one word on tokens and deleting; s
     { path: "/home/me/.claude.json.repomagpie-backup-20261015-010147Z", date: "2026-10-15T01:01:47Z" },
     { path: "/home/me/.cursor/mcp.json.repomagpie-backup-20261015-020000Z", date: "2026-10-15T02:00:00Z" },
   ];
-  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups, journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
+  const out = render({ version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux", commands: [], skills: [], claude_code: CLAUDE_CODE, claude_plugin: NO_PLUGIN, hook: [], reminder: [], agent_hooks: [], agents: [], backups, journals: [], git_repository: false, problems: [], github: { connected: false, source: null } }, "/home/me");
   assert.ok(out.includes([
     "Backups from setup",
     "  ~/.claude.json.repomagpie-backup-20261015-010147Z  2026-10-15 01:01 UTC",

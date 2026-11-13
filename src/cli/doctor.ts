@@ -17,7 +17,7 @@ export async function doctorCommand(options: GlobalOptions, io: Io): Promise<num
   return 0;
 }
 
-// Sections in the order they are wired: the commands, the skill, the Claude Code hook, the other
+// Sections in the order they are wired: the commands, the skill, the Claude Code plugin and hook, the other
 // agents' hooks, each agent's MCP server, the journals; then what to do. Every line is cleaned (paths and commands come from other files).
 export function render(r: DoctorJson, home: string): string {
   const tilde = (path: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
@@ -35,6 +35,15 @@ export function render(r: DoctorJson, home: string): string {
   lines.push("", "Skill");
   if (!r.skills.length) lines.push("  not installed");
   for (const s of r.skills) lines.push(`  ${tilde(s.path)}  ${s.version ? `version ${s.version}` : "version unknown"}${s.link ? `  (a link to ${tilde(s.link)})` : ""}`);
+
+  // Decision 0063: where it is turned on or off, what is installed, and whether Claude Code runs it.
+  const p = r.claude_plugin;
+  lines.push("", "Claude Code plugin");
+  if (!p.settings.length && !p.installed.length) lines.push("  none");
+  for (const s of p.settings) lines.push(`  ${tilde(s.file)}: ${s.id} ${s.enabled ? "on" : "off"}`);
+  for (const i of p.installed) lines.push(`  installed: ${i.id} ${i.version} (${tilde(i.path)})`);
+  if (p.enabled) lines.push(p.active ? `  Claude Code runs ${p.enabled.id}` : `  ${p.enabled.id} is on but not installed here, so Claude Code doesn't run it`);
+  else if (p.settings.length || p.installed.length) lines.push("  off");
 
   lines.push("", "Claude Code hook");
   lines.push(`  Claude Code ${r.claude_code.version ?? "version unknown"} (exec form needs ${r.claude_code.exec_form_minimum} or later)`);
