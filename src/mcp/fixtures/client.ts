@@ -21,12 +21,12 @@ export class Client {
   private buffer = "";
   readonly modern: boolean;
 
-  constructor(box: Box, args: string[] = [], modern = false) {
+  constructor(box: Box, args: string[] = [], modern = false, env: Record<string, string> = {}) {
     this.modern = modern;
     // Code generation off, as V8 allows: any eval or new Function in the server would throw.
     this.child = spawn(process.execPath, ["--disallow-code-generation-from-strings", MAIN, "mcp", ...args], {
       cwd: box.project,
-      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, MAGPIE_HOME: box.journal, HOME: box.home, USERPROFILE: box.home, APPDATA: join(box.home, "AppData") },
+      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, MAGPIE_HOME: box.journal, HOME: box.home, USERPROFILE: box.home, APPDATA: join(box.home, "AppData"), ...env },
     });
     this.child.stdout?.setEncoding("utf8").on("data", (chunk: string) => {
       this.buffer += chunk;
@@ -80,8 +80,8 @@ export class Client {
   }
 }
 
-export async function withClient(box: Box, options: { modern?: boolean; args?: string[] }, body: (client: Client) => Promise<void>): Promise<Client> {
-  const client = new Client(box, options.args, options.modern);
+export async function withClient(box: Box, options: { modern?: boolean; args?: string[]; env?: Record<string, string> }, body: (client: Client) => Promise<void>): Promise<Client> {
+  const client = new Client(box, options.args, options.modern, options.env);
   try {
     await client.open();
     await body(client);

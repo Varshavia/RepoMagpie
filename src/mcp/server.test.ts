@@ -150,6 +150,25 @@ test("note is absent without --allow-write, and an unknown tool is an error", as
   assert.ok(!existsSync(join(box.journal, "notes", "npm--pdf-lib.md")));
 });
 
+test("the Claude Code plugin's switch: REPOMAGPIE_ALLOW_WRITE=true serves note in a plugin's server, and only there", async () => {
+  const box = sandbox(FILES);
+  const plugin = { CLAUDE_PLUGIN_ROOT: box.root };
+  const names = async (client: Client) => ((await client.request("tools/list")).result?.tools as { name: string }[]).map((t) => t.name);
+  const on = await withClient(box, { env: { ...plugin, REPOMAGPIE_ALLOW_WRITE: "true" } }, async (client) => {
+    assert.ok((await names(client)).includes("note"));
+  });
+  assert.match(on.stderr, /^repomagpie mcp: serving, note tool on \(REPOMAGPIE_ALLOW_WRITE\)\.$/m);
+  const off = await withClient(box, { env: { ...plugin, REPOMAGPIE_ALLOW_WRITE: "false" } }, async (client) => {
+    assert.ok(!(await names(client)).includes("note"));
+  });
+  assert.match(off.stderr, /^repomagpie mcp: serving\.$/m);
+  await withClient(box, { env: { REPOMAGPIE_ALLOW_WRITE: "true" } }, async (client) => {
+    assert.ok(!(await names(client)).includes("note"), "exported in a shell, outside a plugin: off");
+  });
+  const flag = await withClient(box, { args: ["--allow-write"], env: { ...plugin, REPOMAGPIE_ALLOW_WRITE: "true" } }, async () => {});
+  assert.match(flag.stderr, /^repomagpie mcp: serving, note tool on \(--allow-write\)\.$/m, "the flag is named when both are given");
+});
+
 test("with --allow-write, note records the user's words as the CLI does; a URL is refused without the network", async () => {
   const box = sandbox(FILES);
   const twin = sandbox(FILES);
