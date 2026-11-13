@@ -13,7 +13,18 @@
   "mcpServers": {
     "repomagpie": {
       "command": "node",
-      "args": ["--disallow-code-generation-from-strings", "${CLAUDE_PLUGIN_ROOT}/dist/cli/main.js", "mcp"]
+      "args": ["--disallow-code-generation-from-strings", "${CLAUDE_PLUGIN_ROOT}/dist/cli/main.js", "mcp"],
+      "env": {
+        "REPOMAGPIE_ALLOW_WRITE": "${user_config.note_tool}"
+      }
+    }
+  },
+  "userConfig": {
+    "note_tool": {
+      "type": "boolean",
+      "title": "Note tool",
+      "description": "Lets Claude save your Verdict on a package to your notes, in your words. Off: Claude only reads your notes.",
+      "default": true
     }
   },
   "hooks": {

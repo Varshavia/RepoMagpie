@@ -10,6 +10,21 @@ import type { Env } from "./journals.ts";
 export const NO_CODEGEN = "--disallow-code-generation-from-strings";
 export const ALLOW_WRITE = "--allow-write"; // repomagpie mcp's flag for the note tool
 
+// The Claude Code plugin's switch for the note tool (decision 0064): plugin.json sets this variable
+// in its MCP server's env from the user's `note_tool` answer.
+export const ALLOW_WRITE_ENV = "REPOMAGPIE_ALLOW_WRITE";
+
+// Whether the variable turns the note tool on: "true" or "1", in any case. Anything else is off,
+// "false", an empty value, or a ${user_config.note_tool} left unexpanded among them, since the
+// documentation doesn't say how a boolean is written there. Only in a plugin's server, which Claude
+// Code gives CLAUDE_PLUGIN_ROOT: an agent's server gets the user's environment too, so the variable
+// exported in a shell would otherwise turn the tool on in setup's entries, where doctor can't see it.
+export function noteToolFromEnv(env: Env): boolean {
+  if (!env.CLAUDE_PLUGIN_ROOT) return false;
+  const value = env[ALLOW_WRITE_ENV]?.toLowerCase();
+  return value === "true" || value === "1";
+}
+
 export interface LaunchRequest {
   execPath: string; // the node running setup
   entry: string; // the CLI's entry file running setup

@@ -42,7 +42,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0031 | [The command is `repomagpie`](0031-the-command-is-repomagpie.md) | accepted (amends 0002's command name) |
 | 0032 | [Note text is data](0032-note-text-is-data.md) | accepted |
 | 0033 | [Releases are staged from CI](0033-releases-staged-from-ci.md) | accepted |
-| 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010) |
+| 0034 | [The MCP server](0034-the-mcp-server.md) | accepted (supersedes the MCP timing in 0002 and 0010; the note tool's default refined by 0064 for the Claude Code plugin) |
 | 0035 | [`setup` and `doctor` change other tools' settings safely](0035-setup-and-doctor.md) | accepted (hook entries for other agents refined by 0036; which agents are chosen, deleting backups and doctor's to-dos refined by 0038; removing the shared skill refined by 0052; the hook's form superseded by 0061; the absolute `node` refined by 0063 for the Claude Code plugin) |
 | 0036 | [The hook in agents that can't ask](0036-hooks-in-other-agents.md) | accepted (refines 0024 and 0035) |
 | 0037 | [Deleting a note moves it to the trash](0037-deleting-a-note-moves-it-to-the-trash.md) | accepted |
@@ -71,4 +71,5 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0060 | [Positioning: your journal of repos and tools, checked before your agent picks one](0060-positioning-your-journal-checked-before-your-agent-picks.md) | accepted (supersedes 0009's one-liner) |
 | 0061 | [The Claude Code hook's form follows Claude Code's version](0061-the-hook-form-follows-claude-code-version.md) | accepted (supersedes 0035's hook form) |
 | 0062 | [Outside pull requests are squash-merged](0062-outside-pull-requests-are-squash-merged.md) | accepted (supersedes 0012's merge method for outside pull requests) |
-| 0063 | [The npm package is a Claude Code plugin](0063-a-claude-code-plugin.md) | accepted (refines 0035's absolute `node` for the plugin's entries) |
+| 0063 | [The npm package is a Claude Code plugin](0063-a-claude-code-plugin.md) | accepted (refines 0035's absolute `node` for the plugin's entries; the read-only MCP server refined by 0064) |
+| 0064 | [The plugin's note tool, behind a switch](0064-the-plugin-note-tool-behind-a-switch.md) | accepted (refines 0063's read-only MCP server and 0034's default for the plugin) |

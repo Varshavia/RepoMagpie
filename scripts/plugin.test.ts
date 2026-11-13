@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { NO_CODEGEN } from "../src/core/launch.ts";
+import { ALLOW_WRITE_ENV, NO_CODEGEN } from "../src/core/launch.ts";
 import { PRE_TOOL_USE } from "../src/core/setup-hook.ts";
 import { PLUGIN_MANIFEST } from "./release-check.ts";
 
@@ -27,9 +27,26 @@ test("the manifest: the package's name, version, description and licence", () =>
   assert.equal(plugin.license, pkg.license);
 });
 
-test("the MCP server: node from PATH, code generation off, the package's entry file, read-only", () => {
+test("the MCP server: node from PATH, code generation off, the package's entry file, the note tool behind the user's switch", () => {
   assert.equal(pkg.bin.repomagpie, "dist/cli/main.js");
-  assert.deepEqual(plugin.mcpServers, { repomagpie: { command: "node", args: [NO_CODEGEN, ENTRY, "mcp"] } });
+  // Never --allow-write in args: the switch is the only way in (decision 0064).
+  assert.deepEqual(plugin.mcpServers, {
+    repomagpie: { command: "node", args: [NO_CODEGEN, ENTRY, "mcp"], env: { [ALLOW_WRITE_ENV]: "${user_config.note_tool}" } },
+  });
+});
+
+test("the switch: a boolean note_tool, on by default, with the keys Claude Code accepts", () => {
+  assert.deepEqual(Object.keys(plugin.userConfig), ["note_tool"]);
+  const option = plugin.userConfig.note_tool as Record<string, unknown>;
+  // An unknown key fails Claude Code's validation; type, title and description are required (plugins-reference).
+  const known = ["type", "title", "description", "default", "required", "sensitive", "multiple", "min", "max"];
+  for (const key of Object.keys(option)) assert.ok(known.includes(key), key);
+  assert.equal(option.type, "boolean");
+  assert.equal(typeof option.title, "string");
+  assert.equal(typeof option.description, "string");
+  assert.equal(option.default, true);
+  // Every ${user_config.X} in the manifest is declared.
+  for (const [, key] of JSON.stringify(plugin).matchAll(/\$\{user_config\.([^}]+)\}/g)) assert.ok(key in plugin.userConfig, key);
 });
 
 test("the hook: setup's exec form on Bash, PowerShell and Monitor, and no Stop reminder", () => {

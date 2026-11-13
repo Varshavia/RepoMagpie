@@ -241,7 +241,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
   program
     .command("mcp")
     .description("an MCP server on stdio, for coding agents (started by the agent, not typed by people)")
-    .option("--allow-write", "also serve the note tool, which records the user's Verdict or alternative")
+    .option("--allow-write", "also serve the note tool, which records the user's Verdict or alternative (in the Claude Code plugin's server, REPOMAGPIE_ALLOW_WRITE=true does the same)")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./mcp.ts")).mcpCommand(command.optsWithGlobals<McpCommandOptions>(), io);
     });

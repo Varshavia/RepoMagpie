@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { NO_CODEGEN, launchCommand, noteTool } from "./launch.ts";
+import { ALLOW_WRITE_ENV, NO_CODEGEN, launchCommand, noteTool, noteToolFromEnv } from "./launch.ts";
 import { scratchBase } from "./fixtures/scratch.ts";
 import type { Platform } from "./agents.ts";
 
@@ -41,6 +41,17 @@ test("the note tool: --allow-write right after mcp when on, never twice, gone wh
   assert.deepEqual(noteTool(on, true), on);
   assert.deepEqual(noteTool(on, false), launch);
   assert.deepEqual(launch.args, [NO_CODEGEN, "main.js", "mcp", "--home", "journal"], "the launch given isn't changed");
+});
+
+test("the plugin's switch: true or 1 in any case turns the note tool on, only with CLAUDE_PLUGIN_ROOT; anything else is off", () => {
+  assert.equal(ALLOW_WRITE_ENV, "REPOMAGPIE_ALLOW_WRITE");
+  const root = { CLAUDE_PLUGIN_ROOT: "/plugins/cache/repomagpie/0.9.0" };
+  for (const value of ["true", "TRUE", "True", "1"]) assert.equal(noteToolFromEnv({ ...root, [ALLOW_WRITE_ENV]: value }), true, value);
+  for (const value of ["false", "0", "", "yes", "on", " true", "${user_config.note_tool}", undefined]) {
+    assert.equal(noteToolFromEnv({ ...root, [ALLOW_WRITE_ENV]: value }), false, String(value));
+  }
+  assert.equal(noteToolFromEnv({ [ALLOW_WRITE_ENV]: "true" }), false, "outside a plugin's server, e.g. exported in a shell");
+  assert.equal(noteToolFromEnv({ CLAUDE_PLUGIN_ROOT: "", [ALLOW_WRITE_ENV]: "true" }), false, "an empty root");
 });
 
 test("the node PATH names is written when it is the same file, so the entry survives upgrades", { skip: platform === "win32" && "symlinks need rights on Windows" }, () => {
