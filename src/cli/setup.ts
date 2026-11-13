@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { AGENTS, type Agent, type Platform } from "../core/agents.ts";
 import { deleteBackups, planBackups, setupBackups, type Backup } from "../core/backups.ts";
+import { piecesText } from "../core/claude-plugin.ts";
 import { backedUp, backupsOf } from "../core/config-write.ts";
 import { resolvePersonalJournal } from "../core/journals.ts";
 import { launchCommand } from "../core/launch.ts";
@@ -81,25 +82,27 @@ export async function setupCommand(options: SetupOptions, io: Io): Promise<numbe
     // Every agent found is listed, with how; those found by their folder only start unchosen.
     const everyFound = only || options.remove ? plan : planSetup(request(allowWrite, plan.agents.filter((a) => a.found).map((a) => a.id)));
     const candidates = everyFound.agents.filter((a) => a.action !== "skip");
+    // No agent to choose, but maybe the Stop reminder alone (Claude Code skipped for its plugin).
     if (!candidates.length) {
       io.err(render(plan, io.home, allowWrite));
-      return 0;
+      if (!anyChange(plan)) return 0;
+    } else {
+      const picked = await multiSelect(terminal, options.remove ? "Remove RepoMagpie from these agents?" : "Set up RepoMagpie's MCP server and hook in these agents?",
+        candidates.map((a) => ({ label: `${a.name} (${foundHow(a, io.home)})`, checked: Boolean(only || options.remove) || a.found?.by !== "folder" })));
+      if (picked === null || !picked.length) return cancelled(io);
+      only = picked.map((i) => candidates[i].id);
+      if (!options.remove && allowWrite === undefined) {
+        // The default is the state now: yes only when every chosen agent with an entry has it on.
+        const chosen = candidates.filter((a) => only?.includes(a.id));
+        const now = chosen.filter((a) => a.note_tool && a.note_tool.from !== null);
+        const write = await confirm(terminal, `Let agents record your Verdicts with the note tool? It writes to your journal, only with your words. Now ${noteToolNow(chosen)}.`, now.length > 0 && now.every((a) => a.note_tool?.from));
+        if (write === null) return cancelled(io);
+        allowWrite = write;
+      }
+      plan = planSetup(request(allowWrite, only));
+      io.err(render(plan, io.home, allowWrite));
+      if (!anyChange(plan)) return 0;
     }
-    const picked = await multiSelect(terminal, options.remove ? "Remove RepoMagpie from these agents?" : "Set up RepoMagpie's MCP server and hook in these agents?",
-      candidates.map((a) => ({ label: `${a.name} (${foundHow(a, io.home)})`, checked: Boolean(only || options.remove) || a.found?.by !== "folder" })));
-    if (picked === null || !picked.length) return cancelled(io);
-    only = picked.map((i) => candidates[i].id);
-    if (!options.remove && allowWrite === undefined) {
-      // The default is the state now: yes only when every chosen agent with an entry has it on.
-      const chosen = candidates.filter((a) => only?.includes(a.id));
-      const now = chosen.filter((a) => a.note_tool && a.note_tool.from !== null);
-      const write = await confirm(terminal, `Let agents record your Verdicts with the note tool? It writes to your journal, only with your words. Now ${noteToolNow(chosen)}.`, now.length > 0 && now.every((a) => a.note_tool?.from));
-      if (write === null) return cancelled(io);
-      allowWrite = write;
-    }
-    plan = planSetup(request(allowWrite, only));
-    io.err(render(plan, io.home, allowWrite));
-    if (!anyChange(plan)) return 0;
     const go = await confirm(terminal, "Make these changes?", true);
     if (!go) return cancelled(io);
   } else if (!options.json) io.err(render(plan, io.home, allowWrite));
@@ -203,7 +206,8 @@ export function render(plan: SetupPlan, home: string, allowWrite?: boolean): str
   for (const a of plan.agents) {
     if (a.action === "skip") {
       // Found by its folder only: setup doesn't choose it unless --agents names it.
-      const reason = a.found?.by === "folder" ? `not chosen: found ${tilde(a.found.path)} only (--agents ${a.id} sets it up)` : a.reason ?? "skip";
+      // Skipped for its plugin: that reason, however Claude Code was found.
+      const reason = a.id === "claude-code" && plan.claude_plugin ? a.reason : a.found?.by === "folder" ? `not chosen: found ${tilde(a.found.path)} only (--agents ${a.id} sets it up)` : a.reason ?? "skip";
       lines.push(`  ${a.name.padEnd(12)}  ${reason}`);
       continue;
     }
@@ -230,7 +234,12 @@ export function render(plan: SetupPlan, home: string, allowWrite?: boolean): str
   }
   const off = noteToolOff(plan.agents.filter((a) => a.note_tool?.from === null && (a.action === "add" || a.action === "manual")), plan.agents, allowWrite);
   if (off) lines.push("", off);
-  if (plan.skill || plan.hook) lines.push("", plan.project ? `In the project ${plan.project} (the MCP entries and the other agents' hooks above stay in your own settings):` : "And in your home folder:");
+  // The plugin and an earlier setup: Claude Code runs both. setup never removes them unasked.
+  const p = plan.claude_plugin;
+  if (p?.setup.length) {
+    lines.push("", `Claude Code also runs what an earlier setup wrote: ${piecesText(p.setup, tilde)}. setup leaves ${p.setup.length === 1 ? "it" : "them"}; repomagpie setup --remove --agents claude-code removes ${p.setup.length === 1 ? "it" : "them"}${p.reminder ? ", and the Stop reminder too (repomagpie setup --capture-reminder adds it back)" : ""}.`);
+  }
+  if (plan.skill || plan.hook || plan.reminder) lines.push("", plan.project ? `In the project ${plan.project} (the MCP entries and the other agents' hooks above stay in your own settings):` : "And in your home folder:");
   for (const item of [plan.skill?.shared, plan.skill?.claude, plan.skill?.antigravity]) {
     if (!item) continue;
     lines.push(`  ${"Skill".padEnd(12)}  ${what(SKILL_WHAT, item.action)}: ${tilde(item.path)}${item.reason ? `: ${item.reason}` : ""}`);
