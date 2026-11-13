@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+RepoMagpie installs as a Claude Code plugin: the skill, the MCP server and the install hook in one step, without `repomagpie setup`. The plugin comes from this repository's marketplace, which lists 0.3.0 right after this release ([README](README.md#the-claude-code-plugin)), and needs Node.js 22.12 or later on `PATH`. Its "Note tool" switch is off by default; turn it on in `/config`. Also since 0.2.1: `setup` and `doctor` know about the plugin, `setup` writes a hook that runs on Claude Code older than 2.1.139, and the install detector skips more flag values (0.3.0-beta.1, below). New since 0.3.0-beta.1: the switch's default, and `doctor`'s wording for a cached copy.
+
 ### Changed
 
 - The Claude Code plugin's "Note tool" switch is off by default. In 0.3.0-beta.1 it was on, on the assumption that Claude Code would ask about it when the plugin is turned on and before each save; Claude Code 2.1.323 does neither. To let Claude save your Verdicts, turn on "Note tool" in `/config`, then restart Claude Code. If you installed 0.3.0-beta.1 and want it off, turn it off there.
@@ -477,7 +481,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0-beta.1...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0-beta.1...v0.3.0
 [0.3.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.1...v0.3.0-beta.1
 [0.2.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.20...v0.2.0
