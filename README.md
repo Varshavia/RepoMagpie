@@ -122,6 +122,7 @@ From a terminal: `claude plugin marketplace add Varshavia/RepoMagpie`, then `cla
 - **It reads the same journal as the command:** `~/.magpie`, or the folder `MAGPIE_HOME` names when Claude Code starts.
 - **It doesn't add the `repomagpie` command.** For `repomagpie note`, `ui`, `discover`, `doctor` and your other agents, install the npm package too (`npm install -g repomagpie`). `repomagpie setup` then skips Claude Code while the plugin is on, and `repomagpie doctor` reports the plugin.
 - **Set up with `setup` before?** Keep one of the two: `repomagpie setup --remove --agents claude-code` takes out setup's Claude Code entries. Until then `doctor` warns, and an avoided install still gets one prompt.
+- **To update it:** `claude plugin marketplace update repomagpie`, then `claude plugin update repomagpie@repomagpie`. Claude Code doesn't update this marketplace on its own unless you turn on its auto-update (`/plugin`, Marketplaces).
 - **To remove it:** `/plugin uninstall repomagpie@repomagpie`. Claude Code may keep the plugin's folder in its cache; `repomagpie doctor` calls it a cached copy.
 
 ## What RepoMagpie runs, sends and fetches
