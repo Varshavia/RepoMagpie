@@ -5,6 +5,7 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
+import { claudePlugin, disableCommand, piecesText, setupPieces, type PluginInstall, type PluginSetting, type SetupPiece } from "./claude-plugin.ts";
 import { claudeCodeVersion, EXEC_FORM_MIN_VERSION, supportsExecForm } from "./claude-version.ts";
 import { findProjectJournal, gitRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
@@ -107,6 +108,10 @@ export interface DoctorJson {
   // Claude Code's version, null when it can't be read (decision 0061). failures: the FAIL lines, also
   // first in problems: exec form installed on a version known to be below the minimum.
   claude_code: { version: string | null; exec_form_minimum: string; failures: string[] };
+  // RepoMagpie's Claude Code plugin (decision 0063): its entries in the user's and the working folder's
+  // settings, the one that turns it on, the versions installed, whether Claude Code runs it, and what an
+  // earlier setup wrote for Claude Code beside it (a double install when active).
+  claude_plugin: { settings: PluginSetting[]; enabled: PluginSetting | null; installed: PluginInstall[]; active: boolean; setup: SetupPiece[] };
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
   // The opt-in Stop reminder (decision 0042): its entries in the user's settings; [] when off.
   reminder: HookEntry[];
@@ -139,15 +144,21 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   else if (repomagpie.version !== request.version) problems.push(`repomagpie on PATH is version ${repomagpie.version}; this is ${request.version}.`);
   if (magpie && !magpie.ours) problems.push(`magpie on PATH runs another program (${magpie.path}), not RepoMagpie. Use repomagpie; hooks and skills already do.`);
 
+  // The Claude Code plugin. While Claude Code runs it, setup skips Claude Code, so the to-dos below
+  // that setup would fix for Claude Code's own entries give way to one: the double install.
+  const plugin = claudePlugin(where, request.cwd);
+  const { pieces, reminder: reminderThere } = setupPieces(where);
+  const pluginActive = plugin.active;
+
   // The skill.
   const skills = skillFolders(where).filter((path) => existsSync(join(path, "SKILL.md"))).map((path) => ({ path, link: linkTarget(path), version: skillVersion(join(path, "SKILL.md")) }));
-  if (!skills.length) problems.push("The skill isn't installed. Run repomagpie setup.");
+  if (!skills.length && !pluginActive) problems.push("The skill isn't installed. Run repomagpie setup.");
   // setup keeps the shared folder current (not a link of the user's), and links Claude Code's and
   // Antigravity CLI's folders to it; it never writes the others.
   const [shared, claudeSkill, , , geminiSkill] = skillFolders(where);
   const sharedFolder = skills.find((s) => s.path === shared && !s.link) ? realpathSync(shared) : null;
   for (const skill of skills) {
-    if (skill.version === null || skill.version === request.version) continue;
+    if (skill.version === null || skill.version === request.version || (pluginActive && skill.path === claudeSkill)) continue;
     const fix = skill.link && sharedFolder && samePath(skill.link, sharedFolder) ? "Run repomagpie setup."
       : skill.link ? "It is a link, which setup leaves: update the folder it points to, or delete the link and run repomagpie setup."
       : skill.path === shared ? "Run repomagpie setup."
@@ -192,6 +203,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   };
   for (const { file, entries, error } of hook) {
     if (error) problems.push(`Couldn't read ${tilde(file)}: ${error}.`);
+    if (pluginActive && file === userSettings) continue; // the double install's to-do covers it
     if (entries.some((e) => e.form === "old")) problems.push(`The Claude Code hook in ${tilde(file)} runs magpie hook claude-code, the old name. ${hookFix(file, "to change it")}`);
     // Monitor runs shell commands too. setup adds it to a group of ours alone, never to a shared one.
     if (entries.some((e) => e.form !== "other" && lacksMonitor(e.matcher))) {
@@ -210,9 +222,19 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // Exec form against the version (decision 0061): a FAIL only when the version is known to be too old.
   const isExec = (e: HookEntry) => e.form === "exec";
   const failures: string[] = [];
-  for (const file of new Set([...hook.filter((h) => h.entries.some(isExec)).map((h) => h.file), ...(reminder.some(isExec) ? [userSettings] : [])])) {
+  const execFiles = hook.filter((h) => h.entries.some(isExec) && !(pluginActive && h.file === userSettings)).map((h) => h.file);
+  for (const file of new Set([...execFiles, ...(reminder.some(isExec) ? [userSettings] : [])])) {
     if (execForm === false) failures.push(`FAIL: Claude Code ${claudeVersion} is older than ${EXEC_FORM_MIN_VERSION}, which exec form needs, so the hook in ${tilde(file)} doesn't run. ${hookFix(file, "to write the shell form")} Or update Claude Code.`);
     else if (execForm === null) problems.push(`Couldn't read Claude Code's version (claude --version), so RepoMagpie can't tell whether it runs the exec-form hook in ${tilde(file)}, which needs ${EXEC_FORM_MIN_VERSION} or later.`);
+  }
+  // The plugin's hook is always the exec form (decision 0063), so the same rule holds for it; only the
+  // fix differs.
+  if (pluginActive && execForm === false) failures.push(`FAIL: Claude Code ${claudeVersion} is older than ${EXEC_FORM_MIN_VERSION}, which the RepoMagpie plugin's hook needs, so it doesn't run. Update Claude Code.`);
+  if (pluginActive && plugin.enabled && pieces.length) {
+    const removes = `repomagpie setup --remove --agents claude-code removes setup's${reminderThere ? " (the Stop reminder too; repomagpie setup --capture-reminder adds it back)" : ""}`;
+    problems.push(`RepoMagpie is set up twice in Claude Code: by its plugin (${plugin.enabled.id}, on in ${tilde(plugin.enabled.file)}) and by an earlier setup (${piecesText(pieces, tilde)}), so Claude Code runs both. Keep one: ${removes}, or ${disableCommand(plugin.enabled)} turns the plugin off.`);
+  } else if (plugin.enabled && !pluginActive && !pieces.length) {
+    problems.push(`The RepoMagpie plugin is on in ${tilde(plugin.enabled.file)} (${plugin.enabled.id}), but it isn't installed here, so Claude Code doesn't run it. claude plugin install ${plugin.enabled.id} installs it.`);
   }
 
   // The other agents' hooks. A broken Copilot CLI hook goes first: Copilot CLI denies every tool
@@ -306,6 +328,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
         : `Run ${setupFor(agent.id, agent.found)}${agent.mcp ? " again" : ""}.`;
     let problem: string | null = null;
     if (agent.error) problems.push(`Couldn't read ${agent.name}'s ${tilde(agent.config)}: ${agent.error}.`);
+    else if (pluginActive && agent.id === "claude-code") continue; // the plugin brings it; a second one is the double install
     else if (agent.found && agent.found.by !== "folder" && !agent.mcp) problem = `${agent.name} has no repomagpie MCP server.`;
     else if (agent.mcp && (!agent.mcp.node_found || !agent.mcp.entry_found)) {
       const missing = !agent.mcp.node_found ? agent.mcp.command ?? "(no command)" : agent.mcp.entry ?? "(no entry file)";
@@ -371,7 +394,8 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   // Information, not a to-do: RepoMagpie works without GitHub, only more slowly.
   const { source } = githubAuth(request);
   problems.unshift(...failures); // last, so that nothing goes above them
-  return { version: request.version, node: request.node, platform: request.platform, commands, skills, claude_code: { version: claudeVersion, exec_form_minimum: EXEC_FORM_MIN_VERSION, failures }, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
+  return { version: request.version, node: request.node, platform: request.platform, commands, skills, claude_code: { version: claudeVersion, exec_form_minimum: EXEC_FORM_MIN_VERSION, failures },
+    claude_plugin: { ...plugin, setup: pieces }, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked

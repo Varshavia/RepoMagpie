@@ -232,6 +232,84 @@ test("exec form on a new enough Claude Code: neither FAIL nor warning", () => {
   assert.ok(!report.problems.some((p) => p.includes("exec")), report.problems.join("\n"));
 });
 
+// RepoMagpie's Claude Code plugin (decision 0063): Claude Code found by its command, the plugin's
+// entry in `file` (the user's settings by default), and its version in the cache.
+function pluginBox(version = "2.1.200", installed = true) {
+  const box = execBox();
+  claude(box, `${version} (Claude Code)`);
+  const enable = (extra: object = {}, file = box.file, on = true) => box.write(file, JSON.stringify({ enabledPlugins: { "repomagpie@repomagpie": on }, ...extra }));
+  if (installed) mkdirSync(join(box.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0"), { recursive: true });
+  const SETUP_TODOS = ["Claude Code has no repomagpie MCP server. Run repomagpie setup.", "The skill isn't installed. Run repomagpie setup."];
+  return { ...box, enable, SETUP_TODOS };
+}
+
+test("the plugin on and installed: reported, and setup's to-dos for Claude Code give way to it", () => {
+  const box = pluginBox();
+  assert.ok(box.SETUP_TODOS.every((todo) => runDoctor(box.request).problems.includes(todo)), "without the plugin, setup's to-dos");
+  box.enable();
+  const report = runDoctor(box.request);
+  const setting = { file: box.file, scope: "user", id: "repomagpie@repomagpie", enabled: true };
+  assert.deepEqual(report.claude_plugin, {
+    settings: [setting], enabled: setting, active: true, setup: [],
+    installed: [{ id: "repomagpie@repomagpie", version: "0.3.0", path: join(box.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0") }],
+  });
+  assert.ok(!report.problems.some((p) => box.SETUP_TODOS.includes(p) || p.includes("plugin")), report.problems.join("\n"));
+});
+
+test("the plugin and an earlier setup: one to-do names both and both ways out; setup's own to-dos for those entries give way", () => {
+  const box = pluginBox();
+  // An earlier setup's MCP entry, its hook in the old form (a to-do of its own without the plugin), its skill.
+  box.write(join(box.home, ".claude.json"), JSON.stringify({ mcpServers: { repomagpie: { command: process.execPath, args: ["--disallow-code-generation-from-strings", box.entry, "mcp"] } } }));
+  const oldHook = { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "magpie hook claude-code" }] }] };
+  box.enable({ hooks: oldHook });
+  box.write(join(box.home, ".claude", "skills", "repomagpie", "SKILL.md"), "---\nname: repomagpie\nmetadata:\n  version: \"0.1.0\"\n---\n");
+  const settings = `~${sep}.claude${sep}settings.json`;
+  const twice = `RepoMagpie is set up twice in Claude Code: by its plugin (repomagpie@repomagpie, on in ${settings}) and by an earlier setup (the MCP server in ~${sep}.claude.json, the hook in ${settings} and the skill in ~${sep}.claude${sep}skills${sep}repomagpie), so Claude Code runs both. Keep one: repomagpie setup --remove --agents claude-code removes setup's, or claude plugin disable repomagpie@repomagpie turns the plugin off.`;
+  let report = runDoctor(box.request);
+  assert.deepEqual(report.claude_plugin.setup.map((p) => p.what), ["the MCP server", "the hook", "the skill"]);
+  assert.ok(report.problems.includes(twice), report.problems.join("\n"));
+  // The old name, the missing Monitor and the old skill would each send the user to setup, which skips Claude Code now.
+  assert.ok(!report.problems.some((p) => p.includes("magpie hook claude-code") || p.includes("Monitor") || p.includes("version 0.1.0")), report.problems.join("\n"));
+  // With the Stop reminder there, the to-do says setup --remove takes it out too.
+  box.enable({ hooks: { ...oldHook, Stop: [{ hooks: [box.exec("claude-code-stop")] }] } });
+  report = runDoctor(box.request);
+  assert.ok(report.problems.some((p) => p.includes("removes setup's (the Stop reminder too; repomagpie setup --capture-reminder adds it back), or claude plugin disable")), report.problems.join("\n"));
+});
+
+test("the plugin on a Claude Code too old for its exec-form hook: a FAIL, first", () => {
+  const box = pluginBox("2.1.100");
+  box.enable();
+  const report = runDoctor(box.request);
+  const expected = "FAIL: Claude Code 2.1.100 is older than 2.1.139, which the RepoMagpie plugin's hook needs, so it doesn't run. Update Claude Code.";
+  assert.deepEqual(report.claude_code.failures, [expected]);
+  assert.equal(report.problems[0], expected);
+});
+
+test("the plugin on in a project's settings but not installed here: a to-do, unless setup set up Claude Code; off in settings.local.json: no plugin", () => {
+  const box = pluginBox("2.1.200", false);
+  const project = join(box.request.cwd, ".claude", "settings.json");
+  box.enable({}, project);
+  let report = runDoctor(box.request);
+  assert.equal(report.claude_plugin.active, false);
+  assert.ok(report.problems.includes(`The RepoMagpie plugin is on in ${project} (repomagpie@repomagpie), but it isn't installed here, so Claude Code doesn't run it. claude plugin install repomagpie@repomagpie installs it.`), report.problems.join("\n"));
+  assert.ok(box.SETUP_TODOS.every((todo) => report.problems.includes(todo)), "not running, so setup's to-dos stay");
+  // An earlier setup's MCP entry: RepoMagpie runs, so no nudge to install the plugin.
+  box.write(join(box.home, ".claude.json"), JSON.stringify({ mcpServers: { repomagpie: { command: process.execPath, args: ["--disallow-code-generation-from-strings", box.entry, "mcp"] } } }));
+  assert.ok(!runDoctor(box.request).problems.some((p) => p.includes("plugin")));
+  // Installed, and turned off for this user in the project's settings.local.json.
+  mkdirSync(join(box.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0"), { recursive: true });
+  box.enable({}, join(box.request.cwd, ".claude", "settings.local.json"), false);
+  report = runDoctor(box.request);
+  assert.deepEqual([report.claude_plugin.enabled, report.claude_plugin.active, report.claude_plugin.settings.map((s) => [s.scope, s.enabled])], [null, false, [["project", true], ["local", false]]]);
+});
+
+test("the plugin's double install in a project: the way to turn it off is for this user alone", () => {
+  const box = pluginBox();
+  box.enable({}, join(box.request.cwd, ".claude", "settings.json"));
+  box.write(join(box.home, ".claude", "skills", "repomagpie", "SKILL.md"), "---\nname: repomagpie\n---\n");
+  assert.ok(runDoctor(box.request).problems.some((p) => p.endsWith("or claude plugin disable repomagpie@repomagpie --scope local turns the plugin off.")));
+});
+
 test("the shell form is a to-do only where setup would change it: not on a version too old or unknown", () => {
   for (const print of ["2.1.138 (Claude Code)", null]) {
     const box = execBox();

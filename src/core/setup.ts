@@ -9,6 +9,7 @@ import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "./agent-cli.ts";
+import { claudePlugin, setupPieces, type SetupPiece } from "./claude-plugin.ts";
 import { claudeCodeVersion, EXEC_FORM_MIN_VERSION, supportsExecForm } from "./claude-version.ts";
 import { AGENTS, foundBy, mcpEntry, onPath, readJsonc, type Agent, type Found, type McpEntry, type McpFormat, type Where } from "./agents.ts";
 import { backupName, pathProblem, readConfig, writeAtomically } from "./config-write.ts";
@@ -66,6 +67,10 @@ export interface SetupPlan {
   // --capture-reminder, kept up to date when there, removed with --remove.
   reminder: HookPlan | null;
   hooks: AgentHookPlan[]; // the other agents' hooks, for each one set up that has a hook (decision 0036)
+  // RepoMagpie's Claude Code plugin, on and installed in the user's settings (decision 0063): setup
+  // skips Claude Code, and lists what an earlier setup wrote there, which it never removes unasked.
+  // null when the plugin isn't on, and with --remove.
+  claude_plugin: { id: string; file: string; setup: SetupPiece[]; reminder: boolean } | null;
 }
 
 export interface SetupRequest {
@@ -104,7 +109,12 @@ const jsonEntry = (id: Agent["id"], l: { command: string; args: string[] }) =>
 export function planSetup(request: SetupRequest): SetupPlan {
   const { where } = request;
   const launch = "error" in request.launch ? null : noteTool(request.launch, request.noteTool === true);
-  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, claude_code: null, agents: [], skill: null, hook: null, reminder: null, hooks: [] };
+  const plan: SetupPlan = { remove: request.remove, project: request.project ?? null, launch, launch_error: "error" in request.launch ? request.launch.error : null, claude_code: null, agents: [], skill: null, hook: null, reminder: null, hooks: [], claude_plugin: null };
+  // The plugin brings Claude Code's MCP server, skill and hook: setup skips them, also with --agents
+  // claude-code, but not with --remove, which takes out what an earlier setup wrote. Only the user's
+  // settings count: setup's entries are the user's, for every project.
+  const plugin = request.remove ? null : claudePlugin(where);
+  let pluginSkipped = false;
   for (const agent of AGENTS) {
     const found = foundBy(agent, where);
     const installed = found !== null;
@@ -118,6 +128,13 @@ export function planSetup(request: SetupRequest): SetupPlan {
       plan.agents.push({ ...base, reason: `not installed: no ${agent.marker(where)} and no ${agent.cli} command` });
       continue;
     }
+    if (agent.id === "claude-code" && plugin?.active && plugin.enabled) {
+      pluginSkipped = true;
+      const { pieces, reminder } = setupPieces(where);
+      plan.claude_plugin = { id: plugin.enabled.id, file: plugin.enabled.file, setup: pieces, reminder };
+      plan.agents.push({ ...base, reason: `the RepoMagpie plugin is on (${plugin.enabled.id}), which brings the MCP server, the skill and the hook` });
+      continue;
+    }
     plan.agents.push(planAgent(agent, base, request, launch));
   }
   // The skill and the hook: in the home folder, or the project's folders with --project.
@@ -125,12 +142,16 @@ export function planSetup(request: SetupRequest): SetupPlan {
   const claude = chosen.some((a) => a.id === "claude-code");
   const root = request.project ?? where.home;
   if (chosen.length) plan.skill = planSkill(skillRequest(request, plan));
-  if (claude && !request.remove && request.project === undefined && launch) plan.claude_code = readClaudeCode(where);
+  // The Stop reminder isn't in the plugin (decision 0063): with the plugin on it stays setup's to add,
+  // keep up to date and remove.
+  // `claude --version` only when it decides something: a reminder asked for or already there.
+  const reminderToo = claude || (pluginSkipped && (request.captureReminder === true || plan.claude_plugin?.reminder === true));
+  if (reminderToo && !request.remove && request.project === undefined && launch) plan.claude_code = readClaudeCode(where);
   const target = hookTarget(request, plan.claude_code);
   if (claude) plan.hook = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, target);
   // The reminder is personal: never in a project's committed settings.
   // Listed only when asked for or when it changes: a reminder that isn't there stays unmentioned.
-  if (claude && request.project === undefined) {
+  if (reminderToo && request.project === undefined) {
     const reminder = planHook(join(root, ".claude", "settings.json"), root, request.remove, request.stamp, target, STOP, request.captureReminder === true);
     // The same file as the hook's: a second backup in this run gets its own name.
     if (reminder.backup && reminder.backup === plan.hook?.backup) reminder.backup = `${reminder.backup}-2`;

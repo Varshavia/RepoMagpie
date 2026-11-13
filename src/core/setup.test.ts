@@ -408,6 +408,93 @@ test("the version isn't read when it decides nothing: --project, --remove, a lau
   assert.equal(planSetup(s.request({ only: ["codex"] })).claude_code, null);
 });
 
+// RepoMagpie's Claude Code plugin (decision 0063), on and installed in the user's settings.
+function pluginBox(clis: (keyof typeof CLIS)[] = ["claude-code", "codex"]) {
+  const s = hookBox(undefined, clis);
+  const settings = (extra: object = {}) => s.write(s.file, `${JSON.stringify({ enabledPlugins: { "repomagpie@repomagpie": true }, ...extra }, null, 2)}\n`);
+  settings();
+  mkdirSync(join(s.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0"), { recursive: true });
+  return { ...s, settings };
+}
+
+test("the plugin on: setup skips Claude Code (its MCP entry, skill link and hook), with the reason; the other agents as before", () => {
+  const s = pluginBox();
+  const before = readFileSync(s.file, "utf8");
+  const plan = planSetup(s.request());
+  const claude = plan.agents.find((a) => a.id === "claude-code");
+  assert.deepEqual([claude?.action, claude?.reason], ["skip", "the RepoMagpie plugin is on (repomagpie@repomagpie), which brings the MCP server, the skill and the hook"]);
+  assert.deepEqual(plan.claude_plugin, { id: "repomagpie@repomagpie", file: s.file, setup: [], reminder: false });
+  assert.deepEqual([plan.hook, plan.reminder, plan.claude_code, plan.skill?.claude], [null, null, null, null]);
+  const done = applySetup(plan, s.request());
+  assert.equal(done.agents.find((a) => a.id === "codex")?.result, "done");
+  assert.ok(existsSync(join(s.home, ".agents", "skills", "repomagpie", "SKILL.md")), "the shared skill, for Codex");
+  assert.ok(!existsSync(join(s.home, ".claude", "skills", "repomagpie")));
+  assert.equal(readFileSync(s.file, "utf8"), before);
+  assert.deepEqual(s.calls().filter((c) => c.agent === "claude" && c.args[0] === "mcp"), []);
+});
+
+test("the plugin on beside an earlier setup: listed, never removed unasked; --agents claude-code is skipped too", () => {
+  const s = pluginBox(["claude-code"]);
+  // What an earlier setup wrote, before the plugin.
+  s.write(s.files.claude, JSON.stringify({ mcpServers: { repomagpie: { command: s.launch.command, args: s.launch.args } } }));
+  s.settings({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [s.execEntry()] }], Stop: [{ hooks: [s.execEntry("claude-code-stop")] }] } });
+  s.write(join(s.home, ".claude", "skills", "repomagpie", "SKILL.md"), "---\nname: repomagpie\n---\n");
+  const files = [s.files.claude, s.file, join(s.home, ".claude", "skills", "repomagpie", "SKILL.md")].map((f) => readFileSync(f, "utf8"));
+  for (const request of [s.request(), s.request({ only: ["claude-code"] })]) {
+    const plan = planSetup(request);
+    assert.equal(plan.agents[0].action, "skip");
+    assert.deepEqual(plan.claude_plugin?.setup.map((p) => p.what), ["the MCP server", "the hook", "the skill"]);
+    assert.equal(plan.claude_plugin?.reminder, true);
+    assert.equal(plan.reminder, null, "the reminder, up to date, is kept and unmentioned, as without the plugin");
+    assert.equal(plan.claude_code?.hook_form, "exec", "its form was checked: the reminder is setup's, not the plugin's");
+    applySetup(plan, request);
+  }
+  assert.deepEqual([s.files.claude, s.file, join(s.home, ".claude", "skills", "repomagpie", "SKILL.md")].map((f) => readFileSync(f, "utf8")), files);
+});
+
+test("the plugin on: --remove --agents claude-code still takes out what an earlier setup wrote", () => {
+  const s = pluginBox(["claude-code"]);
+  s.write(s.files.claude, JSON.stringify({ mcpServers: { repomagpie: { command: s.launch.command, args: s.launch.args } } }));
+  s.settings({ hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [s.execEntry()] }] } });
+  const request = s.request({ remove: true, only: ["claude-code"] });
+  const plan = planSetup(request);
+  assert.equal(plan.claude_plugin, null);
+  assert.deepEqual([plan.agents[0].action, plan.hook?.action], ["remove", "remove"]);
+  const done = applySetup(plan, request);
+  assert.deepEqual([done.agents[0].result, done.hook?.result], ["done", "done"]);
+  const after = JSON.parse(readFileSync(s.file, "utf8"));
+  assert.deepEqual([after.enabledPlugins, after.hooks.PreToolUse], [{ "repomagpie@repomagpie": true }, []], "the plugin's entry stays");
+});
+
+test("the plugin on: --capture-reminder adds the Stop reminder alone, which the plugin doesn't bring", () => {
+  const s = pluginBox(["claude-code"]);
+  const request = s.request({ captureReminder: true });
+  const plan = planSetup(request);
+  assert.deepEqual([plan.agents[0].action, plan.hook, plan.reminder?.action, plan.claude_code?.hook_form], ["skip", null, "add", "exec"]);
+  assert.equal(applySetup(plan, request).reminder?.result, "done");
+  const after = JSON.parse(readFileSync(s.file, "utf8"));
+  assert.deepEqual([after.hooks.PreToolUse, after.hooks.Stop[0].hooks[0]], [undefined, s.execEntry("claude-code-stop")]);
+});
+
+test("the plugin on but not installed, off, or on in a project only: setup sets up Claude Code as before", () => {
+  const s = hookBox(undefined, ["claude-code"]);
+  const cases: [string, object][] = [
+    ["on, not installed", { "repomagpie@repomagpie": true }],
+    ["off", { "repomagpie@repomagpie": false }],
+  ];
+  for (const [name, plugins] of cases) {
+    s.write(s.file, JSON.stringify({ enabledPlugins: plugins }));
+    const plan = planSetup(s.request());
+    assert.deepEqual([plan.agents[0].action, plan.claude_plugin], ["add", null], name);
+  }
+  // A project's settings don't decide for setup, whose entries are the user's.
+  mkdirSync(join(s.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0"), { recursive: true });
+  s.write(s.file, "{}");
+  const project = join(s.root, "project");
+  s.write(join(project, ".claude", "settings.json"), JSON.stringify({ enabledPlugins: { "repomagpie@repomagpie": true } }));
+  assert.equal(planSetup(s.request()).agents[0].action, "add");
+});
+
 test("Copilot CLI: its CLI adds and removes the entry; without it, its mcp-config.json is edited with the type and the tools", () => {
   const s = scratch(["copilot"]);
   const config = join(s.home, ".copilot", "mcp-config.json");
