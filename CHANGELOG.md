@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The Claude Code plugin's "Note tool" switch is off by default. In 0.3.0-beta.1 it was on, on the assumption that Claude Code would ask about it when the plugin is turned on and before each save; Claude Code 2.1.323 does neither. To let Claude save your Verdicts, turn on "Note tool" in `/config`, then restart Claude Code. If you installed 0.3.0-beta.1 and want it off, turn it off there.
+
+### Fixed
+
+- `repomagpie doctor` listed a plugin version left in Claude Code's cache after `claude plugin uninstall` as `installed:` followed by `off`, as if the plugin were still installed. A cached version that no settings file names is now `cached copy: … left by an uninstall or installed for another project`.
+
 ## [0.3.0-beta.1] - 2026-11-13
 
 The npm package is also a Claude Code plugin, `setup` and `doctor` know about it, `setup` writes a hook that runs on Claude Code older than 2.1.139, and the install detector skips more flag values.

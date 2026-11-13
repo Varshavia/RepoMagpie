@@ -35,7 +35,7 @@ test("the MCP server: node from PATH, code generation off, the package's entry f
   });
 });
 
-test("the switch: a boolean note_tool, on by default, with the keys Claude Code accepts", () => {
+test("the switch: a boolean note_tool, off by default, with the keys Claude Code accepts", () => {
   assert.deepEqual(Object.keys(plugin.userConfig), ["note_tool"]);
   const option = plugin.userConfig.note_tool as Record<string, unknown>;
   // An unknown key fails Claude Code's validation; type, title and description are required (plugins-reference).
@@ -44,7 +44,8 @@ test("the switch: a boolean note_tool, on by default, with the keys Claude Code 
   assert.equal(option.type, "boolean");
   assert.equal(typeof option.title, "string");
   assert.equal(typeof option.description, "string");
-  assert.equal(option.default, true);
+  // Off (decision 0065): Claude Code showed no dialog for it and no prompt before a note call.
+  assert.equal(option.default, false);
   // Every ${user_config.X} in the manifest is declared.
   for (const [, key] of JSON.stringify(plugin).matchAll(/\$\{user_config\.([^}]+)\}/g)) assert.ok(key in plugin.userConfig, key);
 });

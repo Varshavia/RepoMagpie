@@ -147,10 +147,11 @@ function checkPackage(dir: string, installed: (pkgDir: string) => number): numbe
 
 // The Claude Code plugin's two commands (decision 0063), from the manifest in the installed package,
 // as Claude Code runs them: ${CLAUDE_PLUGIN_ROOT} is the package's folder, also in the server's
-// environment; ${user_config.KEY} the user's answer, here the default or false, written as "true" or
-// "false" (the documentation doesn't say how; a manual check confirms it, decision 0064); and "node"
-// the node on PATH, here the one running this check. The hook answers as the built CLI did above;
-// the MCP server lists its tools, note among them with the switch's default and not with it off.
+// environment; ${user_config.KEY} the user's answer, here the default or true, written as "true" or
+// "false" (the documentation doesn't say how; with the switch on, Claude Code 2.1.323 served note,
+// 2026-11-13); and "node" the node on PATH, here the one running this check. The hook answers as the
+// built CLI did above; the MCP server lists its tools, without note at the switch's default (off,
+// decision 0065) and with it when the switch is on.
 // Returns the number of failed checks.
 type Entry = { command: string; args: string[]; env?: Record<string, string> };
 function checkPlugin(pkgDir: string, cwd: string, env: NodeJS.ProcessEnv): number {
@@ -187,7 +188,7 @@ function checkPlugin(pkgDir: string, cwd: string, env: NodeJS.ProcessEnv): numbe
     message(null, "notifications/initialized"),
     message(2, "tools/list"),
   ].join("\n");
-  for (const [config, note, label] of [[defaults, true, "the switch's default: with note"], [{ ...defaults, note_tool: false }, false, "note_tool off: without note"]] as const) {
+  for (const [config, note, label] of [[defaults, false, "the switch's default (off): without note"], [{ ...defaults, note_tool: true }, true, "note_tool on: with note"]] as const) {
     const server = mcpArgs && spawnSync(process.execPath, mcpArgs, { cwd, input: `${requests}\n`, encoding: "utf8", env: serverEnv(entry, config), timeout: 30_000 });
     const listed = server ? server.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line) as { id?: number; result?: { tools?: { name: string }[] } }).find((m) => m.id === 2) : undefined;
     const tools = listed?.result?.tools?.map((t) => t.name) ?? [];

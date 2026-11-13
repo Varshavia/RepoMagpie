@@ -24,7 +24,7 @@
       "type": "boolean",
       "title": "Note tool",
       "description": "Lets Claude save your Verdict on a package to your notes, in your words. Off: Claude only reads your notes.",
-      "default": true
+      "default": false
     }
   },
   "hooks": {

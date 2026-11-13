@@ -1,6 +1,6 @@
 # 0064 — The plugin's note tool, behind a switch
 
-**Status:** accepted (2026-11-13, from the maintainer's approval of the note-tool plan). Refines [0063](0063-a-claude-code-plugin.md), rules 2 and 4: the plugin's MCP server is no longer read-only. Departs from [0034](0034-the-mcp-server.md)'s "`--allow-write` is off by default" for the plugin's server only (rule 3 below). `--allow-write`, `setup`'s question about it ([0035](0035-setup-and-doctor.md)) and the `note` tool's own rules are unchanged.
+**Status:** accepted (2026-11-13, from the maintainer's approval of the note-tool plan). Refines [0063](0063-a-claude-code-plugin.md), rules 2 and 4: the plugin's MCP server is no longer read-only. Departs from [0034](0034-the-mcp-server.md)'s "`--allow-write` is off by default" for the plugin's server only (rule 3 below). `--allow-write`, `setup`'s question about it ([0035](0035-setup-and-doctor.md)) and the `note` tool's own rules are unchanged. The default of rule 3, and its two reasons, are superseded by [0065](0065-the-plugin-note-tool-off-by-default.md) (2026-11-13): the manual checks found no dialog and no prompt before a `note` call, so the fallback applies and the switch is off by default.
 
 ## Context
 Under 0063 the plugin's MCP server is read-only. A plugin's arguments are fixed, so they can't follow a setting. The skill falls back to `repomagpie note` when there is no `note` tool, but a plugin user may not have the npm package, and then nothing saves a Verdict. The maintainer's brief asked that plugin users can still save one (2026-11-13).
