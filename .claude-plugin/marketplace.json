@@ -1,0 +1,18 @@
+{
+  "name": "repomagpie",
+  "description": "RepoMagpie's Claude Code plugin, from the npm package repomagpie: your notes on packages and tools, checked before your agent installs one.",
+  "owner": {
+    "name": "Varshavia",
+    "url": "https://github.com/Varshavia"
+  },
+  "plugins": [
+    {
+      "name": "repomagpie",
+      "source": {
+        "source": "npm",
+        "package": "repomagpie",
+        "version": "0.3.0"
+      }
+    }
+  ]
+}
