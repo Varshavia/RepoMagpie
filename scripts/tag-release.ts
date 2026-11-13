@@ -215,7 +215,7 @@ function nextSteps(version: string, prerelease: boolean, head: string, io: Io): 
   })();
   const steps = [
     "",
-    "Next (docs/release.md, section 3, steps 4 to 11):",
+    "Next (docs/release.md, section 3, steps 4 to 12):",
     run
       ? ` 4. The release workflow runs on ${tag}: ${run.url}\n    Wait for both jobs: gh run watch ${id}`
       : ` 4. The release workflow starts on ${tag}. Its run: gh run list --workflow release.yml --limit 1`,
@@ -256,6 +256,14 @@ function nextSteps(version: string, prerelease: boolean, head: string, io: Io): 
         "      mcp-publisher login github",
         "      mcp-publisher publish",
         `    Then https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Varshavia/repomagpie lists ${version}.`,
+      ]),
+    ...(prerelease
+      ? ["12. The plugin's marketplace keeps the last stable version: a pre-release isn't listed there."]
+      : [
+        `12. List it in the plugin's marketplace (docs/release.md): on a branch from main, set .claude-plugin/marketplace.json's version to ${version}, then:`,
+        "      npm test",
+        "      claude plugin validate .claude-plugin/marketplace.json --strict",
+        "    After the merge: claude plugin marketplace update repomagpie, then claude plugin update repomagpie@repomagpie.",
       ]),
     "",
   ];

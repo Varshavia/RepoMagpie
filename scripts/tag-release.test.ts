@@ -100,8 +100,10 @@ test("the merged release on main: every check passes, the typed tag tags and pus
     "repomagpie setup --yes",
     "repomagpie doctor",
     "11. The MCP Registry keeps the last stable version: a pre-release isn't listed there.",
+    "12. The plugin's marketplace keeps the last stable version: a pre-release isn't listed there.",
   ]) assert.ok(r.out.includes(line), line);
   assert.ok(!r.out.includes("mcp-publisher publish"));
+  assert.ok(!r.out.includes("marketplace.json"));
   // From 0.2.0 on, a beta never moves latest (docs/release.md, step 6). The tarball can be fetched
   // only once approved: approve, then the SHA check.
   assert.ok(!r.out.includes("npm dist-tag add"));
@@ -157,6 +159,9 @@ test("a stable version, v0.2.0: staged under latest, latest not moved by hand, t
     "      mcp-publisher login github",
     "      mcp-publisher publish",
     `    Then https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Varshavia/repomagpie lists ${stable}.`,
+    `12. List it in the plugin's marketplace (docs/release.md): on a branch from main, set .claude-plugin/marketplace.json's version to ${stable}, then:`,
+    "      claude plugin validate .claude-plugin/marketplace.json --strict",
+    "    After the merge: claude plugin marketplace update repomagpie, then claude plugin update repomagpie@repomagpie.",
   ]) assert.ok(r.out.includes(line), line);
   assert.ok(!r.out.includes("--prerelease"));
   assert.ok(!r.out.includes("npm dist-tag add"));
