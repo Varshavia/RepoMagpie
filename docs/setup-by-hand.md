@@ -2,6 +2,18 @@
 
 `repomagpie setup` does all of this for you ([README](../README.md#quick-start)). This page is for an agent `setup` doesn't know yet, a settings file with comments, or when you want to write the entries yourself. `repomagpie setup --dry-run` prints the entries with your machine's paths and changes nothing: its first line, `Each agent will start: …`, is the command and then the arguments, with full paths, ready to copy into `command` and `args`. `repomagpie doctor` checks what you wrote.
 
+## The Claude Code plugin
+
+In Claude Code, the plugin sets up the MCP server, the skill and the hook for you ([README](../README.md#the-claude-code-plugin)). Use it or the entries below for Claude Code, not both: with both, every shell command runs two hooks, and `repomagpie doctor` warns. `repomagpie setup --remove --agents claude-code` takes out `setup`'s Claude Code entries.
+
+The plugin's entries are the ones below with `node` by name and the plugin's own folder, so Claude Code needs Node.js 22.12 or later on its `PATH`:
+
+```json
+{ "command": "node", "args": ["--disallow-code-generation-from-strings", "${CLAUDE_PLUGIN_ROOT}/dist/cli/main.js", "mcp"] }
+```
+
+Its `note` tool is off by default. Turn on **Note tool** in `/config` and restart Claude Code; the plugin passes the switch to the server as `REPOMAGPIE_ALLOW_WRITE`, which `repomagpie mcp` reads only when Claude Code starts it from a plugin (with `CLAUDE_PLUGIN_ROOT` set). In an entry you write yourself, use `--allow-write` instead (below).
+
 ## The MCP server
 
 The entry starts Node with code generation turned off, then the installed command's entry file, then `mcp`:
