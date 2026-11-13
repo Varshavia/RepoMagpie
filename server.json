@@ -6,13 +6,13 @@
     "url": "https://github.com/Varshavia/RepoMagpie",
     "source": "github"
   },
-  "version": "0.2.1",
+  "version": "0.3.0-beta.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "repomagpie",
-      "version": "0.2.1",
+      "version": "0.3.0-beta.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

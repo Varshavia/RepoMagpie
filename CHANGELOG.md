@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0-beta.1] - 2026-11-13
+
+The npm package is also a Claude Code plugin, `setup` and `doctor` know about it, `setup` writes a hook that runs on Claude Code older than 2.1.139, and the install detector skips more flag values.
+
 ### Added
 
 - The npm package is also a Claude Code plugin. It carries `.claude-plugin/plugin.json`, which gives Claude Code the RepoMagpie skill, the MCP server and the hook that checks installs, with no `repomagpie setup`. The MCP server's `note` tool, which saves the user's Verdict, sits behind a "Note tool" switch: on by default, asked when the plugin is turned on, and turned off in `/config`. Both start `node` from `PATH`, so the plugin needs Node.js 22.12 or later there. A marketplace to install the plugin from comes in a later release.
@@ -465,7 +469,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0-beta.1...HEAD
+[0.3.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.1...v0.3.0-beta.1
 [0.2.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.20...v0.2.0
 [0.2.0-beta.20]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0-beta.19...v0.2.0-beta.20
