@@ -41,9 +41,15 @@ export function render(r: DoctorJson, home: string): string {
   lines.push("", "Claude Code plugin");
   if (!p.settings.length && !p.installed.length) lines.push("  none");
   for (const s of p.settings) lines.push(`  ${tilde(s.file)}: ${s.id} ${s.enabled ? "on" : "off"}`);
-  for (const i of p.installed) lines.push(`  installed: ${i.id} ${i.version} (${tilde(i.path)})`);
+  // A cached version no settings file read here names: Claude Code's uninstall leaves the folder
+  // (manual check, 2026-11-13), and a project-scope install for another folder looks the same.
+  const named = new Set(p.settings.map((s) => s.id));
+  for (const i of p.installed) {
+    const where = `${i.id} ${i.version} (${tilde(i.path)})`;
+    lines.push(named.has(i.id) ? `  installed: ${where}` : `  cached copy: ${where}, left by an uninstall or installed for another project`);
+  }
   if (p.enabled) lines.push(p.active ? `  Claude Code runs ${p.enabled.id}` : `  ${p.enabled.id} is on but not installed here, so Claude Code doesn't run it`);
-  else if (p.settings.length || p.installed.length) lines.push("  off");
+  else if (p.settings.length) lines.push("  off");
 
   lines.push("", "Claude Code hook");
   lines.push(`  Claude Code ${r.claude_code.version ?? "version unknown"} (exec form needs ${r.claude_code.exec_form_minimum} or later)`);

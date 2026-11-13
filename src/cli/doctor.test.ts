@@ -183,6 +183,28 @@ test("the Claude Code plugin: each settings entry, each installed version, and w
   assert.equal(section(NO_PLUGIN), "Claude Code plugin\n  none");
 });
 
+test("the Claude Code plugin: a cached version no settings file names is a cached copy, not installed, and not off", async () => {
+  const { render } = await import("./doctor.ts");
+  const base = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [], github: { connected: false, source: null } };
+  const cached = { id: "repomagpie@repomagpie-beta", version: "0.3.0-beta.1", path: "/home/me/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1" };
+  const section = (plugin: DoctorJson["claude_plugin"]) => render({ ...base, claude_plugin: plugin }, "/home/me").split("\n\n").find((block) => block.startsWith("Claude Code plugin"));
+  // After claude plugin uninstall: the settings entry is gone, the cache folder isn't.
+  assert.equal(section({ settings: [], enabled: null, installed: [cached], active: false, setup: [] }), [
+    "Claude Code plugin",
+    "  cached copy: repomagpie@repomagpie-beta 0.3.0-beta.1 (~/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1), left by an uninstall or installed for another project",
+  ].join("\n"));
+  // Turned off, still installed: installed, then off. Another marketplace's cached copy beside it.
+  const off = { file: "/home/me/.claude/settings.json", scope: "user" as const, id: "repomagpie@repomagpie", enabled: false };
+  const kept = { id: "repomagpie@repomagpie", version: "0.3.0", path: "/home/me/.claude/plugins/cache/repomagpie/repomagpie/0.3.0" };
+  assert.equal(section({ settings: [off], enabled: null, installed: [kept, cached], active: false, setup: [] }), [
+    "Claude Code plugin",
+    "  ~/.claude/settings.json: repomagpie@repomagpie off",
+    "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
+    "  cached copy: repomagpie@repomagpie-beta 0.3.0-beta.1 (~/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1), left by an uninstall or installed for another project",
+    "  off",
+  ].join("\n"));
+});
+
 test("GitHub connected: one line naming where the token comes from, never the token", async () => {
   const { render } = await import("./doctor.ts");
   const report = { version: "0.2.0", node: { path: "/n", version: "24" }, platform: "linux" as const, commands: [], skills: [], claude_code: CLAUDE_CODE, claude_plugin: NO_PLUGIN, hook: [], reminder: [], agent_hooks: [], agents: [], backups: [], journals: [], git_repository: false, problems: [] };
