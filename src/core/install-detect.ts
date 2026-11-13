@@ -117,6 +117,10 @@ const UV_VALUES = ["-r", "--requirements", "-c", "--constraints", "--overrides",
   "-i", "-f", "--find-links", "--refresh-package", "--upgrade-package", "-P", "--reinstall-package", "--no-binary-package",
   "--no-build-package", "--index-strategy", "--resolution", "--prerelease", "--exclude-newer", "--keyring-provider", "--no-binary",
   "--only-binary", "--config-setting", "-C"];
+// uv add and uv remove have no value-taking --no-binary — there it is a boolean switch, the
+// value-taking form is --no-binary-package — and no --only-binary at all
+// (docs.astral.sh/uv/reference/cli), so a word after either is a package name.
+const UV_ADD_VALUES = UV_VALUES.filter((flag) => flag !== "--no-binary" && flag !== "--only-binary");
 const CARGO_VALUES = ["-F", "--features", "-p", "--package", "--git", "--branch", "--tag", "--rev", "--path", "--registry", "--rename",
   "--target", "--manifest-path", "--lockfile-path", "--config", "-Z", "--base", "--color"];
 
@@ -186,7 +190,7 @@ function packagesOf(name: string, args: string[], action: Action = "install"): {
   }
   if (name === "uv") {
     const p = positionals(args, UV_VALUES);
-    if (is(p[0], verbs.uv)) return { type: "pypi", words: p.slice(1) };
+    if (is(p[0], verbs.uv)) return { type: "pypi", words: positionals(args, UV_ADD_VALUES).slice(1) };
     if (lower(p[0]) === "pip" && is(p[1], verbs.uvPip)) return { type: "pypi", words: p.slice(2) };
     return null;
   }
