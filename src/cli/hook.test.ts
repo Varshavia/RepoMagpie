@@ -82,7 +82,7 @@ test("--help prints the settings snippet and the --inform-only advice", async ()
   assert.match(r.out, /"matcher": "Bash\|PowerShell\|Monitor"/);
   assert.match(r.out, /"command": "repomagpie hook claude-code"/);
   assert.match(r.out, /--inform-only/);
-  assert.match(r.out, /never edits/);
+  assert.match(r.out, /`repomagpie setup` writes this entry for you/);
 });
 
 // --- repomagpie hook codex (decision 0036) ---------------------------------------------------
@@ -121,6 +121,7 @@ test("hook codex --help prints the hooks.json snippet, the Windows form, the tru
   assert.match(r.out, /repomagpie\.cmd hook codex/);
   assert.match(r.out, /\/hooks/);
   assert.match(r.out, /within 10 minutes goes through/);
+  assert.match(r.out, /`repomagpie setup` writes this entry for you/);
 });
 
 // --- repomagpie hook gemini-cli (decision 0036) ----------------------------------------------
@@ -150,6 +151,7 @@ test("hook gemini-cli --help prints the settings.json snippet, the Windows form 
   assert.match(r.out, /"command": "repomagpie hook gemini-cli", "timeout": 10000/);
   assert.match(r.out, /repomagpie\.cmd hook gemini-cli/);
   assert.match(r.out, /--inform-only/);
+  assert.match(r.out, /`repomagpie setup` writes this entry for you/);
 });
 
 // --- repomagpie hook antigravity (decision 0036) ---------------------------------------------
@@ -176,6 +178,7 @@ test("hook antigravity --help prints the hooks.json snippet and what the hook do
   assert.match(r.out, /"matcher": "run_command"/);
   assert.match(r.out, /"command": "repomagpie hook antigravity", "timeout": 10/);
   assert.match(r.out, /always allow/);
+  assert.match(r.out, /`repomagpie setup` writes this entry for you/);
 });
 
 // --- repomagpie hook copilot (decision 0036) -------------------------------------------------
@@ -205,6 +208,7 @@ test("hook copilot --help prints its own hook file, the Windows form and the den
   assert.match(r.out, /"powershell": "repomagpie\.cmd hook copilot", "timeoutSec": 10/);
   assert.match(r.out, /denies every tool call when a hook can't start/);
   assert.match(r.out, /VS Code/);
+  assert.match(r.out, /`repomagpie setup` writes this file for you/);
 });
 
 // --- repomagpie hook cursor (decision 0036) --------------------------------------------------
@@ -230,4 +234,5 @@ test("hook cursor --help prints the hooks.json snippet, the Windows form and wha
   assert.match(r.out, /"command": "repomagpie hook cursor", "timeout": 10/);
   assert.match(r.out, /-ExecutionPolicy Bypass/);
   assert.match(r.out, /within\s+10 minutes goes through/);
+  assert.match(r.out, /`repomagpie setup` writes this entry for you/);
 });
