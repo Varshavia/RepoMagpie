@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - The npm package is also a Claude Code plugin. It carries `.claude-plugin/plugin.json`, which gives Claude Code the RepoMagpie skill, the MCP server's read-only tools and the hook that checks installs, with no `repomagpie setup`. Both start `node` from `PATH`, so the plugin needs Node.js 22.12 or later there. A marketplace to install the plugin from comes in a later release.
+- `repomagpie setup` skips Claude Code when the RepoMagpie plugin is on in `~/.claude/settings.json` and installed, also with `--agents claude-code`, since the plugin brings the MCP server, the skill and the hook. If an earlier `setup` wrote them too, the plan lists them and names `repomagpie setup --remove --agents claude-code`; `setup` never removes them on its own. The Stop reminder isn't in the plugin, so `--capture-reminder` still adds it.
+- `repomagpie doctor` has a "Claude Code plugin" section: where the plugin is turned on or off, which versions are installed, and whether Claude Code runs it (`claude_plugin` in `--json`). When both the plugin and an earlier `setup` are there, one to-do says Claude Code runs both and gives both ways to keep one. On a Claude Code older than 2.1.139, the plugin's hook doesn't run, which is a `FAIL:` line. A plugin turned on but not installed gets the install command.
 
 ### Fixed
 
