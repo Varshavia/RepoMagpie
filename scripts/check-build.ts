@@ -5,7 +5,7 @@
 // tarball from npm pack, installed into a scratch prefix with no network, runs as `repomagpie` and as
 // `magpie` (on Windows through npm's .cmd shims), and `npx <tarball>` runs it too: with two bins, npx
 // runs the one named like the package, and fails when none is. The Claude Code plugin's hook and MCP
-// server run from the installed package's manifest (decision 0063). Run npm run build first.
+// server run from the installed package's manifest (decisions 0063 and 0064). Run npm run build first.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -146,18 +146,30 @@ function checkPackage(dir: string, installed: (pkgDir: string) => number): numbe
 }
 
 // The Claude Code plugin's two commands (decision 0063), from the manifest in the installed package,
-// as Claude Code runs them: ${CLAUDE_PLUGIN_ROOT} is the package's folder, and "node" the node on
-// PATH, here the one running this check. The hook answers as the built CLI did above; the MCP server
-// lists its tools, without the note tool. Returns the number of failed checks.
+// as Claude Code runs them: ${CLAUDE_PLUGIN_ROOT} is the package's folder, also in the server's
+// environment; ${user_config.KEY} the user's answer, here the default or false, written as "true" or
+// "false" (the documentation doesn't say how; a manual check confirms it, decision 0064); and "node"
+// the node on PATH, here the one running this check. The hook answers as the built CLI did above;
+// the MCP server lists its tools, note among them with the switch's default and not with it off.
+// Returns the number of failed checks.
+type Entry = { command: string; args: string[]; env?: Record<string, string> };
 function checkPlugin(pkgDir: string, cwd: string, env: NodeJS.ProcessEnv): number {
-  let manifest: { mcpServers?: Record<string, { command: string; args: string[] }>; hooks?: { PreToolUse?: { hooks: { command: string; args: string[] }[] }[] } };
+  let manifest: { mcpServers?: Record<string, Entry>; hooks?: { PreToolUse?: { hooks: Entry[] }[] }; userConfig?: Record<string, { default?: unknown }> };
   try {
     manifest = JSON.parse(readFileSync(join(pkgDir, ".claude-plugin", "plugin.json"), "utf8"));
   } catch (error) {
     return report(false, "the plugin's manifest in the installed package", String(error));
   }
-  const expand = (entry: { command: string; args: string[] } | undefined) =>
-    entry && entry.command === "node" ? entry.args.map((arg) => arg.replaceAll("${CLAUDE_PLUGIN_ROOT}", pkgDir)) : null;
+  const substitute = (text: string, config: Record<string, unknown>) =>
+    text.replaceAll("${CLAUDE_PLUGIN_ROOT}", pkgDir).replace(/\$\{user_config\.([^}]+)\}/g, (_, key: string) => String(config[key]));
+  const expand = (entry: Entry | undefined) =>
+    entry && entry.command === "node" ? entry.args.map((arg) => substitute(arg, {})) : null;
+  const defaults = Object.fromEntries(Object.entries(manifest.userConfig ?? {}).map(([key, option]) => [key, option.default]));
+  const serverEnv = (entry: Entry | undefined, config: Record<string, unknown>) => ({
+    ...env,
+    CLAUDE_PLUGIN_ROOT: pkgDir,
+    ...Object.fromEntries(Object.entries(entry?.env ?? {}).map(([name, value]) => [name, substitute(value, config)])),
+  });
   let failures = 0;
 
   const hookArgs = expand(manifest.hooks?.PreToolUse?.[0]?.hooks[0]);
@@ -167,18 +179,21 @@ function checkPlugin(pkgDir: string, cwd: string, env: NodeJS.ProcessEnv): numbe
   failures += report(Boolean(fromPlugin && fromPlugin.status === 0 && fromPlugin.stdout !== "" && fromPlugin.stdout === direct.stdout),
     "the plugin's hook from the installed package answers as the built CLI", fromPlugin ? `exit ${fromPlugin.status}: ${fromPlugin.stdout}${fromPlugin.stderr}` : "no node hook in the manifest");
 
-  const mcpArgs = expand(manifest.mcpServers?.repomagpie);
+  const entry = manifest.mcpServers?.repomagpie;
+  const mcpArgs = expand(entry);
   const message = (id: number | null, method: string, params: object = {}) => JSON.stringify({ jsonrpc: "2.0", ...(id === null ? {} : { id }), method, params });
   const requests = [
     message(1, "initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "check-build", version: "1" } }),
     message(null, "notifications/initialized"),
     message(2, "tools/list"),
   ].join("\n");
-  const server = mcpArgs && spawnSync(process.execPath, mcpArgs, { cwd, input: `${requests}\n`, encoding: "utf8", env, timeout: 30_000 });
-  const listed = server ? server.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line) as { id?: number; result?: { tools?: { name: string }[] } }).find((m) => m.id === 2) : undefined;
-  const tools = listed?.result?.tools?.map((t) => t.name) ?? [];
-  failures += report(server?.status === 0 && tools.includes("recall") && !tools.includes("note"),
-    `the plugin's MCP server from the installed package lists its tools, without note (${tools.join(", ")})`, server ? `exit ${server.status}: ${server.stdout}${server.stderr}` : "no node MCP server named repomagpie in the manifest");
+  for (const [config, note, label] of [[defaults, true, "the switch's default: with note"], [{ ...defaults, note_tool: false }, false, "note_tool off: without note"]] as const) {
+    const server = mcpArgs && spawnSync(process.execPath, mcpArgs, { cwd, input: `${requests}\n`, encoding: "utf8", env: serverEnv(entry, config), timeout: 30_000 });
+    const listed = server ? server.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line) as { id?: number; result?: { tools?: { name: string }[] } }).find((m) => m.id === 2) : undefined;
+    const tools = listed?.result?.tools?.map((t) => t.name) ?? [];
+    failures += report(server?.status === 0 && tools.includes("recall") && tools.includes("note") === note,
+      `the plugin's MCP server from the installed package lists its tools, ${label} (${tools.join(", ")})`, server ? `exit ${server.status}: ${server.stdout}${server.stderr}` : "no node MCP server named repomagpie in the manifest");
+  }
   return failures;
 }
 
