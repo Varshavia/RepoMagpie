@@ -30,6 +30,7 @@ import { runRecall } from "../core/recall.ts";
 import { projectInfo } from "../core/repository.ts";
 import { importFailure, runImport, runNote, type Context } from "../core/save.ts";
 import { runSearch, searchForAgent } from "../core/search.ts";
+import { DEFAULT_LIMIT, emptyStars, MAX_PAGES, runStars, type StarList, type StarSelection } from "../core/stars.ts";
 import { runSuggest, suggestForAgent } from "../core/suggest.ts";
 import { tagsFromTopics } from "../core/tags-from-topics.ts";
 import { itemsProblem } from "../core/write.ts";
@@ -55,6 +56,7 @@ const reply = ({ outcome, document }: { outcome: Outcome; document: unknown }): 
 const bad = (document: object, error: string): ApiReply => ({ status: 400, document: { ...document, error } });
 
 const JOURNAL = "journal must be personal or project.";
+const DEFAULT_SELECTION: StarSelection = { limit: DEFAULT_LIMIT, languages: [], topics: [], since: null };
 const scope = (value: unknown): Scope | null => (SCOPES as readonly unknown[]).includes(value) ? (value as Scope) : null;
 const type = (value: unknown): PackageType | undefined | null =>
   value === undefined || value === null ? undefined : (TYPES as readonly unknown[]).includes(value) ? (value as PackageType) : null;
@@ -65,6 +67,7 @@ const optionalTags = (value: unknown): string[] | undefined | null =>
 // The endpoints by path, then method. `open` opens a file in the default app (POST /api/open).
 export function endpoints(context: Context, open: (path: string) => Promise<void>): Record<string, Record<string, Handler>> {
   let searching: Promise<unknown> = Promise.resolve();
+  let stars: { user: string | null; list: StarList } | null = null; // the starred list read last, for the import that follows
   return {
     "/api/settings": {
       GET: () => ({ status: 200, document: settingsDocument(context) }),
@@ -308,6 +311,34 @@ export function endpoints(context: Context, open: (path: string) => Promise<void
         const run = searching.then(() => runDiscover(input, context));
         searching = run.catch(() => undefined);
         return run.then(reply);
+      },
+    },
+
+    // "Import my GitHub stars" (decision 0068): GET reads the starred list (GitHub's requests made here,
+    // never by the browser) and returns every star with the default selection; POST imports the checked
+    // ones by name, from the list read last. Nothing is written by GET.
+    "/api/stars": {
+      GET: async ({ query }) => {
+        const to = query.has("to") ? scope(query.get("to")) : "personal";
+        const user = query.get("user") || null;
+        if (!to) return bad(emptyStars("personal", user, DEFAULT_SELECTION), JOURNAL);
+        const run = await runStars({ user, to, selection: DEFAULT_SELECTION, write: false, all: true }, context);
+        if (run.list) stars = { user, list: run.list };
+        return reply(run);
+      },
+      POST: async ({ body }) => {
+        const to = body.to === undefined ? "personal" : scope(body.to);
+        const user = body.user === undefined || body.user === null ? null : typeof body.user === "string" ? body.user : undefined;
+        if (!to) return bad(emptyStars("personal", null, DEFAULT_SELECTION), JOURNAL);
+        if (user === undefined) return bad(emptyStars(to, null, DEFAULT_SELECTION), "user must be a GitHub login, or null for your own stars.");
+        const names = body.names;
+        if (!Array.isArray(names) || !names.length || names.length > MAX_PAGES * 100 || !names.every((n) => typeof n === "string" && n.length <= 141)) {
+          return bad(emptyStars(to, user, DEFAULT_SELECTION), "names must be the starred repositories to import, as owner/repo.");
+        }
+        const given = stars && stars.user === user ? stars.list : undefined;
+        const run = await runStars({ user, to, selection: DEFAULT_SELECTION, names: names as string[], write: true }, context, given);
+        if (run.list) stars = { user, list: run.list };
+        return reply({ ...run, document: { ...run.document, warnings: [...run.notices, ...run.document.warnings] } });
       },
     },
 

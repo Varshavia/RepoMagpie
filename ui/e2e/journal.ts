@@ -199,12 +199,14 @@ export const gitOnPath = (path: string) => path.split(delimiter).some((folder) =
 // magpie ui --no-open --json, from the source, on the journal; resolves once it prints its URL.
 // fakeGithub: GitHub answers from fake-github.ts instead of the network (the Discover tests).
 // noProject: it starts in the home folder, outside any project.
-export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProject?: boolean } = {}): Promise<Running> {
+// fakeToken: GITHUB_TOKEN is a made-up token, which only the fake GitHub sees (the stars tests).
+export function startMagpie(j: Journal, options: { fakeGithub?: boolean; noProject?: boolean; fakeToken?: boolean } = {}): Promise<Running> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: j.home, USERPROFILE: j.home, MAGPIE_HOME: j.journal };
   // Never the maintainer's GitHub login (decision 0053): no token variables, and no folder on PATH
   // that holds gh, so the app shows "not connected" here as on a fresh machine.
   delete env.GITHUB_TOKEN;
   delete env.GH_TOKEN;
+  if (options.fakeToken && options.fakeGithub) env.GITHUB_TOKEN = "ghp_e2eFakeToken";
   hideGh(env, j.root);
   const preload = options.fakeGithub ? ["--import", pathToFileURL(join(REPO, "ui", "e2e", "fake-github.ts")).href] : [];
   const child: ChildProcess = spawn(process.execPath, [...preload, join(REPO, "src", "cli", "main.ts"), "ui", "--no-open", "--json"], { cwd: options.noProject ? j.home : j.project, env, stdio: ["ignore", "pipe", "pipe"] });

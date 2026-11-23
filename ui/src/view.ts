@@ -2,7 +2,7 @@
 import type { ListView } from "./logic/notes.ts";
 
 export type View =
-  | { page: "inbox" }
+  | { page: "inbox"; tab?: "starred" } // tab: the Starred tab, starred notes without a Verdict (decision 0068)
   | { page: "all" }
   | { page: "kind"; value: string }
   | { page: "tag"; value: string }
@@ -20,6 +20,7 @@ export type View =
 export function listOf(view: View): ListView | null {
   switch (view.page) {
     case "inbox":
+      return { list: view.tab ?? "inbox" };
     case "all":
       return { list: view.page };
     case "kind":

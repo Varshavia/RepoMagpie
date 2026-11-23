@@ -1,6 +1,10 @@
 /* The styles only the parts in later.ts use: they load with that chunk, after styles.css, in the
    order they had there (docs/ui.md §10). */
 
+/* The Inbox's Inbox and Starred tabs (decision 0068), under the list header. */
+.inbox-tabs { margin: var(--sm) var(--md) 0; align-self: flex-start; }
+.inbox-tabs .tabular { color: var(--ink-subtle); margin-left: 4px; }
+
 /* Add's preview: a new note's tags, each with a remove button (decision 0030). */
 .chip.tag.removable { padding-right: var(--xxs); }
 .chip.tag.removable > span::before { content: "#"; color: var(--ink-subtle); }

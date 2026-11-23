@@ -1,0 +1,13 @@
+/* "Import my GitHub stars" (decision 0068): its own chunk, with StarsImport.tsx. */
+.stars-import { display: flex; flex-direction: column; gap: var(--sm); }
+.stars-filters { flex-wrap: wrap; align-items: center; }
+.stars-filters .input { width: auto; min-height: 28px; height: 28px; font-size: 12px; }
+.stars-since { display: inline-flex; align-items: center; gap: var(--xs); font-size: 12px; color: var(--ink-muted); }
+.stars-table { table-layout: fixed; }
+.stars-table th:first-child { width: 32px; }
+.stars-table th:nth-child(2) { width: 22%; }
+.stars-table th:nth-child(6) { width: 96px; }
+.stars-table th:nth-child(7) { width: 88px; }
+.stars-table .chip { margin-left: var(--xs); }
+.stars-pages { display: flex; align-items: center; gap: var(--sm); font-size: 12px; color: var(--ink-muted); }
+.stars-done { color: var(--success); }

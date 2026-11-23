@@ -14,9 +14,13 @@
 //   anything else: the recorded "design system" page (src/core/fixtures/github/search.json), and a
 //   made-up page 2 of three results.
 // A repository from those results answers /repos/owner/repo with its search item, so Add works,
-// except FAILING, which answers 404 as a deleted repository does. Every other path is a 404 (no file
-// list, no README: the note is saved with a warning).
+// except FAILING, which answers 404 as a deleted repository does. /user/starred answers 130 stars
+// (fixtures/github/starred.json, padded by fake-stars.ts). Every other path is a 404 (no file list,
+// no README: the note is saved with a warning).
 import { recorded } from "../../src/core/fixtures/fake-fetch.ts";
+import { fakeStars, starredItems } from "../../src/core/fixtures/fake-stars.ts";
+
+const starred = fakeStars({ items: starredItems(130) });
 
 type Item = Record<string, unknown> & { full_name: string };
 
@@ -68,6 +72,8 @@ globalThis.fetch = (async (input: string | URL | Request) => {
     if (url.searchParams.get("page") === "2") return json({ total_count: first.items.length + more.length, incomplete_results: false, items: more });
     return json({ ...first, total_count: first.items.length + more.length });
   }
+  // The starred list (the stars tests): fixtures/github/starred.json, padded to 130 stars and paged.
+  if (url.pathname === "/user/starred") return starred(url);
   const repo = /^\/repos\/([^/]+\/[^/]+)$/.exec(url.pathname)?.[1];
   const item = repo ? known.get(decodeURIComponent(repo).toLowerCase()) : undefined;
   if (item && item.full_name !== FAILING) return json(item);
