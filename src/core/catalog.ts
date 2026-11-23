@@ -22,6 +22,7 @@ export interface CatalogRow {
   summary: string | null; // the first Use when item, else the first line of What it does
   verdict: string | null; // null for a note without one
   status: "inbox" | "reviewed";
+  starred: boolean; // from the user's GitHub stars, without a Verdict: listed only with `starred` (decision 0068)
   journal: Scope;
   alternatives: string[]; // the names of its alternatives, in recall's order (decision 0029)
   truncated?: string[]; // for an agent: the fields that were cut, only when one was (decision 0032)
@@ -40,6 +41,7 @@ export interface CatalogRequest {
   tags?: string[]; // every tag must be present
   kind?: string;
   journal?: Scope; // one journal only
+  starred?: boolean; // also the starred notes without a Verdict, left out by default (decision 0068)
 }
 
 export interface CatalogRun {
@@ -132,7 +134,7 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
     journals.push({ scope: "project", path: project });
   }
 
-  const keep = (doc: SearchDoc) => doc.type === "note" && (!request.kind || doc.kind === request.kind) && (request.tags ?? []).every((tag) => doc.tags.includes(tag));
+  const keep = (doc: SearchDoc) => doc.type === "note" && (request.starred || !doc.starred) && (!request.kind || doc.kind === request.kind) && (request.tags ?? []).every((tag) => doc.tags.includes(tag));
   const rows: { row: CatalogRow; avoid: boolean; key: Key }[] = [];
   for (const journal of journals) {
     const index = loadIndex(journal.path).index;
@@ -147,6 +149,7 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
         summary: firstLine(doc.useWhen) ?? firstLine(doc.whatItDoes),
         verdict: doc.verdict || null,
         status: doc.status,
+        starred: doc.starred === true,
         journal: journal.scope,
         alternatives: alternativesOfFile(source, doc.file).map((a) => a.name),
       };

@@ -12,7 +12,7 @@ import { graphData, type GraphData } from "./graph.ts";
 import { manifestTypes, type PackageType } from "./identity.ts";
 import { appendTags, createJournal, findManifests, gitRoot, journalTagList, listNotes, readTagList, STARTER_TAGS, type Place } from "./journals.ts";
 import { linkEntries, linkIndex, type Backlink, type Link, type LinkEntries } from "./links.ts";
-import { readableId, readNote, stripComments } from "./note.ts";
+import { readableId, readNote, starredOf, stripComments } from "./note.ts";
 import { assertWritable, isRecord, isTextOrNull, isTexts, journalPathProblem, noteEntries, noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { knownTags, locateJournal, resolveInput, saveItem, type Context, type Journal } from "./save.ts";
@@ -148,6 +148,7 @@ export interface NoteSummary {
   tried: boolean;
   rating: number | null;
   explored: string | null;
+  starred: string | null; // the day it was starred on GitHub (decision 0068); with an inbox status, a starred note
   read_only: boolean;
 }
 
@@ -180,7 +181,7 @@ export function noteListDocument(scope: Scope, filters: NoteFilters, place: Plac
 // Every note's summary. The note-list cache (spec §7) keeps one per file with its modification time
 // and size; only new and changed files are read again, so a saved note doesn't cost a full re-read.
 const NOTE_LIST_CACHE = "note-list.json";
-const NOTE_LIST_VERSION = 4; // 2: nested and unterminated comments stripped from the Verdict; 3: domains; 4: frontend replaces styling (decision 0055)
+const NOTE_LIST_VERSION = 5; // 2: nested and unterminated comments stripped from the Verdict; 3: domains; 4: frontend replaces styling (decision 0055); 5: starred (decision 0068)
 
 function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] } {
   const { files, data, skipped } = noteEntries(journal, NOTE_LIST_CACHE, NOTE_LIST_VERSION, (file, parse) => summary(file, parse()), isSummary);
@@ -191,7 +192,7 @@ function summaries(journal: string): { notes: NoteSummary[]; skipped: string[] }
 function isSummary(s: unknown): boolean {
   return isRecord(s) && isTextOrNull(s.id) && typeof s.file === "string" && isTextOrNull(s.name) && isTextOrNull(s.kind) && isTexts(s.tags) && isTexts(s.domains) && isTexts(s.domains_suggested) &&
     (s.status === "inbox" || s.status === "reviewed") && typeof s.verdict === "string" && typeof s.tried === "boolean" &&
-    (s.rating === null || Number.isInteger(s.rating)) && isTextOrNull(s.explored) && typeof s.read_only === "boolean";
+    (s.rating === null || Number.isInteger(s.rating)) && isTextOrNull(s.explored) && isTextOrNull(s.starred) && typeof s.read_only === "boolean";
 }
 
 function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {
@@ -211,6 +212,7 @@ function summary(file: string, note: ReturnType<typeof readNote>): NoteSummary {
     tried: fm.tried === true,
     rating: Number.isInteger(fm.rating) ? (fm.rating as number) : null,
     explored: typeof fm.explored === "string" ? fm.explored : null,
+    starred: starredOf(fm),
     read_only: id === null,
   };
 }

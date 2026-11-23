@@ -2,6 +2,7 @@
 // notes an empty query lists; and what an empty list says, with its one-click fix.
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import type { SearchResult } from "../../../src/core/search.ts";
+import { isStarred } from "./notes.ts";
 
 // "domain database (suggested) · tag postgresql · words orm, sql"; null when nothing is named.
 export function whyLine(result: Pick<SearchResult, "why" | "domains_suggested">): string | null {
@@ -35,7 +36,7 @@ export function browseRows(lists: Partial<Record<Scope, NoteSummary[] | null>>, 
       if (filters.tag && !n.tags.includes(filters.tag)) continue;
       if (filters.domain && !n.domains.includes(filters.domain) && !n.domains_suggested.includes(filters.domain)) continue;
       rows.push({
-        id: n.id, journal, type: "note", skill: null, name: n.name ?? n.id, verdict: n.verdict || null, status: n.status,
+        id: n.id, journal, type: "note", skill: null, name: n.name ?? n.id, verdict: n.verdict || null, status: n.status, starred: isStarred(n),
         domains: n.domains, domains_suggested: n.domains_suggested, why: { domains: [], tags: [], words: [] }, score: 0, path: "", explored: n.explored ?? "",
       });
     }

@@ -24,6 +24,7 @@ export interface Candidate {
   name: string;
   verdict: string | null; // null for a note without a Verdict
   status: "inbox" | "reviewed";
+  starred: boolean; // from your GitHub stars, not reviewed, so not a decision; ranked last (decision 0068)
   tags: string[];
   score: number;
   why: {
@@ -132,13 +133,14 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
       }
       const matched = keywords.filter((k) => terms.has(singular(k)));
       scored.push({
-        group: doc.status === "reviewed" ? 0 : 1,
+        group: doc.status === "reviewed" ? 0 : doc.starred ? 2 : 1,
         candidate: {
           id: doc.purl,
           journal: journal.scope,
           name: doc.name,
           verdict: doc.verdict || null,
           status: doc.status,
+          starred: doc.starred === true,
           tags: doc.tags,
           score: Math.round((score + tagPoints(doc.tags, keywords)) * 100) / 100,
           why: { keywords: matched, dependencies: source === "manifests" ? matchedDependencies(dependencyNames, matched) : [] },

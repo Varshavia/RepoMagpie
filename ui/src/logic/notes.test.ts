@@ -17,7 +17,7 @@ test("tagListState: missing, empty, or ready", () => {
 
 const note = (over: Partial<NoteSummary>): NoteSummary => ({
   id: "pkg:npm/x", file: "npm--x.md", name: "x", kind: "library", tags: [], domains: [], domains_suggested: [], status: "reviewed", verdict: "fine",
-  tried: false, rating: null, explored: "2026-10-01", read_only: false, ...over,
+  tried: false, rating: null, explored: "2026-10-01", starred: null, read_only: false, ...over,
 });
 
 const NOTES = [
@@ -31,6 +31,7 @@ test("sidebarCounts: all, inbox, kinds by name, tags by count then name, domains
   assert.deepEqual(sidebarCounts(NOTES), {
     all: 4,
     inbox: 3,
+    starred: 0,
     kinds: [{ name: "cli", count: 1 }, { name: "library", count: 2 }],
     tags: [{ name: "pdf", count: 2 }, { name: "testing", count: 1 }],
     domains: [{ name: "api", count: 1, suggested: 1 }, { name: "tooling", count: 2, suggested: 1 }],
@@ -56,6 +57,20 @@ test("filterNotes: inbox, all, one kind, one tag; the document's order is kept",
   assert.deepEqual(names(filterNotes(NOTES, { list: "kind", value: "cli" })), ["github--a--cli.md"]);
   assert.deepEqual(names(filterNotes(NOTES, { list: "tag", value: "pdf" })), ["npm--pdfkit.md", "github--a--cli.md"]);
   assert.deepEqual(names(filterNotes(NOTES, { list: "domain", value: "tooling" })), ["npm--pdfkit.md", "npm--left-pad.md"]);
+});
+
+// The Inbox's Starred tab (decision 0068): starred notes without a Verdict, out of the main inbox and
+// its count; a Verdict moves one out of the tab.
+test("filterNotes and sidebarCounts: starred notes without a Verdict have their own tab and count", () => {
+  const starred = note({ id: "pkg:github/s/one", file: "github--s--one.md", status: "inbox", verdict: "", starred: "2026-11-01" });
+  const reviewed = note({ id: "pkg:github/s/two", file: "github--s--two.md", starred: "2026-10-01" });
+  const all = [...NOTES, starred, reviewed];
+  const names = (list: NoteSummary[]) => list.map((n) => n.file);
+  assert.deepEqual(names(filterNotes(all, { list: "starred" })), ["github--s--one.md"]);
+  assert.ok(!names(filterNotes(all, { list: "inbox" })).includes("github--s--one.md"));
+  assert.deepEqual([sidebarCounts(all).inbox, sidebarCounts(all).starred, sidebarCounts(all).all], [3, 1, 6]);
+  const saved = all.map((n) => (n === starred ? { ...n, status: "reviewed" as const, verdict: "fine" } : n));
+  assert.deepEqual(names(filterNotes(saved, { list: "starred" })), [], "a Verdict moves it out");
 });
 
 test("noteKey: journal and id, or journal and file for a read-only note", () => {

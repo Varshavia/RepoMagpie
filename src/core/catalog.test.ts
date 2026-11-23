@@ -54,6 +54,7 @@ test("one row per note, with the spec's fields in order; skill lines aren't rows
     summary: "small PDFs, no streams",
     verdict: "avoid: async streams painful; use puppeteer",
     status: "reviewed",
+    starred: false,
     journal: "personal",
     alternatives: ["Puppeteer"], // listed by puppeteer's note: alternatives work from either side
   });

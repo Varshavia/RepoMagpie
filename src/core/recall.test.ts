@@ -542,7 +542,7 @@ test("the recall cache: entries keep the alternatives as written; a version 1 ca
 
   const cacheFile = join(path, ".cache", RECALL_CACHE);
   const cache = JSON.parse(readFileSync(cacheFile, "utf8")) as { version: number; files: unknown; data: Record<string, Record<string, unknown>> };
-  assert.equal(cache.version, 4);
+  assert.equal(cache.version, 5);
   const versionOne = Object.values(cache.data).map(({ alternatives: _alternatives, ...rest }) => rest);
   writeFileSync(cacheFile, JSON.stringify({ version: 1, files: cache.files, data: versionOne }));
   const upgraded = loadRecallEntries(path);

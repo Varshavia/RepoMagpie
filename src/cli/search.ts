@@ -4,7 +4,7 @@ import { runSearch, searchForAgent, type JournalSource, type Match, type SearchR
 import { clean } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
-import { INBOX, purlType, renderRows } from "./results.ts";
+import { INBOX, purlType, renderRows, STARRED } from "./results.ts";
 
 export interface SearchOptions extends GlobalOptions {
   tag?: string[];
@@ -38,6 +38,6 @@ export async function searchCommand(query: string, options: SearchOptions, io: I
 
 // Rank, name, PURL type, journal, then the Verdict (spec §8).
 function row(r: SearchResult, i: number): string[] {
-  const lead = r.verdict === null ? `${INBOX} no verdict yet` : `${r.type === "skill" ? "Skill" : "Verdict"}: ${r.verdict}`;
+  const lead = r.verdict === null ? `${INBOX} ${r.starred ? STARRED : "no verdict yet"}` : `${r.type === "skill" ? "Skill" : "Verdict"}: ${r.verdict}`;
   return [String(i + 1), r.skill ? `${r.name} › ${r.skill}` : r.name, purlType(r.id), r.journal, lead];
 }

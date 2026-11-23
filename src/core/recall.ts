@@ -5,15 +5,15 @@ import { join } from "node:path";
 import { PackageURL } from "packageurl-js";
 import { manifestTypes, normalizePackage, type PackageType } from "./identity.ts";
 import { findManifests, findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Env, type Place } from "./journals.ts";
-import { sectionItems, type Note } from "./note.ts";
+import { sectionItems, starredOf, type Note } from "./note.ts";
 import { isRecord, isTextOrNull, isTexts, noteEntries, noteSignature } from "./note-cache.ts";
 import { CAPS, clean, forAgent } from "./text.ts";
 import { alternativeLinks, targetResolver, type FoundLink, type Resolution } from "./wikilinks.ts";
 
 export const RECALL_CACHE = "recall-index.json";
 // 2: entries carry alternatives; 3: nested and unterminated comments stripped; 4: one entry per note
-// file, by its name (noteEntries)
-const CACHE_VERSION = 4;
+// file, by its name (noteEntries); 5: starred (decision 0068)
+const CACHE_VERSION = 5;
 
 type ListName = "use_when" | "avoid_when";
 
@@ -28,6 +28,7 @@ export interface RecallEntry {
   useWhen: string[];
   drafts: ListName[];
   status: "inbox" | "reviewed";
+  starred: boolean; // a starred note without a Verdict: recall and the hook don't answer from it (decision 0068)
   alternatives: FoundLink[]; // the alternatives field's targets, in order, as written
 }
 
@@ -103,7 +104,7 @@ function isRecallEntry(e: unknown): boolean {
     Array.isArray(e.keys) && e.keys.every((key) => Array.isArray(key) && key.length === 2 && isTexts(key)) &&
     typeof e.verdict === "string" && isTexts(e.avoidWhen) && isTexts(e.useWhen) &&
     Array.isArray(e.drafts) && e.drafts.every((d) => d === "use_when" || d === "avoid_when") &&
-    (e.status === "inbox" || e.status === "reviewed") &&
+    (e.status === "inbox" || e.status === "reviewed") && typeof e.starred === "boolean" &&
     Array.isArray(e.alternatives) && e.alternatives.every((a) => isRecord(a) && typeof a.target === "string" && isTextOrNull(a.label));
 }
 
@@ -130,6 +131,7 @@ function entryOf(note: Note, file: string): RecallEntry | null {
     useWhen: sectionItems(section("Use when")?.body ?? ""),
     drafts: [section("Use when")?.draft ? "use_when" : null, section("Avoid when")?.draft ? "avoid_when" : null].filter((d): d is ListName => d !== null),
     status: note.status,
+    starred: note.status === "inbox" && starredOf(fm) !== null,
     alternatives: alternativeLinks(fm.alternatives),
   };
 }
@@ -152,20 +154,42 @@ function candidates(query: string, types: PackageType[]): { type: string; name: 
 }
 
 // The matches for one query across the journals (spec §5): exact matches from every journal,
-// project first; name-only matches only when no journal has an exact one.
-export function recall(sources: RecallSource[], query: string, types: PackageType[]): RecallMatch[] {
+// project first; name-only matches only when no journal has an exact one. A starred note without a
+// Verdict is never a match: a star isn't a decision (decision 0068). `withStarred` matches them too,
+// for delete, which finds a note to remove, not a decision.
+export function recall(sources: RecallSource[], query: string, types: PackageType[], withStarred = false): RecallMatch[] {
+  return matching(sources, query, types, withStarred ? null : false).map(({ source, entry, confidence }) => match(query, source, entry, confidence, sources));
+}
+
+// The starred notes without a Verdict that would match the query: recall's "You starred this on
+// GitHub; no note yet." Matched by the same rules as recall.
+export function recallStarred(sources: RecallSource[], query: string, types: PackageType[]): StarredMatch[] {
+  return matching(sources, query, types, true).map(({ source, entry }) => ({ query, id: entry.id, journal: source.scope, path: join(source.path, "notes", entry.file) }));
+}
+
+export interface StarredMatch {
+  query: string;
+  id: string;
+  journal: RecallSource["scope"];
+  path: string;
+}
+
+// `starred`: only starred notes (true), only the others (false), or both (null).
+function matching(sources: RecallSource[], query: string, types: PackageType[], starred: boolean | null): { source: RecallSource; entry: RecallEntry; confidence: RecallMatch["confidence"] }[] {
   const wanted = candidates(query, types);
   const kinds = new Set(wanted.map((c) => c.type));
   const ordered = [...sources].sort((a, b) => (a.scope === b.scope ? 0 : a.scope === "project" ? -1 : 1));
-  const exact: RecallMatch[] = [];
-  const nameOnly: RecallMatch[] = [];
+  type Found = { source: RecallSource; entry: RecallEntry; confidence: RecallMatch["confidence"] };
+  const exact: Found[] = [];
+  const nameOnly: Found[] = [];
   for (const source of ordered) {
     for (const entry of source.entries) {
+      if (starred !== null && entry.starred !== starred) continue;
       const isExact = entry.keys.some(([type, name]) => wanted.some((c) => c.type === type && exactName(type, c.name) === exactName(type, name)));
       const isNameOnly = !isExact && entry.keys.some(([type, name]) =>
         !kinds.has(type) && wanted.some((c) => looseName(c.name) === looseName(type === "github" ? name.split("/").pop() ?? "" : name)));
-      if (isExact) exact.push(match(query, source, entry, "exact", sources));
-      else if (isNameOnly) nameOnly.push(match(query, source, entry, "name-only", sources));
+      if (isExact) exact.push({ source, entry, confidence: "exact" });
+      else if (isNameOnly) nameOnly.push({ source, entry, confidence: "name-only" });
     }
   }
   return exact.length ? exact : nameOnly;
@@ -274,8 +298,10 @@ function alternativesOf(source: RecallSource, entry: RecallEntry, sources: Recal
 const ALL_TYPES: PackageType[] = ["npm", "pypi", "cargo"];
 
 export interface RecallRun {
-  document: { matches: Omit<RecallMatch, "name">[]; skipped: string[] }; // the --json document (spec §2), for an agent
-  results: { query: string; matches: RecallMatch[] }[]; // as read, for people
+  // The --json document (spec §2), for an agent. `starred`: queries without a match that a starred
+  // note would match: "You starred this on GitHub; no note yet." (decision 0068)
+  document: { matches: Omit<RecallMatch, "name">[]; skipped: string[]; starred: StarredMatch[] };
+  results: { query: string; matches: RecallMatch[]; starred: StarredMatch[] }[]; // as read, for people
   warnings: string[];
 }
 
@@ -298,11 +324,15 @@ export function runRecall(queries: string[], type: PackageType | undefined, plac
   const fromManifests = manifestTypes(findManifests(place.cwd));
   const types = type ? [type] : fromManifests.length ? fromManifests : ALL_TYPES;
   const { sources, warnings } = openRecallSources(place);
-  const results = queries.map((query) => ({ query, matches: recall(sources, query, types) }));
+  const results = queries.map((query) => {
+    const matches = recall(sources, query, types);
+    return { query, matches, starred: matches.length ? [] : recallStarred(sources, query, types) };
+  });
   const matches = results.flatMap((r) => r.matches).map(({ name: _name, ...match }) => matchForAgent(match));
+  const starred = results.flatMap((r) => r.starred).map((s) => forAgent(s, { id: CAPS.id, path: Infinity }));
   // Notes not read for their size: their Verdicts are unknown, so no match isn't the whole answer.
   const skipped = sources.flatMap((s) => s.tooBig ?? []).map((path) => clean(`${path} is over 256 KB`));
-  return { document: { matches, skipped }, results, warnings };
+  return { document: { matches, skipped, starred }, results, warnings };
 }
 
 // An avoid note (decision 0024): its Verdict starts with the word "avoid", or Avoid when has text.
