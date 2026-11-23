@@ -18,7 +18,7 @@ export async function throttle(page: Page, rate: number): Promise<void> {
   await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate });
 }
 
-export const test = base.extend<{ magpie: Magpie; generated: number; empty: boolean; screens: boolean; showcase: boolean; fakeGithub: boolean; noProject: boolean }>({
+export const test = base.extend<{ magpie: Magpie; generated: number; empty: boolean; screens: boolean; showcase: boolean; fakeGithub: boolean; noProject: boolean; fakeToken: boolean }>({
   page: async ({ page }, use) => {
     if (THROTTLE > 1) await throttle(page, THROTTLE);
     if (LATER_DELAY > 0) {
@@ -35,9 +35,10 @@ export const test = base.extend<{ magpie: Magpie; generated: number; empty: bool
   showcase: [false, { option: true }],
   fakeGithub: [false, { option: true }],
   noProject: [false, { option: true }],
-  magpie: async ({ generated, empty, screens, showcase, fakeGithub, noProject }, use) => {
+  fakeToken: [false, { option: true }],
+  magpie: async ({ generated, empty, screens, showcase, fakeGithub, noProject, fakeToken }, use) => {
     const journal = makeJournal({ generated, empty, screens, showcase });
-    const server = await startMagpie(journal, { fakeGithub, noProject });
+    const server = await startMagpie(journal, { fakeGithub, noProject, fakeToken });
     let opened = false; // the printed URL works once; then the cookie opens the app, as for a person
     await use({
       ...journal,

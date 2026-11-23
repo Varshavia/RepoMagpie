@@ -9,12 +9,13 @@ import type { RecallMatch } from "../../src/core/recall.ts";
 import type { ProjectInfoJson } from "../../src/core/repository.ts";
 import type { ImportJson, NoteJson as SavedNoteJson } from "../../src/core/save.ts";
 import type { SearchResult } from "../../src/core/search.ts";
+import type { StarsJson } from "../../src/core/stars.ts";
 import type { SuggestJson } from "../../src/core/suggest.ts";
 import type { TagsFromTopicsJson } from "../../src/core/tags-from-topics.ts";
 import type { Patch } from "./logic/edits.ts";
 
 export type { ProjectInfoJson };
-export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson, DiscoverJson };
+export type { GraphJson, NoteJson, NoteListJson, NotePreviewJson, SettingsJson, TagListJson, ImportJson, SavedNoteJson, SearchResult, SuggestJson, AdoptJson, TagsFromTopicsJson, DeleteJson, RestoreJson, DiscoverJson, StarsJson };
 export type Scope = "personal" | "project";
 export type Address = { id: string } | { file: string };
 export type RecallJson = { matches: Omit<RecallMatch, "name">[]; error?: string };
@@ -51,7 +52,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return document as T;
 }
 
-const get = <T>(path: string, params: Record<string, string | string[] | undefined> = {}) => {
+// Exported for the parts that call an endpoint only they use (StarsImport.tsx), so its call stays in
+// their chunk.
+export const get = <T>(path: string, params: Record<string, string | string[] | undefined> = {}) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, v);
@@ -60,7 +63,7 @@ const get = <T>(path: string, params: Record<string, string | string[] | undefin
   return request<T>(text ? `${path}?${text}` : path);
 };
 
-const write = <T>(method: "POST" | "PATCH", path: string, body: unknown) =>
+export const write = <T>(method: "POST" | "PATCH", path: string, body: unknown) =>
   request<T>(path, { method, headers: { "Content-Type": "application/json", "X-Magpie-Token": TOKEN }, body: JSON.stringify(body) });
 
 const addressParams = (address: Address) => ("id" in address ? { id: address.id } : { file: address.file });

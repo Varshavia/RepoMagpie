@@ -5,7 +5,7 @@ import { api, fetchGraphEarly, type ApiError, type DeleteJson, type NoteJson, ty
 import { EmptyState, SkeletonRows, Toasts, type ToastItem } from "./components/common.tsx";
 import type { DiscoverMemory } from "./components/DiscoverPage.tsx";
 import type { ProjectState } from "./components/fields.tsx";
-import { FromTopicsBanner, FromTopicsButton, useFromTopics } from "./components/FromTopics.tsx";
+import { FromTopicsButton, useFromTopics } from "./components/FromTopics.tsx";
 import { LazyFrame, lazyPart, prefetch } from "./components/lazy.tsx";
 import { Delete, NotePane, type NotePaneProps } from "./components/NotePane.tsx";
 import type { Command, PaletteStart } from "./components/Palette.tsx";
@@ -43,6 +43,8 @@ const Repository = lazyPart(() => import("./components/later.ts").then((m) => m.
 const SharedNotesOff = lazyPart(() => import("./components/later.ts").then((m) => m.SharedNotesOff));
 const PaletteDialog = lazyPart(() => import("./components/later.ts").then((m) => m.Palette));
 const KeyMap = lazyPart(() => import("./components/later.ts").then((m) => m.KeyMapDialog));
+const Tabs = lazyPart(() => import("./components/later.ts").then((m) => m.InboxTabs));
+const TopicsBanner = lazyPart(() => import("./components/later.ts").then((m) => m.FromTopicsBanner));
 
 export function App() {
   const [settings, setSettings] = useState<SettingsJson | null>(null);
@@ -202,10 +204,10 @@ export function App() {
   useEffect(() => {
     if (inProject) api.project().then(setProjectInfo, () => setProjectInfo(null));
   }, [inProject, projectState, live.project.tick]);
-  const list = listOf(view);
   const state = lists[journal];
   const notes = state.status === "ready" ? state.notes : null;
   const counts = useMemo(() => (notes ? sidebarCounts(notes) : null), [notes]);
+  const list = listOf(view);
   const listKey = list ? `${list.list} ${"value" in list ? list.value : ""}` : "";
   const items = useMemo(() => (notes && list ? filterNotes(notes, list) : []), [notes, listKey]);
 
@@ -584,13 +586,20 @@ export function App() {
             ) : null}
             {view.page === "all" && items.length ? <FromTopicsButton busy={fromTopics.busy} onClick={fromTopics.check} /> : null}
           </header>
+          {review ? (
+            <LazyFrame fallback={null}>
+              <Tabs.Part view={view} counts={counts} onView={go} />
+            </LazyFrame>
+          ) : null}
           {inProject ? (
             <LazyFrame fallback={null}>
               <Repository.Part info={projectInfo} />
             </LazyFrame>
           ) : null}
           {view.page === "all" && fromTopics.plan ? (
-            <FromTopicsBanner plan={fromTopics.plan} busy={fromTopics.busy} onApply={fromTopics.apply} onCancel={fromTopics.cancel} />
+            <LazyFrame fallback={null}>
+              <TopicsBanner.Part plan={fromTopics.plan} busy={fromTopics.busy} onApply={fromTopics.apply} onCancel={fromTopics.cancel} />
+            </LazyFrame>
           ) : null}
           {state.status === "ready" && state.skipped.length ? <SkippedFiles skipped={state.skipped} /> : null}
           {state.status === "loading" ? (

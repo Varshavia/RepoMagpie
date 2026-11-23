@@ -1,6 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { magpie, sandbox, type Box } from "../cli/fixtures/sandbox.ts";
@@ -8,7 +8,10 @@ import { removeFolder } from "../core/copy-folder.ts";
 import { graphDocument, noteDocument, noteListDocument, settingsDocument, tagListDocument } from "../core/documents.ts";
 import { noteVersion } from "../core/edit.ts";
 import { STARTER_TAGS } from "../core/journals.ts";
-import { fakeFetch, recorded } from "../core/fixtures/fake-fetch.ts";
+import { fakeFetch, recorded, type Call } from "../core/fixtures/fake-fetch.ts";
+import { fakeStars, starredItems } from "../core/fixtures/fake-stars.ts";
+import { readNote } from "../core/note.ts";
+import type { StarsJson } from "../core/stars.ts";
 import { projectInfo } from "../core/repository.ts";
 import type { Fetch } from "../core/github.ts";
 import type { Context, ImportJson } from "../core/save.ts";
@@ -96,6 +99,41 @@ const searchFetch = (calls: string[] = [], delay = 0) =>
     calls.push(path);
     return new Promise((resolve) => setTimeout(() => resolve(new Response(JSON.stringify(SEARCH), { status: 200 })), delay));
   });
+
+// "Import my GitHub stars" (decision 0068): GET reads the list and writes nothing; POST imports the
+// checked names from the list read last, without asking GitHub again.
+test("GET /api/stars: every star with the default selection, nothing written; POST imports the checked ones", async (t) => {
+  const calls: Call[] = [];
+  const box = sandbox({ "journal/notes/npm--pdfkit.md": PDFKIT });
+  const context: Context = { home: box.home, env: { MAGPIE_HOME: box.journal, GITHUB_TOKEN: "ghp_fake" }, cwd: box.project, fetch: fakeStars({ items: starredItems(150), calls }), today: () => "2026-10-04" };
+  const server = await startServer({ context, open: async () => {}, log: () => {} });
+  t.after(() => server.close());
+  const http = client(server);
+  const read = parsed(await http.get("/api/stars?to=personal"));
+  const doc = read.document as StarsJson;
+  assert.equal(read.status, 200);
+  assert.deepEqual([doc.total, doc.new, doc.stars?.length, doc.selected.length, doc.written], [150, 150, 150, 100, false]);
+  assert.equal(doc.selected[0].name, "microsoft/playwright");
+  assert.deepEqual(readdirSync(join(box.journal, "notes")), ["npm--pdfkit.md"], "GET writes nothing");
+  const asked = calls.length;
+  const done = parsed(await http.write("POST", "/api/stars", { to: "personal", names: ["colinhacks/zod", "astral-sh/ruff", "not/starred"] }));
+  assert.equal(done.status, 200);
+  assert.deepEqual((done.document as StarsJson).items.map((i) => [i.id, i.result]), [["pkg:github/colinhacks/zod", "created"], ["pkg:github/astral-sh/ruff", "created"]], "only starred names");
+  assert.equal(calls.length, asked, "the list read last, not read again");
+  assert.equal(readNote(readFileSync(join(box.journal, "notes", "github--colinhacks--zod.md"), "utf8")).frontmatter.starred, "2026-11-12");
+  const again = parsed(await http.write("POST", "/api/stars", { to: "personal", names: ["colinhacks/zod"] }));
+  assert.deepEqual((again.document as StarsJson).items, [], "already noted: skipped");
+  // A note in the trash: its star is counted and never imported again, even when checked.
+  mkdirSync(join(box.journal, ".trash"));
+  renameSync(join(box.journal, "notes", "github--colinhacks--zod.md"), join(box.journal, ".trash", "github--colinhacks--zod.20261124-090000Z.md"));
+  const trashed = parsed(await http.write("POST", "/api/stars", { to: "personal", names: ["colinhacks/zod"] }));
+  assert.deepEqual([(trashed.document as StarsJson).items, (trashed.document as StarsJson).in_trash], [[], 1]);
+  assert.ok(!existsSync(join(box.journal, "notes", "github--colinhacks--zod.md")));
+  for (const body of [{ to: "both", names: ["a/b"] }, { to: "personal", names: [] }, { to: "personal", names: "a/b" }, { to: "personal", user: 5, names: ["a/b"] }]) {
+    assert.equal((await http.write("POST", "/api/stars", body)).status, 400, JSON.stringify(body));
+  }
+  assert.equal((await http.get("/api/stars?to=both")).status, 400);
+});
 
 test("GET /api/discover returns exactly repomagpie discover --json; the CLI's flags as the query", async (t) => {
   const fetch = searchFetch();

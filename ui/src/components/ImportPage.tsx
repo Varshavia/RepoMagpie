@@ -1,5 +1,6 @@
-// Import (docs/ui.md §7): paste lines, check them (magpie import --dry-run), then import.
-import { useId, useState } from "react";
+// Import (docs/ui.md §7): paste lines, check them (magpie import --dry-run), then import. Or import
+// GitHub stars (decision 0068), in a chunk of its own loaded on the first click.
+import { lazy, Suspense, useId, useState } from "react";
 import { api, type ApiError, type ImportJson, type Scope } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { countItems, noItemsHint, rows, summary, writes } from "../logic/importing.ts";
@@ -9,7 +10,9 @@ import { Banner, FieldError } from "./common.tsx";
 import { JournalChoice, type ProjectState } from "./fields.tsx";
 import { GitHubLine } from "./GitHubLine.tsx";
 
-const EXAMPLE = "https://github.com/microsoft/playwright-cli\nhttps://www.npmjs.com/package/pdfkit\n- [zod](https://github.com/colinhacks/zod)";
+const StarsImport = lazy(() => import("./StarsImport.tsx"));
+
+const EXAMPLE ="https://github.com/microsoft/playwright-cli\nhttps://www.npmjs.com/package/pdfkit\n- [zod](https://github.com/colinhacks/zod)";
 const ICONS: Record<string, IconName> = { created: "check", updated: "check", unchanged: "check", failed: "warning", skipped: "warning" };
 
 export function ImportPage({ project, defaultJournal, github, onImported }: { project: ProjectState; defaultJournal: Scope; github: GitHubSource | null | undefined; onImported: (journal: Scope) => void }) {
@@ -19,6 +22,7 @@ export function ImportPage({ project, defaultJournal, github, onImported }: { pr
   const [result, setResult] = useState<{ doc: ImportJson; dryRun: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<"" | "check" | "import">("");
   const [error, setError] = useState<string | null>(null);
+  const [stars, setStars] = useState(false);
   const items = countItems(text);
   // Import only what was checked: any change to the lines or the journal needs a new check.
   const checked = result?.dryRun && result.text === text ? writes(result.doc) : 0;
@@ -128,6 +132,26 @@ export function ImportPage({ project, defaultJournal, github, onImported }: { pr
           {result.doc.error && !result.doc.items.length ? <Banner tone="danger">{result.doc.error}</Banner> : null}
         </section>
       ) : null}
+
+      <section className="page-section" aria-labelledby={`${id}-stars`}>
+        <h2 className="section-label" id={`${id}-stars`}>
+          GitHub stars
+        </h2>
+        {stars ? (
+          <Suspense fallback={<p className="field-help" role="status">Loading…</p>}>
+            <StarsImport to={to} onImported={onImported} />
+          </Suspense>
+        ) : (
+          <>
+            <p className="field-help">Bring repositories you starred into the Inbox's Starred tab. You see them first and pick; nothing is written until you do.</p>
+            <div className="form-actions">
+              <button type="button" className="button secondary" onClick={() => setStars(true)}>
+                Import my GitHub stars
+              </button>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }
