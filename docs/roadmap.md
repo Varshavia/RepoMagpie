@@ -43,6 +43,7 @@ Parts marked *Obsidian extra (optional)* need Obsidian. Notes, the CLI, search a
   Also now: `0.3.0` (2026-11-13): the Claude Code plugin, with the "Note tool" switch off by default and `doctor`'s cached copy (#123), its docs (#124), and the node checks settled ([decision 0066](decisions/0066-the-node-missing-check-after-launch.md)). On npm under `latest`, and listed in the MCP Registry (its search shows `0.3.0` as the latest, checked 2026-11-13).
   Also now: the plugin's marketplace (`feat/plugin-marketplace`): `.claude-plugin/marketplace.json`, named `repomagpie`, lists the `repomagpie` package from npm at `0.3.0`; `scripts/plugin.test.ts` checks it lists an exact, released, stable version no newer than the package; the [release process](release.md) gets step 12, which bumps it in its own commit after each stable release, and `npm run release:tag` prints it. Merged (#126). The maintainer installed the plugin from it on Windows on 2026-11-13 (0.3.0, Claude Code 2.1.323) and again on 2026-11-23: `doctor` showed the plugin on, no `setup` hook and no `repomagpie` MCP entry, and "Everything is wired" ([manual checks](testing/manual-checks.md#windows)).
   Also now: from that install (`fix/plugin-polish`): with the plugin on, `doctor`'s Claude Code hook and MCP lines say the plugin brings them, with its version, code generation and the note tool's switch ([decision 0067](decisions/0067-doctor-reports-what-the-plugin-provides.md)); the README's plugin install in two code blocks, one command each.
+  Also now: [import GitHub stars](#import-github-stars-featimport-stars) (`feat/import-stars`, [decision 0068](decisions/0068-import-github-stars-into-the-inbox.md)): `repomagpie import --stars` and "Import my GitHub stars" in the app bring starred repositories into the inbox after a preview, in the Inbox's own Starred tab; the agent sees them only in search and suggest, last and marked.
 - **Next:** the [launch](#launch) steps left (the demo, the soft launch and Product Hunt), then [teams after launch](#teams-after-launch) and [the plugin after launch](#the-claude-code-plugin-after-launch).
   Also next: the rest of [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 2 (the field boosts, fuzzy and prefix limits, optional `files`), with its decision record. Then follow-ups from `feat/next-batch`: the graph's cold first open (each note parsed once for both caches; done in `perf/graph-open`, above).
 - **Later:** v0.3 Trust, v0.4 Share. Also later: [RFC 0001](rfcs/0001-domains-tags-and-search.md) Phase 3, opt-in semantic search, decided after Phase 2's eval (D3).
@@ -485,6 +486,21 @@ The last change before launch: the Project view says which repository the shared
 - [x] One muted line on whether the shared notes are committed and pushed, from local git only (no fetch), when the Project view opens and after each change to the project journal.
 
 **Done when:** in a fresh repository, the Project view names it, turning on shared notes says to commit and push, and after a commit the line says so.
+
+### Import GitHub stars (`feat/import-stars`)
+An empty journal fills in a minute from the repositories the user starred, without the agent mistaking a star for a decision ([decision 0068](decisions/0068-import-github-stars-into-the-inbox.md); it builds what [decision 0019](decisions/0019-no-star-import-in-v0-1.md) left for later).
+- [x] The mark: `starred: YYYY-MM-DD`, tool-owned, set once ([note schema](note-schema.md), rule 9).
+- [x] `repomagpie import --stars`: a preview first, a confirm in a terminal, the command to run without one, `--yes`; `--limit` (100), `--all`, `--language`, `--topic`, `--since`, `--to`, `--user`, `--json`; only new stars; a rate limit stops cleanly and says how to resume.
+- [x] The app: "Import my GitHub stars" on the Import page (summary, table, filters, checks, 100 rows a page, in its own chunk) and the Inbox's Starred tab, with counts.
+- [x] The agent's side: catalog leaves starred notes out unless `--include-starred`; recall and the hooks never answer from one ("You starred X on GitHub; no note yet."); search and suggest list them last, marked; one sentence in the skill.
+- [x] 10,000-note benchmarks (`--starred`), reported in spec §7.
+- [ ] Speed at 10,000 notes: meet spec §7's targets there, medians on an idle machine: recall and every hook at most 300 ms; search, catalog and suggest at most 1,000 ms; `graphData` at most 1,000 ms. Not met yet (2026-11-23: recall and the hooks 690–790 ms, search 1,520–1,540, catalog 1,490, suggest 1,560–2,020, `graphData` 2,855, on a loaded machine). The 2,000-note budgets stay. One perf branch, in this order:
+  1. One listing per journal in catalog and suggest (today the search index and recall's entries each list it).
+  2. `projectFirst` in one pass (today quadratic in the hits).
+  3. The cache signature's `lstat` calls in parallel (10,000 files: 590–700 ms in turn, 190–280 ms in parallel).
+  4. `graphData`'s similarity: down-weight topics that sit on a large share of notes (approved by the maintainer, 2026-11-24; it may change the graph's edges).
+
+**Done when:** a user with hundreds of stars previews them, imports the 100 newest, reviews them in the Starred tab, and the agent's recall and hook answers are unchanged.
 
 ## Teams after launch
 The project journal is the team feature. What comes after launch builds on git, not on a server.

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `repomagpie import --stars` brings the repositories you starred on GitHub into your inbox. It shows a summary first: how many stars, how many are new, the top languages and topics, and what it would import (the 100 most recently starred new ones). In a terminal it asks before writing; without one it prints the command to run and writes nothing unless you pass `--yes`. Choose with `--limit`, `--all`, `--language`, `--topic` and `--since`; `--user <login>` reads someone's public stars without a token. A re-run imports only new stars and skips the ones whose note you deleted (it's in the trash); unstarring never deletes a note. A rate limit stops it cleanly, and the output says how to resume.
+- The app's Import page has "Import my GitHub stars": the same summary, a table with filters and check boxes, the 100 newest checked, and "Import selected".
+- The app's Inbox has a Starred tab while you have starred notes without a Verdict. They stay out of the main inbox and its count; a Verdict moves a note out of the tab.
+- Notes from your stars have a new field, `starred`, the day you starred the repository. A starred note without a Verdict isn't a decision: recall and the install hooks never answer from it (recall says "You starred zod on GitHub; no note yet."), `catalog` leaves it out unless you pass `--include-starred` (MCP: `include_starred`), and `search` and `suggest` list it after your other notes, marked `starred on GitHub, not reviewed` (`"starred": true` in `--json`). Once you write a Verdict, it's an ordinary note.
+
 ### Changed
 
 - `repomagpie doctor`, with the Claude Code plugin on, says the plugin brings Claude Code's hook and MCP server. Under "Claude Code hook" it prints `from the plugin repomagpie@repomagpie 0.3.0` instead of `none`. Under "MCP server in each agent", Claude Code's line is `from the plugin, version 0.3.0, code generation off, note tool off (turn it on in /plugin, repomagpie, Configure options)` instead of `no repomagpie entry`. The note tool's state is your answer from Claude Code's settings, or the switch's default when you haven't set it; `note tool: set in /plugin` when it can't be read. `--json` adds `claude_plugin.provides`. With the plugin off, the output is unchanged.
