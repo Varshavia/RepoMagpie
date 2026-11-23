@@ -10,7 +10,12 @@ import { fileURLToPath } from "node:url";
 import { removeFolder } from "../src/core/copy-folder.ts";
 import { renderNote } from "../src/core/write.ts";
 
-export const NOTES = 2_000;
+// `--starred`: the journal of a big GitHub stars import (decision 0068): 10,000 notes, the 2,000 below
+// and 8,000 more imported from stars, without a Verdict. Its numbers are reported against the same
+// budgets, which spec §7 sets at 2,000 notes.
+const STARRED = process.argv.includes("--starred");
+export const NOTES = STARRED ? 10_000 : 2_000;
+const REVIEWED_PART = 2_000; // with --starred, notes from here on are starred
 export const RUNS = 20;
 export const reportOnly = process.argv.includes("--report-only");
 const json = process.argv.includes("--json");
@@ -43,7 +48,7 @@ function topicsFor(i: number): string[] {
 // Runs `body` with a fresh scratch folder (with a .git fence, so no walk leaves it) holding
 // <root>/journal with NOTES generated notes (pkg:npm/package-<i>), then deletes the folder. Each
 // note links to two others (by file stem and by name) and to one subject without a note. One more
-// note is over the size limit, as a cloned repository's could be.
+// note is over the size limit, as a cloned repository's could be. With --starred, see STARRED above.
 // `needsBuild: false` for a benchmark that calls core in-process instead of the built CLI.
 // `topics: true` also gives each note topics and a language (the graph's similarity reads them).
 // `alternatives: true` gives one note in five 1 to 3 alternatives: another note by file stem, one by
@@ -62,7 +67,21 @@ export async function withJournal(name: string, body: (root: string, journal: st
     const journal = join(root, "journal");
     mkdirSync(join(journal, "notes"), { recursive: true });
     for (let i = 0; i < NOTES; i++) {
-      let text = renderNote({
+      // A starred note as import --stars writes one: no Verdict, its topics as tags and its language,
+      // and the description as a draft "What it does"; nothing else (no items, notes, skills or links).
+      const starred = i >= REVIEWED_PART;
+      let text = starred ? renderNote({
+        id: `pkg:npm/package-${i}`,
+        name: `package-${i}`,
+        explored: "2026-11-23",
+        starred: "2026-11-01",
+        kind: "other",
+        tags: topicsFor(i),
+        topics: topicsFor(i),
+        language: LANGUAGES[i % LANGUAGES.length],
+        whatItDoes: words(i + 3, 12),
+        drafts: ["What it does"],
+      }) : renderNote({
         id: `pkg:npm/package-${i}`,
         name: `package-${i}`,
         explored: "2026-10-04",
@@ -78,7 +97,7 @@ export async function withJournal(name: string, body: (root: string, journal: st
         related: `- [[npm--package-${(i + 1) % NOTES}]]\n- [[package-${(i * 7) % NOTES}|a neighbour]]\n- [[subject-${i % 50}]]`,
       });
       text = text.replace("- `skill-a` —", `- \`skill-a\` — ${words(i + 5, 8)}`); // one completed skill line
-      if (alternatives && i % 5 === 0) {
+      if (alternatives && !starred && i % 5 === 0) {
         const targets = [`"[[npm--package-${(i + 11) % NOTES}]]"`, `"[[package-${(i * 13 + 7) % NOTES}]]"`, `"[[subject-${i % 40}]]"`];
         text = text.replace("\nstatus:", `\nalternatives: [${targets.slice(0, 3 - ((i / 5) % 3)).join(", ")}]\nstatus:`);
       }
