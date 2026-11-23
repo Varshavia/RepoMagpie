@@ -33,7 +33,7 @@ test("--help lists note, import, search, recall, suggest, init, adopt and hook",
   const r = await magpie("--help");
   assert.equal(r.code, 0);
   assert.match(r.out, /^\s+note \[options\] <name-or-url> \[text\]\s+capture a verdict in one line$/m);
-  assert.match(r.out, /^\s+import \[options\] <file>\s+add many notes from a file$/m);
+  assert.match(r.out, /^\s+import \[options\] \[file\]\s+add notes from a file or GitHub stars$/m);
   assert.match(r.out, /^\s+search \[options\] <query>\s+keyword search across both journals$/m);
   assert.match(r.out, /^\s+recall \[options\] <package\.\.\.>\s+show your notes before an install$/m);
   assert.match(r.out, /^\s+suggest \[options\] \[description\]\s+show the notes that fit this project$/m);

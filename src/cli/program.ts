@@ -19,6 +19,7 @@ import type { McpCommandOptions } from "./mcp.ts";
 import type { NoteOptions } from "./note.ts";
 import type { Terminal } from "./prompt.ts";
 import type { SetupOptions } from "./setup.ts";
+import type { StarsOptions } from "./stars.ts";
 import type { RecallOptions } from "./recall.ts";
 import type { SearchOptions } from "./search.ts";
 import type { SuggestOptions } from "./suggest.ts";
@@ -81,12 +82,32 @@ export async function run(argv: string[], io: Io): Promise<number> {
 
   program
     .command("import")
-    .description("add many notes from a file")
-    .argument("<file>", 'a file whose "- " lines are items: - <url-or-name> — verdict: ... | use: ... | avoid: ...')
+    .description("add notes from a file or GitHub stars")
+    .argument("[file]", 'a file whose "- " lines are items: - <url-or-name> — verdict: ... | use: ... | avoid: ...')
     .addOption(new Option("--to <journal>", "the journal to write to").choices(["personal", "project"]).default("personal"))
     .option("--dry-run", "report what would happen; write nothing")
-    .action(async (file: string, _options: unknown, command: Command) => {
-      code = await (await import("./import.ts")).importCommand(file, command.optsWithGlobals<ImportOptions>(), io);
+    .option("--stars", "your GitHub stars, into the inbox: shows a summary, then asks")
+    .option("--user <login>", "with --stars: someone's public stars instead of yours (no token needed)")
+    .option("--limit <n>", `with --stars: the n most recently starred new ones (default 100)`, positiveInteger)
+    .option("--all", "with --stars: every new star the filters keep")
+    .option("--language <language>", "with --stars: only this language, as GitHub names it (repeatable)", (value: string, values: string[]) => [...values, value], [])
+    .option("--topic <topic>", "with --stars: only repositories with this topic (repeatable)", (value: string, values: string[]) => [...values, value], [])
+    .option("--since <date>", "with --stars: only stars from this date on, YYYY-MM-DD")
+    .option("--yes", "with --stars: import without asking; needed when there is no terminal")
+    .action(async (file: string | undefined, _options: unknown, command: Command) => {
+      const options = command.optsWithGlobals<ImportOptions & StarsOptions & { stars?: boolean }>();
+      const starFlags = [options.user && "--user", options.limit !== undefined && "--limit", options.all && "--all", options.language?.length && "--language", options.topic?.length && "--topic", options.since && "--since", options.yes && "--yes"].filter(Boolean);
+      const usage = options.stars
+        ? file !== undefined ? "Pass a file or --stars, not both." : options.dryRun ? "--dry-run goes with a file; import --stars writes nothing until you say yes." : null
+        : file === undefined ? "Name a file to import, or pass --stars for your GitHub stars." : starFlags.length ? `${starFlags.join(", ")} ${starFlags.length === 1 ? "goes" : "go"} with --stars.` : null;
+      if (usage) {
+        io.err(`repomagpie import: ${usage}\n`);
+        code = 2;
+        return;
+      }
+      code = options.stars
+        ? await (await import("./stars.ts")).starsCommand(options, io)
+        : await (await import("./import.ts")).importCommand(file as string, options, io);
     });
 
   program
@@ -134,6 +155,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     .option("--limit <n>", "show at most n notes, from 1 to 1000", catalogLimit, 100)
     .option("--cursor <cursor>", "the next page: next_cursor from the previous page")
     .option("--full", "with --json: every field of each note, instead of compact rows")
+    .option("--include-starred", "also the notes from your GitHub stars that have no Verdict yet")
     .action(async (_options: unknown, command: Command) => {
       code = await (await import("./catalog.ts")).catalogCommand(command.optsWithGlobals<CatalogOptions>(), io);
     });

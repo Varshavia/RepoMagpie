@@ -87,6 +87,8 @@ export interface Item {
   alternatives?: string[]; // note's --alternative targets, as the user gave them (decision 0029)
   tags?: string[]; // a new note's tags as chosen in Add's preview, in place of the drafted ones
   domains?: string[]; // note's --domain: the domains the user confirmed (decision 0040)
+  metadata?: RepoMetadata; // import --stars: GitHub's data from the starred list, so no request is sent for it (decision 0068)
+  starred?: string; // import --stars: the date the user starred it
 }
 
 export interface ItemResult {
@@ -116,8 +118,9 @@ export function knownTags(notes: NoteEntry[], tagList: readonly string[], path: 
 // added to it, so a later item can find it. `tagList` is the journal's tag list; a new note's tags
 // that it lacks are appended to tags.md and to it. With `dryRun`, nothing is written: the text that
 // would have been written is kept in `notes`, and `tagList` grows the same way, so later items see
-// the same state as a real run.
-export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, context: Context, dryRun = false, tagList = journalTagList(journal.path)): Promise<ItemResult> {
+// the same state as a real run. `known`, when given, ranks a new note's topics in place of the
+// journal's (a bulk run keeps one, decision 0068): its tagList must be `tagList`.
+export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item, context: Context, dryRun = false, tagList = journalTagList(journal.path), known?: KnownTags): Promise<ItemResult> {
   const entry = noteFor(notes, item.purl);
   const path = entry?.path ?? join(journal.path, "notes", fileNameFor(item.purl));
   const warnings: string[] = [];
@@ -135,9 +138,9 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
   }
   const existing = entry ? (entry.text ?? readFileSync(entry.path, "utf8")) : null;
 
-  let metadata: RepoMetadata | null = null;
+  let metadata: RepoMetadata | null = item.metadata ?? null;
   const verdictTaken = existing !== null && Boolean(item.verdict?.trim()) && readNote(existing).verdict !== "";
-  if (item.purl.startsWith("pkg:github/") && !verdictTaken) {
+  if (item.purl.startsWith("pkg:github/") && !verdictTaken && !metadata) {
     const fetched = await fetchRepository(item.purl, { fetch: context.fetch, token: githubAuth(context).token });
     if (fetched.ok) {
       metadata = fetched.metadata;
@@ -149,8 +152,8 @@ export async function saveItem(journal: Journal, notes: NoteEntry[], item: Item,
     }
   }
 
-  const known = { ...knownTags(notes, tagList, path), aliases: journalAliases(journal.path) };
-  const capture = captureNote(existing, { ...item, metadata, today: context.today(), known });
+  const ranking = known ?? { ...knownTags(notes, tagList, path), aliases: journalAliases(journal.path) };
+  const capture = captureNote(existing, { ...item, metadata, today: context.today(), known: ranking });
   warnings.push(...capture.warnings);
   if (capture.result === "failed") return fail(capture.error ?? "The note was not saved.", entry?.path ?? null, capture.status, capture.name);
 

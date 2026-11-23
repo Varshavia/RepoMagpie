@@ -24,6 +24,7 @@ export interface CaptureInput {
   known: KnownTags; // for ranking the topics that become a new note's tags (decision 0030)
   tags?: string[]; // a new note's tags as the user chose them in Add's preview, in place of the draft
   domains?: string[]; // note's --domain: domains the user confirmed (decision 0040), checked by the caller
+  starred?: string; // import --stars: the date the user starred the repository (decision 0068); a new note only
 }
 
 export interface Capture {
@@ -88,6 +89,7 @@ function create(input: CaptureInput): Capture {
     topics: m?.topics,
     packages: m?.packages ?? undefined,
     explored: input.today,
+    starred: input.starred,
     kind: m ? draftKind(m) : startingKind(input.purl),
     tags,
     domains,

@@ -325,11 +325,12 @@ export function countSkillFolders(files: string[]): number {
 export type Got = { ok: true; text: string } | { ok: false; problem: FetchProblem };
 
 // One read-only GET to GitHub's API, with the timeout, the User-Agent and the token. `slug` names the
-// repository in a 404's message. Also Discover's search request (decision 0045).
-export async function get(path: string, slug: string, options: Options, raw = false): Promise<Got> {
+// repository in a 404's message. Also Discover's search request (decision 0045). `media`, when given,
+// is the Accept header instead (the starred list's star+json, decision 0068).
+export async function get(path: string, slug: string, options: Options, raw = false, media?: string): Promise<Got> {
   const { fetch, token, timeoutMs = 10_000, now = Date.now } = options;
   const headers: Record<string, string> = {
-    Accept: raw ? "application/vnd.github.raw+json" : "application/vnd.github+json",
+    Accept: media ?? (raw ? "application/vnd.github.raw+json" : "application/vnd.github+json"),
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": `repomagpie/${packageVersion()}`,
   };
