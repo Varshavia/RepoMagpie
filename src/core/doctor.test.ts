@@ -252,8 +252,39 @@ test("the plugin on and installed: reported, and setup's to-dos for Claude Code 
   assert.deepEqual(report.claude_plugin, {
     settings: [setting], enabled: setting, active: true, setup: [],
     installed: [{ id: "repomagpie@repomagpie", version: "0.3.0", path: join(box.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0") }],
+    // A cache folder without plugin.json: the version, and nothing guessed about the rest.
+    provides: { version: "0.3.0", code_generation_off: null, note_tool: null },
   });
   assert.ok(!report.problems.some((p) => box.SETUP_TODOS.includes(p) || p.includes("plugin")), report.problems.join("\n"));
+});
+
+test("what the plugin provides: from the installed version's plugin.json and the user's answer, never guessed", () => {
+  const box = pluginBox();
+  const cache = (version: string) => join(box.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", version);
+  const manifest = JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", ".claude-plugin", "plugin.json"), "utf8"));
+  box.write(join(cache("0.3.0"), ".claude-plugin", "plugin.json"), JSON.stringify(manifest));
+  const answer = (value: unknown) => ({ pluginConfigs: { "repomagpie@repomagpie": { options: { note_tool: value } } } });
+  assert.equal(runDoctor(box.request).claude_plugin.provides, null, "not on: nothing provided");
+  box.enable();
+  assert.deepEqual(runDoctor(box.request).claude_plugin.provides, { version: "0.3.0", code_generation_off: true, note_tool: false }, "no answer: the switch's default");
+  box.enable(answer(true));
+  assert.equal(runDoctor(box.request).claude_plugin.provides?.note_tool, true);
+  box.enable(answer("true"));
+  assert.equal(runDoctor(box.request).claude_plugin.provides?.note_tool, null, "not a boolean: unknown");
+  // Claude Code reads no answer from a project's settings, which a cloned repository could supply.
+  box.enable();
+  box.enable(answer(true), join(box.request.cwd, ".claude", "settings.json"));
+  assert.equal(runDoctor(box.request).claude_plugin.provides?.note_tool, false);
+  // The user's settings unreadable, the plugin on in the project's: the switch is unknown.
+  box.write(box.file, "{");
+  assert.equal(runDoctor(box.request).claude_plugin.provides?.note_tool, null);
+  // Several versions in the cache: the newest; a server without the flag says so.
+  box.enable();
+  mkdirSync(cache("0.3.0-beta.1"), { recursive: true });
+  mkdirSync(cache("0.2.10"), { recursive: true });
+  const args = manifest.mcpServers.repomagpie.args.filter((a: string) => a !== "--disallow-code-generation-from-strings");
+  box.write(join(cache("0.3.0"), ".claude-plugin", "plugin.json"), JSON.stringify({ ...manifest, mcpServers: { repomagpie: { ...manifest.mcpServers.repomagpie, args } } }));
+  assert.deepEqual(runDoctor(box.request).claude_plugin.provides, { version: "0.3.0", code_generation_off: false, note_tool: false });
 });
 
 test("the plugin and an earlier setup: one to-do names both and both ways out; setup's own to-dos for those entries give way", () => {

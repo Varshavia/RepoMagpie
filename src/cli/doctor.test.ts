@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DoctorJson } from "../core/doctor.ts";
 import { magpie, sandbox } from "./fixtures/sandbox.ts";
@@ -9,7 +9,8 @@ import { magpie, sandbox } from "./fixtures/sandbox.ts";
 
 const RTL = String.fromCharCode(0x202e);
 const CLAUDE_CODE = { version: "2.1.200", exec_form_minimum: "2.1.139", failures: [] };
-const NO_PLUGIN = { settings: [], enabled: null, installed: [], active: false, setup: [] };
+const NO_PLUGIN = { settings: [], enabled: null, installed: [], active: false, setup: [], provides: null };
+const MANIFEST = join(import.meta.dirname, "..", "..", ".claude-plugin", "plugin.json");
 
 function box() {
   const b = sandbox({ "bin/": null });
@@ -162,20 +163,20 @@ test("the Claude Code plugin: each settings entry, each installed version, and w
   const local = { file: "/work/app/.claude/settings.local.json", scope: "local" as const, id: "repomagpie@repomagpie", enabled: false };
   const installed = [{ id: "repomagpie@repomagpie", version: "0.3.0", path: "/home/me/.claude/plugins/cache/repomagpie/repomagpie/0.3.0" }];
   const section = (plugin: DoctorJson["claude_plugin"]) => render({ ...base, claude_plugin: plugin }, "/home/me").split("\n\n").find((block) => block.startsWith("Claude Code plugin"));
-  assert.equal(section({ settings: [user], enabled: user, installed, active: true, setup: [] }), [
+  assert.equal(section({ settings: [user], enabled: user, installed, active: true, setup: [], provides: null }), [
     "Claude Code plugin",
     "  ~/.claude/settings.json: repomagpie@repomagpie on",
     "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
     "  Claude Code runs repomagpie@repomagpie",
   ].join("\n"));
-  assert.equal(section({ settings: [user, local], enabled: null, installed, active: false, setup: [] }), [
+  assert.equal(section({ settings: [user, local], enabled: null, installed, active: false, setup: [], provides: null }), [
     "Claude Code plugin",
     "  ~/.claude/settings.json: repomagpie@repomagpie on",
     "  /work/app/.claude/settings.local.json: repomagpie@repomagpie off",
     "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
     "  off",
   ].join("\n"));
-  assert.equal(section({ settings: [user], enabled: user, installed: [], active: false, setup: [] }), [
+  assert.equal(section({ settings: [user], enabled: user, installed: [], active: false, setup: [], provides: null }), [
     "Claude Code plugin",
     "  ~/.claude/settings.json: repomagpie@repomagpie on",
     "  repomagpie@repomagpie is on but not installed here, so Claude Code doesn't run it",
@@ -189,20 +190,71 @@ test("the Claude Code plugin: a cached version no settings file names is a cache
   const cached = { id: "repomagpie@repomagpie-beta", version: "0.3.0-beta.1", path: "/home/me/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1" };
   const section = (plugin: DoctorJson["claude_plugin"]) => render({ ...base, claude_plugin: plugin }, "/home/me").split("\n\n").find((block) => block.startsWith("Claude Code plugin"));
   // After claude plugin uninstall: the settings entry is gone, the cache folder isn't.
-  assert.equal(section({ settings: [], enabled: null, installed: [cached], active: false, setup: [] }), [
+  assert.equal(section({ settings: [], enabled: null, installed: [cached], active: false, setup: [], provides: null }), [
     "Claude Code plugin",
     "  cached copy: repomagpie@repomagpie-beta 0.3.0-beta.1 (~/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1), left by an uninstall or installed for another project",
   ].join("\n"));
   // Turned off, still installed: installed, then off. Another marketplace's cached copy beside it.
   const off = { file: "/home/me/.claude/settings.json", scope: "user" as const, id: "repomagpie@repomagpie", enabled: false };
   const kept = { id: "repomagpie@repomagpie", version: "0.3.0", path: "/home/me/.claude/plugins/cache/repomagpie/repomagpie/0.3.0" };
-  assert.equal(section({ settings: [off], enabled: null, installed: [kept, cached], active: false, setup: [] }), [
+  assert.equal(section({ settings: [off], enabled: null, installed: [kept, cached], active: false, setup: [], provides: null }), [
     "Claude Code plugin",
     "  ~/.claude/settings.json: repomagpie@repomagpie off",
     "  installed: repomagpie@repomagpie 0.3.0 (~/.claude/plugins/cache/repomagpie/repomagpie/0.3.0)",
     "  cached copy: repomagpie@repomagpie-beta 0.3.0-beta.1 (~/.claude/plugins/cache/repomagpie-beta/repomagpie/0.3.0-beta.1), left by an uninstall or installed for another project",
     "  off",
   ].join("\n"));
+});
+
+// The plugin as Claude Code installs it from this repository's marketplace: its version in the
+// cache with the package's own plugin.json, on (or off) in the user's settings.
+function withPlugin(b: ReturnType<typeof box>, settings: object = {}, on = true) {
+  const cache = join(b.home, ".claude", "plugins", "cache", "repomagpie", "repomagpie", "0.3.0");
+  mkdirSync(join(cache, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(cache, ".claude-plugin", "plugin.json"), readFileSync(MANIFEST));
+  writeFileSync(join(b.home, ".claude", "settings.json"), JSON.stringify({ enabledPlugins: { "repomagpie@repomagpie": on }, ...settings }));
+}
+const block = (out: string, heading: string) => out.split("\n\n").find((b) => b.startsWith(`${heading}\n`));
+const FROM_PLUGIN = "from the plugin, version 0.3.0, code generation off, note tool off (turn it on in /plugin, repomagpie, Configure options)";
+
+test("the plugin on, no setup entries: the hook and Claude Code's MCP server say the plugin brings them", async () => {
+  const b = box();
+  withPlugin(b);
+  const out = (await magpie(b, ["doctor"], { env: b.env })).out;
+  assert.equal(block(out, "Claude Code hook"), ["Claude Code hook", "  Claude Code version unknown (exec form needs 2.1.139 or later)", "  from the plugin repomagpie@repomagpie 0.3.0"].join("\n"));
+  assert.ok(block(out, "MCP server in each agent")?.split("\n").includes(`  Claude Code   ${FROM_PLUGIN}`), out);
+  // The switch as the user set it in /plugin or /config: Claude Code keeps it in the user's settings.
+  withPlugin(b, { pluginConfigs: { "repomagpie@repomagpie": { options: { note_tool: true } } } });
+  assert.match((await magpie(b, ["doctor"], { env: b.env })).out, /^ {2}Claude Code {3}from the plugin, version 0\.3\.0, code generation off, note tool on$/m);
+  const json = JSON.parse((await magpie(b, ["doctor", "--json"], { env: b.env })).out);
+  assert.deepEqual(json.claude_plugin.provides, { version: "0.3.0", code_generation_off: true, note_tool: true });
+});
+
+test("the plugin on with setup's entries: both are listed, and the double install's to-do stays", async () => {
+  const b = box();
+  const entry = join(b.root, "main.js");
+  writeFileSync(entry, "");
+  withPlugin(b, { hooks: { PreToolUse: [{ matcher: "Bash|PowerShell|Monitor", hooks: [{ type: "command", command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "hook", "claude-code"] }] }] } });
+  writeFileSync(join(b.home, ".claude.json"), JSON.stringify({ mcpServers: { repomagpie: { command: process.execPath, args: ["--disallow-code-generation-from-strings", entry, "mcp"] } } }));
+  const out = (await magpie(b, ["doctor"], { env: b.env })).out;
+  const hook = block(out, "Claude Code hook")?.split("\n") ?? [];
+  assert.equal(hook[2], "  from the plugin repomagpie@repomagpie 0.3.0");
+  assert.match(hook[3], /^ {2}~[\\/]\.claude[\\/]settings\.json: .* hook claude-code {2}\(exec form, node started directly, code generation off\)$/);
+  const mcp = block(out, "MCP server in each agent")?.split("\n") ?? [];
+  const row = mcp.findIndex((line) => line.startsWith("  Claude Code   "));
+  assert.match(mcp[row], /^ {2}Claude Code {3}registered: .*main\.js, .*code generation off$/);
+  assert.equal(mcp[row + 1], `${" ".repeat(16)}also ${FROM_PLUGIN}`);
+  assert.match(out, /^ {2}- RepoMagpie is set up twice in Claude Code: by its plugin \(repomagpie@repomagpie, /m);
+});
+
+test("the plugin off: the hook and Claude Code's MCP lines are as before, and provides is null", async () => {
+  const b = box();
+  withPlugin(b, {}, false);
+  const out = (await magpie(b, ["doctor"], { env: b.env })).out;
+  assert.equal(block(out, "Claude Code hook"), ["Claude Code hook", "  Claude Code version unknown (exec form needs 2.1.139 or later)", "  none"].join("\n"));
+  assert.match(block(out, "MCP server in each agent") ?? "", /^ {2}Claude Code {3}found ~[\\/]\.claude only; no repomagpie entry in ~[\\/]\.claude\.json$/m);
+  assert.ok(!out.includes("from the plugin"));
+  assert.equal(JSON.parse((await magpie(b, ["doctor", "--json"], { env: b.env })).out).claude_plugin.provides, null);
 });
 
 test("GitHub connected: one line naming where the token comes from, never the token", async () => {
