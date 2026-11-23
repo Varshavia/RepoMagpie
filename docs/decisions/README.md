@@ -76,3 +76,4 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0065 | [The plugin's note tool is off by default](0065-the-plugin-note-tool-off-by-default.md) | accepted (supersedes 0064's default) |
 | 0066 | [The plugin's node-missing check comes after launch](0066-the-node-missing-check-after-launch.md) | accepted (supersedes 0063's node-missing check before the marketplace) |
 | 0067 | [`doctor` reports what the plugin provides](0067-doctor-reports-what-the-plugin-provides.md) | accepted (supersedes 0064's consequence that `doctor` doesn't report the switch) |
+| 0068 | [Import GitHub stars into the inbox](0068-import-github-stars-into-the-inbox.md) | accepted (builds the `import --stars` 0019 left for later) |

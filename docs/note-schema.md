@@ -34,6 +34,7 @@ Cargo names are case-sensitive, so two crates whose names differ only in case (`
 | `packages` | no | list of PURLs | tool | Packages this subject publishes, e.g. `["pkg:npm/%40playwright/cli"]`. Recall matches them |
 | `explored` | yes | date | tool | Date the note was created (YYYY-MM-DD); set once, never refreshed |
 | `adopted` | no | date | tool | Project journal only: the date `repomagpie adopt` copied this note from the personal journal ([spec](spec.md)) |
+| `starred` | no | date | tool | The day you starred the repository on GitHub (YYYY-MM-DD, UTC). Only `repomagpie import --stars` writes it, once, at creation; unstarring never changes it. A note with `starred` and no Verdict is a starred note (rule 9, [decision 0068](decisions/0068-import-github-stars-into-the-inbox.md)) |
 | `kind` | yes | enum | human (tool drafts at creation) | See below |
 | `tags` | yes | list | human (tool drafts at creation) | Lowercase, kebab-case, from the journal's tag list. Drafted from a repository's GitHub topics (rule 5) |
 | `domains` | no | list | human | The concerns the subject addresses, that you confirmed: at most 3 of the 16 domains below ([decision 0040](decisions/0040-domains-a-second-axis.md)). Written after `tags`, only when not empty |
@@ -151,7 +152,7 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
 
 1. **Status.** A note is `inbox` until its Verdict has human-written text ([decision 0018](decisions/0018-ai-drafts-humans-decide.md)); then it is `reviewed`. The tool sets `status` when it writes a note. When reading, a note with an empty Verdict counts as `inbox`, whatever its `status` field says.
 2. **Ownership.**
-   - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`, `domains_suggested`. The tool writes `domains_suggested` at creation, and on existing notes only when you run `repomagpie domains --suggest`, which fills it on notes with neither domain field. `explored` and `adopted` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
+   - **Tool-owned:** `id`, `name`, `url`, `language`, `license`, `topics`, `packages`, `explored`, `adopted`, `starred`, `domains_suggested`. The tool writes `domains_suggested` at creation, and on existing notes only when you run `repomagpie domains --suggest`, which fills it on notes with neither domain field. `explored`, `adopted` and `starred` are set once; the tool may refresh the others. It never replaces a `license` value with `unknown`, so a licence the user corrected stays.
    - **Human-owned:** `kind`, `tags`, `domains`, `tried`, `rating`, `status`, `alternatives`, and all body sections. The tool never writes `alternatives` on its own; the local app writes it only when you add or remove one, and `repomagpie note --alternative` only when you name one ([decision 0029](decisions/0029-recall-names-alternatives.md)). Either changes only that entry: the others stay exactly as written, labels included.
    - The tool writes `tags` after creation only when you ask: an edit in the local app, or "Add GitHub topics as tags" (`repomagpie tags --from-topics`), which adds topics until the note has 8 tags and never removes or reorders one ([decision 0030](decisions/0030-github-topics-become-tags.md)). Either is a human edit.
    - **At creation only**, the tool may write drafts of `kind` (from GitHub data, [decision 0030](decisions/0030-github-topics-become-tags.md); `library` for a registry package name without it, [decision 0039](decisions/0039-a-registry-package-note-starts-as-library.md)), `tags` (up to 8 from GitHub topics, rule 5), "What it does" and "Use when". From GitHub, the kind follows the deciding questions above as far as the repository's data can say: it reads the topics, the root manifests' keywords, the root's files and folders and the start of the README ([decision 0047](decisions/0047-kind-rules-measured.md)); `domains_suggested` also reads the keywords, the README's start and a root `action.yml`, and "What it does" takes the README's first sentence when the repository has no description; the README and the keywords themselves are never written to the note ([decision 0046](decisions/0046-classification-signals.md)). It writes the Verdict, "Use when" and "Avoid when" only from the user's own input (rule 7). It also writes defaults: `tried: false`, `rating` empty, `status` per rule 1.
@@ -181,6 +182,12 @@ There are no links across journals. Obsidian resolves a wikilink by file name, s
    - HTML comments (`<!-- … -->`) aren't note text: the Verdict, search, recall and the items of "Use when" and "Avoid when" leave them out, and a `<!--` that never closes leaves out the rest of its line. The file keeps them.
    - Write notes in the canonical format above.
    - Never rewrite a human section; edits that preserve formatting and comments are required for frontmatter changes.
+9. **Starred notes** ([decision 0068](decisions/0068-import-github-stars-into-the-inbox.md)). A note with `starred` and an empty Verdict is a bookmark, not a decision:
+   - recall and the hooks never answer from it; catalog leaves it out unless asked (`--include-starred`);
+   - search and suggest list it after every other note, marked `starred: true`;
+   - the local app lists it in the Inbox's Starred tab, not in the main inbox.
+
+   Once the Verdict has text, it's an ordinary note; `starred` stays. A starred note lacks what only a repository's files give: `packages`, "Notable skills", and the kind and domains read from the README and manifests.
 
 ## Planned fields (not active)
 

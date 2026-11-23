@@ -65,6 +65,9 @@ src/
                estimated kind and domains, whether a journal has each result, its 10-minute cache;
                discover-format: counts, ages and licence words, no imports, shared with the app
                capture: what note and import write for one item
+               stars: import --stars (decision 0068): the starred list from GitHub, page by page, which
+               stars are noted, the preview's document and writing the chosen ones;
+               star-selection: which new stars a selection keeps, no imports, shared with the app
                topic-tags: which GitHub topics become tags, ranked; the stop list (decision 0030)
                tags-from-topics: "Add GitHub topics as tags" for the notes of one journal (decision 0030)
                save: the journal to write to, saving one item; note and import runs with their --json documents
