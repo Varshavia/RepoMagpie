@@ -13,7 +13,7 @@ The user keeps one Markdown note per dependency or tool, in two journals:
 - the **personal journal**: private, outside any repository;
 - the **project journal**: `.magpie/` in the repository, committed and shared with the team.
 
-Each note leads with the user's **Verdict**: one line, in their own words, of what they decided ("avoid: async streams painful; use puppeteer"). A note without a Verdict is in the inbox. The `repomagpie` command reads and writes the journals. You show the user what their notes say; the decisions stay theirs.
+Each note leads with the user's **Verdict**: one line, in their own words, of what they decided ("avoid: async streams painful; use puppeteer"). A note without a Verdict is in the inbox. A result with `starred: true` came from the user's GitHub stars and has no Verdict yet: it's a bookmark, not a decision, so never present it as one. The `repomagpie` command reads and writes the journals. You show the user what their notes say; the decisions stay theirs.
 
 ## Rules
 
