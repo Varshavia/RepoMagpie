@@ -108,10 +108,17 @@ In Claude Code, [the plugin](#the-claude-code-plugin) gives you the same MCP ser
 
 ## The Claude Code plugin
 
-In Claude Code, the plugin installs the skill, the MCP server and the hook in one step, with no `repomagpie setup`:
+In Claude Code, the plugin installs the skill, the MCP server and the hook in one step, with no `repomagpie setup`.
+
+First add the marketplace:
 
 ```text
 /plugin marketplace add Varshavia/RepoMagpie
+```
+
+Then install the plugin:
+
+```text
 /plugin install repomagpie@repomagpie
 ```
 

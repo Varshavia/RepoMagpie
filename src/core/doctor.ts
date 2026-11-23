@@ -5,7 +5,7 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { AGENTS, claudeSettings, foundBy, mcpEntry, onPath, packageOf, readJsonc, skillFolders, type Agent, type Found, type McpEntry, type Platform, type Where } from "./agents.ts";
-import { claudePlugin, disableCommand, piecesText, setupPieces, type PluginInstall, type PluginSetting, type SetupPiece } from "./claude-plugin.ts";
+import { claudePlugin, disableCommand, piecesText, pluginProvides, setupPieces, type PluginInstall, type PluginProvides, type PluginSetting, type SetupPiece } from "./claude-plugin.ts";
 import { claudeCodeVersion, EXEC_FORM_MIN_VERSION, supportsExecForm } from "./claude-version.ts";
 import { findProjectJournal, gitRoot, homeJournal, resolvePersonalJournal, samePath, usable, type Place } from "./journals.ts";
 import { NO_CODEGEN } from "./launch.ts";
@@ -110,8 +110,9 @@ export interface DoctorJson {
   claude_code: { version: string | null; exec_form_minimum: string; failures: string[] };
   // RepoMagpie's Claude Code plugin (decision 0063): its entries in the user's and the working folder's
   // settings, the one that turns it on, the versions installed, whether Claude Code runs it, and what an
-  // earlier setup wrote for Claude Code beside it (a double install when active).
-  claude_plugin: { settings: PluginSetting[]; enabled: PluginSetting | null; installed: PluginInstall[]; active: boolean; setup: SetupPiece[] };
+  // earlier setup wrote for Claude Code beside it (a double install when active). provides: while
+  // Claude Code runs it, the hook and the MCP server it brings (claude-plugin.ts); null otherwise.
+  claude_plugin: { settings: PluginSetting[]; enabled: PluginSetting | null; installed: PluginInstall[]; active: boolean; setup: SetupPiece[]; provides: PluginProvides | null };
   hook: { file: string; entries: HookEntry[]; error?: string }[]; // the settings files that exist
   // The opt-in Stop reminder (decision 0042): its entries in the user's settings; [] when off.
   reminder: HookEntry[];
@@ -395,7 +396,7 @@ export function runDoctor(request: DoctorRequest): DoctorJson {
   const { source } = githubAuth(request);
   problems.unshift(...failures); // last, so that nothing goes above them
   return { version: request.version, node: request.node, platform: request.platform, commands, skills, claude_code: { version: claudeVersion, exec_form_minimum: EXEC_FORM_MIN_VERSION, failures },
-    claude_plugin: { ...plugin, setup: pieces }, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
+    claude_plugin: { ...plugin, setup: pieces, provides: pluginProvides(where, plugin) }, hook, reminder, agent_hooks: agentHooks, agents, backups, journals, git_repository: gitRepository, github: { connected: source !== null, source }, problems };
 }
 
 // An agent's hook entries, read as setup reads them (setup-agent-hooks.ts), with their paths checked

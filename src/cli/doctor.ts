@@ -1,5 +1,6 @@
 // repomagpie doctor (decision 0035): the human output of core's runDoctor. Read-only, and exits 0
 // whatever it finds, so its output can always go into a bug report.
+import type { PluginProvides } from "../core/claude-plugin.ts";
 import { runDoctor, type AgentHookEntry, type AgentReport, type DoctorJson } from "../core/doctor.ts";
 import type { Platform } from "../core/agents.ts";
 import { CONNECT_STEPS, connectionText } from "../core/github-connection.ts";
@@ -53,7 +54,9 @@ export function render(r: DoctorJson, home: string): string {
 
   lines.push("", "Claude Code hook");
   lines.push(`  Claude Code ${r.claude_code.version ?? "version unknown"} (exec form needs ${r.claude_code.exec_form_minimum} or later)`);
-  if (!r.hook.some((h) => h.entries.length)) lines.push("  none");
+  // The plugin's hook is in no settings file; it runs beside any entry listed below.
+  if (p.provides && p.enabled) lines.push(`  from the plugin ${p.enabled.id}${p.provides.version ? ` ${p.provides.version}` : ""}`);
+  else if (!r.hook.some((h) => h.entries.length)) lines.push("  none");
   for (const h of r.hook) {
     for (const e of h.entries) {
       const shown = [e.command, ...(e.args ?? [])].map((part) => tilde(part)).join(" ");
@@ -77,7 +80,13 @@ export function render(r: DoctorJson, home: string): string {
   }
 
   lines.push("", "MCP server in each agent");
-  for (const a of r.agents) lines.push(`  ${a.name.padEnd(12)}  ${agentLine(a, tilde)}`);
+  for (const a of r.agents) {
+    // Claude Code's server from the plugin: the agent's row when setup left no entry there, a second
+    // row under setup's entry when it did (the double install's to-do says so).
+    const plugin = a.id === "claude-code" && p.provides ? pluginServerLine(p.provides) : null;
+    if (plugin && !a.mcp && !a.error) lines.push(`  ${a.name.padEnd(12)}  ${plugin}`);
+    else lines.push(`  ${a.name.padEnd(12)}  ${agentLine(a, tilde)}`, ...(plugin ? [`  ${"".padEnd(12)}  also ${plugin}`] : []));
+  }
 
   // Information, not a to-do: the first backup is the file as it was before setup, so only the user
   // decides when to delete them.
@@ -112,6 +121,15 @@ function agentHookLine(e: AgentHookEntry): string {
     : e.form === "name" ? `repomagpie through the shell${e.node_found ? "" : ", not found"}` : "runs RepoMagpie another way"];
   if (e.flags.length) parts.push(e.flags.join(" "));
   if (e.trust) parts.push(e.trust);
+  return parts.join(", ");
+}
+
+// The note tool's switch is off by default (decision 0065); unknown when the files can't tell.
+function pluginServerLine(p: PluginProvides): string {
+  const parts = ["from the plugin"];
+  if (p.version) parts.push(`version ${p.version}`);
+  if (p.code_generation_off !== null) parts.push(p.code_generation_off ? "code generation off" : "code generation NOT off");
+  parts.push(p.note_tool === null ? "note tool: set in /plugin" : p.note_tool ? "note tool on" : "note tool off (turn it on in /plugin, repomagpie, Configure options)");
   return parts.join(", ");
 }
 

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { claudeSettings, mcpEntry, readJsonc, type Where } from "./agents.ts";
 import { readConfig } from "./config-write.ts";
 import { samePath } from "./journals.ts";
+import { NO_CODEGEN } from "./launch.ts";
 import { findHooks, STOP } from "./setup-hook.ts";
 
 export type PluginScope = "user" | "project" | "local";
@@ -84,6 +85,52 @@ function installs(where: Where): PluginInstall[] {
     }
   };
   return folders(cache).flatMap((market) => folders(join(cache, market, "repomagpie")).map((version) => ({ id: `repomagpie@${market}`, version, path: join(cache, market, "repomagpie", version) })));
+}
+
+// What Claude Code gets from the plugin while it runs it: the hook and the MCP server, as the
+// installed version's plugin.json declares them, and the note tool's switch (decision 0065) as the
+// user set it. Claude Code keeps a userConfig answer in the user's settings, under
+// pluginConfigs["<id>"].options, and reads no project or local entry there; without an answer, the
+// option's default applies (code.claude.com/docs/en/settings-reference and plugins-reference, read
+// 2026-11-23). null for what a file doesn't say or can't be read for.
+export interface PluginProvides {
+  version: string | null; // the installed version, the newest when several are; null for an origin without a cache folder
+  code_generation_off: boolean | null; // the MCP server's node gets --disallow-code-generation-from-strings before the script
+  note_tool: boolean | null;
+}
+
+export function pluginProvides(where: Where, plugin: ClaudePlugin): PluginProvides | null {
+  if (!plugin.active || !plugin.enabled) return null;
+  const id = plugin.enabled.id;
+  const install = plugin.installed.filter((i) => i.id === id).sort((a, b) => compareVersions(b.version, a.version))[0];
+  const manifest = install ? jsonIn(join(install.path, ".claude-plugin", "plugin.json")) : undefined;
+  const args = at(manifest, "mcpServers", "repomagpie", "args");
+  const codegen = Array.isArray(args) ? args.indexOf(NO_CODEGEN) >= 0 && args.indexOf(NO_CODEGEN) < args.findIndex((a) => typeof a === "string" && /\.[cm]?js$/.test(a)) : null;
+  const settings = jsonIn(claudeSettings(where));
+  const answer = settings === undefined ? undefined : at(settings, "pluginConfigs", id, "options", "note_tool") ?? at(manifest, "userConfig", "note_tool", "default");
+  return { version: install?.version ?? null, code_generation_off: codegen, note_tool: typeof answer === "boolean" ? answer : null };
+}
+
+// A JSON file's value: {} when it is missing, undefined when it can't be read or parsed.
+function jsonIn(file: string): unknown {
+  const read = readConfig(file);
+  if ("error" in read) return undefined;
+  if (read.text === null) return {};
+  const parsed = readJsonc(read.text);
+  return "error" in parsed ? undefined : parsed.value;
+}
+
+// The value at a path of object keys (own keys only), undefined where the path breaks.
+const at = (value: unknown, ...keys: string[]): unknown =>
+  keys.reduce<unknown>((v, key) => (typeof v === "object" && v !== null && !Array.isArray(v) && Object.hasOwn(v, key) ? (v as Record<string, unknown>)[key] : undefined), value);
+
+// By the numbers, then a release after its pre-releases.
+function compareVersions(a: string, b: string): number {
+  const split = (v: string) => (v.includes("-") ? [v.slice(0, v.indexOf("-")), v.slice(v.indexOf("-") + 1)] : [v, ""]);
+  const [[mainA, preA], [mainB, preB]] = [split(a), split(b)];
+  const byMain = mainA.localeCompare(mainB, undefined, { numeric: true });
+  if (byMain || !preA !== !preB) return byMain || (preA ? -1 : 1);
+  return preA.localeCompare(preB, undefined, { numeric: true });
 }
 
 // What an earlier `repomagpie setup` wrote for Claude Code in the user's settings, which the plugin

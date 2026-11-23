@@ -72,6 +72,7 @@ Format: **Status** (proposed / accepted / superseded by NNNN), **Context**, **De
 | 0061 | [The Claude Code hook's form follows Claude Code's version](0061-the-hook-form-follows-claude-code-version.md) | accepted (supersedes 0035's hook form) |
 | 0062 | [Outside pull requests are squash-merged](0062-outside-pull-requests-are-squash-merged.md) | accepted (supersedes 0012's merge method for outside pull requests) |
 | 0063 | [The npm package is a Claude Code plugin](0063-a-claude-code-plugin.md) | accepted (refines 0035's absolute `node` for the plugin's entries; the read-only MCP server refined by 0064; the node-missing check moved after launch by 0066) |
-| 0064 | [The plugin's note tool, behind a switch](0064-the-plugin-note-tool-behind-a-switch.md) | accepted (refines 0063's read-only MCP server and 0034's default for the plugin; its default superseded by 0065) |
+| 0064 | [The plugin's note tool, behind a switch](0064-the-plugin-note-tool-behind-a-switch.md) | accepted (refines 0063's read-only MCP server and 0034's default for the plugin; its default superseded by 0065; `doctor` and the switch superseded by 0067) |
 | 0065 | [The plugin's note tool is off by default](0065-the-plugin-note-tool-off-by-default.md) | accepted (supersedes 0064's default) |
 | 0066 | [The plugin's node-missing check comes after launch](0066-the-node-missing-check-after-launch.md) | accepted (supersedes 0063's node-missing check before the marketplace) |
+| 0067 | [`doctor` reports what the plugin provides](0067-doctor-reports-what-the-plugin-provides.md) | accepted (supersedes 0064's consequence that `doctor` doesn't report the switch) |
