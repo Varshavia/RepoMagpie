@@ -32,6 +32,7 @@ export interface NewNote {
   topics?: string[];
   packages?: string[];
   adopted?: string;
+  starred?: string; // the date the user starred the repository on GitHub (decision 0068); only from import --stars
   tried?: boolean;
   rating?: number | null;
   verdict?: string; // human-written only (decision 0018)
@@ -58,6 +59,7 @@ export function renderNote(note: NewNote): string {
     ["packages", note.packages ?? []],
     ["explored", note.explored],
     ...(note.adopted ? [["adopted", note.adopted] as [string, unknown]] : []),
+    ...(note.starred ? [["starred", note.starred] as [string, unknown]] : []),
     ["kind", note.kind],
     ["tags", note.tags],
     ...(note.domains?.length ? [["domains", note.domains] as [string, unknown]] : []),
