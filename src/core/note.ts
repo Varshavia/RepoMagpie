@@ -105,6 +105,15 @@ export function readableId(note: Note): string | null {
   return note.hasFrontmatter && !note.warnings.length && typeof note.frontmatter.id === "string" ? note.frontmatter.id : null;
 }
 
+// The date the note's repository was starred on GitHub (decision 0068), or null: import --stars
+// writes it. A note with it and no Verdict is a starred note, not a decision; with a Verdict it is an
+// ordinary note.
+export function starredOf(frontmatter: Record<string, unknown>): string | null {
+  const value = frontmatter.starred;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
 // Reports every schema problem it finds; never throws.
 export function validate(note: Note, options: { fileName?: string } = {}): Problem[] {
   const problems: Problem[] = [];
@@ -137,7 +146,7 @@ function checkFields(note: Note, add: (where: string, message: string) => void):
   for (const field of ["url", "language", "license"]) {
     if (!empty(fm[field]) && typeof fm[field] !== "string") add(`frontmatter.${field}`, `${field} must be text.`);
   }
-  for (const field of ["explored", "adopted"]) {
+  for (const field of ["explored", "adopted", "starred"]) {
     if (!empty(fm[field]) && !isDate(fm[field])) add(`frontmatter.${field}`, `${field} must be a date written YYYY-MM-DD.`);
   }
   if (!empty(fm.kind) && !KINDS.includes(fm.kind as string)) add("frontmatter.kind", `kind must be one of: ${KINDS.join(", ")}.`);
