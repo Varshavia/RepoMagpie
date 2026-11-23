@@ -161,7 +161,8 @@ export function deleteCandidates(query: string, scope: Scope | undefined, place:
   const fromManifests = manifestTypes(findManifests(place.cwd));
   const types: PackageType[] = fromManifests.length ? fromManifests : ["npm", "pypi", "cargo"];
   const { sources, warnings } = openRecallSources(place);
-  const matches = recall(sources.filter((source) => !scope || source.scope === scope), wanted, types)
+  // Starred notes too (decision 0068): recall leaves them out as decisions, but they can be deleted.
+  const matches = recall(sources.filter((source) => !scope || source.scope === scope), wanted, types, true)
     .map((m) => ({ journal: m.journal, file: basename(m.path), id: m.id, name: m.name, verdict: m.verdict, exact: m.confidence === "exact" }));
   const strip = ({ exact: _exact, ...candidate }: (typeof matches)[number]): DeleteCandidate => candidate;
   return { candidates: matches.filter((m) => m.exact).map(strip), nameOnly: matches.filter((m) => !m.exact).map(strip), warnings };
@@ -187,6 +188,21 @@ function freeName(folder: string, name: string): string {
 // a journal's notes, of .trash/ instead of notes/.
 function trashFiles(journal: string): string[] {
   return noteSignature(journal, TRASH).files;
+}
+
+// The ids of the notes in a journal's trash, lowercased: import --stars skips a repository whose note
+// was deleted (decision 0068). Only the id is read; the trash is still never listed as notes.
+export function trashedIds(journal: string): Set<string> {
+  const ids = new Set<string>();
+  for (const name of trashFiles(journal)) {
+    try {
+      const id = readableId(readNote(readFileSync(join(journal, TRASH, name), "utf8")));
+      if (id) ids.add(id.toLowerCase());
+    } catch {
+      // gone since the folder was read, or unreadable: nothing to skip
+    }
+  }
+  return ids;
 }
 
 // A project journal's .gitignore lists .trash/ (spec §3): added to one written before the trash
