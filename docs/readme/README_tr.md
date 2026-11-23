@@ -74,6 +74,8 @@ Do you want to proceed?
 
    Token olmadan GitHub saatte 60 isteğe izin verir. Sınırı yükseltmek için GitHub CLI ile giriş yap (`gh auth login`): RepoMagpie onun girişini kullanır. Ya da `GITHUB_TOKEN` veya `GH_TOKEN` ayarla. Hangisini kullandığını `repomagpie doctor` söyler.
 
+   GitHub'da yıldızladığın depolar mı var? `repomagpie import --stars` onları gelen kutuna (Inbox) getirir.
+
 > [!IMPORTANT]
 > RepoMagpie yalnızca üç yerden gelir: [bu depo](https://github.com/Varshavia/RepoMagpie) (Claude Code eklentisinin marketplace'i de burasıdır), [`repomagpie`](https://www.npmjs.com/package/repomagpie) npm paketi ve [skills.sh](https://skills.sh/varshavia/repomagpie) üzerindeki ajan skill'i. Kurulum programı, `.exe` ya da başka bir indirme, başka bir paket ve başka bir web sitesi yoktur: kendine RepoMagpie diyen başka her şey bizim değildir ([SECURITY.md](../../SECURITY.md#official-channels)).
 
@@ -142,7 +144,7 @@ Eklenti için de npm kurulumu için de aynıdır. Her ayrıntı [SECURITY.md](..
 - **Hook**, ajanının çalıştırdığı her kabuk komutundan önce çalışır (Claude Code'da `Bash`, `PowerShell` ve `Monitor` araçları). Node, komutu okuyan `repomagpie hook`'u başlatır; komut paket kuruyorsa hook günlüklerini okur ve senin notunla yanıt verir ya da hiçbir şey söylemez. Komutu asla çalıştırmaz, asla onaylamaz ve ağı asla kullanmaz. Codex CLI, Cursor ve Copilot CLI hook'ları, günlüğünün `.cache/` klasöründe bir yeniden deneme kaydı tutar.
 - **MCP sunucusu**, ajanın açık olduğu sürece çalışır. Ajan onu başlatır ve onunla stdin ve stdout üzerinden konuşur: port yok, ağ isteği yok. Araçları günlüklerini okur; `note` aracı, yalnızca sen açtığında, Verdict'ini yazar.
 - **Senin çalıştırdığın komutlar:**
-  - GitHub'ın API'si (`api.github.com`), salt okuma GET istekleriyle: `repomagpie note`'a, `import`'a ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde ve `repomagpie discover` ya da uygulamanın Discover sayfasıyla aradığında. Bunlar o deponun adını ya da aramanı, varsa GitHub token'ını gönderir, notlarını asla göndermez.
+  - GitHub'ın API'si (`api.github.com`), salt okuma GET istekleriyle: `repomagpie note`'a, `import`'a ya da uygulamanın Add sayfasına bir GitHub deposu verdiğinde `repomagpie discover` ya da uygulamanın Discover sayfasıyla aradığında ve yıldızlarını içe aktardığında (`repomagpie import --stars` ya da uygulamanın Import sayfası). Bunlar o deponun adını, aramanı ya da yıldızlarını okuduğun kullanıcı adını, varsa GitHub token'ını gönderir, notlarını asla göndermez.
   - `gh auth token`, bir kez: bunlardan biri ya da `doctor` bir token'a ihtiyaç duyduğunda ve ne `GITHUB_TOKEN` ne de `GH_TOKEN` ayarlı olduğunda.
   - `repomagpie setup`, sen onay verdikten sonra girdilerini eklemek ya da kaldırmak için ajanlarının kendi komutlarını (`claude`, `codex`, `gemini`, `code`) çalıştırır. `setup` ve `doctor`, `claude --version` çalıştırır.
   - `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler ve tarayıcını açar. Project görünümü yerel `git`'ini çalıştırır, fetch yapmaz.
@@ -196,7 +198,7 @@ Bir günlüğü grafik olarak gör: notlar, etiketleri, `[[links]]` ve alternati
 <details>
 <summary><strong>RepoMagpie notlarımı bir yere gönderiyor mu?</strong></summary>
 
-Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde ya da `discover` ile aradığında. Bunlar o deponun adını ya da aramanı, varsa GitHub token'ını (`GITHUB_TOKEN`, `GH_TOKEN` ya da GitHub CLI girişi) gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
+Hayır. Günlüklerin makinendeki Markdown dosyalarıdır ve telemetri yoktur. Tek ağ istekleri GitHub'ın API'sine yapılan salt okuma çağrılarıdır: bir GitHub deposundan not eklediğinde, `discover` ile aradığında ya da yıldızlarını içe aktardığında. Bunlar o deponun adını, aramanı ya da yıldızlarını okuduğun kullanıcı adını, varsa GitHub token'ını (`GITHUB_TOKEN`, `GH_TOKEN` ya da GitHub CLI girişi) gönderir, notlarını asla göndermez. `repomagpie ui` yalnızca `127.0.0.1` üzerinde dinler. Ajanının okuduğu notları ajanın model sağlayıcısı da görür. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) sayfasına bak.
 
 </details>
 
@@ -211,6 +213,13 @@ Kendine ait bir model kullanmaz: komutları adları ve kelimeleri eşleştirir, 
 <summary><strong>Hook kurulumları engelliyor mu?</strong></summary>
 
 Hiçbir kurulumu kalıcı olarak engellemez ve hiçbirini onaylamaz. Bir not paketten kaçınmanı söylediğinde hook sana sorar ya da ilk denemeyi durdurur ve ajanın sana sorar ([tablo](#her-ajan-ne-alır)); bir durdurmadan sonra aynı kurulum 10 dakika boyunca geçer. Başka bir not ya da RepoMagpie'deki bir hata hiçbir kurulumu durdurmaz. [Hook sözleşmesine](../spec.md#6-hook-contract) bak.
+
+</details>
+
+<details>
+<summary><strong>Ajanım GitHub yıldızlarımı tavsiye sayar mı?</strong></summary>
+
+Hayır. Yıldız bir yer imidir, karar değil. `repomagpie import --stars` bir şey yazmadan önce neyi içe aktaracağını gösterir ve yıldızladığın her depoyu Verdict'siz olarak gelen kutuna koyar. Sen bir Verdict yazana kadar recall ve kurulum hook'ları o nottan asla cevap vermez, `catalog` da onu dışarıda bırakır; `search` ve `suggest` onu en sona, "starred on GitHub, not reviewed" işaretiyle koyar. Uygulama bu notları gelen kutusunun Starred sekmesinde tutar. [Karar 0068](../decisions/0068-import-github-stars-into-the-inbox.md) sayfasına bak.
 
 </details>
 

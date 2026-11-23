@@ -74,6 +74,8 @@ Do you want to proceed?
 
    没有 token 时，GitHub 每小时允许 60 次请求。要提高限额，请用 GitHub CLI 登录（`gh auth login`）：RepoMagpie 会使用它的登录状态。也可以设置 `GITHUB_TOKEN` 或 `GH_TOKEN`。`repomagpie doctor` 会告诉你它用的是哪一个。
 
+   在 GitHub 上已经给仓库加过星标？`repomagpie import --stars` 会把它们带进你的 inbox。
+
 > [!IMPORTANT]
 > RepoMagpie 只来自[这个仓库](https://github.com/Varshavia/RepoMagpie)（它也是 Claude Code 插件的插件市场）、npm 包 [`repomagpie`](https://www.npmjs.com/package/repomagpie) 和 [skills.sh](https://skills.sh/varshavia/repomagpie) 上的智能体 skill。没有安装程序，没有 `.exe` 或其他下载，没有其他包，也没有其他网站：任何其他自称 RepoMagpie 的东西都不是我们的（[SECURITY.md](../../SECURITY.md#official-channels)）。
 
@@ -142,7 +144,7 @@ Do you want to proceed?
 - **hook** 在你的智能体运行每条 shell 命令之前运行（在 Claude Code 中是 `Bash`、`PowerShell` 和 `Monitor` 工具）。Node 启动 `repomagpie hook`，由它读取命令；当命令要安装包时，hook 读取你的笔记库，用你的笔记回应，或者什么也不说。它从不运行这条命令，从不批准它，也从不使用网络。Codex CLI、Cursor 和 Copilot CLI 的 hook 会在你笔记库的 `.cache/` 中保留一条重试记录。
 - **MCP 服务器**在你的智能体打开期间运行。智能体启动它，并通过 stdin 和 stdout 与它通信：没有端口，没有网络请求。它的工具读取你的笔记库；`note` 工具只有在你打开它时才会写入你的 Verdict。
 - **你运行的命令：**
-  - GitHub 的 API（`api.github.com`），只使用只读的 GET 请求：当你把一个 GitHub 仓库交给 `repomagpie note`、`import` 或应用的 Add 页面时，以及当你用 `repomagpie discover` 或应用的 Discover 页面搜索时。它们发送该仓库的名称或你的搜索内容，如果有 GitHub token 也会发送，但从不发送你的笔记。
+  - GitHub 的 API（`api.github.com`），只使用只读的 GET 请求：当你把一个 GitHub 仓库交给 `repomagpie note`、`import` 或应用的 Add 页面时，当你用 `repomagpie discover` 或应用的 Discover 页面搜索时，以及当你导入星标时（`repomagpie import --stars` 或应用的 Import 页面）。它们发送该仓库的名称、你的搜索内容或你读取其星标的用户名，如果有 GitHub token 也会发送，但从不发送你的笔记。
   - `gh auth token`，只运行一次：当上述操作之一或 `doctor` 需要 token，而 `GITHUB_TOKEN` 和 `GH_TOKEN` 都没有设置时。
   - `repomagpie setup` 在你同意之后，运行你的智能体自己的命令（`claude`、`codex`、`gemini`、`code`）来添加或移除它的条目。`setup` 和 `doctor` 会运行 `claude --version`。
   - `repomagpie ui` 只监听 `127.0.0.1`，并打开你的浏览器。它的 Project 视图运行你本地的 `git`，不做 fetch。
@@ -196,7 +198,7 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 <details>
 <summary><strong>RepoMagpie 会把我的笔记发送到别处吗？</strong></summary>
 
-不会。你的笔记库是你机器上的 Markdown 文件，也没有遥测。唯一的网络请求是对 GitHub API 的只读调用，发生在你从 GitHub 仓库添加笔记或用 `discover` 搜索时：它们发送该仓库的名称或你的搜索内容，如果有 GitHub token 也会发送（`GITHUB_TOKEN`、`GH_TOKEN` 或 GitHub CLI 的登录状态），但从不发送你的笔记。`repomagpie ui` 只监听 `127.0.0.1`。你的智能体的模型提供商能看到你的智能体读取的笔记。参见 [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends)。
+不会。你的笔记库是你机器上的 Markdown 文件，也没有遥测。唯一的网络请求是对 GitHub API 的只读调用，发生在你从 GitHub 仓库添加笔记、用 `discover` 搜索或导入星标时：它们发送该仓库的名称、你的搜索内容或你读取其星标的用户名，如果有 GitHub token 也会发送（`GITHUB_TOKEN`、`GH_TOKEN` 或 GitHub CLI 的登录状态），但从不发送你的笔记。`repomagpie ui` 只监听 `127.0.0.1`。你的智能体的模型提供商能看到你的智能体读取的笔记。参见 [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends)。
 
 </details>
 
@@ -211,6 +213,13 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 <summary><strong>hook 会阻止安装吗？</strong></summary>
 
 从不永久阻止，也从不批准安装。当一条笔记说要避免这个包时，hook 会询问你，或者拦下第一次尝试，让你的智能体来询问你（[见表格](#每个智能体得到什么)）；拦下之后，同样的安装在 10 分钟内可以通过。其他任何笔记，或者 RepoMagpie 自身的错误，都不会拦下安装。参见 [hook 约定](../spec.md#6-hook-contract)。
+
+</details>
+
+<details>
+<summary><strong>我的智能体会把我的 GitHub 星标当作建议吗？</strong></summary>
+
+不会。星标是书签，不是决定。`repomagpie import --stars` 在写入任何内容之前会先显示它要导入什么，并把每个加星标的仓库放进你的 inbox，不带 Verdict。在你写下 Verdict 之前，recall 和安装 hook 从不根据这条笔记回答，`catalog` 也会把它排除在外；`search` 和 `suggest` 把它列在最后，并标记为 "starred on GitHub, not reviewed"。应用把这些笔记放在 Inbox 的 Starred 标签页中。参见[决定 0068](../decisions/0068-import-github-stars-into-the-inbox.md)。
 
 </details>
 

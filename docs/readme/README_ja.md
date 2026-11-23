@@ -74,6 +74,8 @@ Do you want to proceed?
 
    トークンがない場合、GitHub が許可するリクエストは 1 時間に 60 回です。上限を上げるには GitHub CLI でサインインしてください（`gh auth login`）。RepoMagpie はそのログインを使います。または `GITHUB_TOKEN` か `GH_TOKEN` を設定します。どれを使っているかは `repomagpie doctor` が表示します。
 
+   GitHub ですでにリポジトリにスターを付けていますか？ `repomagpie import --stars` でそれらを inbox に取り込めます。
+
 > [!IMPORTANT]
 > RepoMagpie の入手元は、[このリポジトリ](https://github.com/Varshavia/RepoMagpie)（Claude Code プラグインのマーケットプレイスでもあります）、npm パッケージ [`repomagpie`](https://www.npmjs.com/package/repomagpie)、[skills.sh](https://skills.sh/varshavia/repomagpie) のエージェントスキルだけです。インストーラー、`.exe` などのダウンロード、ほかのパッケージ、ほかのウェブサイトはありません。RepoMagpie を名乗るそれ以外のものは、私たちのものではありません（[SECURITY.md](../../SECURITY.md#official-channels)）。
 
@@ -142,7 +144,7 @@ Claude Code では、プラグインがスキル、MCP サーバー、フック�
 - **フック**は、エージェントがシェルコマンドを実行する前に毎回動きます（Claude Code では `Bash`、`PowerShell`、`Monitor` ツール）。Node が `repomagpie hook` を起動し、それがコマンドを読みます。コマンドがパッケージをインストールするものなら、フックはジャーナルを読み、あなたのメモで答えるか、何も返しません。コマンドを実行することも、承認することも、ネットワークを使うこともありません。Codex CLI、Cursor、Copilot CLI のフックは、ジャーナルの `.cache/` に再試行の記録を残します。
 - **MCP サーバー**は、エージェントが開いている間だけ動きます。エージェントがそれを起動し、stdin と stdout でやり取りします。ポートもネットワークリクエストもありません。そのツールはジャーナルを読み、`note` ツールは、あなたがオンにしたときだけ Verdict を書き込みます。
 - **あなたが実行するコマンド：**
-  - GitHub の API（`api.github.com`）への読み取り専用の GET リクエスト：`repomagpie note`、`import`、アプリの Add ページに GitHub リポジトリを渡したとき、そして `repomagpie discover` やアプリの Discover ページで検索したときです。送られるのはそのリポジトリ名か検索内容と、GitHub トークンがあればそのトークンで、メモが送られることはありません。
+  - GitHub の API（`api.github.com`）への読み取り専用の GET リクエスト：`repomagpie note`、`import`、アプリの Add ページに GitHub リポジトリを渡したとき、`repomagpie discover` やアプリの Discover ページで検索したとき、そしてスターをインポートしたとき（`repomagpie import --stars` またはアプリの Import ページ）です。送られるのはそのリポジトリ名、検索内容、またはスターを読み取るユーザーのログイン名と、GitHub トークンがあればそのトークンで、メモが送られることはありません。
   - `gh auth token` を 1 回：上記のいずれか、または `doctor` がトークンを必要とし、`GITHUB_TOKEN` も `GH_TOKEN` も設定されていないときです。
   - `repomagpie setup` は、あなたの承認のあとで、エージェント自身のコマンド（`claude`、`codex`、`gemini`、`code`）を実行してエントリーを追加または削除します。`setup` と `doctor` は `claude --version` を実行します。
   - `repomagpie ui` は `127.0.0.1` でのみ待ち受け、ブラウザーを開きます。その Project ビューはローカルの `git` を実行し、fetch はしません。
@@ -196,7 +198,7 @@ Suggest for this project（このプロジェクトへの提案）：合うメ�
 <details>
 <summary><strong>RepoMagpie はメモをどこかに送りますか？</strong></summary>
 
-いいえ。ジャーナルはあなたのマシン上の Markdown ファイルで、テレメトリーはありません。ネットワークリクエストは、GitHub リポジトリからメモを追加するときや `discover` で検索するときの、GitHub API への読み取り専用の呼び出しだけです。送られるのはそのリポジトリ名か検索内容と、GitHub トークンがあればそのトークン（`GITHUB_TOKEN`、`GH_TOKEN`、または GitHub CLI のログイン）で、メモが送られることはありません。`repomagpie ui` は `127.0.0.1` でのみ待ち受けます。エージェントが読んだメモは、そのエージェントのモデル提供元にも見えます。[SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) をご覧ください。
+いいえ。ジャーナルはあなたのマシン上の Markdown ファイルで、テレメトリーはありません。ネットワークリクエストは、GitHub リポジトリからメモを追加するとき、`discover` で検索するとき、スターをインポートするときの、GitHub API への読み取り専用の呼び出しだけです。送られるのはそのリポジトリ名、検索内容、またはスターを読み取るユーザーのログイン名と、GitHub トークンがあればそのトークン（`GITHUB_TOKEN`、`GH_TOKEN`、または GitHub CLI のログイン）で、メモが送られることはありません。`repomagpie ui` は `127.0.0.1` でのみ待ち受けます。エージェントが読んだメモは、そのエージェントのモデル提供元にも見えます。[SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) をご覧ください。
 
 </details>
 
@@ -211,6 +213,13 @@ Suggest for this project（このプロジェクトへの提案）：合うメ�
 <summary><strong>フックはインストールをブロックしますか？</strong></summary>
 
 永続的にブロックすることはなく、承認することもありません。メモがそのパッケージを避けるよう言っている場合、フックはあなたに確認するか、最初の試行を止めてエージェントがあなたに確認するようにします（[表](#各エージェントに設定されるもの)）。止めたあと 10 分間は、同じインストールが通ります。それ以外のメモや RepoMagpie のエラーで、インストールが止まることはありません。[フックの仕様](../spec.md#6-hook-contract)をご覧ください。
+
+</details>
+
+<details>
+<summary><strong>エージェントは GitHub のスターをおすすめとして扱いますか？</strong></summary>
+
+いいえ。スターはブックマークであって、決定ではありません。`repomagpie import --stars` は何かを書き込む前に何をインポートするかを表示し、スターを付けた各リポジトリを Verdict なしで inbox に入れます。あなたが Verdict を書くまで、recall とインストールフックがそのメモから答えることはなく、`catalog` もそれを除外します。`search` と `suggest` はそれを最後に、"starred on GitHub, not reviewed" の印を付けて表示します。アプリはこれらのメモを Inbox の Starred タブにまとめます。[決定 0068](../decisions/0068-import-github-stars-into-the-inbox.md) をご覧ください。
 
 </details>
 

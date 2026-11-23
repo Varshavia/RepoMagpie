@@ -74,6 +74,8 @@ Es funktioniert in [sieben Coding-Agents](#was-jeder-agent-bekommt), darunter Cl
 
    Ohne Token erlaubt GitHub 60 Anfragen pro Stunde. Für ein höheres Limit meldest du dich mit der GitHub CLI an (`gh auth login`): RepoMagpie nutzt diese Anmeldung. Oder setz `GITHUB_TOKEN` oder `GH_TOKEN`. `repomagpie doctor` sagt, was davon es nutzt.
 
+   Schon Repos auf GitHub mit einem Stern markiert? `repomagpie import --stars` holt sie in deine inbox.
+
 > [!IMPORTANT]
 > RepoMagpie kommt nur aus [diesem Repository](https://github.com/Varshavia/RepoMagpie) (zugleich der Marketplace des Plugins für Claude Code), dem npm-Paket [`repomagpie`](https://www.npmjs.com/package/repomagpie) und dem Agent-Skill auf [skills.sh](https://skills.sh/varshavia/repomagpie). Es gibt keine Installer, keine `.exe` und keine anderen Downloads, keine anderen Pakete und keine andere Website: Alles andere, was sich RepoMagpie nennt, ist nicht von uns ([SECURITY.md](../../SECURITY.md#official-channels)).
 
@@ -142,7 +144,7 @@ Gleich für das Plugin und die npm-Installation. Alle Details stehen in [SECURIT
 - **Der Hook** läuft vor jedem Shell-Befehl, den dein Agent ausführt (in Claude Code die Tools `Bash`, `PowerShell` und `Monitor`). Node startet `repomagpie hook`, das den Befehl liest; wenn der Befehl Pakete installiert, liest der Hook deine Journals und antwortet mit deiner Notiz oder mit nichts. Er führt den Befehl nie aus, genehmigt ihn nie und nutzt nie das Netzwerk. Die Hooks von Codex CLI, Cursor und Copilot CLI führen einen Eintrag für Wiederholungen im Ordner `.cache/` deines Journals.
 - **Der MCP-Server** läuft, solange dein Agent offen ist. Der Agent startet ihn und spricht über stdin und stdout mit ihm: kein Port, keine Netzwerkanfragen. Seine Tools lesen deine Journals; das Tool `note` schreibt dein Verdict, nur wenn du es einschaltest.
 - **Befehle, die du ausführst:**
-  - Die API von GitHub (`api.github.com`), mit lesenden GET-Anfragen: wenn du `repomagpie note`, `import` oder der Seite Add der App ein GitHub-Repository gibst, und wenn du mit `repomagpie discover` oder der Seite Discover der App suchst. Sie senden den Namen dieses Repositorys oder deine Suche, und dein GitHub-Token, falls es eins gibt, nie deine Notizen.
+  - Die API von GitHub (`api.github.com`), mit lesenden GET-Anfragen: wenn du `repomagpie note`, `import` oder der Seite Add der App ein GitHub-Repository gibst, wenn du mit `repomagpie discover` oder der Seite Discover der App suchst, und wenn du deine Sterne importierst (`repomagpie import --stars` oder die Seite Import der App). Sie senden den Namen dieses Repositorys, deine Suche oder den Login, dessen Sterne du liest, und dein GitHub-Token, falls es eins gibt, nie deine Notizen.
   - `gh auth token`, einmal, wenn einer davon oder `doctor` ein Token braucht und weder `GITHUB_TOKEN` noch `GH_TOKEN` gesetzt ist.
   - `repomagpie setup` führt die eigenen Befehle deiner Agents aus (`claude`, `codex`, `gemini`, `code`), um seine Einträge hinzuzufügen oder zu entfernen, nach deinem Ja. `setup` und `doctor` führen `claude --version` aus.
   - `repomagpie ui` lauscht nur auf `127.0.0.1` und öffnet deinen Browser. Seine Ansicht Project führt dein lokales `git` aus, ohne Fetch.
@@ -196,7 +198,7 @@ Eine Zeile wie "avoid pdfkit" in `CLAUDE.md` gilt für ein Projekt. Eine RepoMag
 <details>
 <summary><strong>Schickt RepoMagpie meine Notizen irgendwohin?</strong></summary>
 
-Nein. Deine Journals sind Markdown-Dateien auf deinem Rechner, und es gibt keine Telemetrie. Die einzigen Netzwerkanfragen sind lesende Aufrufe der GitHub-API, wenn du eine Notiz aus einem GitHub-Repository hinzufügst oder mit `discover` suchst: Sie senden den Namen dieses Repositorys oder deine Suche, und dein GitHub-Token, falls es eins gibt (`GITHUB_TOKEN`, `GH_TOKEN` oder die Anmeldung der GitHub CLI), nie deine Notizen. `repomagpie ui` lauscht nur auf `127.0.0.1`. Der Modellanbieter deines Agents sieht die Notizen, die dein Agent liest. Siehe [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends).
+Nein. Deine Journals sind Markdown-Dateien auf deinem Rechner, und es gibt keine Telemetrie. Die einzigen Netzwerkanfragen sind lesende Aufrufe der GitHub-API, wenn du eine Notiz aus einem GitHub-Repository hinzufügst, mit `discover` suchst oder deine Sterne importierst: Sie senden den Namen dieses Repositorys, deine Suche oder den Login, dessen Sterne du liest, und dein GitHub-Token, falls es eins gibt (`GITHUB_TOKEN`, `GH_TOKEN` oder die Anmeldung der GitHub CLI), nie deine Notizen. `repomagpie ui` lauscht nur auf `127.0.0.1`. Der Modellanbieter deines Agents sieht die Notizen, die dein Agent liest. Siehe [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends).
 
 </details>
 
@@ -211,6 +213,13 @@ Kein eigenes Modell: Seine Befehle vergleichen Namen und Wörter und rufen kein 
 <summary><strong>Blockiert der Hook Installationen?</strong></summary>
 
 Nie endgültig, und er genehmigt nie eine. Wenn eine Notiz sagt, das Paket zu meiden, fragt dich der Hook oder stoppt den ersten Versuch, damit dein Agent dich fragt ([die Tabelle](#was-jeder-agent-bekommt)); nach einem Stopp geht dieselbe Installation 10 Minuten lang durch. Jede andere Notiz oder ein Fehler in RepoMagpie stoppt nie eine Installation. Siehe den [Hook-Vertrag](../spec.md#6-hook-contract).
+
+</details>
+
+<details>
+<summary><strong>Hält mein Agent meine GitHub-Sterne für Empfehlungen?</strong></summary>
+
+Nein. Ein Stern ist ein Lesezeichen, keine Entscheidung. `repomagpie import --stars` zeigt, was es importieren würde, bevor es etwas schreibt, und legt jedes markierte Repository ohne Verdict in deine inbox. Bis du eins schreibst, antworten recall und die Installations-Hooks nie aus dieser Notiz, und `catalog` lässt sie weg; `search` und `suggest` listen sie zuletzt, markiert mit "starred on GitHub, not reviewed". Die App führt diese Notizen im Tab Starred der Inbox. Siehe [Entscheidung 0068](../decisions/0068-import-github-stars-into-the-inbox.md).
 
 </details>
 
