@@ -64,7 +64,7 @@ test("--json prints exactly core's document, and nothing on stderr", async () =>
   assert.deepEqual(Object.keys(json), ["source", "keywords", "candidates", "in_use_avoid"]);
   assert.deepEqual(json.keywords, ["pdfkit", "vitest", "typescript", "cli", "tests"]);
   assert.deepEqual({ ...json.candidates[0], score: typeof json.candidates[0].score }, {
-    id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine for small CLIs", status: "reviewed", tags: ["cli"], score: "number",
+    id: "pkg:npm/commander", journal: "personal", name: "commander", verdict: "fine for small CLIs", status: "reviewed", starred: false, tags: ["cli"], score: "number",
     why: { keywords: ["cli"], dependencies: [] }, path: box.note("npm--commander.md"), alternatives: [],
   });
   assert.equal(json.in_use_avoid[0].id, "pkg:npm/pdfkit");

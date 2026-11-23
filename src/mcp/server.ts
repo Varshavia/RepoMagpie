@@ -148,7 +148,7 @@ export function buildServer(options: McpOptions): McpServer {
 
   server.registerTool("catalog", {
     title: "List the user's notes",
-    description: "Every note in one short row (name, kind, journal, avoid, summary, start of the Verdict), in pages of `limit`; the project's notes first, then avoid notes, then the rest. Pass next_cursor as cursor for the next page. For \"what do I have?\" on a small journal. full: every field.",
+    description: "Every note in one short row (name, kind, journal, avoid, summary, start of the Verdict), in pages of `limit`; the project's notes first, then avoid notes, then the rest. Pass next_cursor as cursor for the next page. For \"what do I have?\" on a small journal. full: every field. Notes imported from the user's GitHub stars that have no Verdict are left out: a star is a bookmark, not a decision; include_starred lists them too (full marks each with starred).",
     inputSchema: input({
       tags: strings(LIMITS.filters, LIMITS.filter, "Only notes with every one of these tags."),
       kind: { type: "string", enum: [...KINDS], description: "Only notes of this kind." },
@@ -156,11 +156,12 @@ export function buildServer(options: McpOptions): McpServer {
       limit: { type: "integer", minimum: 1, maximum: LIMITS.catalog, default: 100 },
       cursor: string(8192, "next_cursor from the previous page."),
       full: { type: "boolean", default: false, description: "Every field of each note instead of compact rows." },
+      include_starred: { type: "boolean", default: false, description: "Also the notes from the user's GitHub stars that have no Verdict yet. Not decisions; only when the user asks about their stars." },
     }),
     outputSchema: output({ columns: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array" } }, notes: list, total: { type: "integer" }, next_cursor: nullable("string") }, ["total", "next_cursor"]),
     annotations: READ,
   }, (args) => call(args, (place) => {
-    const run = runCatalog({ limit: (args.limit as number | undefined) ?? 100, cursor: args.cursor as string | undefined, tags: args.tags as string[] | undefined, kind: args.kind as string | undefined, journal: args.journal as "personal" | "project" | undefined }, place);
+    const run = runCatalog({ limit: (args.limit as number | undefined) ?? 100, cursor: args.cursor as string | undefined, tags: args.tags as string[] | undefined, kind: args.kind as string | undefined, journal: args.journal as "personal" | "project" | undefined, starred: args.include_starred === true }, place);
     return { outcome: run.outcome, document: args.full ? catalogForAgent(run.document) : compactForAgent(run), warnings: run.warnings };
   }));
 

@@ -50,6 +50,7 @@ test("results carry the spec's fields; notes and completed skill lines are found
     name: "mattpocock/skills",
     verdict: "red-green-refactor with an agent",
     status: "inbox",
+    starred: false,
     domains: [],
     domains_suggested: [],
     why: { domains: [], tags: [], words: ["tdd"] },

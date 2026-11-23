@@ -11,7 +11,7 @@ test("whyLine: domains (suggested ones say so), then tags, then the words; null 
 });
 
 const note = (name: string, over: Partial<NoteSummary> = {}): NoteSummary => ({
-  id: `pkg:npm/${name}`, file: `npm--${name}.md`, name, kind: "library", tags: [], domains: [], domains_suggested: [], status: "reviewed", verdict: "fine", tried: false, rating: null, explored: "2026-10-01", read_only: false, ...over,
+  id: `pkg:npm/${name}`, file: `npm--${name}.md`, name, kind: "library", tags: [], domains: [], domains_suggested: [], status: "reviewed", verdict: "fine", tried: false, rating: null, explored: "2026-10-01", starred: null, read_only: false, ...over,
 });
 const ANY = { journal: "", kind: "", tag: "", domain: "" } as const;
 
@@ -25,7 +25,7 @@ test("browseRows: every note the filters keep, a Verdict first, then the most re
   const project = [note("team", { explored: "2026-10-10", kind: "cli" })];
   const rows = browseRows({ personal, project }, ANY);
   assert.deepEqual(rows.map((r) => `${r.journal} ${r.name} ${r.status}`), ["personal new reviewed", "project team reviewed", "personal old reviewed", "personal inbox inbox"]);
-  assert.deepEqual(rows[3], { id: "pkg:npm/inbox", journal: "personal", type: "note", skill: null, name: "inbox", verdict: null, status: "inbox", domains: [], domains_suggested: [], why: { domains: [], tags: [], words: [] }, score: 0, path: "" });
+  assert.deepEqual(rows[3], { id: "pkg:npm/inbox", journal: "personal", type: "note", skill: null, name: "inbox", verdict: null, status: "inbox", starred: false, domains: [], domains_suggested: [], why: { domains: [], tags: [], words: [] }, score: 0, path: "" });
   assert.deepEqual(browseRows({ personal, project }, { ...ANY, journal: "project" }).map((r) => r.name), ["team"]);
   assert.deepEqual(browseRows({ personal, project }, { ...ANY, kind: "cli" }).map((r) => r.name), ["team"]);
   assert.deepEqual(browseRows({ personal, project }, { ...ANY, tag: "pdf" }).map((r) => r.name), ["new"]);

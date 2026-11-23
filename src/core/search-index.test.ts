@@ -75,6 +75,7 @@ test("a note becomes one document with its searchable text, without draft marker
     domains: [],
     domainsSuggested: [],
     status: "reviewed",
+    starred: false,
     verdict: "avoid: async streams painful; use puppeteer",
     useWhen: "- quick one-page PDFs from a script",
     avoidWhen: "- streamed output for large reports",

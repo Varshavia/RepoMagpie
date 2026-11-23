@@ -46,6 +46,7 @@ export interface SearchResult {
   name: string;
   verdict: string | null; // a skill result's own text; null for a note without a Verdict
   status: "inbox" | "reviewed"; // the note's status
+  starred: boolean; // a starred note: from your GitHub stars, not reviewed, so not a decision (decision 0068)
   domains: string[]; // the note's confirmed domains
   domains_suggested: string[]; // its suggested domains
   why: Why;
@@ -60,7 +61,8 @@ export interface SearchResult {
 //   only suggested;
 // - T, the share of requested tags it has: 1 each by name or alias, 0.5 for a near spelling.
 // With match "boost", a note that has a requested domain or tag is a candidate without words;
-// with "filter", only those are. Reviewed results still come before inbox ones (spec §5).
+// with "filter", only those are. Reviewed results still come before inbox ones (spec §5), and
+// starred ones last.
 export function searchJournals(sources: JournalSource[], query: string, filters: SearchFilters): SearchResult[] {
   const domains = [...new Set(filters.domains ?? [])];
   const wanted = [...new Set((filters.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean))];
@@ -114,8 +116,9 @@ export function searchJournals(sources: JournalSource[], query: string, filters:
     if (lexical === 0 && !matchedDomains.length && !matchedTags.length) continue;
     const score = (top ? lexical / top : 0) + weights.domain * domainScore + weights.tag * tagScore;
     hits.push({
-      // Reviewed notes and completed skill lines (human-written) before inbox notes.
-      group: doc.type === "skill" || doc.status === "reviewed" ? 0 : 1,
+      // Reviewed notes and completed skill lines (human-written), then inbox notes, then starred
+      // notes: a star isn't a decision (decision 0068).
+      group: doc.type === "skill" || doc.status === "reviewed" ? 0 : doc.starred ? 2 : 1,
       score,
       result: {
         id: doc.purl,
@@ -125,6 +128,7 @@ export function searchJournals(sources: JournalSource[], query: string, filters:
         name: doc.name,
         verdict: (doc.type === "skill" ? doc.skillText : doc.verdict) || null,
         status: doc.status,
+        starred: doc.starred === true,
         domains: doc.domains ?? [],
         domains_suggested: doc.domainsSuggested ?? [],
         why: { domains: matchedDomains, tags: [...new Set(matchedTags)], words: [...new Set(words)] },

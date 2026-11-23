@@ -212,11 +212,11 @@ test("Note list: every note, sorted by name, read-only ones included", () => {
   assert.deepEqual(document.notes.map((n) => n.file), ["github--microsoft--playwright-cli.md", "npm--broken.md", "npm--pdfkit.md"]);
   assert.deepEqual(document.notes[2], {
     id: "pkg:npm/pdfkit", file: "npm--pdfkit.md", name: "pdfkit", kind: "library", tags: ["pdf"], domains: [], domains_suggested: [], status: "reviewed",
-    verdict: "avoid: async streams painful; use puppeteer", tried: true, rating: 2, explored: "2026-10-03", read_only: false,
+    verdict: "avoid: async streams painful; use puppeteer", tried: true, rating: 2, explored: "2026-10-03", starred: null, read_only: false,
   });
   assert.deepEqual(document.notes[1], {
     id: null, file: "npm--broken.md", name: null, kind: null, tags: [], domains: [], domains_suggested: [], status: "inbox",
-    verdict: "", tried: false, rating: null, explored: null, read_only: true,
+    verdict: "", tried: false, rating: null, explored: null, starred: null, read_only: true,
   });
 });
 

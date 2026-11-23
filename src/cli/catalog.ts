@@ -5,7 +5,7 @@ import type { JournalSource } from "../core/search.ts";
 import { clean } from "../core/text.ts";
 import { contextOf, type GlobalOptions } from "./context.ts";
 import type { Io } from "./program.ts";
-import { INBOX, renderRows } from "./results.ts";
+import { INBOX, renderRows, STARRED } from "./results.ts";
 
 export interface CatalogOptions extends GlobalOptions {
   tag?: string[];
@@ -14,10 +14,11 @@ export interface CatalogOptions extends GlobalOptions {
   limit: number;
   cursor?: string;
   full?: boolean;
+  includeStarred?: boolean;
 }
 
 export async function catalogCommand(options: CatalogOptions, io: Io): Promise<number> {
-  const run = runCatalog({ limit: options.limit, cursor: options.cursor, tags: options.tag, kind: options.kind, journal: options.journal }, contextOf(io, options));
+  const run = runCatalog({ limit: options.limit, cursor: options.cursor, tags: options.tag, kind: options.kind, journal: options.journal, starred: options.includeStarred }, contextOf(io, options));
   if (options.json) {
     io.out(`${JSON.stringify(options.full ? catalogForAgent(run.document) : compactForAgent(run))}\n`);
     return exitCode(run.outcome);
@@ -39,7 +40,7 @@ export async function catalogCommand(options: CatalogOptions, io: Io): Promise<n
 
 // Name, kind, journal, then the Verdict (spec §8).
 function row(r: CatalogRow): string[] {
-  return [r.name, r.kind ?? "-", r.journal, r.verdict === null ? `${INBOX} no verdict yet` : `Verdict: ${r.verdict}`];
+  return [r.name, r.kind ?? "-", r.journal, r.verdict === null ? `${INBOX} ${r.starred ? STARRED : "no verdict yet"}` : `Verdict: ${r.verdict}`];
 }
 
 // The flags the next page needs again: the filters and the limit.
@@ -48,6 +49,7 @@ function repeated(options: CatalogOptions): string {
     ...(options.tag ?? []).flatMap((tag) => ["--tag", tag]),
     ...(options.kind ? ["--kind", options.kind] : []),
     ...(options.journal ? ["--journal", options.journal] : []),
+    ...(options.includeStarred ? ["--include-starred"] : []),
     "--limit", String(options.limit),
   ];
   return flags.map((flag) => ` ${clean(flag)}`).join("");

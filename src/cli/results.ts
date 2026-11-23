@@ -3,6 +3,8 @@ import { clean } from "../core/text.ts";
 import type { Io } from "./program.ts";
 
 export const INBOX = "[inbox]";
+// What follows [inbox] for a starred note without a Verdict (decision 0068).
+export const STARRED = "starred on GitHub, not reviewed";
 
 // Each row is its metadata cells (rank, name, type, journal), then the Verdict line, then optional
 // more lines (suggest's why). Piped: one line per result, nothing cut. In a terminal: the metadata

@@ -51,6 +51,7 @@ test("--json prints exactly the spec's document", async () => {
     name: "mattpocock/skills",
     verdict: "red-green-refactor with an agent",
     status: "inbox",
+    starred: false,
     domains: [],
     domains_suggested: [],
     why: { domains: [], tags: [], words: ["refactor"] },

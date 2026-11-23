@@ -6,11 +6,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import MiniSearch, { type Options } from "minisearch";
 import { noteDomains } from "./domains.ts";
-import { readNote, stripComments } from "./note.ts";
+import { readNote, starredOf, stripComments } from "./note.ts";
 import { noteSignature, readCache, writeCache } from "./note-cache.ts";
 
 export const CACHE_FILE = "search-index.json";
-const CACHE_VERSION = 5; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped; 4: domains; 5: frontend replaces styling (decision 0055)
+const CACHE_VERSION = 6; // 2: the index sits under "data" (note-cache.ts); 3: nested and unterminated comments stripped; 4: domains; 5: frontend replaces styling (decision 0055); 6: starred (decision 0068)
 
 // One searchable document: a note, or one completed skill line of a note (decision 0006).
 export interface SearchDoc {
@@ -25,6 +25,7 @@ export interface SearchDoc {
   domains: string[]; // the confirmed ones in the vocabulary (decision 0040)
   domainsSuggested: string[]; // the suggested ones in the vocabulary, without the confirmed
   status: "inbox" | "reviewed";
+  starred: boolean; // a starred note: from import --stars, still without a Verdict (decision 0068)
   verdict: string;
   useWhen: string;
   avoidWhen: string;
@@ -35,7 +36,7 @@ export interface SearchDoc {
 }
 
 const FIELDS = ["name", "purl", "tags", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skill", "skillText"];
-const STORED = ["type", "file", "purl", "name", "skill", "kind", "tags", "domains", "domainsSuggested", "status", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skillText", "drafts"];
+const STORED = ["type", "file", "purl", "name", "skill", "kind", "tags", "domains", "domainsSuggested", "status", "starred", "verdict", "useWhen", "avoidWhen", "whatItDoes", "myNotes", "skillText", "drafts"];
 
 export const INDEX_OPTIONS: Options<SearchDoc> = {
   idField: "key",
@@ -61,6 +62,7 @@ export function noteDocuments(text: string, file: string): SearchDoc[] {
     domains: domains.domains,
     domainsSuggested: domains.suggested,
     status: note.status,
+    starred: note.status === "inbox" && starredOf(fm) !== null,
   };
   const empty = { verdict: "", useWhen: "", avoidWhen: "", whatItDoes: "", myNotes: "", drafts: [] as string[] };
   const docs: SearchDoc[] = [{

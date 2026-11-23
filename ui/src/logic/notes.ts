@@ -2,14 +2,21 @@
 import type { NoteSummary } from "../../../src/core/documents.ts";
 import { DOMAIN_IDS } from "../../../src/core/domains.ts";
 
-export type ListView = { list: "inbox" } | { list: "all" } | { list: "kind"; value: string } | { list: "tag"; value: string } | { list: "domain"; value: string };
+export type ListView = { list: "inbox" } | { list: "starred" } | { list: "all" } | { list: "kind"; value: string } | { list: "tag"; value: string } | { list: "domain"; value: string };
 
 export interface Counts {
   all: number;
-  inbox: number;
+  inbox: number; // inbox notes, without the starred ones
+  starred: number; // starred notes without a Verdict: the Inbox's Starred tab (decision 0068)
   kinds: { name: string; count: number }[]; // by name
   tags: { name: string; count: number }[]; // most used first, then by name
   domains: { name: string; count: number; suggested: number }[]; // in the vocabulary's order; count: confirmed or suggested, suggested: only suggested
+}
+
+// A starred note (decision 0068): from import --stars, still without a Verdict. A Verdict makes it an
+// ordinary note, so it leaves the Starred tab.
+export function isStarred(n: Pick<NoteSummary, "status" | "starred">): boolean {
+  return n.status === "inbox" && Boolean(n.starred);
 }
 
 export function sidebarCounts(notes: NoteSummary[]): Counts {
@@ -17,8 +24,9 @@ export function sidebarCounts(notes: NoteSummary[]): Counts {
   const tags = new Map<string, number>();
   const domains = new Map<string, { count: number; suggested: number }>();
   let inbox = 0;
+  let starred = 0;
   for (const n of notes) {
-    if (n.status === "inbox") inbox++;
+    if (n.status === "inbox") n.starred ? starred++ : inbox++;
     if (n.kind) kinds.set(n.kind, (kinds.get(n.kind) ?? 0) + 1);
     for (const t of n.tags) tags.set(t, (tags.get(t) ?? 0) + 1);
     for (const d of [...n.domains, ...n.domains_suggested]) {
@@ -30,6 +38,7 @@ export function sidebarCounts(notes: NoteSummary[]): Counts {
   return {
     all: notes.length,
     inbox,
+    starred,
     kinds: [...kinds].map(([name, count]) => ({ name, count })).sort(byName),
     tags: [...tags].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || byName(a, b)),
     domains: DOMAIN_IDS.flatMap((name) => { const c = domains.get(name); return c ? [{ name, ...c }] : []; }),
@@ -61,7 +70,9 @@ export function filterNotes(notes: NoteSummary[], view: ListView): NoteSummary[]
     case "all":
       return notes;
     case "inbox":
-      return notes.filter((n) => n.status === "inbox");
+      return notes.filter((n) => n.status === "inbox" && !n.starred);
+    case "starred":
+      return notes.filter(isStarred);
     case "kind":
       return notes.filter((n) => n.kind === view.value);
     case "tag":

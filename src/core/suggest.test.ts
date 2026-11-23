@@ -57,6 +57,7 @@ test("from the manifests: keywords from dependency names, keywords and descripti
     name: "commander",
     verdict: "fine for small CLIs",
     status: "reviewed",
+    starred: false,
     tags: ["cli"],
     score: "number",
     why: { keywords: ["cli"], dependencies: [] },

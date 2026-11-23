@@ -24,7 +24,10 @@ export async function recallCommand(queries: string[], options: RecallOptions, i
   // Note text reaches the terminal cleaned, never cut: the Verdict is never cut (decision 0032).
   const cards = results.flatMap((r) => r.matches).map((m) => card(cleanAll(m), { home: io.home, color, full: Boolean(options.full), piped: io.columns === undefined }));
   if (cards.length) io.out(`${cards.join("\n\n")}\n`);
-  for (const r of results) if (!r.matches.length) io.err(`No note for ${clean(r.query)}.\n`);
+  for (const r of results) {
+    if (r.matches.length) continue;
+    io.err(r.starred.length ? `You starred ${clean(r.query)} on GitHub; no note yet.\n` : `No note for ${clean(r.query)}.\n`);
+  }
   return 0;
 }
 

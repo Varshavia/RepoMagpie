@@ -330,7 +330,7 @@
   {
     "name": "catalog",
     "title": "List the user's notes",
-    "description": "Every note in one short row (name, kind, journal, avoid, summary, start of the Verdict), in pages of `limit`; the project's notes first, then avoid notes, then the rest. Pass next_cursor as cursor for the next page. For \"what do I have?\" on a small journal. full: every field.",
+    "description": "Every note in one short row (name, kind, journal, avoid, summary, start of the Verdict), in pages of `limit`; the project's notes first, then avoid notes, then the rest. Pass next_cursor as cursor for the next page. For \"what do I have?\" on a small journal. full: every field. Notes imported from the user's GitHub stars that have no Verdict are left out: a star is a bookmark, not a decision; include_starred lists them too (full marks each with starred).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -384,6 +384,11 @@
           "type": "boolean",
           "default": false,
           "description": "Every field of each note instead of compact rows."
+        },
+        "include_starred": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also the notes from the user's GitHub stars that have no Verdict yet. Not decisions; only when the user asks about their stars."
         },
         "project": {
           "type": "string",
