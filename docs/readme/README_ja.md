@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · [Español](README_es.md) · [简体中文](README_zh-CN.md) · 日本語
 
-_これは英語版 README の翻訳で、英語版より古い場合があります。正本は英語版 README です。2026-11-07 時点の英語版 README から翻訳しました。_
+_これは英語版 README の翻訳で、英語版より古い場合があります。正本は英語版 README です。2026-11-23 時点の英語版 README から翻訳しました。_
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie のロゴ：横向きのカササギ">
 
@@ -18,7 +18,7 @@ _これは英語版 README の翻訳で、英語版より古い場合があり�
 [![CI ステータス](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
 [![MIT ライセンス](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](../../LICENSE)
 
-[クイックスタート](#クイックスタート) · [仕組み](#仕組み) · [各エージェントに設定されるもの](#各エージェントに設定されるもの) · [よくある質問](#よくある質問) · [ドキュメント](#ドキュメント)
+[クイックスタート](#クイックスタート) · [仕組み](#仕組み) · [各エージェントに設定されるもの](#各エージェントに設定されるもの) · [Claude Code プラグイン](#claude-code-プラグイン) · [よくある質問](#よくある質問) · [ドキュメント](#ドキュメント)
 
 <code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
@@ -55,7 +55,7 @@ Do you want to proceed?
    repomagpie setup
    ```
 
-   `setup` は変更するファイルを示し、先に確認を求め、編集する各ファイルをバックアップします。`repomagpie setup --dry-run` は計画を表示するだけです（[エージェント](../agents.md)）。
+   `setup` は変更するファイルを示し、先に確認を求め、編集する各ファイルをバックアップします。`repomagpie setup --dry-run` は計画を表示するだけです（[エージェント](../agents.md)）。Claude Code では、`setup` を実行する代わりに[プラグインをインストール](#claude-code-プラグイン)することもできます。
 
 2. 各エージェントで何が接続されているかを確認します：
 
@@ -75,7 +75,7 @@ Do you want to proceed?
    トークンがない場合、GitHub が許可するリクエストは 1 時間に 60 回です。上限を上げるには GitHub CLI でサインインしてください（`gh auth login`）。RepoMagpie はそのログインを使います。または `GITHUB_TOKEN` か `GH_TOKEN` を設定します。どれを使っているかは `repomagpie doctor` が表示します。
 
 > [!IMPORTANT]
-> RepoMagpie の入手元は、[このリポジトリ](https://github.com/Varshavia/RepoMagpie)、npm パッケージ [`repomagpie`](https://www.npmjs.com/package/repomagpie)、[skills.sh](https://skills.sh/varshavia/repomagpie) のエージェントスキルだけです。インストーラー、`.exe` などのダウンロード、ほかのパッケージ、ほかのウェブサイトはありません。RepoMagpie を名乗るそれ以外のものは、私たちのものではありません（[SECURITY.md](../../SECURITY.md#official-channels)）。
+> RepoMagpie の入手元は、[このリポジトリ](https://github.com/Varshavia/RepoMagpie)（Claude Code プラグインのマーケットプレイスでもあります）、npm パッケージ [`repomagpie`](https://www.npmjs.com/package/repomagpie)、[skills.sh](https://skills.sh/varshavia/repomagpie) のエージェントスキルだけです。インストーラー、`.exe` などのダウンロード、ほかのパッケージ、ほかのウェブサイトはありません。RepoMagpie を名乗るそれ以外のものは、私たちのものではありません（[SECURITY.md](../../SECURITY.md#official-channels)）。
 
 ## 仕組み
 
@@ -106,7 +106,47 @@ Linux、Windows、macOS で Node.js 22.12 以降を使う場合に、`repomagpie
 | Antigravity CLI | あり | あり | あり | フックがあなたに確認します |
 | Copilot CLI | あり | あり | あり | フックが最初の試行を止め、エージェントがあなたに確認します |
 
-Codex CLI は、新しいフックを `/hooks` で信頼したあとでないと実行しません。MCP や [Agent Skills](https://agentskills.io) に対応するほかのエージェントも、サーバーやスキルを使えます：[手動セットアップ](../setup-by-hand.md)をご覧ください。このパッケージには実行時の依存関係がなく、ASCII 以外の文字を含むパスでも動作します。
+Claude Code では、[プラグイン](#claude-code-プラグイン)が `setup` なしで同じ MCP サーバー、スキル、フックを提供します。メモツール（note tool）は、あなたがオンにするまでオフです。Codex CLI は、新しいフックを `/hooks` で信頼したあとでないと実行しません。MCP や [Agent Skills](https://agentskills.io) に対応するほかのエージェントも、サーバーやスキルを使えます：[手動セットアップ](../setup-by-hand.md)をご覧ください。このパッケージには実行時の依存関係がなく、ASCII 以外の文字を含むパスでも動作します。
+
+## Claude Code プラグイン
+
+Claude Code では、プラグインがスキル、MCP サーバー、フックを 1 回でインストールします。`repomagpie setup` は不要です。
+
+まずマーケットプレイスを追加します：
+
+```text
+/plugin marketplace add Varshavia/RepoMagpie
+```
+
+次にプラグインをインストールします：
+
+```text
+/plugin install repomagpie@repomagpie
+```
+
+ターミナルからは、`claude plugin marketplace add Varshavia/RepoMagpie` のあとに `claude plugin install repomagpie@repomagpie` を実行します。Claude Code は `repomagpie` パッケージを npm から、このリポジトリのマーケットプレイスが指定するバージョンで取得します。
+
+- **`PATH` に Node.js 22.12 以降が必要です。** プラグインは、フックと MCP サーバーのどちらでも `node` を名前で起動します。Claude Code を起動する場所で `node --version` を実行してください。
+- **メモツールは既定でオフです。** プラグインはメモを読みますが、`/config` で **Note tool**（プラグインの行、"Note tool · repomagpie"）をオンにして Claude Code を再起動するまで、Claude は Verdict を保存できません。オンにすると、Claude はあなたの言葉だけを保存し、Verdict を置き換えることはなく、保存のたびに確認することもありません（[意思決定 0065](../decisions/0065-the-plugin-note-tool-off-by-default.md)）。
+- **コマンドと同じジャーナルを読みます：** `~/.magpie`、または Claude Code の起動時に `MAGPIE_HOME` が指すフォルダーです。
+- **`repomagpie` コマンドは追加しません。** `repomagpie note`、`ui`、`discover`、`doctor` やほかのエージェントのために、npm パッケージもインストールしてください（`npm install -g repomagpie`）。そうすると、プラグインがオンの間は `repomagpie setup` が Claude Code を飛ばし、`repomagpie doctor` がプラグインを報告します。
+- **以前に `setup` で設定しましたか？** どちらか一方を残してください：`repomagpie setup --remove --agents claude-code` が setup の Claude Code 用エントリーを取り除きます。それまでは `doctor` が警告し、避けるインストールでも確認は 1 回だけです。
+- **更新するには：** `claude plugin marketplace update repomagpie` のあとに `claude plugin update repomagpie@repomagpie` を実行します。自動更新（`/plugin`、Marketplaces）をオンにしない限り、Claude Code はこのマーケットプレイスを自動では更新しません。
+- **削除するには：** `/plugin uninstall repomagpie@repomagpie`。Claude Code はプラグインのフォルダーをキャッシュに残すことがあります。`repomagpie doctor` はそれをキャッシュのコピー（cached copy）と呼びます。
+
+## RepoMagpie が実行するもの、送信するもの、取得するもの
+
+プラグインでも npm でのインストールでも同じです。詳細はすべて [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) にあります。
+
+- **インストール：** npm（プラグインの場合は Claude Code）が npm レジストリから `repomagpie` パッケージを取得します。インストールスクリプトも実行時の依存関係もありません。
+- **フック**は、エージェントがシェルコマンドを実行する前に毎回動きます（Claude Code では `Bash`、`PowerShell`、`Monitor` ツール）。Node が `repomagpie hook` を起動し、それがコマンドを読みます。コマンドがパッケージをインストールするものなら、フックはジャーナルを読み、あなたのメモで答えるか、何も返しません。コマンドを実行することも、承認することも、ネットワークを使うこともありません。Codex CLI、Cursor、Copilot CLI のフックは、ジャーナルの `.cache/` に再試行の記録を残します。
+- **MCP サーバー**は、エージェントが開いている間だけ動きます。エージェントがそれを起動し、stdin と stdout でやり取りします。ポートもネットワークリクエストもありません。そのツールはジャーナルを読み、`note` ツールは、あなたがオンにしたときだけ Verdict を書き込みます。
+- **あなたが実行するコマンド：**
+  - GitHub の API（`api.github.com`）への読み取り専用の GET リクエスト：`repomagpie note`、`import`、アプリの Add ページに GitHub リポジトリを渡したとき、そして `repomagpie discover` やアプリの Discover ページで検索したときです。送られるのはそのリポジトリ名か検索内容と、GitHub トークンがあればそのトークンで、メモが送られることはありません。
+  - `gh auth token` を 1 回：上記のいずれか、または `doctor` がトークンを必要とし、`GITHUB_TOKEN` も `GH_TOKEN` も設定されていないときです。
+  - `repomagpie setup` は、あなたの承認のあとで、エージェント自身のコマンド（`claude`、`codex`、`gemini`、`code`）を実行してエントリーを追加または削除します。`setup` と `doctor` は `claude --version` を実行します。
+  - `repomagpie ui` は `127.0.0.1` でのみ待ち受け、ブラウザーを開きます。その Project ビューはローカルの `git` を実行し、fetch はしません。
+- **決してしないこと：** テレメトリー、独自のモデルや API キー、メモの送信、パッケージのインストール、メモに書かれたコマンドの実行。
 
 ## チームでメモを共有する
 
@@ -177,7 +217,7 @@ Suggest for this project（このプロジェクトへの提案）：合うメ�
 <details>
 <summary><strong>どうやって削除しますか？</strong></summary>
 
-`repomagpie setup --remove` を実行します。RepoMagpie 自身の MCP エントリー、フック、スキルフォルダーだけを取り除き、あとから加えた変更の上にバックアップを書き戻すことはなく、ジャーナルと `setup` のバックアップは残します。`--agents` を付けた場合、共有のスキルフォルダーは、ほかのエージェントがまだ読んでいる間は残ります。そのあと `repomagpie setup --delete-backups` が確認のうえバックアップを削除し、`npm uninstall -g repomagpie` がコマンドを削除します。
+`repomagpie setup --remove` を実行します。RepoMagpie 自身の MCP エントリー、フック、スキルフォルダーだけを取り除き、あとから加えた変更の上にバックアップを書き戻すことはなく、ジャーナルと `setup` のバックアップは残します。`--agents` を付けた場合、共有のスキルフォルダーは、ほかのエージェントがまだ読んでいる間は残ります。そのあと `repomagpie setup --delete-backups` が確認のうえバックアップを削除し、`npm uninstall -g repomagpie` がコマンドを削除します。Claude Code プラグインは `/plugin uninstall repomagpie@repomagpie` で削除します。
 
 </details>
 
@@ -201,10 +241,12 @@ Suggest for this project（このプロジェクトへの提案）：合うメ�
 - [エージェント](../agents.md)：各コーディングエージェントが対応している内容と、[手動セットアップ](../setup-by-hand.md)
 - [メモのスキーマ](../note-schema.md)：メモの形式
 - [ローカルアプリ](../ui.md)：画面、API、セキュリティのルール
-- [ベータ版のテスト](../../TESTING.md)：ベータ版を 1 週間使う手順と、フィードバックの送り方
+- [RepoMagpie を 1 週間試す](../../TESTING.md)：RepoMagpie を 1 週間使う手順と、フィードバックの送り方
 - [ビジョン](../vision.md)、[競合](../competitors.md)、[意思決定](../decisions/)
 
-バグやアイデアは issue でお知らせください。プルリクエストも歓迎します。[CONTRIBUTING.md](../../CONTRIBUTING.md) をご覧ください。脆弱性の報告については [SECURITY.md](../../SECURITY.md) をご覧ください。
+## コントリビュート
+
+バグ報告、アイデア、プルリクエストを歓迎します。[CONTRIBUTING.md](../../CONTRIBUTING.md) に、5 分で終わるセットアップ、実行するテスト、issue の担当の仕方が書かれています。[`good first issue`](https://github.com/Varshavia/RepoMagpie/labels/good%20first%20issue) のラベルが付いたものを探してください。全員が[行動規範](../../CODE_OF_CONDUCT.md)に従います。脆弱性の報告については [SECURITY.md](../../SECURITY.md) をご覧ください。
 
 ## ライセンス
 

@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · [Español](README_es.md) · 简体中文 · [日本語](README_ja.md)
 
-_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-07 的英文 README。_
+_本文是英文 README 的翻译，可能落后于英文版；以英文 README 为准。译自 2026-11-23 的英文 README。_
 
 <img src="../assets/logo.svg" width="96" height="96" alt="RepoMagpie 标志：一只侧身的喜鹊">
 
@@ -18,7 +18,7 @@ _本文是英文 README 的翻译，可能落后于英文版；以英文 README 
 [![CI 状态](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
 [![MIT 许可证](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](../../LICENSE)
 
-[快速开始](#快速开始) · [工作原理](#工作原理) · [每个智能体得到什么](#每个智能体得到什么) · [常见问题](#常见问题) · [文档](#文档)
+[快速开始](#快速开始) · [工作原理](#工作原理) · [每个智能体得到什么](#每个智能体得到什么) · [Claude Code 插件](#claude-code-插件) · [常见问题](#常见问题) · [文档](#文档)
 
 <code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
@@ -55,7 +55,7 @@ Do you want to proceed?
    repomagpie setup
    ```
 
-   `setup` 会显示它将修改哪些文件，先征求你的同意，并备份它编辑的每个文件；`repomagpie setup --dry-run` 只显示计划（[智能体](../agents.md)）。
+   `setup` 会显示它将修改哪些文件，先征求你的同意，并备份它编辑的每个文件；`repomagpie setup --dry-run` 只显示计划（[智能体](../agents.md)）。在 Claude Code 中，你可以[安装插件](#claude-code-插件)来代替运行 `setup`。
 
 2. 检查每个智能体中已接入了什么：
 
@@ -75,7 +75,7 @@ Do you want to proceed?
    没有 token 时，GitHub 每小时允许 60 次请求。要提高限额，请用 GitHub CLI 登录（`gh auth login`）：RepoMagpie 会使用它的登录状态。也可以设置 `GITHUB_TOKEN` 或 `GH_TOKEN`。`repomagpie doctor` 会告诉你它用的是哪一个。
 
 > [!IMPORTANT]
-> RepoMagpie 只来自[这个仓库](https://github.com/Varshavia/RepoMagpie)、npm 包 [`repomagpie`](https://www.npmjs.com/package/repomagpie) 和 [skills.sh](https://skills.sh/varshavia/repomagpie) 上的智能体 skill。没有安装程序，没有 `.exe` 或其他下载，没有其他包，也没有其他网站：任何其他自称 RepoMagpie 的东西都不是我们的（[SECURITY.md](../../SECURITY.md#official-channels)）。
+> RepoMagpie 只来自[这个仓库](https://github.com/Varshavia/RepoMagpie)（它也是 Claude Code 插件的插件市场）、npm 包 [`repomagpie`](https://www.npmjs.com/package/repomagpie) 和 [skills.sh](https://skills.sh/varshavia/repomagpie) 上的智能体 skill。没有安装程序，没有 `.exe` 或其他下载，没有其他包，也没有其他网站：任何其他自称 RepoMagpie 的东西都不是我们的（[SECURITY.md](../../SECURITY.md#official-channels)）。
 
 ## 工作原理
 
@@ -106,7 +106,47 @@ Do you want to proceed?
 | Antigravity CLI | 是 | 是 | 是 | hook 询问你 |
 | Copilot CLI | 是 | 是 | 是 | hook 拦下第一次尝试；你的智能体询问你 |
 
-Codex CLI 只有在你于 `/hooks` 中信任新的 hook 之后才会运行它。其他支持 MCP 或 [Agent Skills](https://agentskills.io) 的智能体可以使用服务器或 skill：参见[手动设置](../setup-by-hand.md)。这个包没有运行时依赖，包含非 ASCII 字母的路径也能正常工作。
+在 Claude Code 中，[插件](#claude-code-插件)无需 `setup` 就能提供同样的 MCP 服务器、skill 和 hook；它的笔记工具（note tool）在你打开之前保持关闭。Codex CLI 只有在你于 `/hooks` 中信任新的 hook 之后才会运行它。其他支持 MCP 或 [Agent Skills](https://agentskills.io) 的智能体可以使用服务器或 skill：参见[手动设置](../setup-by-hand.md)。这个包没有运行时依赖，包含非 ASCII 字母的路径也能正常工作。
+
+## Claude Code 插件
+
+在 Claude Code 中，插件一步就能安装 skill、MCP 服务器和 hook，不需要 `repomagpie setup`。
+
+先添加插件市场（marketplace）：
+
+```text
+/plugin marketplace add Varshavia/RepoMagpie
+```
+
+然后安装插件：
+
+```text
+/plugin install repomagpie@repomagpie
+```
+
+在终端中：先运行 `claude plugin marketplace add Varshavia/RepoMagpie`，再运行 `claude plugin install repomagpie@repomagpie`。Claude Code 会从 npm 获取 `repomagpie` 包，版本以这个仓库的插件市场所列的为准。
+
+- **它需要 `PATH` 中有 Node.js 22.12 或更高版本。** 插件按名称启动 `node`，hook 和 MCP 服务器都是如此。请在你启动 Claude Code 的地方运行 `node --version`。
+- **笔记工具默认关闭。** 插件会读取你的笔记，但在你于 `/config` 中打开 **Note tool**（插件那一行，"Note tool · repomagpie"）并重启 Claude Code 之前，Claude 无法保存 Verdict。打开之后，Claude 只保存你自己的话，从不替换已有的 Verdict，也不会在每次保存前询问（[决策 0065](../decisions/0065-the-plugin-note-tool-off-by-default.md)）。
+- **它读取的笔记库与命令相同：** `~/.magpie`，或者 Claude Code 启动时 `MAGPIE_HOME` 指定的文件夹。
+- **它不会添加 `repomagpie` 命令。** 要使用 `repomagpie note`、`ui`、`discover`、`doctor` 以及你的其他智能体，也请安装 npm 包（`npm install -g repomagpie`）。之后，只要插件处于开启状态，`repomagpie setup` 就会跳过 Claude Code，`repomagpie doctor` 会报告插件。
+- **之前用 `setup` 设置过？** 两者只保留一个：`repomagpie setup --remove --agents claude-code` 会移除 setup 为 Claude Code 添加的条目。在那之前，`doctor` 会发出警告，而一个你要避免的安装仍然只会询问一次。
+- **更新：** 先运行 `claude plugin marketplace update repomagpie`，再运行 `claude plugin update repomagpie@repomagpie`。除非你打开它的自动更新（`/plugin`，Marketplaces），Claude Code 不会自行更新这个插件市场。
+- **移除：** `/plugin uninstall repomagpie@repomagpie`。Claude Code 可能会在缓存中保留插件的文件夹；`repomagpie doctor` 把它称为缓存副本（cached copy）。
+
+## RepoMagpie 运行什么、发送什么、获取什么
+
+插件和 npm 安装都一样。所有细节见 [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends)。
+
+- **安装：** npm（插件则由 Claude Code）从 npm registry 获取 `repomagpie` 包。它没有安装脚本，也没有运行时依赖。
+- **hook** 在你的智能体运行每条 shell 命令之前运行（在 Claude Code 中是 `Bash`、`PowerShell` 和 `Monitor` 工具）。Node 启动 `repomagpie hook`，由它读取命令；当命令要安装包时，hook 读取你的笔记库，用你的笔记回应，或者什么也不说。它从不运行这条命令，从不批准它，也从不使用网络。Codex CLI、Cursor 和 Copilot CLI 的 hook 会在你笔记库的 `.cache/` 中保留一条重试记录。
+- **MCP 服务器**在你的智能体打开期间运行。智能体启动它，并通过 stdin 和 stdout 与它通信：没有端口，没有网络请求。它的工具读取你的笔记库；`note` 工具只有在你打开它时才会写入你的 Verdict。
+- **你运行的命令：**
+  - GitHub 的 API（`api.github.com`），只使用只读的 GET 请求：当你把一个 GitHub 仓库交给 `repomagpie note`、`import` 或应用的 Add 页面时，以及当你用 `repomagpie discover` 或应用的 Discover 页面搜索时。它们发送该仓库的名称或你的搜索内容，如果有 GitHub token 也会发送，但从不发送你的笔记。
+  - `gh auth token`，只运行一次：当上述操作之一或 `doctor` 需要 token，而 `GITHUB_TOKEN` 和 `GH_TOKEN` 都没有设置时。
+  - `repomagpie setup` 在你同意之后，运行你的智能体自己的命令（`claude`、`codex`、`gemini`、`code`）来添加或移除它的条目。`setup` 和 `doctor` 会运行 `claude --version`。
+  - `repomagpie ui` 只监听 `127.0.0.1`，并打开你的浏览器。它的 Project 视图运行你本地的 `git`，不做 fetch。
+- **从不：** 遥测、自带的模型或 API 密钥、发送你的笔记、安装包，或者运行笔记中出现的命令。
 
 ## 与团队共享笔记
 
@@ -177,7 +217,7 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 <details>
 <summary><strong>如何移除它？</strong></summary>
 
-运行 `repomagpie setup --remove`。它只移除 RepoMagpie 自己的 MCP 条目、hook 和 skill 文件夹，从不用备份覆盖你之后做的修改，并保留你的笔记库和 `setup` 的备份。使用 `--agents` 时，只要还有其他智能体在读取共享的 skill 文件夹，它就会保留。之后，`repomagpie setup --delete-backups` 会在询问后删除备份，`npm uninstall -g repomagpie` 会移除命令。
+运行 `repomagpie setup --remove`。它只移除 RepoMagpie 自己的 MCP 条目、hook 和 skill 文件夹，从不用备份覆盖你之后做的修改，并保留你的笔记库和 `setup` 的备份。使用 `--agents` 时，只要还有其他智能体在读取共享的 skill 文件夹，它就会保留。之后，`repomagpie setup --delete-backups` 会在询问后删除备份，`npm uninstall -g repomagpie` 会移除命令。Claude Code 插件：`/plugin uninstall repomagpie@repomagpie`。
 
 </details>
 
@@ -201,10 +241,12 @@ Suggest for this project（为这个项目推荐）：适合的笔记，以及�
 - [智能体](../agents.md)：每个编程智能体支持什么，以及[手动设置](../setup-by-hand.md)
 - [笔记格式](../note-schema.md)：笔记的格式
 - [本地应用](../ui.md)：界面、API 和安全规则
-- [测试 beta 版](../../TESTING.md)：使用 beta 版一周的步骤，以及如何发送反馈
+- [试用 RepoMagpie 一周](../../TESTING.md)：使用 RepoMagpie 一周的步骤，以及如何发送反馈
 - [愿景](../vision.md)、[竞品](../competitors.md)和[决策](../decisions/)
 
-报告 bug 和提出想法请开 issue。欢迎提交 pull request，请参见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。报告安全漏洞请参见 [SECURITY.md](../../SECURITY.md)。
+## 参与贡献
+
+欢迎报告 bug、提出想法和提交 pull request。[CONTRIBUTING.md](../../CONTRIBUTING.md) 介绍了五分钟完成的环境设置、要运行的测试，以及如何认领一个 issue：可以找带有 [`good first issue`](https://github.com/Varshavia/RepoMagpie/labels/good%20first%20issue) 标签的。每个人都遵守[行为准则](../../CODE_OF_CONDUCT.md)。报告安全漏洞请参见 [SECURITY.md](../../SECURITY.md)。
 
 ## 许可证
 
