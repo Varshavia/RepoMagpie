@@ -2,7 +2,7 @@
 
 [English](../../README.md) · [Türkçe](README_tr.md) · [Deutsch](README_de.md) · Español · [简体中文](README_zh-CN.md) · [日本語](README_ja.md)
 
-_Esta es una traducción del README en inglés y puede ir por detrás de él; el README en inglés es el que manda. Traducida del README en inglés del 2026-11-07._
+_Esta es una traducción del README en inglés y puede ir por detrás de él; el README en inglés es el que manda. Traducida del README en inglés del 2026-11-23._
 
 <img src="../assets/logo.svg" width="96" height="96" alt="Logo de RepoMagpie: una urraca de perfil">
 
@@ -18,7 +18,7 @@ _Esta es una traducción del README en inglés y puede ir por detrás de él; el
 [![Estado de CI](https://img.shields.io/github/actions/workflow/status/Varshavia/RepoMagpie/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/Varshavia/RepoMagpie/actions/workflows/ci.yml?query=branch%3Amain)
 [![Licencia MIT](https://img.shields.io/badge/licence-MIT-f4c430?style=flat-square)](../../LICENSE)
 
-[Inicio rápido](#inicio-rápido) · [Cómo funciona](#cómo-funciona) · [Qué recibe cada agente](#qué-recibe-cada-agente) · [Preguntas frecuentes](#preguntas-frecuentes) · [Documentación](#documentación)
+[Inicio rápido](#inicio-rápido) · [Cómo funciona](#cómo-funciona) · [Qué recibe cada agente](#qué-recibe-cada-agente) · [Plugin de Claude Code](#el-plugin-de-claude-code) · [Preguntas frecuentes](#preguntas-frecuentes) · [Documentación](#documentación)
 
 <code>npm install -g repomagpie</code><br>
 <code>repomagpie setup</code>
@@ -55,7 +55,7 @@ Funciona en [siete agentes de programación](#qué-recibe-cada-agente), entre el
    repomagpie setup
    ```
 
-   `setup` muestra qué archivos va a cambiar, pregunta primero y hace una copia de seguridad de cada archivo que edita; `repomagpie setup --dry-run` solo muestra el plan ([agentes](../agents.md)).
+   `setup` muestra qué archivos va a cambiar, pregunta primero y hace una copia de seguridad de cada archivo que edita; `repomagpie setup --dry-run` solo muestra el plan ([agentes](../agents.md)). En Claude Code puedes [instalar el plugin](#el-plugin-de-claude-code) en lugar de ejecutar `setup`.
 
 2. Comprueba qué está conectado en cada agente:
 
@@ -75,7 +75,7 @@ Funciona en [siete agentes de programación](#qué-recibe-cada-agente), entre el
    Sin token, GitHub permite 60 solicitudes por hora. Para subir el límite, inicia sesión con GitHub CLI (`gh auth login`): RepoMagpie usa esa sesión. O define `GITHUB_TOKEN` o `GH_TOKEN`. `repomagpie doctor` dice cuál usa.
 
 > [!IMPORTANT]
-> RepoMagpie solo viene de [este repositorio](https://github.com/Varshavia/RepoMagpie), del paquete de npm [`repomagpie`](https://www.npmjs.com/package/repomagpie) y del skill de agente en [skills.sh](https://skills.sh/varshavia/repomagpie). No hay instaladores, ni `.exe` ni otras descargas, ni otros paquetes ni otro sitio web: cualquier otra cosa que se llame RepoMagpie no es nuestra ([SECURITY.md](../../SECURITY.md#official-channels)).
+> RepoMagpie solo viene de [este repositorio](https://github.com/Varshavia/RepoMagpie) (que también es el marketplace del plugin de Claude Code), del paquete de npm [`repomagpie`](https://www.npmjs.com/package/repomagpie) y del skill de agente en [skills.sh](https://skills.sh/varshavia/repomagpie). No hay instaladores, ni `.exe` ni otras descargas, ni otros paquetes ni otro sitio web: cualquier otra cosa que se llame RepoMagpie no es nuestra ([SECURITY.md](../../SECURITY.md#official-channels)).
 
 ## Cómo funciona
 
@@ -106,7 +106,47 @@ Lo que `repomagpie setup` configura en cada agente, en Linux, Windows o macOS co
 | Antigravity CLI | sí | sí | sí | el hook te pregunta |
 | Copilot CLI | sí | sí | sí | el hook detiene el primer intento; tu agente te pregunta |
 
-Codex CLI ejecuta un hook nuevo solo después de que confíes en él en `/hooks`. Otros agentes con MCP o [Agent Skills](https://agentskills.io) pueden usar el servidor o el skill: consulta [la configuración a mano](../setup-by-hand.md). El paquete no tiene dependencias en tiempo de ejecución, y las rutas con letras fuera de ASCII funcionan.
+En Claude Code, [el plugin](#el-plugin-de-claude-code) te da el mismo servidor MCP, skill y hook sin `setup`; su herramienta de notas (note tool) está desactivada hasta que la actives. Codex CLI ejecuta un hook nuevo solo después de que confíes en él en `/hooks`. Otros agentes con MCP o [Agent Skills](https://agentskills.io) pueden usar el servidor o el skill: consulta [la configuración a mano](../setup-by-hand.md). El paquete no tiene dependencias en tiempo de ejecución, y las rutas con letras fuera de ASCII funcionan.
+
+## El plugin de Claude Code
+
+En Claude Code, el plugin instala el skill, el servidor MCP y el hook en un solo paso, sin `repomagpie setup`.
+
+Primero añade el marketplace:
+
+```text
+/plugin marketplace add Varshavia/RepoMagpie
+```
+
+Después instala el plugin:
+
+```text
+/plugin install repomagpie@repomagpie
+```
+
+Desde una terminal: `claude plugin marketplace add Varshavia/RepoMagpie` y después `claude plugin install repomagpie@repomagpie`. Claude Code descarga el paquete `repomagpie` de npm, en la versión que indica el marketplace de este repositorio.
+
+- **Necesita Node.js 22.12 o posterior en el `PATH`.** El plugin inicia `node` por su nombre, para el hook y para el servidor MCP. Ejecuta `node --version` donde inicias Claude Code.
+- **La herramienta de notas está desactivada por defecto.** El plugin lee tus notas, pero Claude no puede guardar un Verdict hasta que actives **Note tool** en `/config` (la fila del plugin, "Note tool · repomagpie") y reinicies Claude Code. Entonces Claude guarda solo tus palabras, nunca reemplaza un Verdict y no pregunta antes de cada guardado ([decisión 0065](../decisions/0065-the-plugin-note-tool-off-by-default.md)).
+- **Lee el mismo diario que el comando:** `~/.magpie`, o la carpeta que indique `MAGPIE_HOME` cuando se inicia Claude Code.
+- **No añade el comando `repomagpie`.** Para `repomagpie note`, `ui`, `discover`, `doctor` y tus otros agentes, instala también el paquete de npm (`npm install -g repomagpie`). Entonces `repomagpie setup` se salta Claude Code mientras el plugin esté activado, y `repomagpie doctor` informa del plugin.
+- **¿Ya lo configuraste con `setup`?** Quédate con uno de los dos: `repomagpie setup --remove --agents claude-code` quita las entradas de setup para Claude Code. Hasta entonces, `doctor` avisa, y una instalación que evitas sigue recibiendo una sola pregunta.
+- **Para actualizarlo:** `claude plugin marketplace update repomagpie` y después `claude plugin update repomagpie@repomagpie`. Claude Code no actualiza este marketplace por sí solo, a menos que actives su actualización automática (`/plugin`, Marketplaces).
+- **Para quitarlo:** `/plugin uninstall repomagpie@repomagpie`. Claude Code puede conservar la carpeta del plugin en su caché; `repomagpie doctor` la llama copia en caché (cached copy).
+
+## Qué ejecuta, envía y descarga RepoMagpie
+
+Lo mismo para el plugin que para la instalación con npm. [SECURITY.md](../../SECURITY.md#what-repomagpie-reads-writes-and-sends) tiene todos los detalles.
+
+- **Instalación:** npm, o Claude Code en el caso del plugin, descarga el paquete `repomagpie` del registro de npm. No tiene scripts de instalación ni dependencias en tiempo de ejecución.
+- **El hook** se ejecuta antes de cada comando de shell que ejecuta tu agente (en Claude Code, las herramientas `Bash`, `PowerShell` y `Monitor`). Node inicia `repomagpie hook`, que lee el comando; cuando el comando instala paquetes, el hook lee tus diarios y responde con tu nota, o con nada. Nunca ejecuta el comando, nunca lo aprueba y nunca usa la red. Los hooks de Codex CLI, Cursor y Copilot CLI guardan un registro de reintentos en la carpeta `.cache/` de tu diario.
+- **El servidor MCP** se ejecuta mientras tu agente está abierto. El agente lo inicia y habla con él por stdin y stdout: sin puerto ni solicitudes de red. Sus herramientas leen tus diarios; la herramienta `note`, solo cuando la activas, escribe tu Verdict.
+- **Comandos que ejecutas:**
+  - La API de GitHub (`api.github.com`), con solicitudes GET de solo lectura: cuando das un repositorio de GitHub a `repomagpie note`, a `import` o a la página Add de la aplicación, y cuando buscas con `repomagpie discover` o con la página Discover de la aplicación. Envían el nombre de ese repositorio o tu búsqueda, y tu token de GitHub si lo hay, nunca tus notas.
+  - `gh auth token`, una vez, cuando uno de ellos, o `doctor`, necesita un token y no está definido ni `GITHUB_TOKEN` ni `GH_TOKEN`.
+  - `repomagpie setup` ejecuta los comandos propios de tus agentes (`claude`, `codex`, `gemini`, `code`) para añadir o quitar sus entradas, después de tu sí. `setup` y `doctor` ejecutan `claude --version`.
+  - `repomagpie ui` escucha solo en `127.0.0.1` y abre tu navegador. Su vista Project ejecuta tu `git` local, sin fetch.
+- **Nunca:** telemetría, un modelo o una clave de API propios, enviar tus notas, instalar un paquete ni ejecutar un comando encontrado en una nota.
 
 ## Comparte notas con tu equipo
 
@@ -177,7 +217,7 @@ Nunca de forma definitiva, y nunca aprueba ninguna. Cuando una nota dice que evi
 <details>
 <summary><strong>¿Cómo lo quito?</strong></summary>
 
-Ejecuta `repomagpie setup --remove`. Solo quita las entradas MCP, los hooks y las carpetas de skills de RepoMagpie, nunca restaura una copia de seguridad encima de tus cambios posteriores, y deja tus diarios y las copias de seguridad de `setup`. Con `--agents`, la carpeta compartida del skill se queda mientras otro agente todavía la lea. Después, `repomagpie setup --delete-backups` borra las copias tras preguntarte, y `npm uninstall -g repomagpie` quita el comando.
+Ejecuta `repomagpie setup --remove`. Solo quita las entradas MCP, los hooks y las carpetas de skills de RepoMagpie, nunca restaura una copia de seguridad encima de tus cambios posteriores, y deja tus diarios y las copias de seguridad de `setup`. Con `--agents`, la carpeta compartida del skill se queda mientras otro agente todavía la lea. Después, `repomagpie setup --delete-backups` borra las copias tras preguntarte, y `npm uninstall -g repomagpie` quita el comando. El plugin de Claude Code: `/plugin uninstall repomagpie@repomagpie`.
 
 </details>
 
@@ -201,10 +241,12 @@ Cada nota es un archivo Markdown con frontmatter YAML, en `~/.magpie/notes/` o e
 - [Agentes](../agents.md): lo que admite cada agente de programación, y [la configuración a mano](../setup-by-hand.md)
 - [Esquema de notas](../note-schema.md): el formato de una nota
 - [La aplicación local](../ui.md): pantallas, API y reglas de seguridad
-- [Probar la beta](../../TESTING.md): los pasos para una semana con la beta y cómo enviar comentarios
+- [Probar RepoMagpie durante una semana](../../TESTING.md): los pasos para una semana con RepoMagpie y cómo enviar comentarios
 - [Visión](../vision.md), [competidores](../competitors.md) y [decisiones](../decisions/)
 
-Abre un issue para errores e ideas. Los pull requests son bienvenidos: consulta [CONTRIBUTING.md](../../CONTRIBUTING.md). Para informar de una vulnerabilidad, consulta [SECURITY.md](../../SECURITY.md).
+## Contribuir
+
+Los informes de errores, las ideas y los pull requests son bienvenidos. [CONTRIBUTING.md](../../CONTRIBUTING.md) explica la configuración en cinco minutos, las pruebas que hay que ejecutar y cómo reservar un issue: busca [`good first issue`](https://github.com/Varshavia/RepoMagpie/labels/good%20first%20issue). Todo el mundo sigue el [código de conducta](../../CODE_OF_CONDUCT.md). Para informar de una vulnerabilidad, consulta [SECURITY.md](../../SECURITY.md).
 
 ## Licencia
 
