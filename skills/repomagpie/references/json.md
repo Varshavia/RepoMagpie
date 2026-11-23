@@ -24,11 +24,13 @@ A hidden or control character in note text shows as an ASCII marker in its place
 - `matches[].alternatives[].avoid_in`: the journals whose note says to avoid it, `"project"` first; `[]` when none.
 - `matches[].alternatives[].path`: its note's file, or `null` when the journal has no note on it.
 - `matches[].alternatives[].reason`: only for an alternative without a note: `"missing"` (no note on it) or `"ambiguous"` (several notes have that name; `repomagpie search <name> --json` lists them).
+- `starred[]`: for a package with no match, notes made from the user's GitHub stars that have no Verdict yet; `[]` when none. Not a decision: say only that the user starred it and has no note on it yet.
 An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `matches[].avoid_when` has items.
 
 ## `repomagpie search <query> --json`
 
-- `results[]`: in rank order; reviewed notes before inbox ones.
+- `results[]`: in rank order; reviewed notes before inbox ones, starred notes last.
+- `results[].starred`: `true` for a note made from the user's GitHub stars that has no Verdict yet: a bookmark, not a decision.
 - `results[].type`: `"note"`, or `"skill"` for one skill line inside a repository note.
 - `results[].skill`: the skill's name for a skill result; `null` otherwise.
 - `results[].name`: the note's name (for a skill, its repository's).
@@ -50,6 +52,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
   - verdict: the start of the Verdict, at most 60 characters, or `null` for an inbox note. Recall or search the note for the whole Verdict.
 - `total`: how many notes match the filters.
 - `next_cursor`: pass it to `--cursor` for the next page; `null` on the last page.
+- Notes made from the user's GitHub stars without a Verdict are left out; `--include-starred` (MCP: `include_starred`) lists them too, only when the user asks about their stars.
 
 ## `repomagpie suggest ["description"] --json`
 
@@ -62,6 +65,7 @@ An avoid note: `matches[].verdict` starts with the word "avoid" (any case), or `
 - `candidates[].why.keywords`: the keywords the note matched. One or two common words ("agent", "app") is a weak reason.
 - `candidates[].why.dependencies`: the project's dependencies the note matched by name, such as `@playwright/test`; `[]` for a description.
 - `candidates[].status`: `"reviewed"` or `"inbox"`.
+- `candidates[].starred`: `true` for a note made from the user's GitHub stars that has no Verdict yet; these come last. A bookmark, not a decision.
 - `candidates[].path`: the note's file; read it when the Verdict and tags aren't enough to judge the fit.
 - `candidates[].alternatives[]`: the note's alternatives, with the same fields as in recall.
 - `in_use_avoid[]`: packages the project already uses that have an avoid note, each shaped like a recall match.
