@@ -90,11 +90,12 @@ export function openRecallSources(options: { home: string; env: Env; cwd: string
 // One journal's entries, in file order. Each is cached per note file (noteEntries): a note added or
 // changed since is read again, alone, and so is one whose cached entry hasn't the expected shape, so a
 // damaged cache can't silence recall or the hook. `rebuilt`: some entry was read again from its note.
-export function loadRecallEntries(journal: string): { entries: RecallEntry[]; rebuilt: boolean; derived: string[]; tooBig: string[] } {
+// `listed`: the journal's noteSignature, when the caller has it already (one listing per journal per
+// command).
+export function loadRecallEntries(journal: string, listed = noteSignature(journal)): { entries: RecallEntry[]; rebuilt: boolean; derived: string[]; tooBig: string[] } {
   // An entry must name the note file it is kept for: a cache a repository committed can't send recall
   // to a file elsewhere, nor to another note (decision 0032). A note without a readable id is null.
   const valid = (e: unknown, file: string) => e === null || (isRecallEntry(e) && (e as RecallEntry).file === file);
-  const listed = noteSignature(journal);
   const { files, data, derived } = noteEntries(journal, RECALL_CACHE, CACHE_VERSION, (file, parse) => entryOf(parse(), file), valid, listed);
   return { entries: files.flatMap((file) => data[file] ?? []), rebuilt: derived.length > 0, derived, tooBig: listed.tooBig };
 }

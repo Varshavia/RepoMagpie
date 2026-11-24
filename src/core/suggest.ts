@@ -5,6 +5,7 @@
 import { join } from "node:path";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
 import { readProject } from "./manifests.ts";
+import { noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { alternativeForAgent, alternativesOfFile, isAvoid, loadRecallEntries, matchForAgent, recall, type Alternative, type RecallMatch, type RecallSource } from "./recall.ts";
 import { projectFirst, type JournalSource } from "./search.ts";
@@ -105,7 +106,8 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
 
   // What the project already uses: what recall would match for each dependency (spec §5). Recall's
   // entries also give each candidate its alternatives.
-  const sources: RecallSource[] = journals.map((j) => ({ ...j, entries: loadRecallEntries(j.path).entries }));
+  const listed = journals.map((j) => noteSignature(j.path)); // one listing per journal, for recall's entries and the index
+  const sources: RecallSource[] = journals.map((j, n) => ({ ...j, entries: loadRecallEntries(j.path, listed[n]).entries }));
   const inUse = project.dependencies.flatMap((d) => recall(sources, d.name, [d.type]));
   const usedIds = new Set(inUse.map((m) => m.id));
   const dependencyNames = [...new Set(project.dependencies.map((d) => d.name))];
@@ -113,7 +115,7 @@ export function runSuggest(request: SuggestRequest, place: Place): SuggestRun {
   const scored: { candidate: Candidate; group: number }[] = [];
   const usedHits: { key: string; score: number }[] = []; // in-use notes the keywords matched, scored as candidates
   for (const [n, journal] of journals.entries()) {
-    const index = loadIndex(journal.path).index;
+    const index = loadIndex(journal.path, listed[n]).index;
     const best = new Map<string, { score: number; terms: Set<string> }>(); // note file → its best document's score, the keywords of all
     // Prefix matching only: the keywords are real words from manifests and descriptions, and fuzzy
     // matching turns test into rest and text. A plural is looked up as its singular instead.
