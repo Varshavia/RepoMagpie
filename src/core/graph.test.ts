@@ -98,36 +98,94 @@ test("graphData: an alternative is one edge per pair, also when both notes list 
   assert.deepEqual(graph.counts.edges_by_type, { tagged: 0, link: 1, alternative: 1, similar: 0 });
 });
 
+// Notes with one topic each that no other note has: they never pair, and they make the journal big
+// enough that the topics a test shares are on a minority of its notes (a topic on half the notes or
+// more weighs nothing).
+const fillers = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, k) => [`npm--filler${k}.md`, note({ id: `pkg:npm/filler${k}`, topics: [`only-${k}`] })]));
+// A topic's weight on df of n notes (BM25's inverse document frequency), and a pair's score as the
+// graph rounds it: the weighted Jaccard index of their topics, plus 0.1 for the same language.
+const idf = (df: number, n: number) => Math.max(0, Math.log((n - df + 0.5) / (df + 0.5)));
+const score = (shared: number[], all: number[], language = false) => Math.round((shared.reduce((a, b) => a + b, 0) / all.reduce((a, b) => a + b, 0) + (language ? 0.1 : 0)) * 1000) / 1000;
+
 test("graphData: similarity keeps a note's top 3; an edge exists if either note keeps it", () => {
-  // x shares one topic with each y (score 1/2); the ys share both topics (score 1), so each y keeps
-  // three other ys, never x. x keeps its top 3, ties broken by file name: y1, y2, y3.
+  // x shares one topic with each y; the ys share both topics (score 1), so each y keeps three other
+  // ys, never x. x keeps its top 3, ties broken by file name: y1, y2, y3. 20 notes in all.
   const ys = Object.fromEntries([1, 2, 3, 4, 5].map((k) => [`npm--y${k}.md`, note({ id: `pkg:npm/y${k}`, topics: ["pdf", "print"] })]));
-  const graph = graphData(journal({ "npm--x.md": note({ id: "pkg:npm/x", topics: ["pdf"] }), ...ys }));
+  const graph = graphData(journal({ "npm--x.md": note({ id: "pkg:npm/x", topics: ["pdf"] }), ...ys, ...fillers(14) }));
   assert.deepEqual(similarOf(graph.edges, "note:npm--x.md"), ["note:npm--y1.md", "note:npm--y2.md", "note:npm--y3.md"]);
   // y4 and y5 keep y1, y2 and y3, so neither keeps the other.
   assert.deepEqual(similarOf(graph.edges, "note:npm--y5.md"), ["note:npm--y1.md", "note:npm--y2.md", "note:npm--y3.md"]);
   assert.deepEqual(similarOf(graph.edges, "note:npm--y1.md"), ["note:npm--x.md", "note:npm--y2.md", "note:npm--y3.md", "note:npm--y4.md", "note:npm--y5.md"]);
   const edge = edgesOf(graph.edges, "similar").find((e) => e.source === "note:npm--x.md" && e.target === "note:npm--y1.md");
-  assert.equal(edge?.score, 0.5);
+  const pdf = idf(6, 20);
+  const print = idf(5, 20);
+  assert.equal(edge?.score, score([pdf], [pdf, print]));
+  assert.equal(edge?.score, 0.436);
   assert.equal(graph.counts.edges_by_type.similar, 12);
 });
 
 test("graphData: the similarity threshold (0.25, with 0.1 for the same language); no shared topic, no edge", () => {
+  // 20 notes. A topic on one note weighs idf(1, 20) = 2.565, on two 2.002, on three 1.609.
+  const one = idf(1, 20);
+  const two = idf(2, 20);
   const root = journal({
-    // One shared topic of five: 0.2, under the threshold; 0.3 with the same language.
+    // One shared topic (on three notes) of five: 0.136, under the threshold even with the same language (0.236).
     "npm--a.md": note({ id: "pkg:npm/a", topics: ["pdf", "a1", "a2"], language: "Go" }),
     "npm--b.md": note({ id: "pkg:npm/b", topics: ["pdf", "b1", "b2"], language: "Rust" }),
     "npm--c.md": note({ id: "pkg:npm/c", topics: ["PDF", "c1", "c2"], language: "go" }),
-    // One shared topic of four: 0.25, at the threshold.
+    // One shared topic (on two notes) of three: 0.281, over the threshold.
     "npm--d.md": note({ id: "pkg:npm/d", topics: ["yaml", "d1"] }),
-    "npm--e.md": note({ id: "pkg:npm/e", topics: ["yaml", "e1", "e2"] }),
+    "npm--e.md": note({ id: "pkg:npm/e", topics: ["yaml", "e1"] }),
+    // One shared topic (on two notes) of four: 0.206 alone, 0.306 with the same language.
+    "npm--g.md": note({ id: "pkg:npm/g", topics: ["zip", "g1"], language: "Go" }),
+    "npm--h.md": note({ id: "pkg:npm/h", topics: ["zip", "h1", "h2"], language: "go" }),
+    "npm--i.md": note({ id: "pkg:npm/i", topics: ["tar", "i1"] }),
+    "npm--j.md": note({ id: "pkg:npm/j", topics: ["tar", "j1", "j2"] }),
     // The same language and no shared topic: no edge.
     "npm--f.md": note({ id: "pkg:npm/f", topics: ["f1"], language: "Go" }),
+    ...fillers(10),
   });
   assert.deepEqual(edgesOf(graphData(root).edges, "similar"), [
-    { type: "similar", source: "note:npm--a.md", target: "note:npm--c.md", score: 0.3 },
-    { type: "similar", source: "note:npm--d.md", target: "note:npm--e.md", score: 0.25 },
+    { type: "similar", source: "note:npm--d.md", target: "note:npm--e.md", score: score([two], [two, one, one]) },
+    { type: "similar", source: "note:npm--g.md", target: "note:npm--h.md", score: score([two], [two, one, one, one], true) },
   ]);
+  assert.deepEqual([score([idf(3, 20)], [idf(3, 20), one, one, one, one], true), score([two], [two, one, one]), score([two], [two, one, one, one]), score([two], [two, one, one, one], true)], [0.236, 0.281, 0.206, 0.306]);
+});
+
+test("graphData: a topic on most notes never makes an edge on its own; a rare topic they also share does", () => {
+  // javascript is on 14 of 20 notes, so it weighs nothing: notes that share only it, even notes with
+  // no other topic, are not similar. r1 and r2 also share a topic only they have.
+  const most = Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`npm--m${k}.md`, note({ id: `pkg:npm/m${k}`, topics: ["javascript", `m${k}`] })]));
+  const root = journal({
+    ...most,
+    "npm--bare1.md": note({ id: "pkg:npm/bare1", topics: ["javascript"] }),
+    "npm--bare2.md": note({ id: "pkg:npm/bare2", topics: ["javascript"] }),
+    "npm--r1.md": note({ id: "pkg:npm/r1", topics: ["javascript", "pdf-render", "r1"] }),
+    "npm--r2.md": note({ id: "pkg:npm/r2", topics: ["javascript", "pdf-render", "r2"] }),
+    ...fillers(6),
+  });
+  assert.equal(idf(14, 20), 0);
+  const two = idf(2, 20);
+  const one = idf(1, 20);
+  assert.deepEqual(edgesOf(graphData(root).edges, "similar"), [
+    { type: "similar", source: "note:npm--r1.md", target: "note:npm--r2.md", score: score([two], [two, one, one]) },
+  ]);
+});
+
+test("graphData: a common topic counts for less than a rare one", () => {
+  // a and b share a topic on 8 of 20 notes; c and d one on 2. Both pairs have three topics in all.
+  const common = Object.fromEntries(Array.from({ length: 6 }, (_, k) => [`npm--k${k}.md`, note({ id: `pkg:npm/k${k}`, topics: ["web", `k${k}`] })]));
+  const root = journal({
+    "npm--a.md": note({ id: "pkg:npm/a", topics: ["web", "a1"] }),
+    "npm--b.md": note({ id: "pkg:npm/b", topics: ["web", "b1"] }),
+    "npm--c.md": note({ id: "pkg:npm/c", topics: ["pdf", "c1"] }),
+    "npm--d.md": note({ id: "pkg:npm/d", topics: ["pdf", "d1"] }),
+    ...common,
+    ...fillers(10),
+  });
+  const pair = (x: string, y: string) => edgesOf(graphData(root).edges, "similar").find((e) => e.source === `note:npm--${x}.md` && e.target === `note:npm--${y}.md`);
+  assert.equal(pair("c", "d")?.score, score([idf(2, 20)], [idf(2, 20), idf(1, 20), idf(1, 20)]));
+  assert.equal(pair("a", "b"), undefined, `web weighs ${idf(8, 20).toFixed(3)}, so a and b score ${score([idf(8, 20)], [idf(8, 20), idf(1, 20), idf(1, 20)])}`);
 });
 
 test("graphData: notes joined by a link or an alternative get no similarity edge", () => {
@@ -136,6 +194,7 @@ test("graphData: notes joined by a link or an alternative get no similarity edge
     "npm--b.md": note({ id: "pkg:npm/b", topics: ["pdf"] }),
     "npm--c.md": note({ id: "pkg:npm/c", topics: ["yaml"], alternatives: ["[[npm--d]]"] }),
     "npm--d.md": note({ id: "pkg:npm/d", topics: ["yaml"] }),
+    ...fillers(16), // so pdf and yaml weigh something: without the link, each pair would be similar
   });
   const graph = graphData(root);
   assert.deepEqual(edgesOf(graph.edges, "similar"), []);
@@ -148,8 +207,9 @@ test("graphData: notes already joined don't take a similar neighbour's place", (
   const close = Object.fromEntries([1, 2, 3].map((k) => [`npm--y${k}.md`, note({ id: `pkg:npm/y${k}`, topics: ["pdf", "print"] })]));
   const root = journal({
     "npm--x.md": note({ id: "pkg:npm/x", topics: ["pdf", "print"] }, "## Related\n[[npm--y1]] [[npm--y2]] [[npm--y3]]\n"),
-    "npm--z.md": note({ id: "pkg:npm/z", topics: ["pdf", "z1"] }),
+    "npm--z.md": note({ id: "pkg:npm/z", topics: ["pdf", "print", "z1"] }),
     ...close,
+    ...fillers(15),
   });
   assert.deepEqual(similarOf(graphData(root).edges, "note:npm--x.md"), ["note:npm--z.md"]);
 });
