@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-24
+
+Bring the repositories you starred on GitHub into your inbox, from the CLI or the app, without your agent taking a star for a decision. Search, catalog, suggest and the graph are faster on a journal of 10,000 notes, and the graph's similar edges weigh rare topics more. `doctor` says what the Claude Code plugin brings.
+
 ### Added
 
 - `repomagpie import --stars` brings the repositories you starred on GitHub into your inbox. It shows a summary first: how many stars, how many are new, the top languages and topics, and what it would import (the 100 most recently starred new ones). In a terminal it asks before writing; without one it prints the command to run and writes nothing unless you pass `--yes`. Choose with `--limit`, `--all`, `--language`, `--topic` and `--since`; `--user <login>` reads someone's public stars without a token. A re-run imports only new stars and skips the ones whose note you deleted (it's in the trash); unstarring never deletes a note. A rate limit stops it cleanly, and the output says how to resume.
@@ -16,8 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The graph's "Similar" edges weigh each GitHub topic by how rare it is in your journal. A topic on most of your notes, such as `javascript` after a big stars import, no longer joins two notes on its own; a topic only a few notes share counts for more. Some similar edges and their scores change. With 10,000 notes the graph's data is built about three times faster.
-- `search`, `catalog` and `suggest` are faster on a big journal: each lists a journal's notes once, and the project's and your personal results are paired in one pass. With 10,000 notes, `search` takes about half the time it did. Their output is unchanged.
-- `repomagpie doctor`, with the Claude Code plugin on, says the plugin brings Claude Code's hook and MCP server. Under "Claude Code hook" it prints `from the plugin repomagpie@repomagpie 0.3.0` instead of `none`. Under "MCP server in each agent", Claude Code's line is `from the plugin, version 0.3.0, code generation off, note tool off (turn it on in /plugin, repomagpie, Configure options)` instead of `no repomagpie entry`. The note tool's state is your answer from Claude Code's settings, or the switch's default when you haven't set it; `note tool: set in /plugin` when it can't be read. `--json` adds `claude_plugin.provides`. With the plugin off, the output is unchanged.
+- `search`, `catalog` and `suggest` are faster on a big journal. With 10,000 notes, `search` takes about half the time it did. Their output is unchanged.
+- `repomagpie doctor`, with the Claude Code plugin on, says the plugin brings Claude Code's hook and MCP server. Under "Claude Code hook" it prints `from the plugin repomagpie@repomagpie 0.4.0` instead of `none`. Under "MCP server in each agent", Claude Code's line names the plugin's version and says whether code generation and the note tool are on, instead of `no repomagpie entry`; `note tool: set in /plugin` when it can't tell. `--json` adds `claude_plugin.provides`. With the plugin off, the output is unchanged.
 
 ## [0.3.0] - 2026-11-13
 
@@ -494,7 +498,8 @@ The first pre-release, for early testers.
 - `GITHUB_TOKEN`, if set, is used for GitHub requests and never printed.
 - A package name never holds `\`, `:` or `%`, or starts with a dot, so `magpie note` and `magpie import` refuse a file path given as a name.
 
-[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Varshavia/RepoMagpie/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Varshavia/RepoMagpie/compare/v0.3.0-beta.1...v0.3.0
 [0.3.0-beta.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.1...v0.3.0-beta.1
 [0.2.1]: https://github.com/Varshavia/RepoMagpie/compare/v0.2.0...v0.2.1
