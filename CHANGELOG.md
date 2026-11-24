@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The graph's "Similar" edges weigh each GitHub topic by how rare it is in your journal. A topic on most of your notes, such as `javascript` after a big stars import, no longer joins two notes on its own; a topic only a few notes share counts for more. Some similar edges and their scores change. With 10,000 notes the graph's data is built about three times faster.
+- `search`, `catalog` and `suggest` are faster on a big journal: each lists a journal's notes once, and the project's and your personal results are paired in one pass. With 10,000 notes, `search` takes about half the time it did. Their output is unchanged.
 - `repomagpie doctor`, with the Claude Code plugin on, says the plugin brings Claude Code's hook and MCP server. Under "Claude Code hook" it prints `from the plugin repomagpie@repomagpie 0.3.0` instead of `none`. Under "MCP server in each agent", Claude Code's line is `from the plugin, version 0.3.0, code generation off, note tool off (turn it on in /plugin, repomagpie, Configure options)` instead of `no repomagpie entry`. The note tool's state is your answer from Claude Code's settings, or the switch's default when you haven't set it; `note tool: set in /plugin` when it can't be read. `--json` adds `claude_plugin.provides`. With the plugin off, the output is unchanged.
 
 ## [0.3.0] - 2026-11-13

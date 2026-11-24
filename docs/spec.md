@@ -571,7 +571,7 @@ Documents that the local app's API returns and no v0.1 command prints yet ([deci
 - Tag nodes: every tag a note carries, whether `tags.md` lists it or not. `count` is the number of notes with it.
 - Ghost nodes (missing notes): only with `ghosts=1`. One per unresolved link or `alternatives` target, ignoring case; `target` is the first spelling, `reason` is `missing` or `ambiguous`, as in the Note document's `links`.
 - `edges`: sorted by type (`tagged`, `link`, `alternative`, `similar`), then `source`, then `target`. `tagged` goes from a note to a tag. `link`, `alternative` and `similar` are one edge per pair of notes, whichever note holds the link, with `source` the smaller key; `link` has `count`, the body links between the two in both directions. A link and an alternative between the same pair are two edges. A note's link to itself is no edge. Edges to a missing note keep their type, with the note as `source`.
-- `similar` has `score`, rounded to 3 decimals: the Jaccard index of the two notes' `topics`, plus 0.1 for the same `language`, at least 0.25. Each note keeps its 3 best; a pair already joined by a link or an alternative gets none. The document always holds them; the page decides whether to show them.
+- `similar` has `score`, rounded to 3 decimals: the weighted Jaccard index of the two notes' `topics`, plus 0.1 for the same `language`, at least 0.25. A topic on `df` of the journal's `N` notes weighs `max(0, ln((N − df + 0.5) / (df + 0.5)))` (BM25's inverse document frequency); the index is the weight of the topics both notes have over the weight of the topics either has. A topic on half the notes or more weighs nothing, so it never makes an edge on its own. Each note keeps its 3 best; a pair already joined by a link or an alternative gets none. The document always holds them; the page decides whether to show them.
 - `counts`: the note and tag nodes, and the edges of each type, in the document. Ghost nodes are not counted; their edges are.
 - A journal that can't be used (section 3) answers 422 with empty `nodes` and `edges`, and `error`.
 
@@ -958,26 +958,27 @@ An older entry of ours (`repomagpie hook <agent>`, `repomagpie.cmd hook <agent>`
 | `search`, `catalog`, `suggest` | at most 1,000 ms |
 | The graph's data (`graphData`) | at most 1,000 ms |
 
-They are not met yet: they are the targets of the next performance branch (roadmap, "Speed at 10,000 notes"). Measured on `feat/import-stars` (2026-11-23, a Windows dev machine under load, CPU about 44 %, so the 2,000-note numbers are higher than on a quiet machine), median and p95 in ms:
+All are met since `fix/speed-at-10000-notes` (2026-11-24). Measured on a Windows dev machine (Ryzen 5 5600, Node 24), idle (CPU under 10 % before each run), median in ms, and p95 for the 10,000-note result after:
 
-| Benchmark | 2,000 notes | 10,000 notes, 8,000 starred | Budget |
-|---|---|---|---|
-| `search "pdf stream"` | 403 / 442 | 1,535 / 1,761 | 500 |
-| `search` with `--domain` and `--tag` | 413 / 431 | 1,517 / 1,675 | 500 |
-| `catalog --json --limit 1000` | 501 / 546 | 1,488 / 1,921 | 500 |
-| `suggest` (manifests and README) | 606 / 703 | 2,017 / 2,511 | 500 |
-| `suggest "a TypeScript CLI with tests"` | 528 / 697 | 1,560 / 1,701 | 500 |
-| `init --auto --json` | 260 / 289 | 758 / 816 | 500 |
-| `recall package-1500` | 297 / 434 | 759 / 840 | 150 |
-| `recall`, one note changed | 264 / 352 | 764 / 799 | 150 |
-| The Claude Code hook, an install with a note | 238 / 284 | 736 / 780 | 150 |
-| The Claude Code hook, no install | 78 / 85 | 90 / 101 | 150 |
-| The other agents' hooks, an install with a note | 211–225 | 690–783 | 150 |
-| The Stop reminder | 228 / 241 | 726 / 769 | 150 |
-| `linkIndex` (warm) | 140 / 188 | 617 / 667 | 150 |
-| `graphData` (warm, ghosts included) | 203 / 241 | 2,855 / 2,997 | 300 |
+| Benchmark | 2,000 notes, after | 10,000 notes, before | 10,000 notes, after (median / p95) | Target at 10,000 |
+|---|---|---|---|---|
+| `search "pdf stream"` | 194 | 846 | 435 / 460 | 1,000 |
+| `search` with `--domain` and `--tag` | 208 | 932 | 477 / 498 | 1,000 |
+| `catalog --json --limit 1000` | 194 | 561 | 434 / 467 | 1,000 |
+| `suggest` (manifests and README) | 288 | 922 | 779 / 791 | 1,000 |
+| `suggest` (manifests and README), 20 % with alternatives | 294 | 1,010 | 783 / 804 | 1,000 |
+| `suggest "a TypeScript CLI with tests"` | 226 | 645 | 491 / 511 | 1,000 |
+| `init --auto --json` | 141 | 291 | 292 / 315 | (none) |
+| `recall package-1500` | 129 | 281 | 273 / 286 | 300 |
+| `recall`, one note changed | 141 | 293 | 283 / 294 | 300 |
+| The Claude Code hook, an install with a note | 117 | 269 | 261 / 273 | 300 |
+| The Claude Code hook, no install | 67 | 68 | 66 / 71 | 300 |
+| The other agents' hooks, an install with a note | 120–131 | 264–289 | 262–268 | 300 |
+| The Stop reminder | 133 | 276 | 277 / 290 | 300 |
+| `linkIndex` (warm) | 35 | 167 | 148 / 191 | (none) |
+| `graphData` (warm, ghosts included) | 69 | 1,828 | 612 / 641 | 1,000 |
 
-Where the time goes at 10,000 notes (one CPU profile each): recall spends 453 of 710 ms in `lstat`, the cache signature's one call per note file; search spends 497 ms there and 418 ms in `projectFirst`, which pairs the two journals' results with a search over every hit before the limit is applied (quadratic in the hits). `catalog` and `suggest` spend about 1 s in `lstat`: they list each journal twice, once for the search index and once for recall's entries. `graphData` grows faster than the notes: a topic on thousands of notes makes the similarity pass compare all of them. On the same machine, 10,000 `lstat` calls take 590–700 ms one after another and 190–280 ms through `fs.promises.lstat` in parallel.
+On an idle machine, `suggest` with alternatives and `graphData` were the targets missed before; the larger numbers measured on `feat/import-stars` (2026-11-23: recall 759 ms, search 1,535, `graphData` 2,855) were taken under load, CPU about 44 %. What changed: `catalog` and `suggest` list each journal once, for the search index and recall's entries both; `projectFirst` groups the results by subject first, so pairing the two journals' results no longer searches every hit for each (it was quadratic in the hits); `graphData`'s similarity weighs each topic by how rare it is ("Graph" under [shared JSON documents](#shared-json-documents)), so a topic on thousands of notes no longer makes the similarity pass compare all of them. Checking the files' metadata in parallel was tried and dropped: on the idle machine, 10,000 `lstat` calls take 106 ms one after another, 140 ms through `fs.promises.lstat` 32 at a time, and 190 ms in a worker. A warm `recall` at 10,000 notes spends about 140 of its 270 ms on the notes' signature, 97 ms of it in `lstat`.
 
 **Caches:** five per journal, in `<journal>/.cache/` ([decision 0001](decisions/0001-plain-markdown-storage.md)): `search-index.json` (the search index), `recall-index.json` (what recall needs from each note: its PURLs, Verdict, "Avoid when", "Use when" and `alternatives` as written), `note-list.json` (each note's summary in the Note list document, for the local app), `links.json` (each note's id, name and links as written, for the link index), and `graph.json` (each note's fields the graph draws, its topics and language, for the graph). Each records every note file's modification time and size. The search index is rebuilt when a note is added, removed or changed; recall's, the note list, the links and the graph's fields read again only the notes that were added or changed, and any note whose cached entry doesn't have the expected shape ([decision 0050](decisions/0050-the-agents-path.md)). Those four are updated, not rewritten ([decision 0057](decisions/0057-the-cache-is-updated-not-rewritten.md)): the entries read again since a cache was last written whole go to its delta beside it, in the same format (`recall-index.delta.json`, `note-list.delta.json`, `links.delta.json`, `graph.delta.json`), which is read first. An entry in either file counts only while its note has the modification time and size recorded with it. The cache is written whole, and its delta removed, when there is no usable cache (none, unreadable, another version), when a note it lists was removed or renamed, when an entry for an unchanged note is missing or of the wrong shape, or when the delta would hold more than 100 entries. A recall entry must also name the note file it is kept under; one that names another file is read again from its note (decision 0032). Links are resolved from the cached entries on every read. In one process, recall's entries, the note list, the links and the graph's fields read and parse each note at most once between them, for the same modification time and size ([decision 0049](decisions/0049-the-graph-opens-faster.md)). All are safe to delete; a cache that can't be read is rebuilt silently, and one that can't be written only costs time on the next run. A cache is written whole to a temporary file, then renamed into place; when the rename fails because another program holds the old file (EPERM, EACCES or EBUSY, as antivirus does on Windows), it is tried again after 5, 10, 15 and 20 ms while that fits in 50 ms, since the hook reads these caches; a write that gives up removes its temporary file. They store file names, not paths, so a journal can be moved. A cache folder or cache file that is a link is never read or written (section 3, "Links and size"); the notes it describes are listed without following links, and without the files over 256 KB.
 
