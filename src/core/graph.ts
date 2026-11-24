@@ -74,10 +74,13 @@ const KIND_GROUPS: Record<string, KindGroup> = {
   app: "resource",
 };
 
-// Similarity (decision 0026): the Jaccard index of the two notes' topics, plus a bonus for the same
-// language. Only notes that share a topic are compared. Each note keeps its 3 best neighbours at or
-// above the threshold; an edge exists if either note keeps it. One shared topic of four (two topics
-// and three) is just enough; one of five is not, unless the language is the same.
+// Similarity (decision 0026): a weighted Jaccard index of the two notes' topics (the weight of the
+// topics they share over the weight of all their topics), plus a bonus for the same language. A topic
+// on df of the journal's N notes weighs its inverse document frequency in BM25's form,
+// max(0, ln((N - df + 0.5) / (df + 0.5))): a rare topic weighs a lot, a common one ("javascript" on
+// thousands of notes) little, and one on half the notes or more nothing, so it never joins two notes
+// on its own. Only notes that share a topic are compared. Each note keeps its 3 best neighbours at or
+// above the threshold; an edge exists if either note keeps it.
 export const SIMILAR = { neighbours: 3, threshold: 0.25, languageBonus: 0.1 };
 
 const EDGE_TYPES: EdgeType[] = ["tagged", "link", "alternative", "similar"];
@@ -173,32 +176,77 @@ export function graphData(journal: string, options: { ghosts?: boolean } = {}): 
 // Pairs [a, b, score] of similar notes, a < b (indexes into `notes`), each pair once. An inverted index
 // from topic to notes finds the notes that share a topic, never all pairs. Joined pairs are left out
 // before ranking, so they don't take a neighbour's place.
+// Speed, without changing the result: each pair is scored once, from its first note, and offered to
+// both notes' best. And each note skips its most common topics' lists (the longest), as long as a pair
+// that shared only those topics would still score under the threshold (their weight over the note's
+// own is the most their Jaccard index can be); the skipped topics still count in the score of every
+// pair found through another topic.
 function similarPairs(notes: Entry[], isJoined: (a: number, b: number) => boolean): [number, number, number][] {
-  const postings = new Map<string, number[]>();
-  notes.forEach((note, i) => {
-    for (const topic of note.topics) {
-      const list = postings.get(topic);
-      if (list) list.push(i);
-      else postings.set(topic, [i]);
+  // Topics as numbers, so the loops below index arrays instead of looking up strings.
+  const ids = new Map<string, number>();
+  const topicsOf = notes.map((note) => [...new Set(note.topics.map((topic) => ids.get(topic) ?? (ids.set(topic, ids.size), ids.size - 1)))]);
+  const postings: number[][] = Array.from({ length: ids.size }, () => []);
+  topicsOf.forEach((topics, i) => {
+    for (const topic of topics) postings[topic].push(i);
+  });
+  const n = notes.length;
+  const w = Float64Array.from(postings, (list) => Math.max(0, Math.log((n - list.length + 0.5) / (list.length + 0.5))));
+  const sets = topicsOf.map((topics) => new Set(topics));
+  const totals = Float64Array.from(topicsOf, (topics) => topics.reduce((sum, topic) => sum + w[topic], 0));
+  const languages = notes.map((note) => note.language?.toLowerCase() ?? null);
+  const shared = new Float64Array(n); // the weight note i shares with each candidate, through the topics scanned
+  const seen = new Uint8Array(n);
+  // Each note's best, [other note, score], best first: a higher score, then the smaller index.
+  const best: [number, number][][] = Array.from({ length: n }, () => []);
+  const offer = (x: number, j: number, score: number) => {
+    const list = best[x];
+    let at = list.length;
+    while (at > 0 && (list[at - 1][1] < score || (list[at - 1][1] === score && list[at - 1][0] > j))) at--;
+    if (at >= SIMILAR.neighbours) return;
+    list.splice(at, 0, [j, score]);
+    if (list.length > SIMILAR.neighbours) list.pop();
+  };
+  topicsOf.forEach((_topics, i) => {
+    if (totals[i] === 0) return; // no topic with weight: every Jaccard index is 0, under the threshold even with the bonus
+    const byCommon = [...topicsOf[i]].sort((a, b) => postings[b].length - postings[a].length);
+    const skipped: number[] = [];
+    let skippedWeight = 0;
+    for (const topic of byCommon) {
+      if ((skippedWeight + w[topic]) / totals[i] + SIMILAR.languageBonus >= SIMILAR.threshold) break;
+      skipped.push(topic);
+      skippedWeight += w[topic];
+    }
+    const touched: number[] = [];
+    for (let t = skipped.length; t < byCommon.length; t++) {
+      const topic = byCommon[t];
+      const weight = w[topic];
+      const list = postings[topic]; // in note order, so the notes after i are at its end
+      for (let k = list.length - 1; k >= 0 && list[k] > i; k--) {
+        const j = list[k];
+        if (seen[j] === 0) {
+          seen[j] = 1;
+          touched.push(j);
+        }
+        shared[j] += weight;
+      }
+    }
+    for (const j of touched) {
+      let common = shared[j];
+      for (const topic of skipped) if (sets[j].has(topic)) common += w[topic];
+      shared[j] = 0;
+      seen[j] = 0;
+      const union = totals[i] + totals[j] - common;
+      const language = languages[i] !== null && languages[i] === languages[j];
+      const score = (union > 0 ? common / union : 0) + (language ? SIMILAR.languageBonus : 0);
+      if (score >= SIMILAR.threshold && !isJoined(i, j)) {
+        offer(i, j, score);
+        offer(j, i, score);
+      }
     }
   });
-  const shared = new Int32Array(notes.length);
   const kept = new Map<string, [number, number, number]>();
-  notes.forEach((note, i) => {
-    const touched: number[] = [];
-    for (const topic of note.topics) {
-      for (const j of postings.get(topic) as number[]) if (j !== i && shared[j]++ === 0) touched.push(j);
-    }
-    const best: [number, number][] = [];
-    for (const j of touched) {
-      const other = notes[j];
-      const language = note.language !== null && note.language.toLowerCase() === other.language?.toLowerCase();
-      const score = shared[j] / (note.topics.length + other.topics.length - shared[j]) + (language ? SIMILAR.languageBonus : 0);
-      shared[j] = 0;
-      if (score >= SIMILAR.threshold && !isJoined(i, j)) best.push([j, score]);
-    }
-    best.sort((x, y) => y[1] - x[1] || x[0] - y[0]);
-    for (const [j, score] of best.slice(0, SIMILAR.neighbours)) {
+  best.forEach((list, i) => {
+    for (const [j, score] of list) {
       const [a, b] = i < j ? [i, j] : [j, i];
       kept.set(`${a} ${b}`, [a, b, score]);
     }
