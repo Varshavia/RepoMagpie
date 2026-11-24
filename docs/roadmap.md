@@ -526,6 +526,7 @@ From the manual checks of `0.3.0-beta.1` (2026-11-13, [manual checks](testing/ma
 2. [ ] **`setup` and `MAGPIE_HOME`:** a plain warning in the plan when the agents' entries will read the journal `MAGPIE_HOME` (or `--home`) names instead of `~/.magpie`; and the `it now starts: …` line worded so that it reads as the entry before the change.
 3. [ ] **A single-use retry pass:** in Codex CLI, Cursor and Copilot CLI, the first retry after a stop uses the pass up, instead of every retry for 10 minutes ([decision 0036](decisions/0036-hooks-in-other-agents.md)). It still can't tell your yes from your no in the chat.
 4. [ ] **The plugin without `node` on `PATH`:** start Claude Code with no `node` on `PATH` and run two shell commands; record what Claude Code shows ([manual checks](testing/manual-checks.md#windows), [decision 0066](decisions/0066-the-node-missing-check-after-launch.md)). If it is an error on every shell command, a new record decides what to do.
+5. [ ] **`doctor` with two cached versions:** after an update, Claude Code keeps the old version's cache, so `doctor` lists both `0.3.0` and `0.4.0` as installed. It should mark the one Claude Code runs. Found in 0.4.0's install check (release step 12.4, 2026-11-24).
 
 ## v0.3 Trust
 - [ ] Vet, reduced ([decision 0011](decisions/0011-vet-and-drift-reduced.md)): record your review and the reviewed commit in the note; link the output of existing scanners.
