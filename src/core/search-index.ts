@@ -87,9 +87,10 @@ export function noteDocuments(text: string, file: string): SearchDoc[] {
   return docs;
 }
 
-// The index of one journal, from the cache when it matches the notes on disk.
-export function loadIndex(journal: string): { index: JournalIndex; rebuilt: boolean } {
-  const { files, signature } = noteSignature(journal);
+// The index of one journal, from the cache when it matches the notes on disk. `listing`: the
+// journal's noteSignature, when the caller has it already (one listing per journal per command).
+export function loadIndex(journal: string, listing = noteSignature(journal)): { index: JournalIndex; rebuilt: boolean } {
+  const { files, signature } = listing;
   const cached = readCache(journal, CACHE_FILE, CACHE_VERSION, signature);
   // Every document must name a note file the listing has: a cache a repository committed can't send
   // a result's path to a file elsewhere (decision 0032).

@@ -5,6 +5,7 @@
 // Never prints.
 import MiniSearch from "minisearch";
 import { findProjectJournal, homeJournal, resolvePersonalJournal, samePath, type Place } from "./journals.ts";
+import { noteSignature } from "./note-cache.ts";
 import type { Outcome } from "./outcome.ts";
 import { alternativesOfFile, loadRecallEntries, verdictSaysAvoid } from "./recall.ts";
 import type { JournalSource } from "./search.ts";
@@ -137,8 +138,9 @@ export function runCatalog(request: CatalogRequest, place: Place): CatalogRun {
   const keep = (doc: SearchDoc) => doc.type === "note" && (request.starred || !doc.starred) && (!request.kind || doc.kind === request.kind) && (request.tags ?? []).every((tag) => doc.tags.includes(tag));
   const rows: { row: CatalogRow; avoid: boolean; key: Key }[] = [];
   for (const journal of journals) {
-    const index = loadIndex(journal.path).index;
-    const source = { ...journal, entries: loadRecallEntries(journal.path).entries };
+    const listed = noteSignature(journal.path); // one listing for the index and recall's entries
+    const index = loadIndex(journal.path, listed).index;
+    const source = { ...journal, entries: loadRecallEntries(journal.path, listed).entries };
     for (const hit of index.search(MiniSearch.wildcard, { filter: (r) => keep(r as unknown as SearchDoc) })) {
       const doc = hit as unknown as SearchDoc;
       const row: CatalogRow = {
