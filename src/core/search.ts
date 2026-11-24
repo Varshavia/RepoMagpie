@@ -152,13 +152,25 @@ function nearSpelling(a: string, b: string): boolean {
 
 // The same subject in both journals (the same `subject` key): the project's result directly before
 // the personal one, at the place of the first of the two (spec §3). Otherwise the order is kept.
+// One pass: the results are grouped by subject first, in their order, so a partner is looked for
+// among the results with the same subject only, not among all of them.
 export function projectFirst<T extends { journal: string }>(results: T[], subject: (result: T) => string | null): T[] {
+  const bySubject = new Map<string, T[]>();
+  const keys = results.map((result) => {
+    const key = subject(result);
+    if (key) {
+      const group = bySubject.get(key);
+      if (group) group.push(result);
+      else bySubject.set(key, [result]);
+    }
+    return key;
+  });
   const placed = new Set<T>();
   const ordered: T[] = [];
-  for (const result of results) {
+  for (const [i, result] of results.entries()) {
     if (placed.has(result)) continue;
-    const key = subject(result);
-    const partner = key ? results.find((other) => !placed.has(other) && other.journal !== result.journal && subject(other) === key) : undefined;
+    const key = keys[i];
+    const partner = key ? bySubject.get(key)?.find((other) => !placed.has(other) && other.journal !== result.journal) : undefined;
     const pair = !partner ? [result] : result.journal === "project" ? [result, partner] : [partner, result];
     for (const r of pair) {
       placed.add(r);
